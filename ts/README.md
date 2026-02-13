@@ -22,3 +22,11 @@ npm test
 - `ctx.request.cookies` is available by default via cookie-header parsing, and can be overridden with `request.cookies`.
 - Streaming responses finalize headers before body bytes; if streaming fails before the first body chunk, a buffered safe
   `500` HTML response is returned.
+
+## Vite Manifest Policy (R2)
+
+- `viteAssetsForEntry()` emits deterministic tags in this order: `modulepreload`, `stylesheet`, then optional asset hints.
+- `includeAssets: true` enables hints for `manifest.assets` (images/fonts/audio/video as preload; unknown assets as prefetch).
+- `dynamicImports` are intentionally ignored for now (`ignore` policy) to keep head output deterministic and avoid
+  speculative prefetch noise.
+- `base` supports root, subpath, and absolute CDN prefixes.

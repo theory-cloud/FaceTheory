@@ -12,6 +12,7 @@ export default defineConfig(({ isSsrBuild }) => {
     build: {
       outDir: ssr ? 'dist/server' : 'dist/client',
       emptyOutDir: false,
+      assetsInlineLimit: 0,
       manifest: !ssr,
       ssr: ssr ? path.resolve(root, 'src/entry-server.tsx') : undefined,
       rollupOptions: {

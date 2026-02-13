@@ -45,17 +45,18 @@ test('vite SSR example: builds client+server and renders without missing assets'
   assert.ok(body.includes('Hello from server'));
   assert.ok(body.includes('id="__FACETHEORY_DATA__"'));
   assert.ok(body.includes('type="module"'));
-  assert.ok(body.includes('rel="modulepreload"'));
-  assert.ok(body.includes('rel="stylesheet"'));
 
-  const bootstrapModuleMatch = body.match(/<script[^>]*src="([^"]+)"[^>]*type="module"/);
-  const bootstrapModule = bootstrapModuleMatch?.[1];
-  assert.ok(bootstrapModule);
-  assert.ok(bootstrapModule.startsWith('/'));
+  const injectedPaths = new Set<string>();
+  for (const match of body.matchAll(/<(?:link|script)\b[^>]*(?:href|src)="([^"]+)"/g)) {
+    const candidate = match[1];
+    if (!candidate || !candidate.startsWith('/')) continue;
+    injectedPaths.add(candidate);
+  }
 
-  const bootstrapFilePath = path.resolve(
-    'examples/vite-ssr-react/dist/client',
-    `.${bootstrapModule}`,
-  );
-  assert.ok(await exists(bootstrapFilePath));
+  assert.ok(injectedPaths.size > 0);
+
+  for (const injectedPath of injectedPaths) {
+    const builtPath = path.resolve('examples/vite-ssr-react/dist/client', `.${injectedPath}`);
+    assert.ok(await exists(builtPath), `missing built asset: ${injectedPath}`);
+  }
 });

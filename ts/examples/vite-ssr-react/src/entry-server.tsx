@@ -20,7 +20,9 @@ export function createViteSSRExampleApp(manifest: ViteManifest) {
           React.createElement(App, { message: (data as any).message }),
         ),
         renderOptions: async (_ctx, data) => {
-          const { headTags } = viteAssetsForEntry(manifest, 'src/entry-client.tsx');
+          const { headTags } = viteAssetsForEntry(manifest, 'src/entry-client.tsx', {
+            includeAssets: true,
+          });
           const hydration = viteHydrationForEntry(manifest, 'src/entry-client.tsx', data);
           return { headTags, hydration };
         },
