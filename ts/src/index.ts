@@ -2,6 +2,7 @@ export * from './app.js';
 export * from './bytes.js';
 export * from './head.js';
 export * from './html.js';
+export * from './isr.js';
 export * from './lambda-url.js';
 export * from './router.js';
 export * from './ssg.js';

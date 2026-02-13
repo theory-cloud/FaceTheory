@@ -41,3 +41,17 @@ npm test
 - Static hosting fallback: when enabled, `404.html` is emitted (from `/404` if present, otherwise a safe default).
 - Build manifest: `.facetheory/ssg-manifest.json`, with ordered page entries and expected Vite manifest path
   (`.vite/manifest.json`) for asset-injection-aware apps.
+
+## ISR Policy (R4)
+
+- Runtime API: `createFaceApp({ faces, isr: { ... } })` with ISR routes (`mode:'isr'`), implemented in `src/isr.ts`.
+- Storage interfaces:
+  - `HtmlStore` for HTML bodies (with `InMemoryHtmlStore` and `S3HtmlStore`).
+  - `IsrMetaStore` for metadata + lock/lease (with `InMemoryIsrMetaStore` and `DynamoDbIsrMetaStore`).
+- Blocking ISR behavior:
+  - cache key includes tenant + route pattern + params (default tenant header: `x-facetheory-tenant`).
+  - stale requests use a lease lock to ensure single-writer regeneration and safe pointer swaps.
+  - regeneration failures keep the previous pointer valid and serve stale by default.
+- Cache headers:
+  - `blockingIsrCacheControl()` emits CloudFront-safe defaults (`max-age=0`, `s-maxage=0`, `must-revalidate`).
+  - responses include `x-facetheory-isr` (`miss`, `hit`, `wait-hit`, `stale`) for runtime visibility.

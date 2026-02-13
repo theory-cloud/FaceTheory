@@ -1,6 +1,13 @@
 import { utf8 } from './bytes.js';
 import { renderFaceHead } from './head.js';
 import { renderHTMLDocument, streamHTMLDocument } from './html.js';
+import {
+  createIsrRuntime,
+  InMemoryHtmlStore,
+  InMemoryIsrMetaStore,
+  type FaceIsrOptions,
+  type IsrRuntime,
+} from './isr.js';
 import { Router } from './router.js';
 import type {
   FaceContext,
@@ -21,6 +28,7 @@ import {
 
 export interface FaceAppOptions {
   faces: FaceModule[];
+  isr?: FaceIsrOptions;
 }
 
 const HTML_CONTENT_TYPE = 'text/html; charset=utf-8';
@@ -40,6 +48,7 @@ class StreamPreflightError extends Error {
 export class FaceApp {
   private readonly router: Router;
   private readonly faceByPattern: Map<string, FaceModule>;
+  private readonly isrRuntime: IsrRuntime | null;
 
   constructor(options: FaceAppOptions) {
     this.router = new Router();
@@ -53,6 +62,19 @@ export class FaceApp {
       this.router.add(pattern);
       this.faceByPattern.set(pattern, face);
     }
+
+    const hasIsrFace = options.faces.some((face) => face.mode === 'isr');
+    if (!hasIsrFace) {
+      this.isrRuntime = null;
+      return;
+    }
+
+    const isrOptions = options.isr ?? {};
+    this.isrRuntime = createIsrRuntime({
+      ...isrOptions,
+      htmlStore: isrOptions.htmlStore ?? new InMemoryHtmlStore(),
+      metaStore: isrOptions.metaStore ?? new InMemoryIsrMetaStore(),
+    });
   }
 
   async handle(request: FaceRequest): Promise<FaceResponse> {
@@ -77,9 +99,25 @@ export class FaceApp {
     };
 
     try {
-      const data = face.load ? await face.load(ctx) : null;
-      const out = await face.render(ctx, data);
-      return await toHTTPResponse(out, normalizedReq);
+      const renderFresh = async (): Promise<FaceResponse> => {
+        const data = face.load ? await face.load(ctx) : null;
+        const out = await face.render(ctx, data);
+        return toHTTPResponse(out, normalizedReq);
+      };
+
+      if (face.mode === 'isr') {
+        if (!this.isrRuntime) {
+          throw new Error(`ISR runtime is not configured for route "${match.pattern}"`);
+        }
+        return await this.isrRuntime.handleFace({
+          face,
+          ctx,
+          routePattern: match.pattern,
+          renderFresh,
+        });
+      }
+
+      return await renderFresh();
     } catch {
       return internalErrorResponse();
     }

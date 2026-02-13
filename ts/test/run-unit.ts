@@ -4,6 +4,7 @@ await import('./unit/head.test.js');
 await import('./unit/app.test.js');
 await import('./unit/lambda-url.test.js');
 await import('./unit/ssg.test.js');
+await import('./unit/isr.test.js');
 await import('./unit/react.test.js');
 await import('./unit/vite.test.js');
 await import('./unit/antd.test.js');
