@@ -9,3 +9,5 @@ await import('./unit/emotion.test.js');
 await import('./unit/portal-fixtures.test.js');
 await import('./unit/streaming.test.js');
 await import('./unit/react-stream.test.js');
+await import('./unit/vue.test.js');
+await import('./unit/svelte.test.js');

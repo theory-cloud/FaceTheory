@@ -26,6 +26,14 @@
     "./react/emotion": {
       "types": "./dist/react/emotion.d.ts",
       "import": "./dist/react/emotion.js"
+    },
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "import": "./dist/vue/index.js"
+    },
+    "./svelte": {
+      "types": "./dist/svelte/index.d.ts",
+      "import": "./dist/svelte/index.js"
     }
   },
   "peerDependencies": {
@@ -34,7 +42,10 @@
     "antd": ">=5",
     "@emotion/react": ">=11",
     "@emotion/cache": ">=11",
-    "@emotion/server": ">=11"
+    "@emotion/server": ">=11",
+    "vue": ">=3",
+    "@vue/server-renderer": ">=3",
+    "svelte": ">=4"
   },
   "peerDependenciesMeta": {
     "antd": {
@@ -47,6 +58,15 @@
       "optional": true
     },
     "@emotion/server": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "@vue/server-renderer": {
+      "optional": true
+    },
+    "svelte": {
       "optional": true
     }
   },
@@ -69,13 +89,16 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.26.0",
     "@typescript-eslint/parser": "^8.26.0",
+    "@vue/server-renderer": "^3.5.13",
     "antd": "^6.2.3",
     "eslint": "^8.57.1",
     "jsdom": "^26.1.0",
     "prettier": "^3.6.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "svelte": "^5.20.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vue": "^3.5.13"
   }
 }
