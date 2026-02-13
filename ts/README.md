@@ -55,3 +55,16 @@ npm test
 - Cache headers:
   - `blockingIsrCacheControl()` emits CloudFront-safe defaults (`max-age=0`, `s-maxage=0`, `must-revalidate`).
   - responses include `x-facetheory-isr` (`miss`, `hit`, `wait-hit`, `stale`) for runtime visibility.
+
+## Streaming Style Strategy (R5)
+
+- React streaming style strategy is configurable via `renderReactStream(..., { styleStrategy })`:
+  - `all-ready` (default): wait for `onAllReady` before finalizing styles; robust with Suspense/async late styles.
+  - `shell`: finalize at `onShellReady`; lower TTFB but late styles may miss head emission.
+- Ant Design + Emotion integrations now follow the selected strategy automatically through integration finalization timing.
+- Streaming CSP nonce coverage:
+  - FaceTheory-applied `<style>/<script>` head tags are nonce-applied.
+  - React streaming inline scripts (Suspense patches) are nonce-applied via `renderToPipeableStream({ nonce })`.
+- Local benchmark note:
+  - compare `styleStrategy:'shell'` vs default `all-ready` in the same route and record first-byte timing to make the
+    robustness/latency tradeoff explicit.

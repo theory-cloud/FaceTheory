@@ -32,7 +32,18 @@ export interface RenderReactStreamOptions extends RenderReactOptions {
    * Default: 5000ms.
    */
   abortDelayMs?: number;
+
+  /**
+   * Head-style extraction strategy for streaming mode.
+   *
+   * - `all-ready` (default): wait for React `onAllReady` before finalizing integrations.
+   *   This ensures late styles from Suspense/async boundaries are available in `<head>`.
+   * - `shell`: finalize at `onShellReady` for lower TTFB.
+   */
+  styleStrategy?: ReactStreamStyleStrategy;
 }
+
+export type ReactStreamStyleStrategy = 'all-ready' | 'shell';
 
 export async function renderReact(
   ctx: FaceContext,
@@ -111,29 +122,71 @@ export async function renderReactStream(
 
   const stream = new PassThrough();
   const abortDelayMs = options.abortDelayMs ?? 5000;
+  const styleStrategy = options.styleStrategy ?? 'all-ready';
 
+  let didPipe = false;
   let shellSettled = false;
+  let allReadySettled = false;
+
   let resolveShell: (() => void) | null = null;
   let rejectShell: ((err: unknown) => void) | null = null;
+  let resolveAllReady: (() => void) | null = null;
+  let rejectAllReady: ((err: unknown) => void) | null = null;
 
   const shellReady = new Promise<void>((resolve, reject) => {
     resolveShell = resolve;
     rejectShell = reject;
   });
+  const allReady = new Promise<void>((resolve, reject) => {
+    resolveAllReady = resolve;
+    rejectAllReady = reject;
+  });
+
+  const settleShellReady = (): void => {
+    if (shellSettled) return;
+    shellSettled = true;
+    resolveShell?.();
+  };
+
+  const settleAllReady = (): void => {
+    if (allReadySettled) return;
+    allReadySettled = true;
+    resolveAllReady?.();
+  };
+
+  const rejectReadiness = (err: unknown): void => {
+    if (!shellSettled) {
+      shellSettled = true;
+      rejectShell?.(err);
+    }
+    if (!allReadySettled) {
+      allReadySettled = true;
+      rejectAllReady?.(err);
+    }
+  };
+
+  const pipeOnce = (pipe: (dest: NodeJS.WritableStream) => void): void => {
+    if (didPipe) return;
+    didPipe = true;
+    pipe(stream);
+  };
 
   const { pipe, abort } = ReactDOMServer.renderToPipeableStream(tree, {
+    ...(ctx.request.cspNonce ? { nonce: ctx.request.cspNonce } : {}),
     onShellReady: () => {
-      if (!shellSettled) {
-        shellSettled = true;
-        resolveShell?.();
+      settleShellReady();
+      if (styleStrategy === 'shell') {
+        pipeOnce(pipe);
       }
-      pipe(stream);
+    },
+    onAllReady: () => {
+      settleAllReady();
+      if (styleStrategy === 'all-ready') {
+        pipeOnce(pipe);
+      }
     },
     onShellError: (err) => {
-      if (!shellSettled) {
-        shellSettled = true;
-        rejectShell?.(err);
-      }
+      rejectReadiness(err);
       stream.destroy(err as Error);
     },
     onError: (err) => {
@@ -141,6 +194,7 @@ export async function renderReactStream(
       if (!stream.destroyed) {
         stream.destroy(err as Error);
       }
+      rejectReadiness(err);
     },
   });
 
@@ -150,8 +204,12 @@ export async function renderReactStream(
   stream.on('end', () => clearTimeout(abortTimer));
   stream.on('error', () => clearTimeout(abortTimer));
 
-  // Ensure integrations can extract critical styles from the shell before FaceApp emits <head>.
-  await shellReady;
+  // Ensure integrations can extract critical styles before FaceApp emits <head>.
+  if (styleStrategy === 'all-ready') {
+    await allReady;
+  } else {
+    await shellReady;
+  }
 
   let out: FaceRenderResult = { html: stream as unknown as AsyncIterable<Uint8Array> };
   if (options.status !== undefined) out.status = options.status;

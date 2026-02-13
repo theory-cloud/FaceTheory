@@ -21,6 +21,9 @@ export const faceApp = createFaceApp({
       render: () => React.createElement(Home),
       renderOptions: {
         headTags: [{ type: 'title', text: 'Home' }],
+        // Default `all-ready` favors style correctness with Suspense/async boundaries.
+        // For lower TTFB, set `styleStrategy: 'shell'`.
+        styleStrategy: 'all-ready',
       },
     }),
   ],
@@ -34,4 +37,3 @@ export async function handler(event: any): Promise<any> {
     query: {},
   });
 }
-
