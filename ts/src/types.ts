@@ -1,5 +1,6 @@
 export type Headers = Record<string, string[]>;
 export type Query = Record<string, string[]>;
+export type CookieMap = Record<string, string>;
 
 export type FaceAttributes = Record<
   string,
@@ -24,6 +25,7 @@ export interface FaceRequest {
   path: string;
   query?: Query;
   headers?: Headers;
+  cookies?: CookieMap;
   body?: Uint8Array;
   isBase64?: boolean;
   cspNonce?: string | null;
@@ -121,5 +123,72 @@ export function cloneQuery(query: Query | undefined): Query {
   for (const [key, values] of Object.entries(query)) {
     out[key] = Array.isArray(values) ? values.map(String) : [String(values)];
   }
+  return out;
+}
+
+export function parseQueryString(queryString: string): Query {
+  const out: Query = {};
+  if (!queryString) return out;
+
+  const params = new URLSearchParams(
+    queryString.startsWith('?') ? queryString.slice(1) : queryString,
+  );
+  for (const [key, value] of params) {
+    const existingValues = out[key];
+    if (existingValues) {
+      existingValues.push(value);
+    } else {
+      out[key] = [value];
+    }
+  }
+
+  return out;
+}
+
+export function cloneCookies(cookies: CookieMap | undefined): CookieMap {
+  const out: CookieMap = {};
+  if (!cookies) return out;
+  for (const [key, value] of Object.entries(cookies)) {
+    out[key] = String(value);
+  }
+  return out;
+}
+
+export function parseCookiesFromHeaders(headers: Headers | undefined): CookieMap {
+  const out: CookieMap = {};
+  if (!headers) return out;
+
+  const cookieHeaderValues: string[] = [];
+  for (const [headerName, headerValues] of Object.entries(headers)) {
+    if (String(headerName).trim().toLowerCase() !== 'cookie') continue;
+    cookieHeaderValues.push(
+      ...(Array.isArray(headerValues) ? headerValues : [String(headerValues)]).map(String),
+    );
+  }
+
+  for (const cookieHeader of cookieHeaderValues) {
+    for (const part of cookieHeader.split(';')) {
+      const segment = part.trim();
+      if (!segment) continue;
+
+      const equalsIdx = segment.indexOf('=');
+      if (equalsIdx <= 0) continue;
+
+      const name = segment.slice(0, equalsIdx).trim();
+      if (!name) continue;
+
+      let value = segment.slice(equalsIdx + 1).trim();
+      if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+        value = value.slice(1, -1);
+      }
+
+      try {
+        out[name] = decodeURIComponent(value);
+      } catch {
+        out[name] = value;
+      }
+    }
+  }
+
   return out;
 }

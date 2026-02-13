@@ -10,10 +10,31 @@ import type {
   FaceResponse,
   Headers,
 } from './types.js';
-import { canonicalizeHeaders, cloneQuery, normalizePath } from './types.js';
+import {
+  canonicalizeHeaders,
+  cloneCookies,
+  cloneQuery,
+  normalizePath,
+  parseCookiesFromHeaders,
+  parseQueryString,
+} from './types.js';
 
 export interface FaceAppOptions {
   faces: FaceModule[];
+}
+
+const HTML_CONTENT_TYPE = 'text/html; charset=utf-8';
+const SAFE_INTERNAL_ERROR_HTML = renderHTMLDocument({
+  head: '<title>Internal Server Error</title>',
+  body: '<h1>Internal Server Error</h1><template data-facetheory-error="true"></template>',
+});
+
+class StreamPreflightError extends Error {
+  constructor(cause: unknown) {
+    super('stream body failed before first chunk');
+    this.name = 'StreamPreflightError';
+    this.cause = cause;
+  }
 }
 
 export class FaceApp {
@@ -55,9 +76,13 @@ export class FaceApp {
       proxy: match.proxy ?? null,
     };
 
-    const data = face.load ? await face.load(ctx) : null;
-    const out = await face.render(ctx, data);
-    return toHTTPResponse(out, normalizedReq);
+    try {
+      const data = face.load ? await face.load(ctx) : null;
+      const out = await face.render(ctx, data);
+      return await toHTTPResponse(out, normalizedReq);
+    } catch {
+      return internalErrorResponse();
+    }
   }
 }
 
@@ -66,55 +91,136 @@ export function createFaceApp(options: FaceAppOptions): FaceApp {
 }
 
 function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
+  const rawPath = String(req.path ?? '').trim();
+  const headers = canonicalizeHeaders(req.headers);
+
   return {
     method: String(req.method ?? '').trim().toUpperCase() || 'GET',
-    path: normalizePath(req.path),
-    headers: canonicalizeHeaders(req.headers),
-    query: cloneQuery(req.query),
+    path: normalizePath(rawPath),
+    headers,
+    query: req.query ? cloneQuery(req.query) : queryFromPath(rawPath),
+    cookies: req.cookies ? cloneCookies(req.cookies) : parseCookiesFromHeaders(headers),
     body: req.body ?? new Uint8Array(),
     isBase64: Boolean(req.isBase64),
     cspNonce: req.cspNonce ?? null,
   };
 }
 
-function toHeaders(input: FaceRenderResult['headers']): Headers {
-  const out: Headers = {};
-  if (!input) return out;
-  for (const [key, value] of Object.entries(input)) {
-    const lower = String(key).trim().toLowerCase();
-    if (!lower) continue;
-    out[lower] = Array.isArray(value) ? value.map(String) : [String(value)];
-  }
-  return out;
+function queryFromPath(path: string): Record<string, string[]> {
+  const idx = path.indexOf('?');
+  if (idx < 0 || idx === path.length - 1) return {};
+  return parseQueryString(path.slice(idx + 1));
 }
 
-function toHTTPResponse(
+function toHeaders(input: FaceRenderResult['headers'], cookies: string[] | undefined): Headers {
+  const headers: Headers = {};
+  const setCookieValues: string[] = [];
+
+  for (const [key, value] of Object.entries(input ?? {})) {
+    const lower = String(key).trim().toLowerCase();
+    if (!lower) continue;
+
+    const normalizedValues = (Array.isArray(value) ? value : [value]).map(String);
+    if (lower === 'set-cookie') {
+      setCookieValues.push(...normalizedValues);
+      continue;
+    }
+
+    const existingValues = headers[lower];
+    if (existingValues) {
+      existingValues.push(...normalizedValues);
+    } else {
+      headers[lower] = [...normalizedValues];
+    }
+  }
+
+  if (cookies?.length) {
+    setCookieValues.push(...cookies.map(String));
+  }
+
+  if (setCookieValues.length > 0) {
+    headers['set-cookie'] = setCookieValues;
+  }
+
+  const sortedHeaders: Headers = {};
+  for (const key of Object.keys(headers).sort()) {
+    sortedHeaders[key] = headers[key] ?? [];
+  }
+  return sortedHeaders;
+}
+
+async function toHTTPResponse(
   out: FaceRenderResult,
   req: Readonly<Required<FaceRequest>>,
-): FaceResponse {
+): Promise<FaceResponse> {
   const status = out.status ?? 200;
-  const headers = toHeaders(out.headers);
-  const cookies = out.cookies ?? [];
+  const headers = toHeaders(out.headers, out.cookies);
+  const cookies = headers['set-cookie'] ?? [];
 
   if (!headers['content-type']) {
-    headers['content-type'] = ['text/html; charset=utf-8'];
+    headers['content-type'] = [HTML_CONTENT_TYPE];
   }
 
   const head = renderFaceHead(out, { cspNonce: req.cspNonce });
 
-  const body =
-    typeof out.html === 'string'
-      ? utf8(
-          renderHTMLDocument({
-            head,
-            body: out.html,
-          }),
-        )
-      : streamHTMLDocument({ head, body: out.html });
+  if (typeof out.html === 'string') {
+    return {
+      status,
+      headers,
+      cookies,
+      body: utf8(
+        renderHTMLDocument({
+          head,
+          body: out.html,
+        }),
+      ),
+      isBase64: false,
+    };
+  }
+
+  const body = streamHTMLDocument({
+    head,
+    body: await preflightStream(out.html),
+  });
 
   return { status, headers, cookies, body, isBase64: false };
 }
 
+async function preflightStream(
+  input: AsyncIterable<Uint8Array>,
+): Promise<AsyncIterable<Uint8Array>> {
+  const iterator = input[Symbol.asyncIterator]();
+
+  let firstChunk: IteratorResult<Uint8Array>;
+  try {
+    firstChunk = await iterator.next();
+  } catch (err) {
+    throw new StreamPreflightError(err);
+  }
+
+  return (async function* () {
+    if (!firstChunk.done) {
+      yield firstChunk.value;
+    }
+
+    for (;;) {
+      const next = await iterator.next();
+      if (next.done) break;
+      yield next.value;
+    }
+  })();
+}
+
 function textResponse(status: number, body: string, headers: Headers): FaceResponse {
-  return { status, headers, cookies: [], body: utf8(body), isBase64: false };
+  return { status, headers, cookies: headers['set-cookie'] ?? [], body: utf8(body), isBase64: false };
+}
+
+function internalErrorResponse(): FaceResponse {
+  return {
+    status: 500,
+    headers: { 'content-type': [HTML_CONTENT_TYPE] },
+    cookies: [],
+    body: utf8(SAFE_INTERNAL_ERROR_HTML),
+    isBase64: false,
+  };
 }
