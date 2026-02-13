@@ -1,6 +1,6 @@
 import { utf8 } from './bytes.js';
 import { renderFaceHead } from './head.js';
-import { renderHTMLDocument } from './html.js';
+import { renderHTMLDocument, streamHTMLDocument } from './html.js';
 import { Router } from './router.js';
 import type {
   FaceContext,
@@ -100,15 +100,17 @@ function toHTTPResponse(
     headers['content-type'] = ['text/html; charset=utf-8'];
   }
 
+  const head = renderFaceHead(out, { cspNonce: req.cspNonce });
+
   const body =
     typeof out.html === 'string'
       ? utf8(
           renderHTMLDocument({
-            head: renderFaceHead(out, { cspNonce: req.cspNonce }),
+            head,
             body: out.html,
           }),
         )
-      : out.html;
+      : streamHTMLDocument({ head, body: out.html });
 
   return { status, headers, cookies, body, isBase64: false };
 }

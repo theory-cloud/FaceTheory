@@ -1,3 +1,5 @@
+import { PassThrough } from 'node:stream';
+
 import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server';
 
@@ -22,6 +24,14 @@ export interface RenderReactOptions {
   styleTags?: FaceStyleTag[];
   hydration?: FaceHydration;
   integrations?: Array<UIIntegration<React.ReactElement>>;
+}
+
+export interface RenderReactStreamOptions extends RenderReactOptions {
+  /**
+   * Abort delay passed to React's streaming renderer.
+   * Default: 5000ms.
+   */
+  abortDelayMs?: number;
 }
 
 export async function renderReact(
@@ -54,6 +64,76 @@ export async function renderReact(
   const styleTags = [...integrationStyleTags, ...(options.styleTags ?? [])];
 
   let out: FaceRenderResult = { html };
+  if (options.status !== undefined) out.status = options.status;
+  if (options.headers !== undefined) out.headers = options.headers;
+  if (options.cookies !== undefined) out.cookies = options.cookies;
+  if (options.head !== undefined) out.head = options.head;
+  if (headTags.length) out.headTags = headTags;
+  if (styleTags.length) out.styleTags = styleTags;
+  if (options.hydration !== undefined) out.hydration = options.hydration;
+
+  for (const integration of integrations) {
+    if (integration.finalize) {
+      out = await integration.finalize(out, ctx);
+    }
+  }
+
+  return out;
+}
+
+export async function renderReactStream(
+  ctx: FaceContext,
+  node: React.ReactNode,
+  options: RenderReactStreamOptions = {},
+): Promise<FaceRenderResult> {
+  const integrations = options.integrations ?? [];
+
+  let tree: React.ReactElement = React.createElement(React.Fragment, null, node);
+
+  for (const integration of integrations) {
+    if (integration.wrapTree) {
+      tree = integration.wrapTree(tree, ctx);
+    }
+  }
+
+  const integrationHeadTags: FaceHeadTag[] = [];
+  const integrationStyleTags: FaceStyleTag[] = [];
+
+  for (const integration of integrations) {
+    if (!integration.contribute) continue;
+    const contribution = await integration.contribute(ctx);
+    if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
+    if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
+  }
+
+  const headTags = [...integrationHeadTags, ...(options.headTags ?? [])];
+  const styleTags = [...integrationStyleTags, ...(options.styleTags ?? [])];
+
+  const stream = new PassThrough();
+  const abortDelayMs = options.abortDelayMs ?? 5000;
+
+  const { pipe, abort } = ReactDOMServer.renderToPipeableStream(tree, {
+    onShellReady: () => {
+      pipe(stream);
+    },
+    onShellError: (err) => {
+      stream.destroy(err as Error);
+    },
+    onError: (err) => {
+      // Preserve React's default error reporting; surface the error if the stream is consumed.
+      if (!stream.destroyed) {
+        stream.destroy(err as Error);
+      }
+    },
+  });
+
+  const abortTimer = setTimeout(() => abort(), abortDelayMs);
+  abortTimer.unref?.();
+  stream.on('close', () => clearTimeout(abortTimer));
+  stream.on('end', () => clearTimeout(abortTimer));
+  stream.on('error', () => clearTimeout(abortTimer));
+
+  let out: FaceRenderResult = { html: stream as unknown as AsyncIterable<Uint8Array> };
   if (options.status !== undefined) out.status = options.status;
   if (options.headers !== undefined) out.headers = options.headers;
   if (options.cookies !== undefined) out.cookies = options.cookies;
@@ -104,3 +184,38 @@ export function createReactFace<Data = unknown>(
   return mod;
 }
 
+export interface ReactStreamFaceOptions<Data = unknown> {
+  route: string;
+  mode: FaceMode;
+  load?: (ctx: FaceContext) => Promise<Data>;
+  render: (ctx: FaceContext, data: Data) => React.ReactNode | Promise<React.ReactNode>;
+  renderOptions?:
+    | RenderReactStreamOptions
+    | ((
+        ctx: FaceContext,
+        data: Data,
+      ) => RenderReactStreamOptions | Promise<RenderReactStreamOptions>);
+}
+
+export function createReactStreamFace<Data = unknown>(
+  options: ReactStreamFaceOptions<Data>,
+): FaceModule {
+  const mod: FaceModule = {
+    route: options.route,
+    mode: options.mode,
+    render: async (ctx, data) => {
+      const tree = await options.render(ctx, data as Data);
+      const renderOptions =
+        typeof options.renderOptions === 'function'
+          ? await options.renderOptions(ctx, data as Data)
+          : (options.renderOptions ?? {});
+      return renderReactStream(ctx, tree, renderOptions);
+    },
+  };
+
+  if (options.load) {
+    mod.load = options.load as unknown as (ctx: FaceContext) => Promise<unknown>;
+  }
+
+  return mod;
+}
