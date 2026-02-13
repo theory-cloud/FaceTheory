@@ -18,11 +18,21 @@
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
+    },
+    "./react/antd": {
+      "types": "./dist/react/antd.d.ts",
+      "import": "./dist/react/antd.js"
     }
   },
   "peerDependencies": {
     "react": ">=18",
-    "react-dom": ">=18"
+    "react-dom": ">=18",
+    "antd": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "antd": {
+      "optional": true
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -39,6 +49,7 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.26.0",
     "@typescript-eslint/parser": "^8.26.0",
+    "antd": "^6.2.3",
     "eslint": "^8.57.1",
     "prettier": "^3.6.0",
     "react": "^19.2.4",
