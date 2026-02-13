@@ -22,15 +22,31 @@
     "./react/antd": {
       "types": "./dist/react/antd.d.ts",
       "import": "./dist/react/antd.js"
+    },
+    "./react/emotion": {
+      "types": "./dist/react/emotion.d.ts",
+      "import": "./dist/react/emotion.js"
     }
   },
   "peerDependencies": {
     "react": ">=18",
     "react-dom": ">=18",
-    "antd": ">=5"
+    "antd": ">=5",
+    "@emotion/react": ">=11",
+    "@emotion/cache": ">=11",
+    "@emotion/server": ">=11"
   },
   "peerDependenciesMeta": {
     "antd": {
+      "optional": true
+    },
+    "@emotion/react": {
+      "optional": true
+    },
+    "@emotion/cache": {
+      "optional": true
+    },
+    "@emotion/server": {
       "optional": true
     }
   },
@@ -44,6 +60,9 @@
     "test:unit": "tsx test/run-unit.ts"
   },
   "devDependencies": {
+    "@emotion/cache": "^11.14.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/server": "^11.11.0",
     "@types/node": "^24.10.9",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
