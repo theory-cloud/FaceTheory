@@ -19,6 +19,27 @@ export function createEmotionIntegration(
   let cache: ReturnType<typeof createCache> | null = null;
   let server: ReturnType<typeof createEmotionServer> | null = null;
 
+  const stylesFromCache = (): FaceStyleTag[] => {
+    if (!cache) return [];
+
+    const ids: string[] = [];
+    let cssText = '';
+    for (const [id, css] of Object.entries(cache.inserted)) {
+      if (!css || css === true) continue;
+      ids.push(id);
+      cssText += css;
+    }
+
+    if (!ids.length || !cssText) return [];
+
+    return [
+      {
+        cssText,
+        attrs: { 'data-emotion': `${cache.key} ${ids.join(' ')}` },
+      },
+    ];
+  };
+
   return {
     name: 'emotion',
     wrapTree: (tree) => {
@@ -35,14 +56,21 @@ export function createEmotionIntegration(
     },
     finalize: (out) => {
       if (!cache || !server) return out;
-      if (typeof out.html !== 'string') return out;
 
-      const chunks = server.extractCriticalToChunks(out.html);
-      const styles: FaceStyleTag[] = chunks.styles.map((s) => ({
-        cssText: s.css,
-        attrs: { 'data-emotion': `${s.key} ${s.ids.join(' ')}` },
-      }));
+      // Buffered SSR: extract only what was used in the HTML.
+      if (typeof out.html === 'string') {
+        const chunks = server.extractCriticalToChunks(out.html);
+        const styles: FaceStyleTag[] = chunks.styles.map((s) => ({
+          cssText: s.css,
+          attrs: { 'data-emotion': `${s.key} ${s.ids.join(' ')}` },
+        }));
 
+        if (!styles.length) return out;
+        return { ...out, styleTags: [...(out.styleTags ?? []), ...styles] };
+      }
+
+      // Streaming SSR: extract from the cache after the shell is ready.
+      const styles = stylesFromCache();
       if (!styles.length) return out;
       return { ...out, styleTags: [...(out.styleTags ?? []), ...styles] };
     },

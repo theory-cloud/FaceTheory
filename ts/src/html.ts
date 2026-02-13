@@ -45,8 +45,16 @@ export async function* streamHTMLDocument(
   yield utf8(
     `<!doctype html><html lang="${escapeHTML(lang)}"><head>${head}</head><body>`,
   );
-  for await (const chunk of parts.body) {
-    yield chunk;
+  try {
+    for await (const chunk of parts.body) {
+      yield chunk;
+    }
+  } catch (err) {
+    // Avoid breaking the full HTML document shape on streaming errors.
+    // Do not include error details in HTML (may contain sensitive information).
+    // eslint-disable-next-line no-console
+    console.error('FaceTheory: streaming body error', err);
+    yield utf8('<template data-facetheory-stream-error="true"></template>');
   }
   yield utf8(`</body></html>`);
 }

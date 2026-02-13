@@ -112,11 +112,28 @@ export async function renderReactStream(
   const stream = new PassThrough();
   const abortDelayMs = options.abortDelayMs ?? 5000;
 
+  let shellSettled = false;
+  let resolveShell: (() => void) | null = null;
+  let rejectShell: ((err: unknown) => void) | null = null;
+
+  const shellReady = new Promise<void>((resolve, reject) => {
+    resolveShell = resolve;
+    rejectShell = reject;
+  });
+
   const { pipe, abort } = ReactDOMServer.renderToPipeableStream(tree, {
     onShellReady: () => {
+      if (!shellSettled) {
+        shellSettled = true;
+        resolveShell?.();
+      }
       pipe(stream);
     },
     onShellError: (err) => {
+      if (!shellSettled) {
+        shellSettled = true;
+        rejectShell?.(err);
+      }
       stream.destroy(err as Error);
     },
     onError: (err) => {
@@ -132,6 +149,9 @@ export async function renderReactStream(
   stream.on('close', () => clearTimeout(abortTimer));
   stream.on('end', () => clearTimeout(abortTimer));
   stream.on('error', () => clearTimeout(abortTimer));
+
+  // Ensure integrations can extract critical styles from the shell before FaceApp emits <head>.
+  await shellReady;
 
   let out: FaceRenderResult = { html: stream as unknown as AsyncIterable<Uint8Array> };
   if (options.status !== undefined) out.status = options.status;
