@@ -11,3 +11,4 @@ await import('./unit/streaming.test.js');
 await import('./unit/react-stream.test.js');
 await import('./unit/vue.test.js');
 await import('./unit/svelte.test.js');
+await import('./unit/vite-ssr-example.test.js');

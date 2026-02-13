@@ -77,7 +77,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run test:unit",
-    "test:unit": "tsx test/run-unit.ts"
+    "test:unit": "tsx test/run-unit.ts",
+    "example:vite:ssr:build": "vite build --config examples/vite-ssr-react/vite.config.ts && vite build --ssr src/entry-server.tsx --config examples/vite-ssr-react/vite.config.ts",
+    "example:vite:ssr:serve": "tsx examples/vite-ssr-react/node-server.ts"
   },
   "devDependencies": {
     "@emotion/cache": "^11.14.0",
@@ -99,6 +101,7 @@
     "svelte": "^5.20.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
+    "vite": "^7.3.1",
     "vue": "^3.5.13"
   }
 }
