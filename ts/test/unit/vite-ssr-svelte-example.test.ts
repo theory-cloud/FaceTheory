@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { execFile } from 'node:child_process';
-import { rm, readFile, stat } from 'node:fs/promises';
+import { readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 
 import type { ViteManifest } from '../../src/vite.js';
 
@@ -20,31 +20,33 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
-test('vite SSR example: builds client+server and renders without missing assets', { concurrency: false }, async () => {
+test('vite SSR svelte example: builds client+server and renders without missing assets', { concurrency: false }, async () => {
   const cwd = path.resolve('.');
 
-  const distDir = path.resolve('examples/vite-ssr-react/dist');
+  const distDir = path.resolve('examples/vite-ssr-svelte/dist');
   await rm(distDir, { recursive: true, force: true });
 
-  await execFileAsync('npm', ['run', 'example:vite:ssr:build'], { cwd });
+  await execFileAsync('npm', ['run', 'example:vite:svelte:build'], { cwd });
 
-  const manifestPath = path.resolve('examples/vite-ssr-react/dist/client/.vite/manifest.json');
+  const manifestPath = path.resolve('examples/vite-ssr-svelte/dist/client/.vite/manifest.json');
   const manifestRaw = await readFile(manifestPath, 'utf8');
   const manifest = JSON.parse(manifestRaw) as ViteManifest;
-  assert.ok(manifest['src/entry-client.tsx']);
+  assert.ok(manifest['src/entry-client.ts']);
 
-  const serverEntryPath = path.resolve('examples/vite-ssr-react/dist/server/entry-server.js');
+  const serverEntryPath = path.resolve('examples/vite-ssr-svelte/dist/server/entry-server.js');
   assert.ok(await exists(serverEntryPath));
 
   const serverMod = await import(pathToFileURL(serverEntryPath).href);
-  const app = serverMod.createViteSSRExampleApp(manifest);
+  const app = serverMod.createViteSvelteSSRExampleApp(manifest);
 
   const resp = await app.handle({ method: 'GET', path: '/' });
   const body = new TextDecoder().decode(resp.body as Uint8Array);
 
-  assert.ok(body.includes('Hello from server'));
+  assert.ok(body.includes('Svelte SSR Example'), `unexpected html: ${body.slice(0, 220)}`);
+  assert.ok(body.includes('Hello from server'), `unexpected html: ${body.slice(0, 220)}`);
   assert.ok(body.includes('id="__FACETHEORY_DATA__"'));
   assert.ok(body.includes('type="module"'));
+  assert.ok(body.includes('id="svelte-inline-style"'));
 
   const injectedPaths = new Set<string>();
   for (const match of body.matchAll(/<(?:link|script)\b[^>]*(?:href|src)="([^"]+)"/g)) {
@@ -52,11 +54,10 @@ test('vite SSR example: builds client+server and renders without missing assets'
     if (!candidate || !candidate.startsWith('/')) continue;
     injectedPaths.add(candidate);
   }
-
   assert.ok(injectedPaths.size > 0);
 
   for (const injectedPath of injectedPaths) {
-    const builtPath = path.resolve('examples/vite-ssr-react/dist/client', `.${injectedPath}`);
+    const builtPath = path.resolve('examples/vite-ssr-svelte/dist/client', `.${injectedPath}`);
     assert.ok(await exists(builtPath), `missing built asset: ${injectedPath}`);
   }
 });

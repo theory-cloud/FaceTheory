@@ -7,6 +7,7 @@ import type {
   FaceModule,
   FaceRenderResult,
   FaceStyleTag,
+  UIIntegration,
 } from '../types.js';
 
 export interface SvelteSSRRenderResult {
@@ -27,6 +28,7 @@ export interface RenderSvelteOptions {
   headTags?: FaceHeadTag[];
   styleTags?: FaceStyleTag[];
   hydration?: FaceHydration;
+  integrations?: Array<SvelteUIIntegration>;
 }
 
 export interface SvelteRenderInput<Props = Record<string, unknown>> {
@@ -38,37 +40,52 @@ export interface SvelteRenderInput<Props = Record<string, unknown>> {
   cssText?: string;
 }
 
+export type SvelteUIIntegration<Props extends Record<string, unknown> = Record<string, unknown>> =
+  UIIntegration<SvelteRenderInput<Props>>;
+
 export async function renderSvelte<Props extends Record<string, unknown>>(
-  _ctx: FaceContext,
+  ctx: FaceContext,
   input: SvelteRenderInput<Props>,
   options: RenderSvelteOptions = {},
 ): Promise<FaceRenderResult> {
-  let rendered: SvelteSSRRenderResult;
+  const integrations = (options.integrations ?? []) as Array<SvelteUIIntegration<Props>>;
 
-  const maybeLegacy = input.component as Partial<SvelteLegacySSRComponent<Props>>;
-  if (typeof maybeLegacy.render === 'function') {
-    rendered = maybeLegacy.render(input.props);
-  } else {
-    const { render } = await import('svelte/server');
-    const serverRenderOptions = input.props === undefined ? {} : { props: input.props };
-    const out = render(input.component as any, serverRenderOptions as any);
-
-    rendered = { html: String((out as any).body ?? (out as any).html ?? '') };
-
-    const head = (out as any).head;
-    if (head) rendered.head = String(head);
-
-    const css = (out as any).css;
-    if (css?.code) rendered.css = { code: String(css.code) };
+  let currentInput: SvelteRenderInput<Props> = input;
+  for (const integration of integrations) {
+    if (!integration.wrapTree) continue;
+    currentInput = integration.wrapTree(currentInput, ctx);
   }
 
-  const headTags: FaceHeadTag[] = [...(options.headTags ?? [])];
-  const styleTags: FaceStyleTag[] = [...(options.styleTags ?? [])];
+  const integrationHeadTags: FaceHeadTag[] = [];
+  const integrationStyleTags: FaceStyleTag[] = [];
+  for (const integration of integrations) {
+    if (!integration.contribute) continue;
+    const contribution = await integration.contribute(ctx);
+    if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
+    if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
+  }
+
+  let rendered: SvelteSSRRenderResult;
+
+  const maybeLegacy = currentInput.component as Partial<SvelteLegacySSRComponent<Props>>;
+  if (typeof maybeLegacy.render === 'function') {
+    try {
+      rendered = maybeLegacy.render(currentInput.props);
+    } catch (err) {
+      if (!isSvelte5DeprecatedRenderError(err)) throw err;
+      rendered = await renderWithSvelteServer(currentInput.component, currentInput.props);
+    }
+  } else {
+    rendered = await renderWithSvelteServer(currentInput.component, currentInput.props);
+  }
+
+  const headTags: FaceHeadTag[] = [...integrationHeadTags, ...(options.headTags ?? [])];
+  const styleTags: FaceStyleTag[] = [...integrationStyleTags, ...(options.styleTags ?? [])];
 
   if (rendered.head) {
     headTags.push({ type: 'raw', html: rendered.head });
   }
-  const cssText = rendered.css?.code ?? input.cssText;
+  const cssText = rendered.css?.code ?? currentInput.cssText;
   if (cssText) {
     styleTags.push({
       cssText,
@@ -76,7 +93,7 @@ export async function renderSvelte<Props extends Record<string, unknown>>(
     });
   }
 
-  const out: FaceRenderResult = { html: rendered.html };
+  let out: FaceRenderResult = { html: rendered.html };
   if (options.status !== undefined) out.status = options.status;
   if (options.headers !== undefined) out.headers = options.headers;
   if (options.cookies !== undefined) out.cookies = options.cookies;
@@ -85,7 +102,38 @@ export async function renderSvelte<Props extends Record<string, unknown>>(
   if (styleTags.length) out.styleTags = styleTags;
   if (options.hydration !== undefined) out.hydration = options.hydration;
 
+  for (const integration of integrations) {
+    if (!integration.finalize) continue;
+    out = await integration.finalize(out, ctx);
+  }
+
   return out;
+}
+
+function isSvelte5DeprecatedRenderError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return err.message.includes('Component.render(...) is no longer valid in Svelte 5');
+}
+
+async function renderWithSvelteServer<Props extends Record<string, unknown>>(
+  component: unknown,
+  props: Props | undefined,
+): Promise<SvelteSSRRenderResult> {
+  const { render } = await import('svelte/server');
+  const serverRenderOptions = props === undefined ? {} : { props };
+  const out = render(component as any, serverRenderOptions as any);
+
+  const rendered: SvelteSSRRenderResult = {
+    html: String((out as any).body ?? (out as any).html ?? ''),
+  };
+
+  const head = (out as any).head;
+  if (head) rendered.head = String(head);
+
+  const css = (out as any).css;
+  if (css?.code) rendered.css = { code: String(css.code) };
+
+  return rendered;
 }
 
 export interface SvelteFaceOptions<

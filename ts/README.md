@@ -68,3 +68,15 @@ npm test
 - Local benchmark note:
   - compare `styleStrategy:'shell'` vs default `all-ready` in the same route and record first-byte timing to make the
     robustness/latency tradeoff explicit.
+
+## Vue + Svelte Parity (R6)
+
+- Vue and Svelte adapters now support integration hooks (`integrations`) with the same model as React:
+  - `wrapTree`
+  - `contribute` (head/style collection)
+  - `finalize` (last-pass output shaping)
+- Deterministic head/style assembly is covered for Vue/Svelte contract tests, including CSP nonce application to all inline
+  style/script tags.
+- Vite SSR examples now include Vue + Svelte parity paths with manifest-driven asset injection and hydration bootstrap:
+  - `npm run example:vite:vue:build`
+  - `npm run example:vite:svelte:build`

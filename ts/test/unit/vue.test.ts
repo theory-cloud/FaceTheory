@@ -25,3 +25,76 @@ test('vue adapter: renders VNode + head tags', async () => {
   assert.ok(body.includes('<main>Hello Vue</main>'));
 });
 
+test('vue adapter: integration hooks provide deterministic head/style ordering and nonce coverage', async () => {
+  const app = createFaceApp({
+    faces: [
+      createVueFace({
+        route: '/',
+        mode: 'ssr',
+        load: async () => ({ message: 'Vue Integration' }),
+        render: (_ctx, data) => h('main', { class: 'from-int from-options' }, (data as any).message),
+        renderOptions: {
+          head: { title: 'Vue Integration Title' },
+          headTags: [
+            { type: 'link', attrs: { rel: 'stylesheet', href: '/options.css' } },
+            { type: 'script', attrs: { id: 'options-inline' }, body: 'window.__VUE_OPTIONS__=1;' },
+          ],
+          styleTags: [{ cssText: '.from-options{color:rgb(20,30,40);}', attrs: { id: 'style-options' } }],
+          hydration: {
+            data: { framework: 'vue' },
+            bootstrapModule: '/assets/vue-entry.js',
+          },
+          integrations: [
+            {
+              name: 'vue-wrap-contrib-finalize',
+              wrapTree: (tree) => h('section', { class: 'wrapped' }, [tree]),
+              contribute: () => ({
+                headTags: [{ type: 'link', attrs: { rel: 'stylesheet', href: '/integration-a.css' } }],
+                styleTags: [
+                  { cssText: '.from-int{color:rgb(1,2,3);}', attrs: { id: 'style-int' } },
+                ],
+              }),
+              finalize: (out) => ({
+                ...out,
+                headTags: [
+                  ...(out.headTags ?? []),
+                  { type: 'link', attrs: { rel: 'stylesheet', href: '/integration-b.css' } },
+                ],
+              }),
+            },
+          ],
+        },
+      }),
+    ],
+  });
+
+  const nonce = 'nonce-vue-r6';
+  const resp = await app.handle({ method: 'GET', path: '/', cspNonce: nonce });
+  const body = new TextDecoder().decode(resp.body as Uint8Array);
+
+  assert.ok(body.includes('<title>Vue Integration Title</title>'));
+  assert.ok(body.includes('Vue Integration'));
+  assert.ok(body.includes('class="wrapped"'));
+  assert.ok(body.includes('id="__FACETHEORY_DATA__"'));
+
+  const idxIntegrationA = body.indexOf('/integration-a.css');
+  const idxOptions = body.indexOf('/options.css');
+  const idxIntegrationB = body.indexOf('/integration-b.css');
+  assert.ok(idxIntegrationA >= 0 && idxOptions >= 0 && idxIntegrationB >= 0);
+  assert.ok(idxIntegrationA < idxOptions);
+  assert.ok(idxOptions < idxIntegrationB);
+
+  const idxStyleInt = body.indexOf('id="style-int"');
+  const idxStyleOptions = body.indexOf('id="style-options"');
+  assert.ok(idxStyleInt >= 0 && idxStyleOptions >= 0);
+  assert.ok(idxStyleInt < idxStyleOptions);
+
+  const styleTags = Array.from(body.matchAll(/<style\b[^>]*>/g)).map((match) => match[0]);
+  const scriptTags = Array.from(body.matchAll(/<script\b[^>]*>/g)).map((match) => match[0]);
+
+  assert.ok(styleTags.length >= 2);
+  assert.ok(scriptTags.length >= 2);
+  for (const tag of [...styleTags, ...scriptTags]) {
+    assert.ok(tag.includes(`nonce="${nonce}"`), `missing nonce on tag: ${tag}`);
+  }
+});

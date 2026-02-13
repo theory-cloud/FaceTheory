@@ -1,4 +1,4 @@
-import { createSSRApp, h, type VNode } from 'vue';
+import { createSSRApp, h, type App, type VNode } from 'vue';
 import { renderToString } from '@vue/server-renderer';
 
 import type {
@@ -10,7 +10,12 @@ import type {
   FaceModule,
   FaceRenderResult,
   FaceStyleTag,
+  UIIntegration,
 } from '../types.js';
+
+export interface VueUIIntegration extends UIIntegration<VNode> {
+  wrapApp?: (app: App, ctx: FaceContext) => void | Promise<void>;
+}
 
 export interface RenderVueOptions {
   status?: number;
@@ -20,20 +25,43 @@ export interface RenderVueOptions {
   headTags?: FaceHeadTag[];
   styleTags?: FaceStyleTag[];
   hydration?: FaceHydration;
+  integrations?: Array<VueUIIntegration>;
 }
 
 export async function renderVue(
-  _ctx: FaceContext,
+  ctx: FaceContext,
   vnode: VNode,
   options: RenderVueOptions = {},
 ): Promise<FaceRenderResult> {
-  const app = createSSRApp({ render: () => vnode });
+  const integrations = options.integrations ?? [];
+
+  let tree = vnode;
+  for (const integration of integrations) {
+    if (!integration.wrapTree) continue;
+    tree = integration.wrapTree(tree, ctx);
+  }
+
+  const app = createSSRApp({ render: () => tree });
+  for (const integration of integrations) {
+    if (!integration.wrapApp) continue;
+    await integration.wrapApp(app, ctx);
+  }
+
+  const integrationHeadTags: FaceHeadTag[] = [];
+  const integrationStyleTags: FaceStyleTag[] = [];
+  for (const integration of integrations) {
+    if (!integration.contribute) continue;
+    const contribution = await integration.contribute(ctx);
+    if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
+    if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
+  }
+
   const html = await renderToString(app);
 
-  const headTags = options.headTags ?? [];
-  const styleTags = options.styleTags ?? [];
+  const headTags = [...integrationHeadTags, ...(options.headTags ?? [])];
+  const styleTags = [...integrationStyleTags, ...(options.styleTags ?? [])];
 
-  const out: FaceRenderResult = { html };
+  let out: FaceRenderResult = { html };
   if (options.status !== undefined) out.status = options.status;
   if (options.headers !== undefined) out.headers = options.headers;
   if (options.cookies !== undefined) out.cookies = options.cookies;
@@ -41,6 +69,11 @@ export async function renderVue(
   if (headTags.length) out.headTags = headTags;
   if (styleTags.length) out.styleTags = styleTags;
   if (options.hydration !== undefined) out.hydration = options.hydration;
+
+  for (const integration of integrations) {
+    if (!integration.finalize) continue;
+    out = await integration.finalize(out, ctx);
+  }
 
   return out;
 }
@@ -77,4 +110,3 @@ export function createVueFace<Data = unknown>(options: VueFaceOptions<Data>): Fa
 }
 
 export { h };
-

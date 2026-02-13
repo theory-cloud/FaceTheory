@@ -17,3 +17,5 @@ await import('./unit/react-stream.test.js');
 await import('./unit/vue.test.js');
 await import('./unit/svelte.test.js');
 await import('./unit/vite-ssr-example.test.js');
+await import('./unit/vite-ssr-vue-example.test.js');
+await import('./unit/vite-ssr-svelte-example.test.js');
