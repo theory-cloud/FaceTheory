@@ -92,52 +92,53 @@ export async function buildSsgSite(options: BuildSsgSiteOptions): Promise<BuildS
       ...(fetchImpl !== undefined ? { fetch: fetchImpl } : {}),
     },
     async () => {
-    for (const page of plannedPages) {
-      const response = await app.handle({ method: 'GET', path: page.path });
-      if (response.status >= 500) {
-        const networkHint =
-          !allowNetwork && fetchImpl === undefined
-            ? ' Network access is disabled by default during SSG; mock fetch or set allowNetwork:true.'
-            : '';
-        throw new Error(
-          `SSG route "${page.path}" returned status ${response.status}; build aborted.${networkHint}`,
-        );
-      }
-      if (response.isBase64) {
-        throw new Error(
-          `SSG route "${page.path}" returned isBase64=true; only text/html responses are supported`,
-        );
-      }
-
-      const body = await collectBody(response.body);
-      const html = new TextDecoder().decode(body);
-      const file = ssgFilePathForRoute(page.path, trailingSlash);
-      const contentType = firstHeaderValue(response.headers, 'content-type') ?? 'text/html; charset=utf-8';
-
-      await writeOutFile(outDir, file, html);
-
-      let hydrationDataFile: string | undefined;
-      if (emitHydrationData) {
-        const hydrationJson = extractHydrationDataJson(html);
-        if (hydrationJson !== null) {
-          hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
-          await writeOutFile(outDir, hydrationDataFile, `${hydrationJson}\n`);
+      for (const page of plannedPages) {
+        const response = await app.handle({ method: 'GET', path: page.path });
+        if (response.status >= 500) {
+          const networkHint =
+            !allowNetwork && fetchImpl === undefined
+              ? ' Network access is disabled by default during SSG; mock fetch or set allowNetwork:true.'
+              : '';
+          throw new Error(
+            `SSG route "${page.path}" returned status ${response.status}; build aborted.${networkHint}`,
+          );
         }
-      }
+        if (response.isBase64) {
+          throw new Error(
+            `SSG route "${page.path}" returned isBase64=true; only text/html responses are supported`,
+          );
+        }
 
-      const entry: SsgPageEntry = {
-        routePattern: page.routePattern,
-        path: page.path,
-        file,
-        status: response.status,
-        contentType,
-      };
-      if (hydrationDataFile !== undefined) {
-        entry.hydrationDataFile = hydrationDataFile;
+        const body = await collectBody(response.body);
+        const html = new TextDecoder().decode(body);
+        const file = ssgFilePathForRoute(page.path, trailingSlash);
+        const contentType =
+          firstHeaderValue(response.headers, 'content-type') ?? 'text/html; charset=utf-8';
+
+        await writeOutFile(outDir, file, html);
+
+        let hydrationDataFile: string | undefined;
+        if (emitHydrationData) {
+          const hydrationJson = extractHydrationDataJson(html);
+          if (hydrationJson !== null) {
+            hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
+            await writeOutFile(outDir, hydrationDataFile, `${hydrationJson}\n`);
+          }
+        }
+
+        const entry: SsgPageEntry = {
+          routePattern: page.routePattern,
+          path: page.path,
+          file,
+          status: response.status,
+          contentType,
+        };
+        if (hydrationDataFile !== undefined) {
+          entry.hydrationDataFile = hydrationDataFile;
+        }
+        builtPages.push(entry);
+        htmlByPath.set(page.path, html);
       }
-      builtPages.push(entry);
-      htmlByPath.set(page.path, html);
-    }
     },
   );
 
