@@ -1,5 +1,6 @@
 import { utf8 } from './bytes.js';
-import { renderHTMLDocument, safeJson } from './html.js';
+import { renderFaceHead } from './head.js';
+import { renderHTMLDocument } from './html.js';
 import { Router } from './router.js';
 import type {
   FaceContext,
@@ -56,7 +57,7 @@ export class FaceApp {
 
     const data = face.load ? await face.load(ctx) : null;
     const out = await face.render(ctx, data);
-    return toHTTPResponse(out);
+    return toHTTPResponse(out, normalizedReq);
   }
 }
 
@@ -72,6 +73,7 @@ function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
     query: cloneQuery(req.query),
     body: req.body ?? new Uint8Array(),
     isBase64: Boolean(req.isBase64),
+    cspNonce: req.cspNonce ?? null,
   };
 }
 
@@ -86,7 +88,10 @@ function toHeaders(input: FaceRenderResult['headers']): Headers {
   return out;
 }
 
-function toHTTPResponse(out: FaceRenderResult): FaceResponse {
+function toHTTPResponse(
+  out: FaceRenderResult,
+  req: Readonly<Required<FaceRequest>>,
+): FaceResponse {
   const status = out.status ?? 200;
   const headers = toHeaders(out.headers);
   const cookies = out.cookies ?? [];
@@ -99,7 +104,7 @@ function toHTTPResponse(out: FaceRenderResult): FaceResponse {
     typeof out.html === 'string'
       ? utf8(
           renderHTMLDocument({
-            head: renderHead(out),
+            head: renderFaceHead(out, { cspNonce: req.cspNonce }),
             body: out.html,
           }),
         )
@@ -108,27 +113,6 @@ function toHTTPResponse(out: FaceRenderResult): FaceResponse {
   return { status, headers, cookies, body, isBase64: false };
 }
 
-function renderHead(out: FaceRenderResult): string {
-  const chunks: string[] = [];
-
-  if (out.head?.title) {
-    chunks.push(`<title>${out.head.title}</title>`);
-  }
-  if (out.head?.html) {
-    chunks.push(out.head.html);
-  }
-
-  if (out.hydration) {
-    chunks.push(
-      `<script id="__FACETHEORY_DATA__" type="application/json">${safeJson(out.hydration.data)}</script>`,
-    );
-    chunks.push(`<script type="module" src="${out.hydration.bootstrapModule}"></script>`);
-  }
-
-  return chunks.join('');
-}
-
 function textResponse(status: number, body: string, headers: Headers): FaceResponse {
   return { status, headers, cookies: [], body: utf8(body), isBase64: false };
 }
-

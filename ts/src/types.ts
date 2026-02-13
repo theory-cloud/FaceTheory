@@ -1,6 +1,24 @@
 export type Headers = Record<string, string[]>;
 export type Query = Record<string, string[]>;
 
+export type FaceAttributes = Record<
+  string,
+  string | number | boolean | null | undefined
+>;
+
+export type FaceHeadTag =
+  | { type: 'title'; text: string }
+  | { type: 'meta'; attrs: FaceAttributes }
+  | { type: 'link'; attrs: FaceAttributes }
+  | { type: 'script'; attrs: FaceAttributes; body?: string }
+  | { type: 'style'; cssText: string; attrs?: FaceAttributes }
+  | { type: 'raw'; html: string };
+
+export interface FaceStyleTag {
+  cssText: string;
+  attrs?: FaceAttributes;
+}
+
 export interface FaceRequest {
   method: string;
   path: string;
@@ -8,6 +26,7 @@ export interface FaceRequest {
   headers?: Headers;
   body?: Uint8Array;
   isBase64?: boolean;
+  cspNonce?: string | null;
 }
 
 export type FaceBody = Uint8Array | AsyncIterable<Uint8Array>;
@@ -43,8 +62,27 @@ export interface FaceRenderResult {
   headers?: Record<string, string | string[]>;
   cookies?: string[];
   head?: FaceHead;
+  headTags?: FaceHeadTag[];
+  styleTags?: FaceStyleTag[];
   html: string | AsyncIterable<Uint8Array>;
   hydration?: FaceHydration;
+}
+
+export interface UIIntegrationContribution {
+  headTags?: FaceHeadTag[];
+  styleTags?: FaceStyleTag[];
+}
+
+export interface UIIntegration<TTree = unknown> {
+  name: string;
+  wrapTree?: (tree: TTree, ctx: FaceContext) => TTree;
+  contribute?: (
+    ctx: FaceContext,
+  ) => UIIntegrationContribution | Promise<UIIntegrationContribution>;
+  finalize?: (
+    out: FaceRenderResult,
+    ctx: FaceContext,
+  ) => FaceRenderResult | Promise<FaceRenderResult>;
 }
 
 export interface FaceModule {
@@ -85,4 +123,3 @@ export function cloneQuery(query: Query | undefined): Query {
   }
   return out;
 }
-
