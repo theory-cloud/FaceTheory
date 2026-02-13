@@ -85,6 +85,8 @@
     "ssg": "tsx src/ssg-cli.ts",
     "example:ssg:build": "tsx examples/ssg-basic/build.ts",
     "example:ssg:serve": "tsx examples/ssg-basic/serve-static.ts",
+    "example:buffered:serve": "tsx examples/react-ssr-buffered/node-server.ts",
+    "example:streaming:serve": "tsx examples/react-ssr-streaming/node-server.ts",
     "example:vite:ssr:build": "vite build --config examples/vite-ssr-react/vite.config.ts && vite build --ssr src/entry-server.tsx --config examples/vite-ssr-react/vite.config.ts",
     "example:vite:ssr:serve": "tsx examples/vite-ssr-react/node-server.ts",
     "example:vite:vue:build": "vite build --config examples/vite-ssr-vue/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-vue/vite.config.ts",
