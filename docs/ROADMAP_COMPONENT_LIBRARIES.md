@@ -187,7 +187,7 @@ Acceptance criteria
 - SSR fixtures render without runtime errors and include both Ant Design + Emotion style tags.
 - Hydration fixtures run without console warnings/errors (className mismatch, missing styles, etc).
 - No network calls are required during SSR tests (all external data is mocked/stubbed).
-- A short “Portal SSR readiness checklist” exists and is kept up to date.
+- A short “Portal SSR readiness checklist” exists and is kept up to date (`docs/PORTAL_SSR_READINESS_CHECKLIST.md`).
 
 ---
 
@@ -233,3 +233,14 @@ Acceptance criteria
 
 - Vue and Svelte PoCs can SSR-render a small component and inject head tags and styles via the same CL0 mechanism.
 - The roadmap clearly identifies which React-specific steps are abstracted vs which are adapter-specific.
+
+### Parity checklist (React → Vue/Svelte)
+
+This is the shared contract surface we want to reuse as we add “real UI” support outside React.
+
+- **Head tags**: `headTags` returned from a Face render (framework adapters populate it; core renders deterministically).
+- **Critical CSS**: `styleTags` returned from a Face render (adapter/integrations extract; core emits into `<head>`).
+- **Theme propagation**: a framework adapter can wrap rendering with providers and pass tokens consistently.
+- **Asset injection**: Vite manifest helpers are framework-neutral; adapters only provide hydration bootstrap.
+- **Hydration**: hydration payload + bootstrap module are encoded via `FaceHydration` and emitted with CSP-safe escaping.
+- **Streaming**: head/styles must be flushed before any streamed body bytes (adapter-specific, but uses core streaming wrapper).
