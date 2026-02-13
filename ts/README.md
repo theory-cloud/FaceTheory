@@ -30,3 +30,14 @@ npm test
 - `dynamicImports` are intentionally ignored for now (`ignore` policy) to keep head output deterministic and avoid
   speculative prefetch noise.
 - `base` supports root, subpath, and absolute CDN prefixes.
+
+## SSG Policy (R3)
+
+- Build API: `buildSsgSite({ faces, outDir, ... })` in `src/ssg.ts`.
+- CLI: `npm run ssg -- --entry <module> --out <dir>` (entry module exports `faces`).
+- Route-to-file convention:
+  - `trailingSlash:'always'` (default): `/about` -> `about/index.html`
+  - `trailingSlash:'never'`: `/about` -> `about.html`
+- Static hosting fallback: when enabled, `404.html` is emitted (from `/404` if present, otherwise a safe default).
+- Build manifest: `.facetheory/ssg-manifest.json`, with ordered page entries and expected Vite manifest path
+  (`.vite/manifest.json`) for asset-injection-aware apps.
