@@ -23,6 +23,10 @@
       "types": "./dist/react/antd.d.ts",
       "import": "./dist/react/antd.js"
     },
+    "./react/antd-emotion": {
+      "types": "./dist/react/antd-emotion.d.ts",
+      "import": "./dist/react/antd-emotion.js"
+    },
     "./react/emotion": {
       "types": "./dist/react/emotion.d.ts",
       "import": "./dist/react/emotion.js"

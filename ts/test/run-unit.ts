@@ -7,6 +7,7 @@ await import('./unit/vite.test.js');
 await import('./unit/antd.test.js');
 await import('./unit/emotion.test.js');
 await import('./unit/portal-fixtures.test.js');
+await import('./unit/antd-coverage.test.js');
 await import('./unit/streaming.test.js');
 await import('./unit/react-stream.test.js');
 await import('./unit/vue.test.js');

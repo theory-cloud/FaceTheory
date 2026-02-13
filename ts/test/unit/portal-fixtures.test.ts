@@ -11,6 +11,7 @@ import * as ReactDOMServer from 'react-dom/server';
 
 import { createFaceApp } from '../../src/app.js';
 import { createReactFace } from '../../src/adapters/react.js';
+import { createAntdEmotionTokenIntegration } from '../../src/react/antd-emotion.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
 import { createEmotionIntegration } from '../../src/react/emotion.js';
 
@@ -119,10 +120,11 @@ test('portal fixture harness: SSR renders portal-like components with AntD + Emo
             React.createElement(
               'div',
               { id: 'root' },
-              React.createElement(AntdTokenBridge, null, React.createElement(PortalContent)),
+              React.createElement(PortalContent),
             ),
           renderOptions: {
             integrations: [
+              createAntdEmotionTokenIntegration(),
               createAntdIntegration({ hashed: false }),
               createEmotionIntegration(),
             ],
