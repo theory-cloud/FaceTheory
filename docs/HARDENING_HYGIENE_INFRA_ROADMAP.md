@@ -169,6 +169,27 @@ Work (FaceTheory + AppTheory integration points)
   - SSG cache invalidation strategy
   - ISR lock contention diagnostics
 
+Status (as of 2026-02-14): DONE
+
+Delivered (FaceTheory)
+- [x] `x-request-id` propagation in FaceApp responses (generated if missing).
+  - References: `ts/src/app.ts`, `ts/test/unit/app.test.ts`
+- [x] Observability hooks (`createFaceApp({ observability: ... })`) with structured request logs and minimal metrics
+  (including ISR state and render duration).
+  - References: `ts/src/ops.ts`, `ts/src/app.ts`, `ts/test/unit/ops.test.ts`
+- [x] AppTheory adapter aligns request IDs by injecting `ctx.requestId` as `x-request-id`.
+  - References: `ts/src/apptheory/index.ts`, `ts/test/unit/apptheory-adapter.test.ts`
+- [x] React streaming readiness timing callback support (`onReadiness`) for shell/all-ready.
+  - References: `ts/src/adapters/react.ts`, `ts/test/unit/react-stream.test.ts`
+- [x] Operational checklist + security/limits guidance + runbooks.
+  - References: `docs/OPERATIONS.md`, `docs/README.md`
+
+Delivered (Infra examples)
+- [x] CloudFront request/response correlation with `x-request-id` for both S3 and SSR paths.
+- [x] CloudFront baseline security headers via `ResponseHeadersPolicy` (non-CSP; CSP is origin-defined).
+- [x] Example emits structured logs/metrics via FaceTheory observability hooks.
+  - References: `infra/apptheory-ssg-isr-site/src/stack.ts`, `infra/apptheory-ssg-isr-site/src/ssr-handler.ts`
+
 Acceptance criteria
 - A production checklist exists in docs and matches what the example infra actually provisions.
 - Examples emit stable, parseable logs/headers that can be used for dashboards and incident triage.

@@ -22,10 +22,39 @@ test('FaceApp: renders HTML with title', async () => {
   const resp = await app.handle({ method: 'GET', path: '/' });
   assert.equal(resp.status, 200);
   assert.equal(resp.headers['content-type']?.[0], 'text/html; charset=utf-8');
+  assert.ok(String(resp.headers['x-request-id']?.[0] ?? '').trim());
 
   const body = decodeBody(resp.body as Uint8Array);
   assert.ok(body.includes('<title>Home</title>'));
   assert.ok(body.includes('<div>hi</div>'));
+});
+
+test('FaceApp: propagates x-request-id and injects one when missing', async () => {
+  let seen: string | null = null;
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: (ctx) => {
+          seen = String(ctx.request.headers['x-request-id']?.[0] ?? '').trim() || null;
+          return { html: '<div>ok</div>' };
+        },
+      },
+    ],
+  });
+
+  const provided = await app.handle({
+    method: 'GET',
+    path: '/',
+    headers: { 'x-request-id': ['req-1'] },
+  });
+  assert.equal(seen, 'req-1');
+  assert.equal(provided.headers['x-request-id']?.[0], 'req-1');
+
+  const missing = await app.handle({ method: 'GET', path: '/' });
+  const generated = String(missing.headers['x-request-id']?.[0] ?? '').trim();
+  assert.ok(generated.length > 0);
 });
 
 test('FaceApp: load/render errors return deterministic 500 HTML', async () => {

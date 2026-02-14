@@ -19,6 +19,11 @@ function env(key: string): string {
   return value;
 }
 
+function logJson(value: unknown): void {
+  // eslint-disable-next-line no-console
+  console.log(JSON.stringify(value));
+}
+
 function hasHeader(headers: Headers | undefined, key: string): boolean {
   const values = headers?.[key.toLowerCase()];
   return Array.isArray(values) && values.length > 0;
@@ -137,6 +142,23 @@ const faceApp = createFaceApp({
     }),
     // When S3HtmlStore has a keyPrefix, keep pointers relative (no prefix) to avoid `prefix/prefix/...`.
     htmlPointerPrefix: '',
+  },
+  observability: {
+    log: (record) => {
+      logJson({
+        ts: new Date().toISOString(),
+        service: 'facetheory',
+        ...record,
+      });
+    },
+    metric: (record) => {
+      logJson({
+        ts: new Date().toISOString(),
+        service: 'facetheory',
+        event: 'facetheory.metric',
+        ...record,
+      });
+    },
   },
 });
 

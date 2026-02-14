@@ -2,6 +2,7 @@ await import('./unit/router.test.js');
 await import('./unit/html.test.js');
 await import('./unit/head.test.js');
 await import('./unit/app.test.js');
+await import('./unit/ops.test.js');
 await import('./unit/lambda-url.test.js');
 await import('./unit/aws-s3.test.js');
 await import('./unit/ssg.test.js');

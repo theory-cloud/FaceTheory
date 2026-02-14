@@ -18,7 +18,7 @@ Still app-specific / planned:
 - Deployment infra and automation (CloudFront/S3/Lambda URL wiring)
   - Reference CDK stack (SSR + assets): `infra/apptheory-ssr-site/` (AppTheory CDK `AppTheorySsrSite`)
   - Reference CDK stack (SSG origin-group + ISR): `infra/apptheory-ssg-isr-site/`
-- Operational policies and rollout conventions across environments
+- Operational checklist + security/limits guidance + runbooks: `docs/OPERATIONS.md`
 
 ## Repository Layout
 
@@ -58,6 +58,7 @@ From `ts/`:
 
 - `docs/ARCHITECTURE.md` — runtime and system model
 - `docs/AWS_DEPLOYMENT_SHAPE.md` — CloudFront/S3/Lambda URL deployment shape and cache policy guidance
+- `docs/OPERATIONS.md` — production checklist + observability/security guidance + deploy/rollback runbooks
 - `docs/FOLLOWUP_ROADMAP.md` — implementation milestone checklist
 - `docs/HARDENING_HYGIENE_INFRA_ROADMAP.md` — hardening + hygiene + AppTheory integration + deployment infra roadmap
 - `docs/ROADMAP_COMPONENT_LIBRARIES.md` — component-library support plan

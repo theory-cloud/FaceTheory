@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { utf8 } from './bytes.js';
 import { renderFaceHead } from './head.js';
 import { renderHTMLDocument, streamHTMLDocument } from './html.js';
@@ -8,9 +10,11 @@ import {
   type FaceIsrOptions,
   type IsrRuntime,
 } from './isr.js';
+import { logLevelForStatus, type FaceObservabilityHooks } from './ops.js';
 import { Router } from './router.js';
 import type {
   FaceContext,
+  FaceMode,
   FaceModule,
   FaceRenderResult,
   FaceRequest,
@@ -29,6 +33,7 @@ import {
 export interface FaceAppOptions {
   faces: FaceModule[];
   isr?: FaceIsrOptions;
+  observability?: FaceObservabilityHooks;
 }
 
 const HTML_CONTENT_TYPE = 'text/html; charset=utf-8';
@@ -36,6 +41,8 @@ const SAFE_INTERNAL_ERROR_HTML = renderHTMLDocument({
   head: '<title>Internal Server Error</title>',
   body: '<h1>Internal Server Error</h1><template data-facetheory-error="true"></template>',
 });
+
+const REQUEST_ID_HEADER = 'x-request-id';
 
 class StreamPreflightError extends Error {
   constructor(cause: unknown) {
@@ -49,10 +56,12 @@ export class FaceApp {
   private readonly router: Router;
   private readonly faceByPattern: Map<string, FaceModule>;
   private readonly isrRuntime: IsrRuntime | null;
+  private readonly observability: FaceObservabilityHooks | null;
 
   constructor(options: FaceAppOptions) {
     this.router = new Router();
     this.faceByPattern = new Map();
+    this.observability = options.observability ?? null;
 
     for (const face of options.faces) {
       const pattern = normalizePath(face.route);
@@ -78,19 +87,43 @@ export class FaceApp {
   }
 
   async handle(request: FaceRequest): Promise<FaceResponse> {
+    const hooks = this.observability;
+    const now = hooks?.now ?? (() => Date.now());
+    const startedAt = now();
+
     const normalizedReq = normalizeRequest(request);
+    const requestId = normalizedReq.headers[REQUEST_ID_HEADER]?.[0] ?? '';
+
+    let routePattern = '';
+    let mode: FaceMode | 'none' = 'none';
+    let renderMs: number | null = null;
+
+    let response: FaceResponse;
     const match = this.router.match(normalizedReq.path);
 
     if (!match) {
-      return textResponse(404, 'Not Found', { 'content-type': ['text/plain; charset=utf-8'] });
+      response = textResponse(404, 'Not Found', { 'content-type': ['text/plain; charset=utf-8'] });
+      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
+        routePattern,
+        mode,
+        renderMs,
+      });
     }
 
     const face = this.faceByPattern.get(match.pattern);
     if (!face) {
-      return textResponse(500, 'Internal Error', {
+      response = textResponse(500, 'Internal Error', {
         'content-type': ['text/plain; charset=utf-8'],
       });
+      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
+        routePattern,
+        mode,
+        renderMs,
+      });
     }
+
+    routePattern = match.pattern;
+    mode = face.mode;
 
     const ctx: FaceContext = {
       request: normalizedReq,
@@ -100,26 +133,46 @@ export class FaceApp {
 
     try {
       const renderFresh = async (): Promise<FaceResponse> => {
+        const renderStartedAt = now();
         const data = face.load ? await face.load(ctx) : null;
-        const out = await face.render(ctx, data);
-        return toHTTPResponse(out, normalizedReq);
+        try {
+          const out = await face.render(ctx, data);
+          return await toHTTPResponse(out, normalizedReq);
+        } finally {
+          renderMs = Math.max(0, now() - renderStartedAt);
+        }
       };
 
       if (face.mode === 'isr') {
         if (!this.isrRuntime) {
           throw new Error(`ISR runtime is not configured for route "${match.pattern}"`);
         }
-        return await this.isrRuntime.handleFace({
+        response = await this.isrRuntime.handleFace({
           face,
           ctx,
           routePattern: match.pattern,
           renderFresh,
         });
+        return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
+          routePattern,
+          mode,
+          renderMs,
+        });
       }
 
-      return await renderFresh();
+      response = await renderFresh();
+      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
+        routePattern,
+        mode,
+        renderMs,
+      });
     } catch {
-      return internalErrorResponse();
+      response = internalErrorResponse();
+      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
+        routePattern,
+        mode,
+        renderMs,
+      });
     }
   }
 }
@@ -131,6 +184,7 @@ export function createFaceApp(options: FaceAppOptions): FaceApp {
 function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
   const rawPath = String(req.path ?? '').trim();
   const headers = canonicalizeHeaders(req.headers);
+  ensureRequestId(headers);
 
   return {
     method: String(req.method ?? '').trim().toUpperCase() || 'GET',
@@ -142,6 +196,84 @@ function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
     isBase64: Boolean(req.isBase64),
     cspNonce: req.cspNonce ?? null,
   };
+}
+
+function ensureRequestId(headers: Headers): void {
+  const existing = headers[REQUEST_ID_HEADER] ?? [];
+  const first = String(existing[0] ?? '').trim();
+  headers[REQUEST_ID_HEADER] = [first || randomUUID()];
+}
+
+function finishResponse(
+  hooks: FaceObservabilityHooks | null,
+  now: () => number,
+  startedAt: number,
+  requestId: string,
+  req: Readonly<Required<FaceRequest>>,
+  response: FaceResponse,
+  context: {
+    routePattern: string;
+    mode: FaceMode | 'none';
+    renderMs: number | null;
+  },
+): FaceResponse {
+  const headers: Headers = { ...(response.headers ?? {}) };
+  headers[REQUEST_ID_HEADER] = [requestId];
+
+  const sorted: Headers = {};
+  for (const key of Object.keys(headers).sort()) {
+    sorted[key] = headers[key] ?? [];
+  }
+
+  const out: FaceResponse = { ...response, headers: sorted };
+
+  const durationMs = Math.max(0, now() - startedAt);
+  const isrState = String(out.headers['x-facetheory-isr']?.[0] ?? '').trim() || null;
+  const isStream = !(out.body instanceof Uint8Array);
+
+  const level = logLevelForStatus(out.status);
+
+  hooks?.log?.({
+    level,
+    event: 'facetheory.request.completed',
+    requestId,
+    method: req.method,
+    path: req.path,
+    routePattern: context.routePattern,
+    mode: context.mode,
+    status: out.status,
+    durationMs,
+    renderMs: context.renderMs,
+    isrState,
+    isStream,
+  });
+
+  hooks?.metric?.({
+    name: 'facetheory.request',
+    value: 1,
+    tags: {
+      method: req.method,
+      route_pattern: context.routePattern || req.path,
+      mode: String(context.mode),
+      status: String(out.status),
+      isr_state: isrState ?? '',
+      is_stream: isStream ? '1' : '0',
+    },
+  });
+
+  if (context.renderMs !== null) {
+    hooks?.metric?.({
+      name: 'facetheory.render_ms',
+      value: context.renderMs,
+      tags: {
+        method: req.method,
+        route_pattern: context.routePattern || req.path,
+        mode: String(context.mode),
+      },
+    });
+  }
+
+  return out;
 }
 
 function queryFromPath(path: string): Record<string, string[]> {

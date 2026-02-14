@@ -39,10 +39,12 @@ test('apptheory adapter: buffered response matches FaceApp status/headers/cookie
     ],
   });
 
+  const requestId = 'request-1';
+
   const faceResp = await faceApp.handle({
     method: 'GET',
     path: '/',
-    headers: { cookie: ['promo=spring%20sale'] },
+    headers: { cookie: ['promo=spring%20sale'], 'x-request-id': [requestId] },
   });
 
   const env = createTestEnv();
@@ -54,7 +56,7 @@ test('apptheory adapter: buffered response matches FaceApp status/headers/cookie
   const appResp = await env.invoke(app, {
     method: 'GET',
     path: '/',
-    headers: { cookie: ['promo=spring%20sale'] },
+    headers: { cookie: ['promo=spring%20sale'], 'x-request-id': [requestId] },
   });
 
   assert.equal(appResp.status, faceResp.status);

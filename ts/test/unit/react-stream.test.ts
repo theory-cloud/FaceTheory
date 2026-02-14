@@ -39,3 +39,29 @@ test('react adapter: streaming body renders and FaceApp wraps document', async (
   assert.ok(html.includes('<main>Hello (stream)</main>'));
 });
 
+test('react adapter: readiness callback fires for shell and all-ready', async () => {
+  const readiness: Array<{ phase: string; requestId: string | null }> = [];
+
+  const app = createFaceApp({
+    faces: [
+      createReactStreamFace({
+        route: '/',
+        mode: 'ssr',
+        render: () => React.createElement('main', null, 'Hello'),
+        renderOptions: {
+          onReadiness: (evt) => readiness.push({ phase: evt.phase, requestId: evt.requestId }),
+        },
+      }),
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/', headers: { 'x-request-id': ['req-1'] } });
+  assert.ok(!(resp.body instanceof Uint8Array));
+
+  // Yield to allow callbacks to flush (especially `onAllReady`).
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.ok(readiness.some((e) => e.phase === 'shell'));
+  assert.ok(readiness.some((e) => e.phase === 'all-ready'));
+  assert.ok(readiness.every((e) => e.requestId === 'req-1'));
+});

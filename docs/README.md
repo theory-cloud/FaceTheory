@@ -2,6 +2,7 @@
 
 - `docs/ARCHITECTURE.md` — deployment + runtime design (Lambda Function URL + streaming)
 - `docs/AWS_DEPLOYMENT_SHAPE.md` — recommended AWS topology + CloudFront cache behaviors for SSR/SSG/ISR
+- `docs/OPERATIONS.md` — production checklist + observability/security guidance + deploy/rollback runbooks
 - `docs/FOLLOWUP_ROADMAP.md` — implementation completion plan (AWS adapter, HTTP semantics, SSG/ISR, streaming robustness)
 - `docs/HARDENING_HYGIENE_INFRA_ROADMAP.md` — production hardening + hygiene + AppTheory integration + deployment infra
 - `docs/ROADMAP_COMPONENT_LIBRARIES.md` — component library support roadmap (React/Ant Design first)

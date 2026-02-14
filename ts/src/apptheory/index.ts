@@ -25,7 +25,7 @@ export function appTheoryRequestToFaceRequest(request: AppTheoryRequest): FaceRe
 export function appTheoryContextToFaceRequest(ctx: AppTheoryContext): FaceRequest {
   // We intentionally omit `cookies` so FaceApp parses from headers using FaceTheory semantics
   // (including URL-decoding). AppTheory's cookie parsing does not decode percent-encoding.
-  return appTheoryRequestToFaceRequest({
+  const req = appTheoryRequestToFaceRequest({
     method: ctx.request.method,
     path: ctx.request.path,
     query: ctx.request.query,
@@ -33,6 +33,17 @@ export function appTheoryContextToFaceRequest(ctx: AppTheoryContext): FaceReques
     body: ctx.request.body,
     isBase64: ctx.request.isBase64,
   });
+
+  // AppTheory selects a request ID even if the inbound request omitted one. Propagate it to FaceTheory
+  // so logs/headers correlate across the adapter boundary.
+  const requestId = String(ctx.requestId ?? '').trim();
+  if (requestId) {
+    const headers: Headers = { ...(req.headers ?? {}) };
+    headers['x-request-id'] = [requestId];
+    req.headers = headers;
+  }
+
+  return req;
 }
 
 function cloneHeadersWithoutSetCookie(input: Headers): Headers {

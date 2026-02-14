@@ -129,6 +129,13 @@ function handler(event) {
   var req = event.request;
   var uri = req.uri || '/';
 
+  // Request correlation:
+  // - Always set/propagate x-request-id so SSR logs and viewer responses can correlate with CloudFront.
+  // - Prefer an inbound x-request-id if present, otherwise use the CloudFront request ID.
+  if (!req.headers['x-request-id']) {
+    req.headers['x-request-id'] = { value: event.context.requestId };
+  }
+
   // Preserve the original path so SSR can route correctly when S3 misses.
   req.headers['x-facetheory-original-uri'] = { value: uri };
 
@@ -152,9 +159,37 @@ function handler(event) {
       `.trim()),
     });
 
+    const requestIdResponseHeader = new cloudfront.Function(this, 'RequestIdResponseHeader', {
+      code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var req = event.request;
+  var resp = event.response;
+
+  var requestId = '';
+  if (req.headers && req.headers['x-request-id']) {
+    requestId = String(req.headers['x-request-id'].value || '').trim();
+  }
+  if (!requestId) requestId = String(event.context.requestId || '').trim();
+
+  if (requestId) {
+    resp.headers = resp.headers || {};
+    if (!resp.headers['x-request-id']) {
+      resp.headers['x-request-id'] = { value: requestId };
+    }
+  }
+
+  return resp;
+}
+      `.trim()),
+    });
+
     const originRequestPolicy = new cloudfront.OriginRequestPolicy(this, 'OriginRequestPolicy', {
       comment: 'Forward enough for SSR/ISR, without exploding the static cache key',
-      headerBehavior: cloudfront.OriginRequestHeaderBehavior.allowList('x-facetheory-original-uri', 'x-facetheory-tenant'),
+      headerBehavior: cloudfront.OriginRequestHeaderBehavior.allowList(
+        'x-request-id',
+        'x-facetheory-original-uri',
+        'x-facetheory-tenant',
+      ),
       queryStringBehavior: cloudfront.OriginRequestQueryStringBehavior.all(),
       cookieBehavior: cloudfront.OriginRequestCookieBehavior.all(),
     });
@@ -173,6 +208,35 @@ function handler(event) {
       autoDeleteObjects: true,
     });
 
+    // Note: avoid CSP here. Nonce-based CSP must be generated per SSR request and set by the SSR origin.
+    const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'ResponseHeadersPolicy', {
+      comment: 'FaceTheory example security headers (CSP is origin-defined)',
+      securityHeadersBehavior: {
+        strictTransportSecurity: {
+          accessControlMaxAge: Duration.days(365 * 2),
+          includeSubdomains: true,
+          preload: true,
+          override: true,
+        },
+        contentTypeOptions: { override: true },
+        frameOptions: { frameOption: cloudfront.HeadersFrameOption.DENY, override: true },
+        referrerPolicy: {
+          referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+          override: true,
+        },
+        xssProtection: { protection: true, modeBlock: true, override: true },
+      },
+      customHeadersBehavior: {
+        customHeaders: [
+          {
+            header: 'permissions-policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+            override: true,
+          },
+        ],
+      },
+    });
+
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultRootObject: 'index.html',
       enableLogging: true,
@@ -183,10 +247,15 @@ function handler(event) {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
         originRequestPolicy,
+        responseHeadersPolicy,
         functionAssociations: [
           {
             function: ssgRewrite,
             eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+          },
+          {
+            function: requestIdResponseHeader,
+            eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
           },
         ],
       },
@@ -196,18 +265,39 @@ function handler(event) {
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
+          responseHeadersPolicy,
+          functionAssociations: [
+            {
+              function: requestIdResponseHeader,
+              eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
+            },
+          ],
         },
         '/.vite/*': {
           origin: s3Origin,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
+          responseHeadersPolicy,
+          functionAssociations: [
+            {
+              function: requestIdResponseHeader,
+              eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
+            },
+          ],
         },
         '/_facetheory/data/*': {
           origin: s3Origin,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
+          responseHeadersPolicy,
+          functionAssociations: [
+            {
+              function: requestIdResponseHeader,
+              eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
+            },
+          ],
         },
       },
     });

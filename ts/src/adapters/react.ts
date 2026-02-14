@@ -41,9 +41,23 @@ export interface RenderReactStreamOptions extends RenderReactOptions {
    * - `shell`: finalize at `onShellReady` for lower TTFB.
    */
   styleStrategy?: ReactStreamStyleStrategy;
+
+  /**
+   * Optional readiness callback for observability.
+   * - `shell`: React `onShellReady`
+   * - `all-ready`: React `onAllReady`
+   */
+  onReadiness?: (event: ReactStreamReadinessEvent) => void;
 }
 
 export type ReactStreamStyleStrategy = 'all-ready' | 'shell';
+
+export interface ReactStreamReadinessEvent {
+  phase: 'shell' | 'all-ready';
+  styleStrategy: ReactStreamStyleStrategy;
+  requestId: string | null;
+  ms: number;
+}
 
 export async function renderReact(
   ctx: FaceContext,
@@ -123,6 +137,8 @@ export async function renderReactStream(
   const stream = new PassThrough();
   const abortDelayMs = options.abortDelayMs ?? 5000;
   const styleStrategy = options.styleStrategy ?? 'all-ready';
+  const startedAt = Date.now();
+  const requestId = String(ctx.request.headers['x-request-id']?.[0] ?? '').trim() || null;
 
   let didPipe = false;
   let shellSettled = false;
@@ -175,12 +191,24 @@ export async function renderReactStream(
     ...(ctx.request.cspNonce ? { nonce: ctx.request.cspNonce } : {}),
     onShellReady: () => {
       settleShellReady();
+      options.onReadiness?.({
+        phase: 'shell',
+        styleStrategy,
+        requestId,
+        ms: Math.max(0, Date.now() - startedAt),
+      });
       if (styleStrategy === 'shell') {
         pipeOnce(pipe);
       }
     },
     onAllReady: () => {
       settleAllReady();
+      options.onReadiness?.({
+        phase: 'all-ready',
+        styleStrategy,
+        requestId,
+        ms: Math.max(0, Date.now() - startedAt),
+      });
       if (styleStrategy === 'all-ready') {
         pipeOnce(pipe);
       }

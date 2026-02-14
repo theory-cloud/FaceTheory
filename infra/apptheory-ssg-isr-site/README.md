@@ -4,6 +4,8 @@ This example demonstrates FaceTheory H3 deployment semantics:
 
 - **SSG hits avoid Lambda**: CloudFront uses an **origin group** with **S3 primary** and **Lambda Function URL fallback**.
 - **SSG hydration JSON** lives under `/_facetheory/data/*` and is routed to S3.
+- **Request correlation**: CloudFront propagates and emits `x-request-id` for both S3 and SSR responses.
+- **Baseline security headers** are attached via a CloudFront `ResponseHeadersPolicy` (non-CSP).
 - **ISR** uses:
   - FaceTheory `S3HtmlStore` for HTML objects
   - TableTheory `FaceTheoryIsrMetaStore` (DynamoDB) via FaceTheory’s adapter
@@ -50,6 +52,7 @@ curl -I https://<cloudfront-domain>/
 
 Expect:
 - `x-facetheory-ssr: 1`
+- `x-request-id: ...`
 
 3. ISR should include FaceTheory ISR state header:
 
@@ -59,6 +62,6 @@ curl -I https://<cloudfront-domain>/isr-demo
 
 Expect:
 - `x-facetheory-isr: miss|hit|wait-hit|stale`
+- `x-request-id: ...`
 
 To exercise contention, hit it in parallel after waiting > 5 seconds.
-

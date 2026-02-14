@@ -9,6 +9,7 @@ export interface LambdaUrlHttpContext {
 
 export interface LambdaUrlRequestContext {
   http?: LambdaUrlHttpContext;
+  requestId?: string;
 }
 
 export interface LambdaUrlEvent {
@@ -77,6 +78,12 @@ export interface CreateLambdaUrlStreamingHandlerOptions {
 export function lambdaUrlEventToFaceRequest(event: LambdaUrlEvent): FaceRequest {
   const headers = headersFromLambdaEvent(event.headers);
   appendCookieArrayToHeaders(headers, event.cookies);
+  if (!findHeaderKey(headers, 'x-request-id')) {
+    const requestId = String(event.requestContext?.requestId ?? '').trim();
+    if (requestId) {
+      headers['x-request-id'] = [requestId];
+    }
+  }
 
   return {
     method: String(event.requestContext?.http?.method ?? 'GET').trim().toUpperCase() || 'GET',

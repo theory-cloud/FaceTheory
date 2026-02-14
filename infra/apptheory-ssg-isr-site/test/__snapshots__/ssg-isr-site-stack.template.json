@@ -505,7 +505,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "bb77db1a0ecbc243fed23795c195ae3029d4e710e6e085413365073bc927b872.zip"
+          "S3Key": "340c1a2050896adfd83e4e53565db5cafa3887e65f77951a4e3d528ef46d50ab.zip"
         },
         "Environment": {
           "Variables": {
@@ -892,7 +892,7 @@
       "Type": "AWS::CloudFront::Function",
       "Properties": {
         "AutoPublish": true,
-        "FunctionCode": "function handler(event) {\n  var req = event.request;\n  var uri = req.uri || '/';\n\n  // Preserve the original path so SSR can route correctly when S3 misses.\n  req.headers['x-facetheory-original-uri'] = { value: uri };\n\n  if (uri === '/assets' || uri.startsWith('/assets/')) return req;\n  if (uri === '/.vite' || uri.startsWith('/.vite/')) return req;\n  if (uri === '/_facetheory/data' || uri.startsWith('/_facetheory/data/')) return req;\n\n  // If the final segment contains a dot, treat it as a file request.\n  var idx = uri.lastIndexOf('/');\n  var last = uri.substring(idx + 1);\n  if (last.indexOf('.') !== -1) return req;\n\n  if (uri.endsWith('/')) {\n    req.uri = uri + 'index.html';\n    return req;\n  }\n\n  req.uri = uri + '/index.html';\n  return req;\n}",
+        "FunctionCode": "function handler(event) {\n  var req = event.request;\n  var uri = req.uri || '/';\n\n  // Request correlation:\n  // - Always set/propagate x-request-id so SSR logs and viewer responses can correlate with CloudFront.\n  // - Prefer an inbound x-request-id if present, otherwise use the CloudFront request ID.\n  if (!req.headers['x-request-id']) {\n    req.headers['x-request-id'] = { value: event.context.requestId };\n  }\n\n  // Preserve the original path so SSR can route correctly when S3 misses.\n  req.headers['x-facetheory-original-uri'] = { value: uri };\n\n  if (uri === '/assets' || uri.startsWith('/assets/')) return req;\n  if (uri === '/.vite' || uri.startsWith('/.vite/')) return req;\n  if (uri === '/_facetheory/data' || uri.startsWith('/_facetheory/data/')) return req;\n\n  // If the final segment contains a dot, treat it as a file request.\n  var idx = uri.lastIndexOf('/');\n  var last = uri.substring(idx + 1);\n  if (last.indexOf('.') !== -1) return req;\n\n  if (uri.endsWith('/')) {\n    req.uri = uri + 'index.html';\n    return req;\n  }\n\n  req.uri = uri + '/index.html';\n  return req;\n}",
         "FunctionConfig": {
           "Comment": {
             "Fn::Join": [
@@ -920,6 +920,38 @@
         }
       }
     },
+    "RequestIdResponseHeaderA32D1D61": {
+      "Type": "AWS::CloudFront::Function",
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "function handler(event) {\n  var req = event.request;\n  var resp = event.response;\n\n  var requestId = '';\n  if (req.headers && req.headers['x-request-id']) {\n    requestId = String(req.headers['x-request-id'].value || '').trim();\n  }\n  if (!requestId) requestId = String(event.context.requestId || '').trim();\n\n  if (requestId) {\n    resp.headers = resp.headers || {};\n    if (!resp.headers['x-request-id']) {\n      resp.headers['x-request-id'] = { value: requestId };\n    }\n  }\n\n  return resp;\n}",
+        "FunctionConfig": {
+          "Comment": {
+            "Fn::Join": [
+              "",
+              [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "FaceTheoryAppTheIdResponseHeaderAB4B1BF9"
+              ]
+            ]
+          },
+          "Runtime": "cloudfront-js-1.0"
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region"
+              },
+              "FaceTheoryAppTheIdResponseHeaderAB4B1BF9"
+            ]
+          ]
+        }
+      }
+    },
     "OriginRequestPolicy3EFDB4FA": {
       "Type": "AWS::CloudFront::OriginRequestPolicy",
       "Properties": {
@@ -931,6 +963,7 @@
           "HeadersConfig": {
             "HeaderBehavior": "whitelist",
             "Headers": [
+              "x-request-id",
               "x-facetheory-original-uri",
               "x-facetheory-tenant"
             ]
@@ -1075,6 +1108,48 @@
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
     },
+    "ResponseHeadersPolicy13DBF9E0": {
+      "Type": "AWS::CloudFront::ResponseHeadersPolicy",
+      "Properties": {
+        "ResponseHeadersPolicyConfig": {
+          "Comment": "FaceTheory example security headers (CSP is origin-defined)",
+          "CustomHeadersConfig": {
+            "Items": [
+              {
+                "Header": "permissions-policy",
+                "Override": true,
+                "Value": "camera=(), microphone=(), geolocation=()"
+              }
+            ]
+          },
+          "Name": "FaceTheoryAppTheorySsgIsrSiteResponseHeadersPolicy9923F5A6",
+          "SecurityHeadersConfig": {
+            "ContentTypeOptions": {
+              "Override": true
+            },
+            "FrameOptions": {
+              "FrameOption": "DENY",
+              "Override": true
+            },
+            "ReferrerPolicy": {
+              "Override": true,
+              "ReferrerPolicy": "strict-origin-when-cross-origin"
+            },
+            "StrictTransportSecurity": {
+              "AccessControlMaxAgeSec": 63072000,
+              "IncludeSubdomains": true,
+              "Override": true,
+              "Preload": true
+            },
+            "XSSProtection": {
+              "ModeBlock": true,
+              "Override": true,
+              "Protection": true
+            }
+          }
+        }
+      }
+    },
     "DistributionOrigin1S3OriginAccessControlEB606076": {
       "Type": "AWS::CloudFront::OriginAccessControl",
       "Properties": {
@@ -1141,7 +1216,21 @@
               ],
               "CachePolicyId": "83da9c7e-98b4-4e11-a168-04f0df8e2c65",
               "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "RequestIdResponseHeaderA32D1D61",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
               "PathPattern": "/assets/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "ResponseHeadersPolicy13DBF9E0"
+              },
               "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30301D709",
               "ViewerProtocolPolicy": "redirect-to-https"
             },
@@ -1152,7 +1241,21 @@
               ],
               "CachePolicyId": "83da9c7e-98b4-4e11-a168-04f0df8e2c65",
               "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "RequestIdResponseHeaderA32D1D61",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
               "PathPattern": "/.vite/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "ResponseHeadersPolicy13DBF9E0"
+              },
               "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30301D709",
               "ViewerProtocolPolicy": "redirect-to-https"
             },
@@ -1163,7 +1266,21 @@
               ],
               "CachePolicyId": "83da9c7e-98b4-4e11-a168-04f0df8e2c65",
               "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "RequestIdResponseHeaderA32D1D61",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
               "PathPattern": "/_facetheory/data/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "ResponseHeadersPolicy13DBF9E0"
+              },
               "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30301D709",
               "ViewerProtocolPolicy": "redirect-to-https"
             }
@@ -1184,10 +1301,22 @@
                     "FunctionARN"
                   ]
                 }
+              },
+              {
+                "EventType": "viewer-response",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "RequestIdResponseHeaderA32D1D61",
+                    "FunctionARN"
+                  ]
+                }
               }
             ],
             "OriginRequestPolicyId": {
               "Ref": "OriginRequestPolicy3EFDB4FA"
+            },
+            "ResponseHeadersPolicyId": {
+              "Ref": "ResponseHeadersPolicy13DBF9E0"
             },
             "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOriginGroup1DF0DDE71",
             "ViewerProtocolPolicy": "redirect-to-https"
