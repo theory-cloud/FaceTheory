@@ -62,6 +62,8 @@ Acceptance criteria
 
 Goal: stop re-implementing AppTheory’s AWS HTTP plumbing; provide a first-class integration path.
 
+Status (as of 2026-02-14): DONE
+
 Motivation
 - AppTheory already implements Lambda Function URL normalization and response streaming wiring:
   - Streaming handler entrypoint: `AppTheory ts/src/app.ts` (`createLambdaFunctionURLStreamingHandler`)
@@ -69,19 +71,21 @@ Motivation
   - Deterministic invoke helpers: `AppTheory ts/src/testkit.ts`
 
 Work
-- Add a FaceTheory-to-AppTheory adapter module (name TBD; examples):
-  - `ts/src/apptheory/index.ts` in FaceTheory, or a separate package entrypoint if you want dependency isolation.
+- [x] Add a FaceTheory-to-AppTheory adapter module:
+  - `ts/src/apptheory/index.ts`
   - Converts:
     - AppTheory `Request` -> FaceTheory `FaceRequest`
     - FaceTheory `FaceResponse` -> AppTheory `Response` (`bodyStream` for streaming).
-- Provide an example AWS handler that uses AppTheory’s streaming handler and invokes FaceTheory through the adapter.
-- Add contract tests that prove:
+- [x] Provide an example AWS handler that uses AppTheory’s streaming handler and invokes FaceTheory through the adapter:
+  - `ts/examples/apptheory-lambda-url-streaming/handler.ts`
+- [x] Add contract tests that prove:
   - Identical headers/cookies/status for buffered responses.
   - Streaming invariants: headers finalized before bytes; document prefix/head appear before body.
+  - `ts/test/unit/apptheory-adapter.test.ts`
 
 Acceptance criteria
-- A runnable example uses AppTheory streaming wiring end-to-end (no direct use of FaceTheory `ts/src/lambda-url.ts`).
-- Deterministic tests use AppTheory `TestEnv.invokeLambdaFunctionURLStreaming(...)` to assert chunk ordering and headers.
+- [x] A runnable example uses AppTheory streaming wiring end-to-end (no direct use of FaceTheory `ts/src/lambda-url.ts`).
+- [x] Deterministic tests use AppTheory `TestEnv.invokeLambdaFunctionURLStreaming(...)` to assert chunk ordering and headers.
 
 ---
 

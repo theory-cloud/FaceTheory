@@ -3,7 +3,7 @@
 This folder contains the initial TypeScript implementation skeleton for FaceTheory.
 
 Planned integrations:
-- AppTheory: request/response normalization and Lambda event wiring
+- AppTheory: request/response normalization and Lambda event wiring (supported via `src/apptheory/`)
 - TableTheory: ISR metadata/locks via DynamoDB (HTML bodies stored in S3)
 
 ## Dev
@@ -12,6 +12,28 @@ Planned integrations:
 cd ts
 npm ci
 npm test
+```
+
+## AppTheory Integration (H1)
+
+FaceTheory includes an optional AppTheory adapter entrypoint so apps can use AppTheory's Lambda Function URL streaming
+wiring end-to-end (instead of `src/lambda-url.ts`).
+
+Example handler:
+
+```ts
+import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createAppTheoryFaceHandler } from '@theory-cloud/facetheory/apptheory';
+
+const faceApp = createFaceApp({ faces: [] });
+
+const app = createApp();
+const faceHandler = createAppTheoryFaceHandler({ app: faceApp });
+app.get('/', faceHandler);
+app.get('/{proxy+}', faceHandler);
+
+export const handler = createLambdaFunctionURLStreamingHandler(app);
 ```
 
 ## HTTP Semantics (R0)
