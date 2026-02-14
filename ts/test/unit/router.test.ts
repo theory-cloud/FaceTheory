@@ -27,6 +27,22 @@ test('router: proxy+ does not match empty', () => {
   assert.equal(r.match('/'), null);
 });
 
+test('router: supports {name+} catch-all params', () => {
+  const r = new Router();
+  r.add('/{rest+}');
+
+  const m = r.match('/anything/else');
+  assert.equal(m?.pattern, '/{rest+}');
+  assert.equal(m?.params.rest, 'anything/else');
+  assert.equal(m?.proxy, 'anything/else');
+});
+
+test('router: {name+} does not match empty', () => {
+  const r = new Router();
+  r.add('/{rest+}');
+  assert.equal(r.match('/'), null);
+});
+
 test('router: proxy* matches empty', () => {
   const r = new Router();
   r.add('/{proxy*}');
@@ -35,3 +51,10 @@ test('router: proxy* matches empty', () => {
   assert.equal(m?.proxy, undefined);
 });
 
+test('router: {name*} matches empty', () => {
+  const r = new Router();
+  r.add('/{rest*}');
+  const m = r.match('/');
+  assert.equal(m?.pattern, '/{rest*}');
+  assert.equal(m?.proxy, undefined);
+});

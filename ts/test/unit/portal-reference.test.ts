@@ -100,8 +100,6 @@ test('portal reference: SSR + hydration renders real portal components', async (
     }) as any;
 
     try {
-      let html: string;
-
       const app = createFaceApp({
         faces: [
           createReactFace({
@@ -159,7 +157,7 @@ test('portal reference: SSR + hydration renders real portal components', async (
       });
 
       const resp = await app.handle({ method: 'GET', path: '/', cspNonce: 'nonce-portal-ref' });
-      html = new TextDecoder().decode(resp.body as Uint8Array);
+      const html = new TextDecoder().decode(resp.body as Uint8Array);
 
       assert.ok(html.includes('Dashboard'));
       assert.ok(html.includes('Portal header'));

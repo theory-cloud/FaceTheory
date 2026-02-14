@@ -69,10 +69,7 @@ export interface FaceRequestHandler {
   handle: (request: FaceRequest) => Promise<FaceResponse>;
 }
 
-export interface CreateLambdaUrlStreamingHandlerOptions<
-  TEvent extends LambdaUrlEvent = LambdaUrlEvent,
-  TContext = unknown,
-> {
+export interface CreateLambdaUrlStreamingHandlerOptions {
   app: FaceRequestHandler;
   awslambda?: AwsLambdaGlobalLike;
 }
@@ -167,7 +164,7 @@ export function createLambdaUrlStreamingHandler<
   TEvent extends LambdaUrlEvent = LambdaUrlEvent,
   TContext = unknown,
 >(
-  options: CreateLambdaUrlStreamingHandlerOptions<TEvent, TContext>,
+  options: CreateLambdaUrlStreamingHandlerOptions,
 ): (event: TEvent, context: TContext) => Promise<void> {
   const awsLambda = options.awslambda ?? getDefaultAwsLambdaGlobal();
   return awsLambda.streamifyResponse(async (event, responseStream) => {
@@ -290,10 +287,14 @@ function lambdaHeadersAndCookiesFromFaceResponse(response: FaceResponse): {
   cookies: string[];
 } {
   const headers = canonicalizeHeaders(response.headers);
-  const setCookies = [
-    ...(headers['set-cookie'] ?? []),
-    ...(response.cookies ?? []).map(String),
-  ];
+  const setCookies: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of [...(headers['set-cookie'] ?? []), ...response.cookies.map(String)]) {
+    const value = String(raw);
+    if (seen.has(value)) continue;
+    seen.add(value);
+    setCookies.push(value);
+  }
 
   const lambdaHeaders: Record<string, string> = {};
   for (const key of Object.keys(headers).sort()) {

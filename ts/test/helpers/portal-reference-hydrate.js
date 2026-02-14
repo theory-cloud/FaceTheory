@@ -181,10 +181,10 @@ async function main() {
 
     const antdCache = createCache();
 
-    function AntdTokenBridge({ children }) {
+    const AntdTokenBridge = ({ children }) => {
       const { token } = antdTheme.useToken();
       return React.createElement(EmotionThemeProvider, { theme: token, children });
-    }
+    };
 
     const clientTree = React.createElement(
       CacheProvider,
@@ -256,7 +256,9 @@ async function main() {
   } finally {
     try {
       root?.unmount?.();
-    } catch {}
+    } catch (err) {
+      void err;
+    }
     await vite?.close?.();
     if (createdNodeModulesLink) await rm(portalNodeModules, { recursive: true, force: true });
 

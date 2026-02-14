@@ -35,16 +35,17 @@ Each milestone lists where the work belongs.
 Goal: eliminate known correctness issues and make local/CI gates meaningful.
 
 Work (FaceTheory)
-- Fix Lambda URL cookie duplication in response mapping.
+- Status (as of 2026-02-14): DONE
+- [x] Fix Lambda URL cookie duplication in response mapping.
   - Today: `FaceApp` duplicates set-cookies into both `headers['set-cookie']` and `response.cookies`, and the Lambda URL
     adapter merges both again.
   - References: `ts/src/app.ts`, `ts/src/lambda-url.ts`
-- Align router + SSG route syntax for catch-all routes.
+- [x] Align router + SSG route syntax for catch-all routes.
   - AppTheory canonicalizes catch-all as `{name+}`; FaceTheory runtime currently special-cases `{proxy+}`/`{proxy*}`, while
     SSG planning treats `{name+}`/`{name*}` as catch-all.
   - Decide and document the single accepted syntax (or support both) and make runtime + SSG consistent.
   - References: `ts/src/router.ts`, `ts/src/ssg.ts`
-- Make `cd ts && npm run lint` pass (or split lint scopes so “core lint” is green).
+- [x] Make `cd ts && npm run lint` pass (or split lint scopes so “core lint” is green).
   - Explicitly decide whether examples/tests must pass the same lint rules as `ts/src/`.
   - References: `ts/.eslintrc.cjs`, `ts/package.json`
 

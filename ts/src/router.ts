@@ -17,9 +17,27 @@ function splitPath(path: string): string[] {
   return normalized.split('/');
 }
 
+type ParsedPatternSegment =
+  | { kind: 'static'; value: string }
+  | { kind: 'param'; name: string }
+  | { kind: 'proxy_plus'; name: string }
+  | { kind: 'proxy_star'; name: string };
+
+function parsePatternSegment(segment: string): ParsedPatternSegment {
+  if (!(segment.startsWith('{') && segment.endsWith('}')) || segment.length <= 2) {
+    return { kind: 'static', value: segment };
+  }
+
+  const token = segment.slice(1, -1);
+  if (token.endsWith('+')) return { kind: 'proxy_plus', name: token.slice(0, -1) };
+  if (token.endsWith('*')) return { kind: 'proxy_star', name: token.slice(0, -1) };
+  return { kind: 'param', name: token };
+}
+
 function segmentWeight(segment: string): number {
-  if (segment === '{proxy+}' || segment === '{proxy*}') return 1;
-  if (segment.startsWith('{') && segment.endsWith('}') && segment.length > 2) return 2;
+  const parsed = parsePatternSegment(segment);
+  if (parsed.kind === 'proxy_plus' || parsed.kind === 'proxy_star') return 1;
+  if (parsed.kind === 'param') return 2;
   return 3;
 }
 
@@ -42,24 +60,29 @@ function matchPath(
     const pattern = patternSegments[i];
     if (!pattern) return null;
 
-    if (pattern === '{proxy+}' || pattern === '{proxy*}') {
+    const parsed = parsePatternSegment(pattern);
+    if (parsed.kind === 'proxy_plus' || parsed.kind === 'proxy_star') {
       if (i !== patternSegments.length - 1) return null;
-      if (pattern === '{proxy+}' && pathSegments.length <= i) return null;
+      if (!parsed.name) return null;
 
-      const rest = pathSegments.slice(i).join('/');
-      if (rest) params.proxy = rest;
+      const restSegments = pathSegments.slice(i);
+      if (parsed.kind === 'proxy_plus' && restSegments.length === 0) return null;
+
+      const rest = restSegments.join('/');
+      if (rest) params[parsed.name] = rest;
       return rest ? { params, proxy: rest } : { params };
     }
 
     const seg = pathSegments[i];
     if (!seg) return null;
 
-    if (pattern.startsWith('{') && pattern.endsWith('}') && pattern.length > 2) {
-      const name = pattern.slice(1, -1);
-      params[name] = seg;
+    if (parsed.kind === 'param') {
+      if (!parsed.name) return null;
+      params[parsed.name] = seg;
       continue;
     }
-    if (pattern !== seg) return null;
+    if (parsed.kind !== 'static') return null;
+    if (parsed.value !== seg) return null;
   }
 
   if (patternSegments.length !== pathSegments.length) return null;

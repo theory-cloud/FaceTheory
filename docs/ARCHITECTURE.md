@@ -69,13 +69,16 @@ Two routing layers matter:
 2) **AppTheory/FaceTheory** must still support patterns that can express:
    - static routes (`/about`)
    - params (`/users/{id}`)
-   - catch-all (`/{proxy+}`) for “app shell” style routing and framework routers
+   - catch-all (`/{rest+}`) for “app shell” style routing and framework routers
 
 FaceTheory should treat catch-all as a first-class primitive and define precedence rules:
 
 1) static segments
 2) `{param}` segments
-3) `{proxy+}` (must be last)
+3) `{name+}` / `{name*}` catch-all segments (must be last)
+
+FaceTheory supports the legacy API Gateway-style `/{proxy+}` / `/{proxy*}` syntax as an alias for `/{name+}` /
+`/{name*}` (where `name === "proxy"`).
 
 This is an AppTheory router wishlist item (see `docs/WISHLIST.md`).
 
@@ -98,7 +101,7 @@ Adapters choose one:
 export type FaceMode = "ssr" | "ssg" | "isr";
 
 export interface FaceModule {
-  route: string; // e.g. "/about", "/blog/{proxy+}"
+  route: string; // e.g. "/about", "/blog/{rest+}"
   mode: FaceMode;
 
   // SSG/ISR hooks
@@ -160,4 +163,3 @@ The v1 plan should start with **blocking ISR** (simpler correctness), then add S
 - CloudFront caching rules for ISR (TTL, headers, invalidation strategy).
 - How to represent “head” deterministically across adapters (title/meta/link/script ordering).
 - What the “FaceTheory contract tests” look like (inspired by AppTheory/TableTheory fixture-backed contracts).
-

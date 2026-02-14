@@ -1,13 +1,13 @@
 import * as React from 'react';
 
-import { ThemeProvider as EmotionThemeProvider } from '@emotion/react';
+import { ThemeProvider as EmotionThemeProvider, type Theme } from '@emotion/react';
 import { theme as antdTheme } from 'antd';
 
 import type { UIIntegration } from '../types.js';
 
 function AntdTokenEmotionBridge({ children }: { children: React.ReactNode }) {
   const { token } = antdTheme.useToken();
-  return React.createElement(EmotionThemeProvider, { theme: token as any, children });
+  return React.createElement(EmotionThemeProvider, { theme: token as unknown as Theme, children });
 }
 
 /**
@@ -22,4 +22,3 @@ export function createAntdEmotionTokenIntegration(): UIIntegration<React.ReactEl
     wrapTree: (tree) => React.createElement(AntdTokenEmotionBridge, null, tree),
   };
 }
-

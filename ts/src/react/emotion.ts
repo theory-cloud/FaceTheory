@@ -1,7 +1,7 @@
 import * as React from 'react';
 
 import createCache from '@emotion/cache';
-import { CacheProvider, ThemeProvider as EmotionThemeProvider } from '@emotion/react';
+import { CacheProvider, ThemeProvider as EmotionThemeProvider, type Theme } from '@emotion/react';
 import createEmotionServer from '@emotion/server/create-instance';
 
 import type { FaceStyleTag, UIIntegration } from '../types.js';
@@ -51,7 +51,7 @@ export function createEmotionIntegration(
         ? withCache
         : React.createElement(
             EmotionThemeProvider,
-            { theme: options.theme as any, children: withCache },
+            { theme: options.theme as unknown as Theme, children: withCache },
           );
     },
     finalize: (out) => {

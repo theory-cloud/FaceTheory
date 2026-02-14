@@ -76,6 +76,22 @@ test('faceResponseToLambdaUrlResult: preserves set-cookie as separate values', a
   });
 });
 
+test('faceResponseToLambdaUrlResult: does not duplicate cookies when set-cookie is mirrored', async () => {
+  const response: FaceResponse = {
+    status: 200,
+    headers: {
+      'content-type': ['text/plain; charset=utf-8'],
+      'set-cookie': ['a=1; Path=/'],
+    },
+    cookies: ['a=1; Path=/'],
+    body: utf8('ok'),
+    isBase64: false,
+  };
+
+  const result = await faceResponseToLambdaUrlResult(response);
+  assert.deepEqual(result.cookies, ['a=1; Path=/']);
+});
+
 test('faceResponseToLambdaUrlResult: base64-encodes binary payloads when requested', async () => {
   const body = new Uint8Array([0, 127, 128, 255]);
   const response: FaceResponse = {

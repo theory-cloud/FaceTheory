@@ -119,19 +119,28 @@ async function renderWithSvelteServer<Props extends Record<string, unknown>>(
   component: unknown,
   props: Props | undefined,
 ): Promise<SvelteSSRRenderResult> {
-  const { render } = await import('svelte/server');
-  const serverRenderOptions = props === undefined ? {} : { props };
-  const out = render(component as any, serverRenderOptions as any);
+  const { render } = (await import('svelte/server')) as unknown as {
+    render: (component: unknown, options?: unknown) => unknown;
+  };
+  const serverRenderOptions: unknown = props === undefined ? {} : { props };
+  const outUnknown = render(component, serverRenderOptions);
+  const out =
+    outUnknown && typeof outUnknown === 'object'
+      ? (outUnknown as Record<string, unknown>)
+      : {};
 
   const rendered: SvelteSSRRenderResult = {
-    html: String((out as any).body ?? (out as any).html ?? ''),
+    html: String(out.body ?? out.html ?? ''),
   };
 
-  const head = (out as any).head;
+  const head = out.head;
   if (head) rendered.head = String(head);
 
-  const css = (out as any).css;
-  if (css?.code) rendered.css = { code: String(css.code) };
+  const cssUnknown = out.css;
+  if (cssUnknown && typeof cssUnknown === 'object') {
+    const css = cssUnknown as Record<string, unknown>;
+    if (css.code) rendered.css = { code: String(css.code) };
+  }
 
   return rendered;
 }

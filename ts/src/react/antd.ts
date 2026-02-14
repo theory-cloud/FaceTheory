@@ -57,8 +57,8 @@ function mergeDeep<T>(base: T, override: unknown): T {
 
   const out: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(override)) {
-    const existing = (out as any)[key];
-    (out as any)[key] = mergeDeep(existing, value);
+    const existing = out[key];
+    out[key] = mergeDeep(existing, value);
   }
   return out as T;
 }
@@ -125,9 +125,13 @@ export function createAntdIntegration(
         options.themeOverride,
       );
 
+      const hashedFromTheme = isPlainObject(mergedThemeFromInputs)
+        ? mergedThemeFromInputs['hashed']
+        : undefined;
+
       const resolvedHashed =
         options.hashed ??
-        (isPlainObject(mergedThemeFromInputs) ? (mergedThemeFromInputs as any).hashed : undefined) ??
+        (typeof hashedFromTheme === 'boolean' ? hashedFromTheme : undefined) ??
         false;
 
       const mergedTheme = isPlainObject(mergedThemeFromInputs)

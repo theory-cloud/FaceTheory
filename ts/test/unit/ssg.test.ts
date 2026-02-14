@@ -97,7 +97,7 @@ test('ssg: static + param routes produce deterministic files and manifest', asyn
       emitHydrationData: true,
       trailingSlash: 'always',
     });
-    const resultB = await buildSsgSite({
+    await buildSsgSite({
       faces,
       outDir: outB,
       emitHydrationData: true,

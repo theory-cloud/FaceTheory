@@ -10,14 +10,14 @@ import { App } from './app.js';
 export function createViteSSRExampleApp(manifest: ViteManifest) {
   return createFaceApp({
     faces: [
-      createReactFace({
+      createReactFace<{ message: string }>({
         route: '/',
         mode: 'ssr',
         load: async () => ({ message: 'from server' }),
         render: (_ctx, data) => React.createElement(
           'div',
           { id: 'root' },
-          React.createElement(App, { message: (data as any).message }),
+          React.createElement(App, { message: data.message }),
         ),
         renderOptions: async (_ctx, data) => {
           const { headTags } = viteAssetsForEntry(manifest, 'src/entry-client.tsx', {

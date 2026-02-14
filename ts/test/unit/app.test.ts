@@ -172,6 +172,9 @@ test('FaceApp: streaming body error before first chunk falls back to buffered 50
           html: (async function* () {
             await Promise.resolve();
             throw new Error('stream failed before bytes');
+            // Unreachable, but required to satisfy eslint `require-yield`.
+            // This test depends on the stream failing before the first chunk.
+            yield new Uint8Array();
           })(),
         }),
       },
