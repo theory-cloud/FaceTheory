@@ -13,7 +13,7 @@ SSR/SSG/ISR.
   - optional SSG HTML output
   - optional ISR HTML object storage (via `S3HtmlStore`)
 - **DynamoDB table**
-  - ISR metadata + lease/lock state (via `DynamoDbIsrMetaStore`)
+  - ISR metadata + lease/lock state (via TableTheory `FaceTheoryIsrMetaStore`; FaceTheory does not ship native DynamoDB clients)
 
 ## CloudFront Behaviors
 

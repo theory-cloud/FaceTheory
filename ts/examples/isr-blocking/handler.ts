@@ -1,7 +1,7 @@
 // Example sketch: blocking ISR with in-memory stores.
 //
-// Replace the in-memory stores with `S3HtmlStore` + `DynamoDbIsrMetaStore`
-// in production.
+// Replace the in-memory stores with `S3HtmlStore` + a TableTheory-backed `IsrMetaStore`
+// (for DynamoDB use TableTheory `FaceTheoryIsrMetaStore`) in production.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

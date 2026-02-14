@@ -47,7 +47,7 @@ npm test
 - Runtime API: `createFaceApp({ faces, isr: { ... } })` with ISR routes (`mode:'isr'`), implemented in `src/isr.ts`.
 - Storage interfaces:
   - `HtmlStore` for HTML bodies (with `InMemoryHtmlStore` and `S3HtmlStore`).
-  - `IsrMetaStore` for metadata + lock/lease (with `InMemoryIsrMetaStore` and `DynamoDbIsrMetaStore`).
+  - `IsrMetaStore` for metadata + lock/lease (with `InMemoryIsrMetaStore`; for DynamoDB use TableTheory `FaceTheoryIsrMetaStore`).
 - Blocking ISR behavior:
   - cache key includes tenant + route pattern + params (default tenant header: `x-facetheory-tenant`).
   - stale requests use a lease lock to ensure single-writer regeneration and safe pointer swaps.

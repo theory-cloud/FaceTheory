@@ -3,12 +3,15 @@ import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
 import {
+  type CommitIsrGenerationInput,
   defaultIsrCacheKey,
-  DynamoDbIsrMetaStore,
   InMemoryHtmlStore,
   InMemoryIsrMetaStore,
-  type DynamoDbIsrMetaClient,
-  type DynamoDbIsrMetaItem,
+  type IsrMetaRecord,
+  type IsrMetaStore,
+  type ReleaseIsrLeaseInput,
+  type TryAcquireIsrLeaseInput,
+  type TryAcquireIsrLeaseResult,
 } from '../../src/isr.js';
 
 function decodeBody(body: Uint8Array): string {
@@ -33,76 +36,6 @@ async function withTimeout<T>(input: Promise<T>, timeoutMs: number): Promise<T> 
       },
     );
   });
-}
-
-class FakeDynamoMetaClient implements DynamoDbIsrMetaClient {
-  private readonly items = new Map<string, DynamoDbIsrMetaItem>();
-  readonly writes: DynamoDbIsrMetaItem[] = [];
-
-  async getItem(input: { tableName: string; cacheKey: string }): Promise<DynamoDbIsrMetaItem | null> {
-    const item = this.items.get(input.cacheKey);
-    return item ? { ...item } : null;
-  }
-
-  async putItemIfLeaseAvailable(input: {
-    tableName: string;
-    item: DynamoDbIsrMetaItem;
-    nowMs: number;
-  }): Promise<boolean> {
-    const existing = this.items.get(input.item.cacheKey);
-    const hasActiveLease =
-      existing !== undefined &&
-      existing.leaseOwner !== null &&
-      existing.leaseToken !== null &&
-      existing.leaseExpiresAt > input.nowMs &&
-      existing.leaseOwner !== input.item.leaseOwner;
-
-    if (hasActiveLease) return false;
-
-    const next = { ...input.item };
-    this.items.set(next.cacheKey, next);
-    this.writes.push({ ...next });
-    return true;
-  }
-
-  async updateItemIfLeaseMatches(input: {
-    tableName: string;
-    cacheKey: string;
-    leaseOwner: string;
-    leaseToken: string;
-    item: DynamoDbIsrMetaItem;
-  }): Promise<boolean> {
-    const existing = this.items.get(input.cacheKey);
-    if (!existing) return false;
-    if (existing.leaseOwner !== input.leaseOwner || existing.leaseToken !== input.leaseToken) {
-      return false;
-    }
-
-    const next = { ...input.item };
-    this.items.set(input.cacheKey, next);
-    this.writes.push({ ...next });
-    return true;
-  }
-
-  async clearLeaseIfMatches(input: {
-    tableName: string;
-    cacheKey: string;
-    leaseOwner: string;
-    leaseToken: string;
-  }): Promise<void> {
-    const existing = this.items.get(input.cacheKey);
-    if (!existing) return;
-    if (existing.leaseOwner !== input.leaseOwner || existing.leaseToken !== input.leaseToken) {
-      return;
-    }
-
-    this.items.set(input.cacheKey, {
-      ...existing,
-      leaseOwner: null,
-      leaseToken: null,
-      leaseExpiresAt: 0,
-    });
-  }
 }
 
 test('isr: stale burst triggers one regeneration and waiters share result', async () => {
@@ -313,14 +246,36 @@ test('isr: tenant partitioning keeps cache entries isolated', async () => {
   assert.equal(cacheKeys.length, 2);
 });
 
-test('isr: dynamodb metadata writes never include HTML body text', async () => {
+class RecordingMetaStore implements IsrMetaStore {
+  private readonly inner: IsrMetaStore;
+  readonly commits: CommitIsrGenerationInput[] = [];
+
+  constructor(inner: IsrMetaStore) {
+    this.inner = inner;
+  }
+
+  async get(cacheKey: string): Promise<IsrMetaRecord | null> {
+    return await this.inner.get(cacheKey);
+  }
+
+  async tryAcquireLease(input: TryAcquireIsrLeaseInput): Promise<TryAcquireIsrLeaseResult> {
+    return await this.inner.tryAcquireLease(input);
+  }
+
+  async commitGeneration(input: CommitIsrGenerationInput): Promise<void> {
+    this.commits.push({ ...input });
+    return await this.inner.commitGeneration(input);
+  }
+
+  async releaseLease(input: ReleaseIsrLeaseInput): Promise<void> {
+    return await this.inner.releaseLease(input);
+  }
+}
+
+test('isr: metadata commits never include HTML body text', async () => {
   const marker = 'SUPER_SECRET_HTML_PAYLOAD';
   const htmlStore = new InMemoryHtmlStore();
-  const client = new FakeDynamoMetaClient();
-  const metaStore = new DynamoDbIsrMetaStore({
-    client,
-    tableName: 'facetheory-isr',
-  });
+  const recording = new RecordingMetaStore(new InMemoryIsrMetaStore());
 
   const app = createFaceApp({
     faces: [
@@ -335,20 +290,20 @@ test('isr: dynamodb metadata writes never include HTML body text', async () => {
     ],
     isr: {
       htmlStore,
-      metaStore,
+      metaStore: recording,
     },
   });
 
   const response = await app.handle({ method: 'GET', path: '/' });
   assert.ok(decodeBody(response.body as Uint8Array).includes(marker));
-  assert.ok(client.writes.length > 0);
+  assert.ok(recording.commits.length > 0);
 
-  for (const item of client.writes) {
-    const payload = JSON.stringify(item);
+  for (const commit of recording.commits) {
+    const payload = JSON.stringify(commit);
     assert.equal(payload.includes(marker), false);
-    assert.equal(Object.prototype.hasOwnProperty.call(item, 'html'), false);
-    assert.equal(Object.prototype.hasOwnProperty.call(item, 'body'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(commit, 'html'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(commit, 'body'), false);
   }
 
-  assert.ok(client.writes.some((item) => typeof item.htmlPointer === 'string' && item.htmlPointer.length > 0));
+  assert.ok(recording.commits.some((commit) => typeof commit.htmlPointer === 'string' && commit.htmlPointer.length > 0));
 });

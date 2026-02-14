@@ -10,7 +10,7 @@ Implemented in `ts/`:
 - Lambda Function URL adapter (`R1`)
 - Vite manifest asset injection (`R2`)
 - SSG pipeline + CLI (`R3`)
-- Blocking ISR with S3/Dynamo-compatible store interfaces (`R4`)
+- Blocking ISR with S3 + pluggable metadata/lease store interfaces (`R4`) (TableTheory for DynamoDB)
 - Streaming late-style strategy + CSP nonce coverage (`R5`)
 - Vue/Svelte parity hooks + Vite examples (`R6`)
 
@@ -57,6 +57,8 @@ From `ts/`:
 - `docs/ARCHITECTURE.md` — runtime and system model
 - `docs/AWS_DEPLOYMENT_SHAPE.md` — CloudFront/S3/Lambda URL deployment shape and cache policy guidance
 - `docs/FOLLOWUP_ROADMAP.md` — implementation milestone checklist
+- `docs/HARDENING_HYGIENE_INFRA_ROADMAP.md` — hardening + hygiene + AppTheory integration + deployment infra roadmap
 - `docs/ROADMAP_COMPONENT_LIBRARIES.md` — component-library support plan
 - `docs/ROADMAP.md` — high-level milestone roadmap
+- `docs/UPSTREAM_RELEASE_PINS.md` — pinned AppTheory/TableTheory versions (GitHub release assets; no npm registry)
 - `docs/WISHLIST.md` — AppTheory/TableTheory dependencies and asks
