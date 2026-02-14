@@ -8,3 +8,6 @@
 - `docs/ROADMAP.md` — milestones (SSR + SSG/ISR)
 - `docs/UPSTREAM_RELEASE_PINS.md` — pinned AppTheory/TableTheory release asset versions (no npm registry)
 - `docs/WISHLIST.md` — AppTheory/TableTheory wishlist to support FaceTheory on AWS
+
+Infra examples:
+- `infra/apptheory-ssr-site/` — reference CDK stack using AppTheory `AppTheorySsrSite` (CloudFront + S3 + Lambda URL)

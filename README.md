@@ -15,7 +15,8 @@ Implemented in `ts/`:
 - Vue/Svelte parity hooks + Vite examples (`R6`)
 
 Still app-specific / planned:
-- AWS infra provisioning and deployment automation (CloudFront/S3/Lambda URL wiring)
+- Deployment infra and automation (CloudFront/S3/Lambda URL wiring)
+  - Reference CDK stack: `infra/apptheory-ssr-site/` (AppTheory CDK `AppTheorySsrSite`)
 - Operational policies and rollout conventions across environments
 
 ## Repository Layout

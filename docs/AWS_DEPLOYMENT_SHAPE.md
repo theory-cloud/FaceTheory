@@ -15,6 +15,41 @@ SSR/SSG/ISR.
 - **DynamoDB table**
   - ISR metadata + lease/lock state (via TableTheory `FaceTheoryIsrMetaStore`; FaceTheory does not ship native DynamoDB clients)
 
+## AppTheory CDK (Recommended)
+
+AppTheory CDK ships `AppTheorySsrSite`, which implements this topology and wires recommended environment variables onto
+your SSR Lambda function.
+
+Reference example (FaceTheory repo):
+- `infra/apptheory-ssr-site/`
+
+When `wireRuntimeEnv:true` (default), the SSR function will receive:
+- `APPTHEORY_ASSETS_BUCKET`
+- `APPTHEORY_ASSETS_PREFIX`
+- `APPTHEORY_ASSETS_MANIFEST_KEY` (Vite commonly emits `.vite/manifest.json`; ensure your stack config matches)
+
+If a cache table name is configured, AppTheory also wires these aliases:
+- `APPTHEORY_CACHE_TABLE_NAME`
+- `FACETHEORY_CACHE_TABLE_NAME`
+- `CACHE_TABLE_NAME`
+- `CACHE_TABLE`
+
+## Build Outputs (Recommended Contract)
+
+This is the deployment contract FaceTheory assumes for typical Vite SSR apps:
+
+- **SSR Lambda handler**: exports a Lambda Function URL handler (streaming-capable).
+  - Preferred wiring: AppTheory `createLambdaFunctionURLStreamingHandler(app)` + FaceTheory AppTheory adapter
+    (`@theory-cloud/facetheory/apptheory`).
+- **Assets bucket layout**: S3 keys should match the URL path that CloudFront routes to S3.
+  - Hashed build assets should live under an asset prefix (commonly `assets/`), and be served with long-lived caching.
+  - Vite manifest key should be explicitly configured in CDK to match your build output path
+    (commonly `.vite/manifest.json`).
+- **Optional SSG hydration JSON**:
+  - keys under `/_facetheory/data/*` (SSG) routed to S3
+
+See `infra/apptheory-ssr-site/` for a concrete stack that encodes these conventions.
+
 ## CloudFront Behaviors
 
 Recommended path behaviors (top to bottom):

@@ -93,27 +93,27 @@ Acceptance criteria
 
 Goal: ship a production-grade default AWS topology by leveraging AppTheory CDK constructs rather than reinventing infra.
 
+Status (as of 2026-02-14): DONE
+
 Starting point (AppTheory)
 - `AppTheorySsrSite` already implements the “CloudFront + S3 + Lambda Function URL” pattern FaceTheory recommends.
   - Reference: `AppTheory cdk/lib/ssr-site.ts`
 
 Work (AppTheory CDK + FaceTheory docs/examples)
-- Define the required build outputs and S3 layout for FaceTheory apps:
+- [x] Define the required build outputs and S3 layout for FaceTheory apps:
   - Client assets prefix (e.g. `/assets/*`)
   - Manifest key (Vite commonly emits `.vite/manifest.json`; ensure `assetsManifestKey` is configurable accordingly)
   - Server bundle entrypoint (Lambda handler)
-- Add a reference CDK stack (location decision):
-  - Option A: a FaceTheory “deployment example” that imports `@theory-cloud/apptheory-cdk` and uses `AppTheorySsrSite`
-  - Option B: an AppTheory CDK example that specifically deploys a FaceTheory sample app
-- Decide and document a runtime env contract for FaceTheory on AWS:
+- [x] Add a reference CDK stack:
+  - FaceTheory example: `infra/apptheory-ssr-site/`
+- [x] Decide and document a runtime env contract for FaceTheory on AWS:
   - Use AppTheory-wired env vars where possible (`APPTHEORY_ASSETS_BUCKET`, `APPTHEORY_ASSETS_PREFIX`,
     `APPTHEORY_ASSETS_MANIFEST_KEY`, `FACETHEORY_CACHE_TABLE_NAME` when a cache table is configured)
   - Document any FaceTheory-specific env vars for ISR HTML storage/prefix if needed
 
 Acceptance criteria
-- `cdk synth` output is snapshotted (AppTheory CDK already uses snapshot tests; ensure a FaceTheory configuration is
-  covered).
-- A “deploy + curl” smoke guide exists and demonstrates:
+- [x] `cdk synth` output is snapshotted (`infra/apptheory-ssr-site/test/__snapshots__/ssr-site-stack.template.json`).
+- [x] A “deploy + curl” smoke guide exists and demonstrates:
   - CloudFront domain serves streamed HTML from the Lambda URL origin
   - `/assets/*` is served from S3 with long-lived caching
 
