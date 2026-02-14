@@ -9,8 +9,8 @@ packages) to be production-ready on AWS while keeping portability and contract t
 
 - **Streaming responses (Lambda Function URL)**: a first-class, portable streaming response body contract (TS first),
   plus Lambda Function URL integration that can write streamed bytes (`text/html`, `text/event-stream`, etc).
-- **Catch-all routes**: router support for API Gateway–style `/{proxy+}` (must be terminal) with clear precedence rules
-  so catch-alls don’t shadow specific routes.
+- **Catch-all routes**: router support for `/{name+}` / `/{name*}` (must be terminal), with clear precedence rules so
+  catch-alls don’t shadow specific routes.
 - **Streaming-aware TestEnv**: deterministic tests that capture streamed chunks + final status/headers/cookies, alongside
   existing buffered response tests.
 
@@ -62,4 +62,3 @@ apps, consider a companion package (AppTheory-owned) that mirrors proven Lift CD
   (manifest location, bucket names, cache table name).
 - **ISR plumbing**: optional “regeneration trigger” mechanism (Lambda Invoke async / EventBridge / SQS) for future
   stale-while-revalidate mode.
-

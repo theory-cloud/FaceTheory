@@ -14,6 +14,76 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./aws-s3": {
+      "types": "./dist/aws-s3/index.d.ts",
+      "import": "./dist/aws-s3/index.js"
+    },
+    "./apptheory": {
+      "types": "./dist/apptheory/index.d.ts",
+      "import": "./dist/apptheory/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./react/antd": {
+      "types": "./dist/react/antd.d.ts",
+      "import": "./dist/react/antd.js"
+    },
+    "./react/antd-emotion": {
+      "types": "./dist/react/antd-emotion.d.ts",
+      "import": "./dist/react/antd-emotion.js"
+    },
+    "./react/emotion": {
+      "types": "./dist/react/emotion.d.ts",
+      "import": "./dist/react/emotion.js"
+    },
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "import": "./dist/vue/index.js"
+    },
+    "./svelte": {
+      "types": "./dist/svelte/index.d.ts",
+      "import": "./dist/svelte/index.js"
+    },
+    "./tabletheory": {
+      "types": "./dist/tabletheory/index.d.ts",
+      "import": "./dist/tabletheory/index.js"
+    }
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "antd": ">=5",
+    "@emotion/react": ">=11",
+    "@emotion/cache": ">=11",
+    "@emotion/server": ">=11",
+    "vue": ">=3",
+    "@vue/server-renderer": ">=3",
+    "svelte": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "antd": {
+      "optional": true
+    },
+    "@emotion/react": {
+      "optional": true
+    },
+    "@emotion/cache": {
+      "optional": true
+    },
+    "@emotion/server": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "@vue/server-renderer": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
     }
   },
   "scripts": {
@@ -23,16 +93,49 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run test:unit",
-    "test:unit": "tsx test/run-unit.ts"
+    "test:unit": "tsx test/run-unit.ts",
+    "ssg": "tsx src/ssg-cli.ts",
+    "example:ssg:build": "tsx examples/ssg-basic/build.ts",
+    "example:ssg:serve": "tsx examples/ssg-basic/serve-static.ts",
+    "example:buffered:serve": "tsx examples/react-ssr-buffered/node-server.ts",
+    "example:streaming:serve": "tsx examples/react-ssr-streaming/node-server.ts",
+    "example:vite:ssr:build": "vite build --config examples/vite-ssr-react/vite.config.ts && vite build --ssr src/entry-server.tsx --config examples/vite-ssr-react/vite.config.ts",
+    "example:vite:ssr:serve": "tsx examples/vite-ssr-react/node-server.ts",
+    "example:vite:vue:build": "vite build --config examples/vite-ssr-vue/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-vue/vite.config.ts",
+    "example:vite:vue:serve": "tsx examples/vite-ssr-vue/node-server.ts",
+    "example:vite:svelte:build": "vite build --config examples/vite-ssr-svelte/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-svelte/vite.config.ts",
+    "example:vite:svelte:serve": "tsx examples/vite-ssr-svelte/node-server.ts"
   },
   "devDependencies": {
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.9.0/theory-cloud-apptheory-0.9.0.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.4.0/theory-cloud-tabletheory-ts-1.4.0.tgz",
+    "@aws-sdk/client-s3": "^3.971.0",
+    "@sveltejs/vite-plugin-svelte": "^6.2.0",
+    "@emotion/cache": "^11.14.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/server": "^11.11.0",
     "@types/node": "^24.10.9",
+    "@types/jsdom": "^21.1.7",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.26.0",
     "@typescript-eslint/parser": "^8.26.0",
+    "@vue/server-renderer": "^3.5.13",
+    "antd": "^6.2.3",
     "eslint": "^8.57.1",
+    "jsdom": "^26.1.0",
     "prettier": "^3.6.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "svelte": "^5.20.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vue": "^3.5.13"
+  },
+  "overrides": {
+    "@theory-cloud/apptheory": {
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.4.0/theory-cloud-tabletheory-ts-1.4.0.tgz"
+    }
   }
 }
-

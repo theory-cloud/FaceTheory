@@ -1,13 +1,34 @@
 export type Headers = Record<string, string[]>;
 export type Query = Record<string, string[]>;
+export type CookieMap = Record<string, string>;
+
+export type FaceAttributes = Record<
+  string,
+  string | number | boolean | null | undefined
+>;
+
+export type FaceHeadTag =
+  | { type: 'title'; text: string }
+  | { type: 'meta'; attrs: FaceAttributes }
+  | { type: 'link'; attrs: FaceAttributes }
+  | { type: 'script'; attrs: FaceAttributes; body?: string }
+  | { type: 'style'; cssText: string; attrs?: FaceAttributes }
+  | { type: 'raw'; html: string };
+
+export interface FaceStyleTag {
+  cssText: string;
+  attrs?: FaceAttributes;
+}
 
 export interface FaceRequest {
   method: string;
   path: string;
   query?: Query;
   headers?: Headers;
+  cookies?: CookieMap;
   body?: Uint8Array;
   isBase64?: boolean;
+  cspNonce?: string | null;
 }
 
 export type FaceBody = Uint8Array | AsyncIterable<Uint8Array>;
@@ -43,8 +64,27 @@ export interface FaceRenderResult {
   headers?: Record<string, string | string[]>;
   cookies?: string[];
   head?: FaceHead;
+  headTags?: FaceHeadTag[];
+  styleTags?: FaceStyleTag[];
   html: string | AsyncIterable<Uint8Array>;
   hydration?: FaceHydration;
+}
+
+export interface UIIntegrationContribution {
+  headTags?: FaceHeadTag[];
+  styleTags?: FaceStyleTag[];
+}
+
+export interface UIIntegration<TTree = unknown> {
+  name: string;
+  wrapTree?: (tree: TTree, ctx: FaceContext) => TTree;
+  contribute?: (
+    ctx: FaceContext,
+  ) => UIIntegrationContribution | Promise<UIIntegrationContribution>;
+  finalize?: (
+    out: FaceRenderResult,
+    ctx: FaceContext,
+  ) => FaceRenderResult | Promise<FaceRenderResult>;
 }
 
 export interface FaceModule {
@@ -86,3 +126,69 @@ export function cloneQuery(query: Query | undefined): Query {
   return out;
 }
 
+export function parseQueryString(queryString: string): Query {
+  const out: Query = {};
+  if (!queryString) return out;
+
+  const params = new URLSearchParams(
+    queryString.startsWith('?') ? queryString.slice(1) : queryString,
+  );
+  for (const [key, value] of params) {
+    const existingValues = out[key];
+    if (existingValues) {
+      existingValues.push(value);
+    } else {
+      out[key] = [value];
+    }
+  }
+
+  return out;
+}
+
+export function cloneCookies(cookies: CookieMap | undefined): CookieMap {
+  const out: CookieMap = {};
+  if (!cookies) return out;
+  for (const [key, value] of Object.entries(cookies)) {
+    out[key] = String(value);
+  }
+  return out;
+}
+
+export function parseCookiesFromHeaders(headers: Headers | undefined): CookieMap {
+  const out: CookieMap = {};
+  if (!headers) return out;
+
+  const cookieHeaderValues: string[] = [];
+  for (const [headerName, headerValues] of Object.entries(headers)) {
+    if (String(headerName).trim().toLowerCase() !== 'cookie') continue;
+    cookieHeaderValues.push(
+      ...(Array.isArray(headerValues) ? headerValues : [String(headerValues)]).map(String),
+    );
+  }
+
+  for (const cookieHeader of cookieHeaderValues) {
+    for (const part of cookieHeader.split(';')) {
+      const segment = part.trim();
+      if (!segment) continue;
+
+      const equalsIdx = segment.indexOf('=');
+      if (equalsIdx <= 0) continue;
+
+      const name = segment.slice(0, equalsIdx).trim();
+      if (!name) continue;
+
+      let value = segment.slice(equalsIdx + 1).trim();
+      if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+        value = value.slice(1, -1);
+      }
+
+      try {
+        out[name] = decodeURIComponent(value);
+      } catch {
+        out[name] = value;
+      }
+    }
+  }
+
+  return out;
+}

@@ -10,9 +10,11 @@ pnpm-debug.log*
 # Builds
 dist/
 coverage/
+ts/examples/ssg-basic/dist-static/
 
 # OS/editor
 .DS_Store
 .idea/
 .vscode/
 
+reference/

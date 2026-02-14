@@ -1,12 +1,12 @@
-// Example sketch: AWS Lambda Function URL streaming handler.
+// Example: AWS Lambda Function URL handler using the FaceTheory Lambda adapter.
 //
 // This is not included in `tsc` builds (examples are excluded from tsconfig).
-// It exists to illustrate the intended integration shape for FaceTheory streaming.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { createFaceApp } from '../../src/app.js';
 import { streamFromString } from '../../src/bytes.js';
+import { createLambdaUrlStreamingHandler } from '../../src/lambda-url.js';
 
 export const faceApp = createFaceApp({
   faces: [
@@ -30,16 +30,4 @@ export const faceApp = createFaceApp({
   ],
 });
 
-// Pseudocode: wrap with `awslambda.streamifyResponse(...)` in production.
-export async function handler(event: any): Promise<any> {
-  const resp = await faceApp.handle({
-    method: event?.requestContext?.http?.method ?? 'GET',
-    path: event?.rawPath ?? '/',
-    headers: {}, // map from event.headers if desired
-    query: {}, // parse event.rawQueryString if desired
-  });
-
-  // In streaming mode, write `resp.body` chunks into the Lambda response stream.
-  return resp;
-}
-
+export const handler = createLambdaUrlStreamingHandler({ app: faceApp });

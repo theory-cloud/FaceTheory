@@ -1,0 +1,21 @@
+html {
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+main {
+  max-width: 60rem;
+  margin: 4rem auto;
+  padding: 0 1rem;
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 2.25rem;
+  line-height: 1.1;
+}
+
+p {
+  margin: 0.25rem 0 0;
+  color: #444;
+}
+

@@ -1,0 +1,23 @@
+{
+  "name": "@theory-cloud/facetheory-infra-apptheory-ssr-site",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "tsx test/run.ts",
+    "test:update": "UPDATE_SNAPSHOTS=1 tsx test/run.ts",
+    "synth": "tsx scripts/synth.ts"
+  },
+  "devDependencies": {
+    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v0.9.0/theory-cloud-apptheory-cdk-0.9.0.tgz",
+    "@types/node": "^24.10.9",
+    "aws-cdk-lib": "2.235.1",
+    "constructs": "10.4.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
+
