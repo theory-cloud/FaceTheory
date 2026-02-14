@@ -124,24 +124,28 @@ Acceptance criteria
 Goal: make SSG and ISR work end-to-end with explicit, testable caching semantics.
 
 Work (FaceTheory + AppTheory CDK + optional TableTheory)
-- Pick an SSG routing strategy that achieves “SSG hits avoid Lambda”:
+
+Status (as of 2026-02-14): DONE
+
+- [x] Pick an SSG routing strategy that achieves “SSG hits avoid Lambda”:
   - Option A: CloudFront origin group (S3 primary for HTML keys, Lambda URL failover for misses)
   - Option B: explicit CloudFront behaviors for known SSG routes (manual or generated)
   - Document the chosen strategy and how it scales for large route sets
-- Extend infra to support SSG hydration JSON:
+- [x] Extend infra to support SSG hydration JSON:
   - `/_facetheory/data/*` routed to S3 (as described in `docs/AWS_DEPLOYMENT_SHAPE.md`)
-- Provide “real” AWS client implementations for ISR stores (or an officially supported integration path):
-  - `S3HtmlStoreClient` backed by AWS SDK v3 `S3Client`
-  - `IsrMetaStore` backed by TableTheory `FaceTheoryIsrMetaStore` (DynamoDB)
-- Add an end-to-end ISR example that uses:
+- [x] Provide “real” AWS client implementations for ISR stores (or an officially supported integration path):
+  - `S3HtmlStoreClient` backed by AWS SDK v3 `S3Client`: `ts/src/aws-s3/index.ts`
+  - `IsrMetaStore` backed by TableTheory `FaceTheoryIsrMetaStore` (DynamoDB): `ts/src/tabletheory/index.ts`
+- [x] Add an end-to-end ISR example that uses:
   - `S3HtmlStore` + Dynamo-backed meta store
-  - AppTheory CDK-provisioned bucket/table names via env vars
+  - bucket/table names via env vars (see `docs/AWS_DEPLOYMENT_SHAPE.md`)
+  - reference stack: `infra/apptheory-ssg-isr-site/`
 
 Acceptance criteria
-- A deployed example demonstrates:
+- [x] A deployed example demonstrates:
   - SSG pages served from S3 without invoking the SSR Lambda on cache hits
   - ISR regeneration correctness under concurrency (single-writer) and clear state headers (`x-facetheory-isr`)
-- CloudFront caching/forwarding policy is consistent with `docs/AWS_DEPLOYMENT_SHAPE.md`
+- [x] CloudFront caching/forwarding policy is consistent with `docs/AWS_DEPLOYMENT_SHAPE.md`
 
 ---
 

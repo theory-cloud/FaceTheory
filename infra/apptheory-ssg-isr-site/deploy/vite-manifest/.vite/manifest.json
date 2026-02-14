@@ -1,0 +1,8 @@
+{
+  "src/entry-client.ts": {
+    "file": "assets/entry.js",
+    "css": ["assets/entry.css"],
+    "isEntry": true
+  }
+}
+

@@ -11,9 +11,9 @@ SSR/SSG/ISR.
 - **S3 bucket(s)**
   - immutable client assets (Vite output)
   - optional SSG HTML output
-  - optional ISR HTML object storage (via `S3HtmlStore`)
+  - optional ISR HTML object storage (via `S3HtmlStore`; AWS SDK v3 client adapter: `@theory-cloud/facetheory/aws-s3`)
 - **DynamoDB table**
-  - ISR metadata + lease/lock state (via TableTheory `FaceTheoryIsrMetaStore`; FaceTheory does not ship native DynamoDB clients)
+  - ISR metadata + lease/lock state (via TableTheory `FaceTheoryIsrMetaStore` and FaceTheory adapter `@theory-cloud/facetheory/tabletheory`)
 
 ## AppTheory CDK (Recommended)
 
@@ -22,6 +22,7 @@ your SSR Lambda function.
 
 Reference example (FaceTheory repo):
 - `infra/apptheory-ssr-site/`
+- `infra/apptheory-ssg-isr-site/` (SSG origin-group + ISR example)
 
 When `wireRuntimeEnv:true` (default), the SSR function will receive:
 - `APPTHEORY_ASSETS_BUCKET`
@@ -33,6 +34,16 @@ If a cache table name is configured, AppTheory also wires these aliases:
 - `FACETHEORY_CACHE_TABLE_NAME`
 - `CACHE_TABLE_NAME`
 - `CACHE_TABLE`
+
+FaceTheory ISR HTML storage is provided by `S3HtmlStore` and typically needs these env vars in the SSR runtime:
+- `FACETHEORY_ISR_BUCKET` (S3 bucket name)
+- `FACETHEORY_ISR_PREFIX` (S3 prefix used by your `S3HtmlStore` instance)
+
+Note on prefixes:
+- `S3HtmlStore` has a `keyPrefix` (physical S3 prefix).
+- FaceTheory ISR runtime has `htmlPointerPrefix` (logical prefix embedded in stored pointers).
+
+Avoid configuring both to the same non-empty prefix, or you’ll end up with `prefix/prefix/...` keys.
 
 ## Build Outputs (Recommended Contract)
 
@@ -48,15 +59,45 @@ This is the deployment contract FaceTheory assumes for typical Vite SSR apps:
 - **Optional SSG hydration JSON**:
   - keys under `/_facetheory/data/*` (SSG) routed to S3
 
-See `infra/apptheory-ssr-site/` for a concrete stack that encodes these conventions.
+See:
+- `infra/apptheory-ssr-site/` for SSR + assets via AppTheory `AppTheorySsrSite`
+- `infra/apptheory-ssg-isr-site/` for SSG origin-group failover + ISR (S3 + Dynamo)
 
 ## CloudFront Behaviors
 
-Recommended path behaviors (top to bottom):
+There are two viable strategies for “SSG hits avoid Lambda”.
+
+### Strategy A (Recommended for large SSG route sets): origin group (S3 primary, Lambda URL failover)
+
+Behaviors:
 
 1. `/assets/*` + `/.vite/*` -> **S3 origin**
 2. `/_facetheory/data/*` -> **S3 origin** (if SSG hydration JSON files are emitted)
-3. Optional known static routes (for SSG-first pages) -> **S3 origin**
+3. Default `/*` -> **Origin group**
+  - primary: **S3 origin** (SSG HTML keys)
+  - failover: **Lambda URL origin** (SSR + ISR) on 403/404 misses
+
+This requires a viewer-request CloudFront Function that:
+- rewrites extensionless routes to the S3 HTML key shape (commonly `.../index.html`)
+- copies the original viewer URI into a header (example: `x-facetheory-original-uri`) so SSR can route correctly on failover
+
+Pros:
+- scales to large SSG route sets (no per-route behaviors)
+
+Cons:
+- static + dynamic share the same **cache policy** and **origin request policy** at the default behavior; your SSR handler must be strict about cache headers (e.g. `cache-control: private, no-store`)
+- requires explicit URI rewrite discipline
+
+Reference stack:
+- `infra/apptheory-ssg-isr-site/`
+
+### Strategy B: explicit behaviors for known SSG routes (small route sets)
+
+Behaviors (top to bottom):
+
+1. `/assets/*` + `/.vite/*` -> **S3 origin**
+2. `/_facetheory/data/*` -> **S3 origin**
+3. Known static routes (SSG-first pages) -> **S3 origin**
 4. Default `/*` -> **Lambda URL origin**
 
 Notes:

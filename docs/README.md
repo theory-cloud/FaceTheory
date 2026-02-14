@@ -11,3 +11,4 @@
 
 Infra examples:
 - `infra/apptheory-ssr-site/` — reference CDK stack using AppTheory `AppTheorySsrSite` (CloudFront + S3 + Lambda URL)
+- `infra/apptheory-ssg-isr-site/` — reference CDK stack demonstrating SSG origin-group failover + ISR (S3 + Dynamo via TableTheory)

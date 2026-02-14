@@ -15,6 +15,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./aws-s3": {
+      "types": "./dist/aws-s3/index.d.ts",
+      "import": "./dist/aws-s3/index.js"
+    },
     "./apptheory": {
       "types": "./dist/apptheory/index.d.ts",
       "import": "./dist/apptheory/index.js"
@@ -42,6 +46,10 @@
     "./svelte": {
       "types": "./dist/svelte/index.d.ts",
       "import": "./dist/svelte/index.js"
+    },
+    "./tabletheory": {
+      "types": "./dist/tabletheory/index.d.ts",
+      "import": "./dist/tabletheory/index.js"
     }
   },
   "peerDependencies": {
@@ -101,6 +109,7 @@
   "devDependencies": {
     "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.9.0/theory-cloud-apptheory-0.9.0.tgz",
     "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.4.0/theory-cloud-tabletheory-ts-1.4.0.tgz",
+    "@aws-sdk/client-s3": "^3.971.0",
     "@sveltejs/vite-plugin-svelte": "^6.2.0",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",

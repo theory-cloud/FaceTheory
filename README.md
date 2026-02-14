@@ -16,7 +16,8 @@ Implemented in `ts/`:
 
 Still app-specific / planned:
 - Deployment infra and automation (CloudFront/S3/Lambda URL wiring)
-  - Reference CDK stack: `infra/apptheory-ssr-site/` (AppTheory CDK `AppTheorySsrSite`)
+  - Reference CDK stack (SSR + assets): `infra/apptheory-ssr-site/` (AppTheory CDK `AppTheorySsrSite`)
+  - Reference CDK stack (SSG origin-group + ISR): `infra/apptheory-ssg-isr-site/`
 - Operational policies and rollout conventions across environments
 
 ## Repository Layout

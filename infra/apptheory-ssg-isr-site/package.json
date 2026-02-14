@@ -1,0 +1,28 @@
+{
+  "name": "@theory-cloud/facetheory-infra-apptheory-ssg-isr-site",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "tsx test/run.ts",
+    "test:update": "UPDATE_SNAPSHOTS=1 tsx test/run.ts",
+    "synth": "tsx scripts/synth.ts"
+  },
+  "devDependencies": {
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.9.0/theory-cloud-apptheory-0.9.0.tgz",
+    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v0.9.0/theory-cloud-apptheory-cdk-0.9.0.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.4.0/theory-cloud-tabletheory-ts-1.4.0.tgz",
+    "@aws-sdk/client-dynamodb": "^3.971.0",
+    "@aws-sdk/client-s3": "^3.971.0",
+    "@types/node": "^24.10.9",
+    "aws-cdk-lib": "2.235.1",
+    "constructs": "10.4.5",
+    "esbuild": "^0.25.9",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
+
