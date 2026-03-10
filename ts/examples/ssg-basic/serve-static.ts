@@ -75,6 +75,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, () => {
-  // eslint-disable-next-line no-console
   console.log(`Serving SSG output at http://localhost:${port}`);
 });
