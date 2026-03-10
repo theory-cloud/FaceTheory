@@ -6,7 +6,7 @@ streaming SSR** stack with **SSG + ISR** support and adapters for React/Vue/Svel
 ## M0 — Planning baseline (docs)
 
 - Architecture + decisions documented (`docs/ARCHITECTURE.md`).
-- Roadmap and dependency wishlist documented (`docs/ROADMAP.md`, `docs/WISHLIST.md`).
+- Roadmap and dependency wishlist documented (`docs/planning/ROADMAP.md`, `docs/planning/WISHLIST.md`).
 
 ## M1 — Minimal SSR (buffered) on Lambda Function URL
 
@@ -98,4 +98,3 @@ Acceptance:
 - Multi-tenant considerations (header/query extraction, cache key partitioning).
 - Observability defaults (logs/metrics/traces) consistent with AppTheory.
 - Security posture: CSP, cookies, origin handling, request size limits.
-

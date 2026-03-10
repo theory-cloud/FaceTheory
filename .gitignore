@@ -18,3 +18,4 @@ ts/examples/ssg-basic/dist-static/
 .vscode/
 
 reference/
+.theory/

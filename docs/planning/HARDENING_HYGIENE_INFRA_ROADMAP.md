@@ -1,14 +1,14 @@
 # FaceTheory Hardening, Hygiene, and Infra Roadmap (AppTheory-First)
 
-This roadmap is for the next phase after `docs/FOLLOWUP_ROADMAP.md`: production hardening, repo hygiene, deeper
+This roadmap is for the next phase after `docs/planning/FOLLOWUP_ROADMAP.md`: production hardening, repo hygiene, deeper
 integration with `theory-cloud/AppTheory` where it already provides mature building blocks, and deployment
 infrastructure for real AWS environments.
 
 It complements:
 - `docs/ARCHITECTURE.md` (system model)
 - `docs/AWS_DEPLOYMENT_SHAPE.md` (CloudFront/S3/Lambda URL topology + cache guidance)
-- `docs/ROADMAP.md` (milestone overview)
-- `docs/WISHLIST.md` (cross-repo asks; may be revised as items land)
+- `docs/planning/ROADMAP.md` (milestone overview)
+- `docs/planning/WISHLIST.md` (cross-repo asks; may be revised as items land)
 - `docs/UPSTREAM_RELEASE_PINS.md` (AppTheory/TableTheory versions pinned to GitHub release assets)
 
 ## Guiding principles

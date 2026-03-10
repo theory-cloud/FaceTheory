@@ -1,0 +1,56 @@
+concepts:
+  facetheory_runtime:
+    type: library-runtime
+    language: TypeScript (Node.js >=24)
+    purpose: "SSR, SSG, and blocking ISR runtime for AWS Lambda Function URL deployments."
+    provides:
+      - "A `createFaceApp({ faces })` application runtime with route modes `ssr`, `ssg`, and `isr`."
+      - "Deterministic request normalization, response header ordering, and cookie handling."
+      - "Framework adapters for React, Vue, and Svelte through published package subpaths."
+    requires:
+      - "Node.js >=24 and npm."
+      - "Optional peer frameworks depending on adapter usage."
+    use_when:
+      - "You want one runtime contract for AWS-first HTML delivery across React, Vue, or Svelte."
+    dont_use_when:
+      - "You need undocumented deployment surfaces or compatibility claims outside the published package exports."
+
+  face_module_contract:
+    type: runtime-contract
+    purpose: "Defines route behavior through `FaceModule` and `FaceMode`."
+    provides:
+      - "Route pattern, render mode, optional data loading, and optional static param generation."
+      - "A single render result contract across buffered SSR, streaming SSR, SSG, and ISR."
+    failure_modes:
+      - "Dynamic SSG routes without `generateStaticParams()` fail build planning."
+      - "ISR routes without storage coordination fall back to incorrect regeneration behavior."
+
+  aws_entrypoint:
+    type: deployment
+    purpose: "Recommended request entrypoint is AppTheory or FaceTheory Lambda Function URL handling behind CloudFront."
+    provides:
+      - "Request conversion from Lambda Function URL or AppTheory contexts into `FaceRequest`."
+      - "Streaming response support and `x-request-id` propagation."
+    use_when:
+      - "You are serving dynamic HTML from Lambda Function URL with CloudFront in front."
+    dont_use_when:
+      - "You plan to hand-roll response mapping instead of using the documented adapter surfaces."
+
+  blocking_isr:
+    type: caching-runtime
+    purpose: "FaceTheory blocking ISR stores HTML separately from metadata and lease state."
+    provides:
+      - "HTML object storage through `HtmlStore` implementations including `S3HtmlStore`."
+      - "Metadata and regeneration lease control through `IsrMetaStore` implementations including TableTheory-backed adapters."
+      - "Runtime state visibility through `x-facetheory-isr` headers."
+    failure_modes:
+      - "Using the same logical and physical prefixes can create duplicated S3 object keys."
+      - "Missing or undersized lease settings can cause repeated stale or wait-hit behavior under load."
+
+  upstream_release_pins:
+    type: compatibility
+    purpose: "AppTheory and TableTheory compatibility is pinned to exact GitHub release tarballs."
+    provides:
+      - "Deterministic dependency combinations for runtime and infra examples."
+    failure_modes:
+      - "Registry or floating installs can drift away from tested combinations."
