@@ -1,44 +1,73 @@
-# FaceTheory TypeScript Workspace
+# FaceTheory
 
-This folder contains the `@theory-cloud/facetheory` package source, tests, and runnable examples.
+`@theory-cloud/facetheory` is a TypeScript runtime for AWS-first SSR, SSG, and blocking ISR on Node.js `>=24`, with package exports for React, Vue, and Svelte adapters plus AppTheory and TableTheory integration surfaces.
 
-Canonical product and operator documentation lives under [`../docs/`](../docs/README.md). This README stays focused on workspace-local commands and orientation.
-
-## Local Development
+## Install v0.1.0
 
 ```bash
-cd ts
-npm ci
-npm run typecheck
-npm test
+npm install --save-exact \
+  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.0/theory-cloud-facetheory-0.1.0.tgz
 ```
 
-Build the package:
+Install the peers that match your adapter surface:
 
-```bash
-npm run build
+- React: `npm install react react-dom`
+- React + AntD/Emotion: `npm install antd @emotion/react @emotion/cache @emotion/server`
+- Vue: `npm install vue @vue/server-renderer`
+- Svelte: `npm install svelte`
+
+Optional companion packages:
+
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v0.9.0/theory-cloud-apptheory-0.9.0.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v0.9.0/theory-cloud-apptheory-cdk-0.9.0.tgz`
+- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.4.0/theory-cloud-tabletheory-ts-1.4.0.tgz`
+
+## Minimal App
+
+```ts
+import { createFaceApp, type FaceModule } from '@theory-cloud/facetheory';
+
+const faces: FaceModule[] = [
+  {
+    route: '/',
+    mode: 'ssr',
+    render: async () => ({ html: '<h1>Hello FaceTheory</h1>' }),
+  },
+];
+
+export const app = createFaceApp({ faces });
 ```
 
-## Local Examples
+Expose it directly through Lambda Function URLs:
 
-- Buffered React SSR: `npm run example:buffered:serve`
-- Streaming React SSR: `npm run example:streaming:serve`
-- React Vite SSR: `npm run example:vite:ssr:build && npm run example:vite:ssr:serve`
-- Vue Vite SSR: `npm run example:vite:vue:build && npm run example:vite:vue:serve`
-- Svelte Vite SSR: `npm run example:vite:svelte:build && npm run example:vite:svelte:serve`
-- SSG: `npm run example:ssg:build && npm run example:ssg:serve`
+```ts
+import { createLambdaUrlStreamingHandler } from '@theory-cloud/facetheory';
+import { app } from './app';
 
-## Key Workspace Entry Points
+export const handler = createLambdaUrlStreamingHandler({ app });
+```
 
-- `src/index.ts` core runtime exports
-- `src/apptheory/index.ts` AppTheory adapter
-- `src/aws-s3/index.ts` AWS SDK S3 adapter
-- `src/tabletheory/index.ts` TableTheory ISR adapter
-- `src/ssg-cli.ts` repository-local SSG CLI implementation
+`createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, use `handleLambdaUrlEvent(app, event)` for local checks or pass the optional `awslambda` adapter explicitly.
 
-## Documentation Pointers
+## Public Exports
 
-- [`../docs/api-reference.md`](../docs/api-reference.md)
-- [`../docs/core-patterns.md`](../docs/core-patterns.md)
-- [`../docs/testing-guide.md`](../docs/testing-guide.md)
-- [`../docs/cdk/README.md`](../docs/cdk/README.md)
+- `@theory-cloud/facetheory` core runtime, SSG helpers, Lambda Function URL adapter, and ISR stores
+- `@theory-cloud/facetheory/apptheory` AppTheory request/response adapter
+- `@theory-cloud/facetheory/aws-s3` AWS SDK S3 HTML store adapter
+- `@theory-cloud/facetheory/react` React buffered and streaming helpers
+- `@theory-cloud/facetheory/react/antd` Ant Design integration
+- `@theory-cloud/facetheory/react/emotion` Emotion integration
+- `@theory-cloud/facetheory/react/antd-emotion` AntD token integration
+- `@theory-cloud/facetheory/vue` Vue adapter
+- `@theory-cloud/facetheory/svelte` Svelte adapter
+- `@theory-cloud/facetheory/tabletheory` TableTheory ISR metadata adapter
+
+## Documentation
+
+- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v0.1.0/docs/getting-started.md)
+- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v0.1.0/docs/api-reference.md)
+- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v0.1.0/docs/core-patterns.md)
+- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v0.1.0/docs/testing-guide.md)
+- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v0.1.0/docs/cdk/README.md)
+
+The `v0.1.0` release also includes `facetheory-reference-0.1.0.tar.gz` with the canonical docs, runnable examples, and reference deployment stacks.
