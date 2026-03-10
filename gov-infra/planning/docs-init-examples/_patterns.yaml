@@ -1,0 +1,51 @@
+# Machine-readable usage patterns for FaceTheory
+
+patterns:
+  lambda_url_streaming_happy_path:
+    name: "Use AppTheory streaming handler with FaceTheory adapter"
+    problem: "How should an app expose FaceTheory SSR on AWS Lambda Function URL?"
+    solution: "Create a FaceTheory app, wrap it with `createAppTheoryFaceHandler`, and export AppTheory `createLambdaFunctionURLStreamingHandler(app)`."
+    correct_example: |
+      # CORRECT: use the documented adapter path from ts/README.md
+      import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
+      import { createFaceApp } from '@theory-cloud/facetheory';
+      import { createAppTheoryFaceHandler } from '@theory-cloud/facetheory/apptheory';
+
+      const faceApp = createFaceApp({ faces: [] });
+      const app = createApp();
+      app.get('/', createAppTheoryFaceHandler({ app: faceApp }));
+      app.get('/{proxy+}', createAppTheoryFaceHandler({ app: faceApp }));
+
+      export const handler = createLambdaFunctionURLStreamingHandler(app);
+    anti_patterns:
+      - name: "Skip adapter translation between AppTheory and FaceTheory"
+        why: "Request/response normalization, request-id propagation, and set-cookie handling are implemented in the adapter."
+        incorrect_example: |
+          # INCORRECT: hand-coding ad hoc request conversion instead of using createAppTheoryFaceHandler
+          export const handler = async (event) => {
+            // TODO: avoid this undocumented mapping path
+            return { statusCode: 200, body: '<h1>hello</h1>' };
+          };
+        consequences:
+          - Lost `x-request-id` correlation and reduced observability
+          - Incorrect cookie/header behavior versus documented runtime semantics
+
+  pinned_upstream_dependencies:
+    name: "Pin AppTheory/TableTheory from GitHub release assets"
+    problem: "How should FaceTheory projects manage upstream dependencies that are not npm-published?"
+    solution: "Install and pin exact GitHub release tarballs documented in `docs/UPSTREAM_RELEASE_PINS.md`."
+    correct_example: |
+      # CORRECT: install pinned release assets
+      npm install --save-exact \
+        https://github.com/theory-cloud/AppTheory/releases/download/v0.9.0/theory-cloud-apptheory-0.9.0.tgz
+      npm install --save-exact \
+        https://github.com/theory-cloud/TableTheory/releases/download/v1.4.0/theory-cloud-tabletheory-ts-1.4.0.tgz
+    anti_patterns:
+      - name: "Floating upstream versions"
+        why: "FaceTheory docs and examples are validated against explicit upstream pins."
+        incorrect_example: |
+          # INCORRECT: unpinned install can drift from tested combinations
+          npm install @theory-cloud/apptheory @theory-cloud/tabletheory-ts
+        consequences:
+          - Compatibility drift with FaceTheory examples
+          - Harder incident diagnosis across teams

@@ -1,0 +1,38 @@
+# Machine-readable concept map for FaceTheory
+
+concepts:
+  facetheory_runtime:
+    type: library-runtime
+    language: TypeScript (Node.js >=24)
+    purpose: "Streaming SSR/SSG/ISR runtime for AWS Lambda Function URL with React, Vue, and Svelte adapters."
+    tagline: "Deterministic head/style rendering with portable framework adapters."
+    provides:
+      - "`createFaceApp({ faces })` runtime with `ssr | ssg | isr` route modes (ts/src/app.ts, ts/src/types.ts)."
+      - "Lambda Function URL request/response conversion and streaming handler support (ts/src/lambda-url.ts)."
+      - "Framework adapter surfaces exported at `@theory-cloud/facetheory/react`, `/vue`, and `/svelte` (ts/package.json exports)."
+    requires:
+      - "Node.js >=24 (ts/package.json engines.node)."
+      - "TypeScript toolchain and npm workflow (`npm ci`, `npm run typecheck`, `npm test`)."
+      - "Optional peer frameworks depending on adapter usage (react/react-dom, vue/@vue/server-renderer, svelte)."
+    use_when:
+      - "You need AWS-first SSR with optional SSG/ISR and a single runtime contract across supported UI frameworks."
+    dont_use_when:
+      - "You require API Gateway-specific routing as the primary deployment surface; this repo is Lambda Function URL-first."
+
+  aws_deployment_shape:
+    type: deployment
+    purpose: "Recommended CloudFront + S3 + Lambda URL topology for FaceTheory apps."
+    provides:
+      - "Static assets and optional SSG hydration paths on S3 (`/assets/*`, `/.vite/*`, `/_facetheory/data/*`)."
+      - "Dynamic SSR and ISR regeneration path through Lambda URL fallback (docs/AWS_DEPLOYMENT_SHAPE.md)."
+    failure_modes:
+      - "Over-caching SSR responses when cache-control is not explicitly set to non-cacheable semantics."
+      - "Duplicate S3 ISR key prefixes when `S3HtmlStore.keyPrefix` and ISR `htmlPointerPrefix` are both set to the same non-empty value."
+
+  upstream_release_pins:
+    type: compatibility
+    purpose: "FaceTheory integrations pin AppTheory/TableTheory from GitHub release assets."
+    provides:
+      - "Deterministic dependency resolution for runtime and infra integrations."
+    failure_modes:
+      - "Installing upstream packages from npm registry instead of pinned GitHub assets can create unsupported version drift."
