@@ -7,59 +7,42 @@ FaceTheory is a TypeScript runtime for SSR, SSG, and blocking ISR on Node.js `>=
 Required:
 - Node.js `>=24`
 - npm
-- This repository checked out locally
 
 Optional:
-- `make` if you want root-level wrappers such as `make ts-typecheck` and `make ts-test`
 - AWS familiarity if you plan to use the reference deployment stacks
+- AppTheory and TableTheory if you want the documented AWS-first integration path
 
-## Install And Validate
+## Install The Published Package
 
-This path assumes a fresh checkout and validates the core workspace before you try any framework-specific example.
+Use the exact GitHub release asset so your application stays pinned to the published FaceTheory contract.
 
-### Step 1: Install the TypeScript workspace
-
-```bash
-cd ts
-npm ci
-```
-
-### Step 2: Run the baseline verification commands
+### Step 1: Install FaceTheory
 
 ```bash
-cd ts
-npm run typecheck
-npm test
+npm install --save-exact \
+  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.0/theory-cloud-facetheory-0.1.0.tgz
 ```
 
-Equivalent root-level wrappers after install:
+### Step 2: Install the peers that match your adapter surface
+
+- React: `npm install react react-dom`
+- React + AntD/Emotion: `npm install antd @emotion/react @emotion/cache @emotion/server`
+- Vue: `npm install vue @vue/server-renderer`
+- Svelte: `npm install svelte`
+
+### Step 3: Install optional companion packages
+
+These are only required if your application uses the corresponding integration surface:
 
 ```bash
-make ts-typecheck
-make ts-test
+npm install --save-exact \
+  https://github.com/theory-cloud/AppTheory/releases/download/v0.17.1/theory-cloud-apptheory-0.17.1.tgz
+
+npm install --save-exact \
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.4.2/theory-cloud-tabletheory-ts-1.4.2.tgz
 ```
 
-Expected result:
-- TypeScript checks pass.
-- The unit suite passes for request normalization, routing, SSR, streaming, SSG, ISR, and adapter flows.
-
-## Run A First Example
-
-Start the React streaming example:
-
-```bash
-cd ts
-npm run example:streaming:serve
-```
-
-Then open `http://localhost:4173/`.
-
-Other high-signal examples:
-- Buffered React SSR: `npm run example:buffered:serve`
-- React Vite SSR: `npm run example:vite:ssr:build && npm run example:vite:ssr:serve`
-- Vue Vite SSR: `npm run example:vite:vue:build && npm run example:vite:vue:serve`
-- Svelte Vite SSR: `npm run example:vite:svelte:build && npm run example:vite:svelte:serve`
-- Static generation: `npm run example:ssg:build && npm run example:ssg:serve`
+Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoint. Use TableTheory when you want the documented production ISR metadata store adapter.
 
 ## Build A Minimal App
 
@@ -81,26 +64,84 @@ Next, expose `app.handle()` through either:
 - `createLambdaUrlStreamingHandler({ app })` from `@theory-cloud/facetheory`, or
 - `createAppTheoryFaceHandler({ app })` plus AppTheory's Lambda Function URL streaming handler
 
-## Static Generation Quickstart
+## Add A Handler
 
-Use this flow when you want to verify the static build contract separately from request-time SSR.
+Direct Lambda Function URL handling:
 
-Use the repository CLI wrapper:
+```ts
+import { createLambdaUrlStreamingHandler } from '@theory-cloud/facetheory';
 
-```bash
-cd ts
-npm run ssg -- --entry ./examples/ssg-basic/faces.ts --out ./tmp-ssg
+export const handler = createLambdaUrlStreamingHandler({ app });
 ```
 
-Supported flags:
-- `--entry <module>`
-- `--out <dir>`
-- `--trailing-slash always|never`
-- `--allow-network`
-- `--emit-hydration-data`
+This entrypoint is for AWS Lambda. Outside Lambda, either pass the optional `awslambda` adapter explicitly or test request handling with `handleLambdaUrlEvent(app, event)`.
+
+AppTheory entrypoint handling:
+
+```ts
+import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
+import { createAppTheoryFaceHandler } from '@theory-cloud/facetheory/apptheory';
+
+const runtime = createApp();
+runtime.get('/', createAppTheoryFaceHandler({ app }));
+runtime.get('/{proxy+}', createAppTheoryFaceHandler({ app }));
+
+export const handler = createLambdaFunctionURLStreamingHandler(runtime);
+```
+
+## Static Generation Quickstart
+
+Package consumers should call `buildSsgSite()` directly. The repository-local CLI remains available in the reference bundle if you want to study or adapt the example flow.
+
+Use the programmatic surface:
+
+```ts
+import { buildSsgSite, type FaceModule } from '@theory-cloud/facetheory';
+
+const faces: FaceModule[] = [
+  {
+    route: '/',
+    mode: 'ssg',
+    render: async () => ({ html: '<h1>Static FaceTheory</h1>' }),
+  },
+];
+
+await buildSsgSite({
+  faces,
+  outDir: './dist',
+});
+```
 
 Important default:
 - SSG disables real network `fetch()` calls unless `--allow-network` or a mocked `fetch` implementation is supplied.
+
+## Reference Bundle
+
+The `v0.1.0` GitHub release includes `facetheory-reference-0.1.0.tar.gz`. It contains:
+
+- `docs/` canonical consumer and operator docs
+- `ts/examples/` runnable React, Vue, Svelte, and SSG examples
+- `infra/` reference AppTheory + CloudFront deployment stacks
+
+Use this bundle when you want the docs and examples available locally without cloning the repository.
+
+## Repository Development
+
+If you are contributing to FaceTheory itself, use the workspace-local flow instead of the published package install.
+
+```bash
+cd ts
+npm ci
+npm run typecheck
+npm test
+```
+
+Equivalent root-level wrappers after install:
+
+```bash
+make ts-typecheck
+make ts-test
+```
 
 ## Next Steps
 

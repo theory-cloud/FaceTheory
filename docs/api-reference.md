@@ -5,12 +5,27 @@ This reference summarizes the supported package exports, runtime contracts, and 
 ## Overview
 
 Package:
-- `@theory-cloud/facetheory`
+- `@theory-cloud/facetheory` from `https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.0/theory-cloud-facetheory-0.1.0.tgz`
 
 Runtime:
 - Node.js `>=24`
 
 Primary package exports are defined in `ts/package.json`. The repository also includes a local SSG CLI entrypoint used by `npm run ssg`.
+
+## Install
+
+Install the exact release asset before wiring one of the adapter surfaces into your application:
+
+```bash
+npm install --save-exact \
+  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.0/theory-cloud-facetheory-0.1.0.tgz
+```
+
+Adapter peers:
+- React routes require `react` and `react-dom`
+- React + AntD/Emotion integrations additionally require `antd`, `@emotion/react`, `@emotion/cache`, and `@emotion/server`
+- Vue routes require `vue` and `@vue/server-renderer`
+- Svelte routes require `svelte`
 
 ## Package Export Map
 
@@ -72,6 +87,10 @@ import { createFaceApp, createLambdaUrlStreamingHandler } from '@theory-cloud/fa
 const app = createFaceApp({ faces });
 export const handler = createLambdaUrlStreamingHandler({ app });
 ```
+
+Runtime note:
+- `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global unless you pass the optional `awslambda` adapter explicitly
+- Local tests can call `handleLambdaUrlEvent(app, event)` without the Lambda global
 
 ### Use AppTheory as the AWS entrypoint
 

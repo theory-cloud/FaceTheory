@@ -45,7 +45,6 @@ export async function runSsgCli(argv: string[] = process.argv.slice(2)): Promise
 
   const buildResult = await buildSsgSite(buildOptions);
 
-  // eslint-disable-next-line no-console
   console.log(
     `SSG complete: ${buildResult.pages.length} page(s) written to ${buildResult.outDir} (manifest: ${buildResult.manifestFile})`,
   );
@@ -136,7 +135,6 @@ function resolveFaces(config: SsgCliConfigModule): FaceModule[] {
 }
 
 function printUsage(): void {
-  // eslint-disable-next-line no-console
   console.log(
     [
       'Usage: tsx src/ssg-cli.ts --entry <module> --out <dir> [options]',
@@ -157,7 +155,6 @@ function isDirectExecution(): boolean {
 
 if (isDirectExecution()) {
   runSsgCli().catch((err) => {
-    // eslint-disable-next-line no-console
     console.error(err instanceof Error ? err.message : String(err));
     process.exitCode = 1;
   });

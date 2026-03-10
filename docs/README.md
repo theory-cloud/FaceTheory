@@ -4,6 +4,7 @@ This is the official documentation index for the canonical `docs/` surface.
 
 ## Quick Links
 
+- [Changelog](../CHANGELOG.md)
 - [Docs Contract](./_contract.yaml)
 - [Getting Started](./getting-started.md)
 - [API Reference](./api-reference.md)
@@ -56,3 +57,5 @@ Roadmap and checklist material lives under `docs/planning/` so the root of `docs
 FaceTheory is a TypeScript runtime for AWS-first SSR, SSG, and blocking ISR with package exports for React, Vue, and Svelte adapters, plus AppTheory and TableTheory integration points.
 
 Use this doc set for supported interfaces, setup, verification, troubleshooting, and deployment guidance. Keep roadmap or planning material out of this navigation path.
+
+The `v0.1.0` GitHub release ships the runtime tarball, a reference bundle with docs plus examples, and `SHA256SUMS.txt` so consumers can install without cloning the repository.

@@ -45,12 +45,10 @@ async function main() {
 
   const port = Number(process.env.PORT ?? 4173);
   server.listen(port);
-  // eslint-disable-next-line no-console
   console.log(`listening on http://localhost:${port}/`);
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

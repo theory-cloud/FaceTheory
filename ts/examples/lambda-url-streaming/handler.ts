@@ -2,8 +2,6 @@
 //
 // This is not included in `tsc` builds (examples are excluded from tsconfig).
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { createFaceApp } from '../../src/app.js';
 import { streamFromString } from '../../src/bytes.js';
 import { createLambdaUrlStreamingHandler } from '../../src/lambda-url.js';

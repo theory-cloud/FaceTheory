@@ -2,8 +2,6 @@
 //
 // This is not included in `tsc` builds (examples are excluded from tsconfig).
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
 
 import { createFaceApp } from '../../src/app.js';
@@ -42,4 +40,3 @@ app.handle('HEAD', '/', faceHandler);
 app.handle('HEAD', '/{proxy+}', faceHandler);
 
 export const handler = createLambdaFunctionURLStreamingHandler(app);
-

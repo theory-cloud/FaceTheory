@@ -13,5 +13,4 @@ const result = await buildSsgSite({
   emitHydrationData: false,
 });
 
-// eslint-disable-next-line no-console
 console.log(`SSG build wrote ${result.pages.length} page(s) to ${result.outDir}`);

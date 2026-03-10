@@ -2,8 +2,6 @@
 //
 // This is not included in `tsc` builds (examples are excluded from tsconfig).
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import * as React from 'react';
 
 import { createFaceApp } from '../../src/app.js';
@@ -38,4 +36,3 @@ export async function handler(event: any): Promise<any> {
     query: {}, // parse event.rawQueryString if desired
   });
 }
-

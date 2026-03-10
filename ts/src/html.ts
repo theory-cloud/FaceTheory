@@ -52,7 +52,6 @@ export async function* streamHTMLDocument(
   } catch (err) {
     // Avoid breaking the full HTML document shape on streaming errors.
     // Do not include error details in HTML (may contain sensitive information).
-    // eslint-disable-next-line no-console
     console.error('FaceTheory: streaming body error', err);
     yield utf8('<template data-facetheory-stream-error="true"></template>');
   }
