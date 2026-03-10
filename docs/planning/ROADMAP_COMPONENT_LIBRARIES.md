@@ -1,6 +1,6 @@
 # FaceTheory Component Library Roadmap (React-first)
 
-This roadmap complements `docs/ROADMAP.md` by focusing specifically on **component library + design system support**.
+This roadmap complements `docs/planning/ROADMAP.md` by focusing specifically on **component library + design system support**.
 The first target is the PayTheory standard reference app: `reference/paytheory-portal` (React + Ant Design + Emotion).
 
 ## Guiding principles (cross-framework)
@@ -187,7 +187,7 @@ Acceptance criteria
 - SSR fixtures render without runtime errors and include both Ant Design + Emotion style tags.
 - Hydration fixtures run without console warnings/errors (className mismatch, missing styles, etc).
 - No network calls are required during SSR tests (all external data is mocked/stubbed).
-- A short “Portal SSR readiness checklist” exists and is kept up to date (`docs/PORTAL_SSR_READINESS_CHECKLIST.md`).
+- A short “Portal SSR readiness checklist” exists and is kept up to date (`docs/planning/PORTAL_SSR_READINESS_CHECKLIST.md`).
 
 ---
 

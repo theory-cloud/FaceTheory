@@ -1,0 +1,207 @@
+# FaceTheory API Reference
+
+This reference summarizes the supported package exports, runtime contracts, and deployment-facing conventions that back the canonical FaceTheory docs set.
+
+## Overview
+
+Package:
+- `@theory-cloud/facetheory`
+
+Runtime:
+- Node.js `>=24`
+
+Primary package exports are defined in `ts/package.json`. The repository also includes a local SSG CLI entrypoint used by `npm run ssg`.
+
+## Package Export Map
+
+Use this table as the public entrypoint map for package consumers. It reflects the exports declared in `ts/package.json` and the corresponding source modules.
+
+| Export | Surface | Primary interfaces |
+|---|---|---|
+| `@theory-cloud/facetheory` | Core runtime | `createFaceApp`, `FaceApp`, `FaceModule`, `FaceMode`, `FaceRequest`, `FaceResponse`, `FaceRenderResult`, `buildSsgSite`, `createLambdaUrlStreamingHandler`, `S3HtmlStore`, `InMemoryHtmlStore`, `InMemoryIsrMetaStore`, `blockingIsrCacheControl`, `viteAssetsForEntry`, `viteHydrationForEntry`, `createCspNonce` |
+| `@theory-cloud/facetheory/apptheory` | AppTheory adapter | `createAppTheoryFaceHandler`, `appTheoryContextToFaceRequest`, `faceResponseToAppTheoryResponse` |
+| `@theory-cloud/facetheory/aws-s3` | AWS SDK S3 adapter | `createAwsSdkS3HtmlStoreClient` |
+| `@theory-cloud/facetheory/react` | React adapter | `renderReact`, `renderReactStream`, `createReactFace`, `createReactStreamFace` |
+| `@theory-cloud/facetheory/react/antd` | Ant Design integration | `createAntdIntegration` |
+| `@theory-cloud/facetheory/react/emotion` | Emotion integration | `createEmotionIntegration` |
+| `@theory-cloud/facetheory/react/antd-emotion` | AntD token bridge | `createAntdEmotionTokenIntegration` |
+| `@theory-cloud/facetheory/vue` | Vue adapter | `renderVue`, `createVueFace`, `h` |
+| `@theory-cloud/facetheory/svelte` | Svelte adapter | `renderSvelte`, `createSvelteFace` |
+| `@theory-cloud/facetheory/tabletheory` | TableTheory ISR adapter | `TableTheoryIsrMetaStoreAdapter`, `createTableTheoryIsrMetaStore` |
+
+## Core Runtime Contracts
+
+These contracts shape every adapter and delivery mode. If you change one of these interfaces, update the canonical docs in the same change.
+
+| Interface | Purpose | Notes |
+|---|---|---|
+| `FaceModule` | Route definition | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`. |
+| `FaceMode` | Rendering mode | One of `ssr`, `ssg`, or `isr`. |
+| `FaceRequest` | Normalized request input | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`. |
+| `FaceResponse` | Runtime response | Includes normalized headers, cookies array, status, body, and `isBase64`. |
+| `FaceRenderResult` | Render output before HTTP conversion | Supports `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. |
+| `FaceContext` | Per-request context | Exposes normalized request, route params, and proxy match. |
+| `FaceAppOptions` | App constructor options | Accepts `faces`, optional ISR config, and optional observability hooks. |
+| `FaceIsrOptions` | ISR runtime tuning | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation. |
+
+## Core Usage
+
+These examples show the shortest supported path from route definitions to a deployable handler.
+
+### Create an app
+
+```ts
+import { createFaceApp, type FaceModule } from '@theory-cloud/facetheory';
+
+const faces: FaceModule[] = [
+  {
+    route: '/',
+    mode: 'ssr',
+    render: async () => ({ html: '<h1>Hello FaceTheory</h1>' }),
+  },
+];
+
+const app = createFaceApp({ faces });
+```
+
+### Expose Lambda Function URL handling directly
+
+```ts
+import { createFaceApp, createLambdaUrlStreamingHandler } from '@theory-cloud/facetheory';
+
+const app = createFaceApp({ faces });
+export const handler = createLambdaUrlStreamingHandler({ app });
+```
+
+### Use AppTheory as the AWS entrypoint
+
+```ts
+import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createAppTheoryFaceHandler } from '@theory-cloud/facetheory/apptheory';
+
+const app = createApp();
+const faceApp = createFaceApp({ faces });
+const faceHandler = createAppTheoryFaceHandler({ app: faceApp });
+
+app.get('/', faceHandler);
+app.get('/{proxy+}', faceHandler);
+
+export const handler = createLambdaFunctionURLStreamingHandler(app);
+```
+
+## Framework Adapter Summary
+
+Each adapter keeps the same `FaceModule` contract while translating framework-specific rendering details into a shared runtime output.
+
+React:
+- `createReactFace()` for buffered SSR
+- `createReactStreamFace()` for streaming SSR
+- `renderReactStream(..., { styleStrategy: 'all-ready' | 'shell' })`
+- Integrations compose through `wrapTree`, `contribute`, and `finalize`
+
+Vue:
+- `createVueFace()` wraps a `VNode` render function into a `FaceModule`
+- `renderVue()` supports integration hooks plus `wrapApp`
+
+Svelte:
+- `createSvelteFace()` wraps a `SvelteRenderInput`
+- `renderSvelte()` supports legacy `Component.render()` and Svelte 5 server rendering
+
+## ISR Storage And Cache APIs
+
+Blocking ISR separates HTML object storage from metadata and lease coordination. Keep both sides configured explicitly in production.
+
+HTML storage:
+- `InMemoryHtmlStore`
+- `S3HtmlStore`
+- `createAwsSdkS3HtmlStoreClient({ s3 })`
+
+Metadata and lease storage:
+- `InMemoryIsrMetaStore`
+- `createTableTheoryIsrMetaStore({ config })`
+- `TableTheoryIsrMetaStoreAdapter`
+
+Relevant helpers:
+- `defaultIsrCacheKey(input)`
+- `blockingIsrCacheControl(input)`
+- `isFresh(record, nowMs)`
+
+Important deployment note:
+- `S3HtmlStore.keyPrefix` is a physical S3 prefix
+- `htmlPointerPrefix` in `FaceIsrOptions` is a logical prefix embedded in stored pointers
+- Do not set both to the same non-empty value unless you intentionally want duplicated path segments
+
+## Vite And Hydration Helpers
+
+Use these helpers when a Vite SSR build needs deterministic asset tags and a matching hydration bootstrap module.
+
+| Helper | Purpose |
+|---|---|
+| `viteAssetsForEntry(manifest, entry, options)` | Produces deterministic `modulepreload`, `stylesheet`, and optional asset hint tags. |
+| `viteHydrationForEntry(manifest, entry, data, options)` | Produces a `FaceHydration` payload using the manifest bootstrap module. |
+| `viteDynamicImportPolicy()` | Returns the current dynamic import policy, which is `ignore`. |
+
+Current behavior:
+- `dynamicImports` from Vite manifests are intentionally ignored
+- `includeAssets: true` adds preload or prefetch hints for manifest asset files
+
+## Observability Hooks
+
+Observability is optional, but the hook surface is part of the public runtime contract for request timing and correlation.
+
+`createFaceApp({ observability })` supports:
+- `observability.log(record)` for `facetheory.request.completed`
+- `observability.metric(record)` for request and render timing metrics
+- `observability.now()` to override the clock used for durations
+
+React streaming also exposes `onReadiness` for `shell` and `all-ready` timing events.
+
+## Repository CLI Surface
+
+The repository-local CLI is the supported way to exercise SSG from this workspace. Published package consumers should use `buildSsgSite()` directly unless a separate CLI is introduced later.
+
+The package does not publish `ssg-cli.ts` as a package export. In this repository, use:
+
+```bash
+cd ts
+npm run ssg -- --entry ./examples/ssg-basic/faces.ts --out ./tmp-ssg
+```
+
+Supported flags:
+- `--entry <module>`
+- `--out <dir>`
+- `--trailing-slash always|never`
+- `--allow-network`
+- `--emit-hydration-data`
+
+`buildSsgSite()` uses the same contract programmatically.
+
+## Deployment-Facing Environment Conventions
+
+These variables come from the reference AWS stacks and describe the expected runtime wiring around assets and ISR storage. They are conventions for the documented deployment shape, not mandatory inputs for every local app.
+
+The recommended CloudFront and CDK examples use these runtime conventions:
+
+| Variable | Purpose |
+|---|---|
+| `APPTHEORY_ASSETS_BUCKET` | S3 bucket containing static assets |
+| `APPTHEORY_ASSETS_PREFIX` | Asset prefix under that bucket |
+| `APPTHEORY_ASSETS_MANIFEST_KEY` | Vite manifest object key |
+| `FACETHEORY_ISR_BUCKET` | S3 bucket used for ISR HTML objects |
+| `FACETHEORY_ISR_PREFIX` | S3 prefix for ISR HTML objects |
+| `APPTHEORY_CACHE_TABLE_NAME` | AppTheory-wired cache metadata table alias |
+| `FACETHEORY_CACHE_TABLE_NAME` | FaceTheory cache metadata table alias |
+| `CACHE_TABLE_NAME` | Compatibility alias for metadata table |
+| `CACHE_TABLE` | Compatibility alias for metadata table |
+
+These are deployment conventions from the reference stacks, not required inputs for every local runtime.
+
+## Related Docs
+
+Use the surrounding docs set for task-oriented setup, verification, and deployment guidance.
+
+- [Getting Started](./getting-started.md)
+- [Core Patterns](./core-patterns.md)
+- [Testing Guide](./testing-guide.md)
+- [CDK And AWS Notes](./cdk/README.md)

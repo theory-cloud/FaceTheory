@@ -4,7 +4,7 @@ This roadmap turns the gaps identified during the docs vs implementation review 
 clear acceptance criteria.
 
 It is intentionally **implementation-focused** (what to build next), while the existing docs remain the **vision/design**
-(`docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/ROADMAP_COMPONENT_LIBRARIES.md`).
+(`docs/ARCHITECTURE.md`, `docs/planning/ROADMAP.md`, `docs/planning/ROADMAP_COMPONENT_LIBRARIES.md`).
 
 ## Guiding principles
 
@@ -231,4 +231,3 @@ Acceptance criteria
 
 1) R0 (core semantics) → 2) R1 (Lambda URL adapter) → 3) R2 (assets) → 4) R3 (SSG) → 5) R4 (ISR) → 6) R5 (streaming robustness)
 → 7) R6 (Vue/Svelte parity) → 8) R7 (docs polish).
-

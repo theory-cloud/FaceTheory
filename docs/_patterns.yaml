@@ -1,0 +1,105 @@
+patterns:
+  lambda_url_streaming_happy_path:
+    name: "Use the documented AppTheory to FaceTheory adapter path"
+    problem: "How should a FaceTheory app be exposed for Lambda Function URL streaming?"
+    solution: "Create a FaceTheory app, wrap it with `createAppTheoryFaceHandler`, and export AppTheory's streaming handler."
+    correct_example: |
+      import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
+      import { createFaceApp } from '@theory-cloud/facetheory';
+      import { createAppTheoryFaceHandler } from '@theory-cloud/facetheory/apptheory';
+
+      const faceApp = createFaceApp({ faces });
+      const app = createApp();
+      const faceHandler = createAppTheoryFaceHandler({ app: faceApp });
+
+      app.get('/', faceHandler);
+      app.get('/{proxy+}', faceHandler);
+
+      export const handler = createLambdaFunctionURLStreamingHandler(app);
+    anti_patterns:
+      - name: "Custom request and response translation"
+        why: "It bypasses request-id propagation, cookie normalization, and tested streaming behavior."
+        incorrect_example: |
+          export const handler = async () => ({
+            statusCode: 200,
+            headers: { 'cache-control': 'public, max-age=31536000, immutable' },
+            body: '<html>...</html>',
+          });
+        consequences:
+          - Incorrect header and cookie semantics
+          - Unsafe caching for request-dependent HTML
+
+  rendering_mode_selection:
+    name: "Choose route mode by freshness and storage requirements"
+    problem: "How should SSR, SSG, and ISR be selected?"
+    solution: "Use `ssg` for build-time pages, `isr` for cached pages with regeneration storage, and `ssr` for request-time rendering."
+    correct_example: |
+      import type { FaceModule } from '@theory-cloud/facetheory';
+
+      export const faces: FaceModule[] = [
+        { route: '/', mode: 'ssr', render: async () => ({ html: '<h1>Home</h1>' }) },
+        { route: '/docs', mode: 'ssg', render: async () => ({ html: '<h1>Docs</h1>' }) },
+        {
+          route: '/news/{id}',
+          mode: 'isr',
+          revalidateSeconds: 60,
+          render: async () => ({ html: '<h1>News</h1>' }),
+        },
+      ];
+    anti_patterns:
+      - name: "Enable ISR without HTML and metadata stores"
+        why: "Blocking ISR correctness depends on coordinated HTML storage plus lease metadata."
+        incorrect_example: |
+          const app = createFaceApp({
+            faces: [{ route: '/blog/{id}', mode: 'isr', render: async () => ({ html: '...' }) }],
+          });
+        consequences:
+          - Regeneration cannot be coordinated correctly in production
+          - Behavior diverges from documented deployment guidance
+
+  isr_prefix_separation:
+    name: "Keep physical S3 prefixes separate from logical HTML pointer prefixes"
+    problem: "How should ISR object keys be shaped?"
+    solution: "Use `S3HtmlStore.keyPrefix` and `htmlPointerPrefix` intentionally, not as duplicated copies of the same path."
+    correct_example: |
+      const htmlStore = new S3HtmlStore({
+        client,
+        bucket: 'example-bucket',
+        keyPrefix: 'isr-html',
+      });
+
+      const app = createFaceApp({
+        faces,
+        isr: {
+          htmlStore,
+          metaStore,
+          htmlPointerPrefix: 'pages',
+        },
+      });
+    anti_patterns:
+      - name: "Duplicate prefix segments"
+        why: "Using the same non-empty value in both places produces keys like `prefix/prefix/...`."
+        incorrect_example: |
+          keyPrefix: 'isr'
+          htmlPointerPrefix: 'isr'
+        consequences:
+          - Cache misses against unexpected S3 keys
+          - Confusing object layouts during incident response
+
+  pinned_upstream_dependencies:
+    name: "Pin AppTheory and TableTheory to GitHub release tarballs"
+    problem: "How should FaceTheory projects install upstream dependencies?"
+    solution: "Use exact release asset URLs documented in the compatibility pins."
+    correct_example: |
+      npm install --save-exact \
+        https://github.com/theory-cloud/AppTheory/releases/download/v0.9.0/theory-cloud-apptheory-0.9.0.tgz
+      npm install --save-exact \
+        https://github.com/theory-cloud/TableTheory/releases/download/v1.4.0/theory-cloud-tabletheory-ts-1.4.0.tgz
+    anti_patterns:
+      - name: "Floating registry installs"
+        why: "The repo validates against explicit pinned combinations."
+        incorrect_example: |
+          npm install @theory-cloud/apptheory @theory-cloud/tabletheory-ts
+        consequences:
+          - Compatibility drift
+          - Harder debugging across repos

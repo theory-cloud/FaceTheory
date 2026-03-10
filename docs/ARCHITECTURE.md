@@ -80,7 +80,7 @@ FaceTheory should treat catch-all as a first-class primitive and define preceden
 FaceTheory supports the legacy API Gateway-style `/{proxy+}` / `/{proxy*}` syntax as an alias for `/{name+}` /
 `/{name*}` (where `name === "proxy"`).
 
-This is an AppTheory router wishlist item (see `docs/WISHLIST.md`).
+This is an AppTheory router wishlist item (see `docs/planning/WISHLIST.md`).
 
 ## Streaming response model
 

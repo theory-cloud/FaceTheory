@@ -1,0 +1,56 @@
+decisions:
+  rendering_mode_selection:
+    question: "Which route mode should be used: `ssr`, `ssg`, or `isr`?"
+    decision_tree:
+      - condition: "The page can be generated at build time and does not require per-request personalization."
+        check: "Can the route be produced by `buildSsgSite()` or `npm run ssg`?"
+        if_yes:
+          choice: "Use `mode: ssg`."
+          reason: "This keeps delivery on the static S3 and CloudFront path."
+        if_no:
+          choice: "Evaluate `isr` versus `ssr`."
+          reason: "The page needs runtime freshness or per-request rendering."
+      - condition: "The page can be cached and periodically regenerated."
+        check: "Do you have coordinated HTML storage and metadata lease storage?"
+        if_yes:
+          choice: "Use `mode: isr` with `S3HtmlStore` and an `IsrMetaStore` such as the TableTheory adapter."
+          reason: "Blocking ISR supports deterministic regeneration and stale fallback."
+        if_no:
+          choice: "Use `mode: ssr` until storage is provisioned."
+          reason: "ISR without stores is not a supported production configuration."
+
+  aws_entrypoint_selection:
+    question: "How should a FaceTheory app be exposed on AWS?"
+    decision_tree:
+      - condition: "You are deploying a mixed static and dynamic site."
+        check: "Can CloudFront route static paths to S3 and dynamic paths to Lambda Function URL?"
+        if_yes:
+          choice: "Use the documented CloudFront plus S3 plus Lambda URL topology."
+          reason: "It preserves static caching, streaming HTML delivery, and optional ISR storage."
+        if_no:
+          choice: "Keep deployment guidance scoped to the documented topology."
+          reason: "Direct Lambda URL-only production guidance is outside the current public contract."
+
+  react_streaming_style_strategy:
+    question: "Should React streaming finalize styles at `shell` or `all-ready`?"
+    decision_tree:
+      - condition: "Late styles from Suspense or async boundaries must appear in `<head>` consistently."
+        check: "Is style completeness more important than earliest possible TTFB?"
+        if_yes:
+          choice: "Use `styleStrategy: all-ready`."
+          reason: "This is the default and the safest option for deterministic style extraction."
+        if_no:
+          choice: "Consider `styleStrategy: shell`."
+          reason: "It can lower TTFB, but late styles may miss head emission."
+
+  upstream_dependency_policy:
+    question: "How should AppTheory and TableTheory dependencies be installed?"
+    decision_tree:
+      - condition: "The dependency is AppTheory or TableTheory."
+        check: "Is the install pinned to the GitHub release asset URLs documented by FaceTheory?"
+        if_yes:
+          choice: "Keep the exact release pins."
+          reason: "The repo's examples and overrides are built around explicit upstream versions."
+        if_no:
+          choice: "Do not claim compatibility yet."
+          reason: "Pin versions first, then update docs and verification."

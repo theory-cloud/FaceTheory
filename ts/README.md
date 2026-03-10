@@ -1,104 +1,44 @@
-# FaceTheory (TypeScript)
+# FaceTheory TypeScript Workspace
 
-This folder contains the initial TypeScript implementation skeleton for FaceTheory.
+This folder contains the `@theory-cloud/facetheory` package source, tests, and runnable examples.
 
-Planned integrations:
-- AppTheory: request/response normalization and Lambda event wiring (supported via `src/apptheory/`)
-- TableTheory: ISR metadata/locks via DynamoDB (HTML bodies stored in S3)
+Canonical product and operator documentation lives under [`../docs/`](../docs/README.md). This README stays focused on workspace-local commands and orientation.
 
-## Dev
+## Local Development
 
 ```bash
 cd ts
 npm ci
+npm run typecheck
 npm test
 ```
 
-## AppTheory Integration (H1)
+Build the package:
 
-FaceTheory includes an optional AppTheory adapter entrypoint so apps can use AppTheory's Lambda Function URL streaming
-wiring end-to-end (instead of `src/lambda-url.ts`).
-
-Example handler:
-
-```ts
-import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
-import { createFaceApp } from '@theory-cloud/facetheory';
-import { createAppTheoryFaceHandler } from '@theory-cloud/facetheory/apptheory';
-
-const faceApp = createFaceApp({ faces: [] });
-
-const app = createApp();
-const faceHandler = createAppTheoryFaceHandler({ app: faceApp });
-app.get('/', faceHandler);
-app.get('/{proxy+}', faceHandler);
-
-export const handler = createLambdaFunctionURLStreamingHandler(app);
+```bash
+npm run build
 ```
 
-## HTTP Semantics (R0)
+## Local Examples
 
-- Response headers are normalized to lowercase keys and emitted with deterministic key ordering.
-- `cookies` and `headers['set-cookie']` are merged into `set-cookie` multi-value headers without comma-joining values.
-- `ctx.request.query` is parsed from `request.path` when the incoming request omits an explicit `query` object.
-- `ctx.request.cookies` is available by default via cookie-header parsing, and can be overridden with `request.cookies`.
-- Streaming responses finalize headers before body bytes; if streaming fails before the first body chunk, a buffered safe
-  `500` HTML response is returned.
+- Buffered React SSR: `npm run example:buffered:serve`
+- Streaming React SSR: `npm run example:streaming:serve`
+- React Vite SSR: `npm run example:vite:ssr:build && npm run example:vite:ssr:serve`
+- Vue Vite SSR: `npm run example:vite:vue:build && npm run example:vite:vue:serve`
+- Svelte Vite SSR: `npm run example:vite:svelte:build && npm run example:vite:svelte:serve`
+- SSG: `npm run example:ssg:build && npm run example:ssg:serve`
 
-## Vite Manifest Policy (R2)
+## Key Workspace Entry Points
 
-- `viteAssetsForEntry()` emits deterministic tags in this order: `modulepreload`, `stylesheet`, then optional asset hints.
-- `includeAssets: true` enables hints for `manifest.assets` (images/fonts/audio/video as preload; unknown assets as prefetch).
-- `dynamicImports` are intentionally ignored for now (`ignore` policy) to keep head output deterministic and avoid
-  speculative prefetch noise.
-- `base` supports root, subpath, and absolute CDN prefixes.
+- `src/index.ts` core runtime exports
+- `src/apptheory/index.ts` AppTheory adapter
+- `src/aws-s3/index.ts` AWS SDK S3 adapter
+- `src/tabletheory/index.ts` TableTheory ISR adapter
+- `src/ssg-cli.ts` repository-local SSG CLI implementation
 
-## SSG Policy (R3)
+## Documentation Pointers
 
-- Build API: `buildSsgSite({ faces, outDir, ... })` in `src/ssg.ts`.
-- CLI: `npm run ssg -- --entry <module> --out <dir>` (entry module exports `faces`).
-- Route-to-file convention:
-  - `trailingSlash:'always'` (default): `/about` -> `about/index.html`
-  - `trailingSlash:'never'`: `/about` -> `about.html`
-- Static hosting fallback: when enabled, `404.html` is emitted (from `/404` if present, otherwise a safe default).
-- Build manifest: `.facetheory/ssg-manifest.json`, with ordered page entries and expected Vite manifest path
-  (`.vite/manifest.json`) for asset-injection-aware apps.
-
-## ISR Policy (R4)
-
-- Runtime API: `createFaceApp({ faces, isr: { ... } })` with ISR routes (`mode:'isr'`), implemented in `src/isr.ts`.
-- Storage interfaces:
-  - `HtmlStore` for HTML bodies (with `InMemoryHtmlStore` and `S3HtmlStore`).
-  - `IsrMetaStore` for metadata + lock/lease (with `InMemoryIsrMetaStore`; for DynamoDB use TableTheory `FaceTheoryIsrMetaStore`).
-- Blocking ISR behavior:
-  - cache key includes tenant + route pattern + params (default tenant header: `x-facetheory-tenant`).
-  - stale requests use a lease lock to ensure single-writer regeneration and safe pointer swaps.
-  - regeneration failures keep the previous pointer valid and serve stale by default.
-- Cache headers:
-  - `blockingIsrCacheControl()` emits CloudFront-safe defaults (`max-age=0`, `s-maxage=0`, `must-revalidate`).
-  - responses include `x-facetheory-isr` (`miss`, `hit`, `wait-hit`, `stale`) for runtime visibility.
-
-## Streaming Style Strategy (R5)
-
-- React streaming style strategy is configurable via `renderReactStream(..., { styleStrategy })`:
-  - `all-ready` (default): wait for `onAllReady` before finalizing styles; robust with Suspense/async late styles.
-  - `shell`: finalize at `onShellReady`; lower TTFB but late styles may miss head emission.
-- Ant Design + Emotion integrations now follow the selected strategy automatically through integration finalization timing.
-- Streaming CSP nonce coverage:
-  - FaceTheory-applied `<style>/<script>` head tags are nonce-applied.
-  - React streaming inline scripts (Suspense patches) are nonce-applied via `renderToPipeableStream({ nonce })`.
-- Local benchmark note:
-  - compare `styleStrategy:'shell'` vs default `all-ready` in the same route and record first-byte timing to make the
-    robustness/latency tradeoff explicit.
-
-## Vue + Svelte Parity (R6)
-
-- Vue and Svelte adapters now support integration hooks (`integrations`) with the same model as React:
-  - `wrapTree`
-  - `contribute` (head/style collection)
-  - `finalize` (last-pass output shaping)
-- Deterministic head/style assembly is covered for Vue/Svelte contract tests, including CSP nonce application to all inline
-  style/script tags.
-- Vite SSR examples now include Vue + Svelte parity paths with manifest-driven asset injection and hydration bootstrap:
-  - `npm run example:vite:vue:build`
-  - `npm run example:vite:svelte:build`
+- [`../docs/api-reference.md`](../docs/api-reference.md)
+- [`../docs/core-patterns.md`](../docs/core-patterns.md)
+- [`../docs/testing-guide.md`](../docs/testing-guide.md)
+- [`../docs/cdk/README.md`](../docs/cdk/README.md)
