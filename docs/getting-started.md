@@ -20,7 +20,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.0/theory-cloud-facetheory-0.1.0.tgz
+  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.1/theory-cloud-facetheory-0.1.1.tgz
 ```
 
 ### Step 2: Install the peers that match your adapter surface
@@ -117,7 +117,7 @@ Important default:
 
 ## Reference Bundle
 
-The `v0.1.0` GitHub release includes `facetheory-reference-0.1.0.tar.gz`. It contains:
+The `v0.1.1` GitHub release includes `facetheory-reference-0.1.1.tar.gz`. It contains:
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples

@@ -4,13 +4,13 @@ FaceTheory is a TypeScript runtime for AWS-first SSR, SSG, and blocking ISR with
 
 Canonical documentation lives under [docs/README.md](./docs/README.md).
 
-## Install v0.1.0
+## Install v0.1.1
 
 Install the exact GitHub release tarball:
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.0/theory-cloud-facetheory-0.1.0.tgz
+  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.1/theory-cloud-facetheory-0.1.1.tgz
 ```
 
 Add the framework peers that match your adapter surface:
@@ -55,7 +55,7 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
-The `v0.1.0` GitHub release also ships `facetheory-reference-0.1.0.tar.gz`, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use.
+The `v0.1.1` GitHub release also ships `facetheory-reference-0.1.1.tar.gz`, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use.
 
 ## Repository Development
 

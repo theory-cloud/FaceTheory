@@ -1,6 +1,6 @@
 {
   "name": "@theory-cloud/facetheory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AWS-first SSR, SSG, and blocking ISR runtime for Node.js with React, Vue, and Svelte adapters.",
   "license": "Apache-2.0",
   "type": "module",
@@ -9,7 +9,7 @@
     "url": "git+https://github.com/theory-cloud/FaceTheory.git",
     "directory": "ts"
   },
-  "homepage": "https://github.com/theory-cloud/FaceTheory/tree/v0.1.0/docs",
+  "homepage": "https://github.com/theory-cloud/FaceTheory/tree/v0.1.1/docs",
   "bugs": {
     "url": "https://github.com/theory-cloud/FaceTheory/issues"
   },

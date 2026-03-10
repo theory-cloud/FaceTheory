@@ -5,7 +5,7 @@ This reference summarizes the supported package exports, runtime contracts, and 
 ## Overview
 
 Package:
-- `@theory-cloud/facetheory` from `https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.0/theory-cloud-facetheory-0.1.0.tgz`
+- `@theory-cloud/facetheory` from `https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.1/theory-cloud-facetheory-0.1.1.tgz`
 
 Runtime:
 - Node.js `>=24`
@@ -18,7 +18,7 @@ Install the exact release asset before wiring one of the adapter surfaces into y
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.0/theory-cloud-facetheory-0.1.0.tgz
+  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.1/theory-cloud-facetheory-0.1.1.tgz
 ```
 
 Adapter peers:
