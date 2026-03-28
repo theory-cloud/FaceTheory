@@ -11,6 +11,7 @@ pnpm-debug.log*
 dist/
 coverage/
 ts/examples/ssg-basic/dist-static/
+ts/*.tgz
 
 # OS/editor
 .DS_Store
