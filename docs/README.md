@@ -63,4 +63,4 @@ FaceTheory is a TypeScript runtime for AWS-first SSR, SSG, and blocking ISR with
 
 Use this doc set for supported interfaces, setup, verification, troubleshooting, and deployment guidance. Keep roadmap or planning material out of this navigation path.
 
-The `v0.2.0-rc.2` GitHub release ships the runtime tarball, a reference bundle with docs plus examples, and `SHA256SUMS.txt` so consumers can install without cloning the repository. <!-- x-release-please-version -->
+The `v0.3.0` GitHub release ships the runtime tarball, a reference bundle with docs plus examples, and `SHA256SUMS.txt` so consumers can install without cloning the repository. <!-- x-release-please-version -->
