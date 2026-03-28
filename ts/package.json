@@ -124,7 +124,9 @@
     "example:vite:vue:build": "vite build --config examples/vite-ssr-vue/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-vue/vite.config.ts",
     "example:vite:vue:serve": "tsx examples/vite-ssr-vue/node-server.ts",
     "example:vite:svelte:build": "vite build --config examples/vite-ssr-svelte/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-svelte/vite.config.ts",
-    "example:vite:svelte:serve": "tsx examples/vite-ssr-svelte/node-server.ts"
+    "example:vite:svelte:serve": "tsx examples/vite-ssr-svelte/node-server.ts",
+    "example:vite:svelte:library:build": "vite build --config examples/vite-ssr-svelte-library/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-svelte-library/vite.config.ts",
+    "example:vite:svelte:library:serve": "tsx examples/vite-ssr-svelte-library/node-server.ts"
   },
   "devDependencies": {
     "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.17.1/theory-cloud-apptheory-0.17.1.tgz",

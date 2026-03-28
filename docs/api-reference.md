@@ -33,7 +33,7 @@ Use this table as the public entrypoint map for package consumers. It reflects t
 
 | Export | Surface | Primary interfaces |
 |---|---|---|
-| `@theory-cloud/facetheory` | Core runtime | `createFaceApp`, `FaceApp`, `FaceModule`, `FaceMode`, `FaceRequest`, `FaceResponse`, `FaceRenderResult`, `buildSsgSite`, `createLambdaUrlStreamingHandler`, `S3HtmlStore`, `InMemoryHtmlStore`, `InMemoryIsrMetaStore`, `blockingIsrCacheControl`, `viteAssetsForEntry`, `viteHydrationForEntry`, `createCspNonce` |
+| `@theory-cloud/facetheory` | Core runtime | `createFaceApp`, `FaceApp`, `FaceModule`, `FaceMode`, `FaceRequest`, `FaceResponse`, `FaceRenderResult`, `buildSsgSite`, `createLambdaUrlStreamingHandler`, `S3HtmlStore`, `InMemoryHtmlStore`, `InMemoryIsrMetaStore`, `blockingIsrCacheControl`, `viteAssetsForEntry`, `viteHydrationForEntry`, `createCspNonce`, `readFaceHydrationData`, `parseFaceNavigationSnapshot`, `fetchFaceNavigationSnapshot`, `applyFaceNavigationSnapshot`, `loadFaceNavigationModule`, `startFaceNavigation` |
 | `@theory-cloud/facetheory/apptheory` | AppTheory adapter | `createAppTheoryFaceHandler`, `appTheoryContextToFaceRequest`, `faceResponseToAppTheoryResponse` |
 | `@theory-cloud/facetheory/aws-s3` | AWS SDK S3 adapter | `createAwsSdkS3HtmlStoreClient` |
 | `@theory-cloud/facetheory/react` | React adapter | `renderReact`, `renderReactStream`, `createReactFace`, `createReactStreamFace` |
@@ -54,7 +54,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 | `FaceMode` | Rendering mode | One of `ssr`, `ssg`, or `isr`. |
 | `FaceRequest` | Normalized request input | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`. |
 | `FaceResponse` | Runtime response | Includes normalized headers, cookies array, status, body, and `isBase64`. |
-| `FaceRenderResult` | Render output before HTTP conversion | Supports `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. |
+| `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. |
 | `FaceContext` | Per-request context | Exposes normalized request, route params, and proxy match. |
 | `FaceAppOptions` | App constructor options | Accepts `faces`, optional ISR config, and optional observability hooks. |
 | `FaceIsrOptions` | ISR runtime tuning | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation. |
@@ -126,6 +126,7 @@ Vue:
 Svelte:
 - `createSvelteFace()` wraps a `SvelteRenderInput`
 - `renderSvelte()` supports legacy `Component.render()` and Svelte 5 server rendering
+- Packaged Svelte libraries should import their CSS from the client entry and use `viteAssetsForEntry()` + `viteHydrationForEntry()` to keep SSR asset tags and hydration aligned
 
 ## ISR Storage And Cache APIs
 
@@ -164,6 +165,44 @@ Use these helpers when a Vite SSR build needs deterministic asset tags and a mat
 Current behavior:
 - `dynamicImports` from Vite manifests are intentionally ignored
 - `includeAssets: true` adds preload or prefetch hints for manifest asset files
+
+## Client Navigation
+
+FaceTheory now exposes browser-side helpers for SPA-style navigation between `FaceModule` routes without a full document reload.
+
+Core helpers:
+- `readFaceHydrationData(document?)` reads the `__FACETHEORY_DATA__` payload from the current document
+- `parseFaceNavigationSnapshot(html, options)` converts a rendered FaceTheory document into a structured navigation snapshot
+- `fetchFaceNavigationSnapshot(url, options)` fetches and parses the next route as HTML
+- `applyFaceNavigationSnapshot(snapshot, options)` syncs document attrs, non-executable head tags, and either the configured view container or the full body
+- `loadFaceNavigationModule(snapshot, options)` invokes an exported `hydrateFaceNavigation(...)` hook when present, or reloads the bootstrap module when the hook is absent
+- `startFaceNavigation(options)` intercepts same-origin links, fetches the next FaceTheory document, applies it, and triggers hydration
+
+Recommended host pattern:
+- wrap route content in a stable shell with a view container such as `data-facetheory-view`
+- export `hydrateFaceNavigation(context)` from the client bootstrap module when you need persistent app state across navigations
+- rely on the default module reload only as a compatibility fallback for existing entry modules that hydrate by top-level side effect
+
+## Document Shell Attrs
+
+`FaceRenderResult` can set document-level attrs directly:
+
+```ts
+return {
+  lang: 'ar',
+  htmlAttrs: { dir: 'rtl', 'data-theme': 'midnight' },
+  bodyAttrs: { class: 'app-shell', 'data-density': 'compact' },
+  html: '<div id="root">...</div>',
+};
+```
+
+Semantics:
+- `lang` writes the emitted `<html lang="...">` value
+- `htmlAttrs` and `bodyAttrs` are escaped and serialized like head attrs
+- attrs are emitted in sorted key order for deterministic output
+- explicit `lang` overrides `htmlAttrs.lang`
+- if neither surface sets `lang`, FaceTheory still emits `lang="en"`
+- buffered and streaming document paths use the same merge rules
 
 ## Observability Hooks
 

@@ -18,3 +18,28 @@ test('renderHTMLDocument emits doctype', () => {
   assert.ok(html.startsWith('<!doctype html>'));
 });
 
+test('renderHTMLDocument merges document shell attrs deterministically', () => {
+  const html = renderHTMLDocument({
+    lang: 'fr',
+    htmlAttrs: {
+      class: 'shell',
+      'data-theme': 'light',
+      lang: 'ignored-by-explicit-lang',
+    },
+    bodyAttrs: {
+      class: 'page',
+      hidden: true,
+      'data-label': '<unsafe>',
+    },
+    body: 'ok',
+  });
+
+  assert.ok(
+    html.includes('<html class="shell" data-theme="light" lang="fr">'),
+    html,
+  );
+  assert.ok(
+    html.includes('<body class="page" data-label="&lt;unsafe&gt;" hidden>ok</body>'),
+    html,
+  );
+});

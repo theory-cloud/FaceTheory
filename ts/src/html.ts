@@ -1,3 +1,5 @@
+import type { FaceAttributes } from './types.js';
+
 export function escapeHTML(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -18,18 +20,61 @@ export function safeJson(value: unknown): string {
 
 export interface HTMLDocumentParts {
   lang?: string;
+  htmlAttrs?: FaceAttributes;
+  bodyAttrs?: FaceAttributes;
   head?: string;
   body: string;
 }
 
+function renderAttributes(attrs: FaceAttributes | undefined): string {
+  if (!attrs) return '';
+
+  const keys = Object.keys(attrs).sort();
+  let out = '';
+  for (const key of keys) {
+    const value = attrs[key];
+    if (value === undefined || value === null || value === false) continue;
+
+    const name = escapeHTML(key);
+    if (value === true) {
+      out += ` ${name}`;
+      continue;
+    }
+
+    out += ` ${name}="${escapeHTML(String(value))}"`;
+  }
+
+  return out;
+}
+
+function htmlAttributesForDocument(parts: {
+  lang?: string;
+  htmlAttrs?: FaceAttributes;
+}): FaceAttributes {
+  const htmlAttrs: FaceAttributes = { ...(parts.htmlAttrs ?? {}) };
+  if (parts.lang !== undefined && parts.lang !== null && parts.lang !== '') {
+    htmlAttrs.lang = parts.lang;
+  } else if (
+    htmlAttrs.lang === undefined ||
+    htmlAttrs.lang === null ||
+    htmlAttrs.lang === ''
+  ) {
+    htmlAttrs.lang = 'en';
+  }
+  return htmlAttrs;
+}
+
 export function renderHTMLDocument(parts: HTMLDocumentParts): string {
-  const lang = parts.lang ?? 'en';
   const head = parts.head ?? '';
-  return `<!doctype html><html lang="${escapeHTML(lang)}"><head>${head}</head><body>${parts.body}</body></html>`;
+  const htmlAttrs = renderAttributes(htmlAttributesForDocument(parts));
+  const bodyAttrs = renderAttributes(parts.bodyAttrs);
+  return `<!doctype html><html${htmlAttrs}><head>${head}</head><body${bodyAttrs}>${parts.body}</body></html>`;
 }
 
 export interface HTMLDocumentStreamParts {
   lang?: string;
+  htmlAttrs?: FaceAttributes;
+  bodyAttrs?: FaceAttributes;
   head?: string;
   body: AsyncIterable<Uint8Array>;
 }
@@ -39,11 +84,12 @@ import { utf8 } from './bytes.js';
 export async function* streamHTMLDocument(
   parts: HTMLDocumentStreamParts,
 ): AsyncIterable<Uint8Array> {
-  const lang = parts.lang ?? 'en';
   const head = parts.head ?? '';
+  const htmlAttrs = renderAttributes(htmlAttributesForDocument(parts));
+  const bodyAttrs = renderAttributes(parts.bodyAttrs);
 
   yield utf8(
-    `<!doctype html><html lang="${escapeHTML(lang)}"><head>${head}</head><body>`,
+    `<!doctype html><html${htmlAttrs}><head>${head}</head><body${bodyAttrs}>`,
   );
   try {
     for await (const chunk of parts.body) {

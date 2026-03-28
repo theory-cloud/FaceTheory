@@ -170,6 +170,124 @@ Why this can be incorrect:
 - `shell` may emit before late styles from Suspense or async boundaries are available.
 - It is only appropriate when you have explicitly accepted that tradeoff.
 
+## Pattern: Set document-shell attrs in the render contract
+
+Problem:
+The host needs root-level document semantics such as `lang`, `dir`, theme, or body classes without bypassing FaceTheory's HTML emitters.
+
+**CORRECT**
+
+```ts
+{
+  route: '/',
+  mode: 'ssr',
+  render: async () => ({
+    lang: 'ar',
+    htmlAttrs: { dir: 'rtl', 'data-theme': 'midnight' },
+    bodyAttrs: { class: 'dashboard-shell' },
+    html: '<div id="root">...</div>',
+  }),
+}
+```
+
+Why this is correct:
+- It uses the public render contract instead of raw string surgery around `<html>` or `<body>`.
+- The same attrs flow through buffered and streaming responses.
+- Attr output stays escaped and deterministic.
+
+**INCORRECT**
+
+```ts
+render: async () => ({
+  html: '<html dir="rtl"><body class="dashboard-shell">...</body></html>',
+})
+```
+
+Why this is incorrect:
+- It bypasses FaceTheory's document shell and can produce nested or invalid HTML.
+- It loses the shared escaping and merge rules that the runtime and tests enforce.
+
+## Pattern: Host packaged Svelte component libraries through the client entry
+
+Problem:
+You need FaceTheory's Svelte adapter to SSR and hydrate components that come from an external Svelte package, while also delivering the package CSS and any Vite-discovered assets coherently.
+
+**CORRECT**
+
+```ts
+// src/entry-client.ts
+import '@theory-cloud/facetheory-svelte-library-example/styles.css';
+
+// src/entry-server.ts
+const { headTags } = viteAssetsForEntry(manifest, 'src/entry-client.ts', {
+  includeAssets: true,
+});
+
+return {
+  headTags,
+  hydration: viteHydrationForEntry(manifest, 'src/entry-client.ts', data),
+};
+```
+
+Why this is correct:
+- The packaged library is imported like a normal dependency instead of being copied into the host app.
+- Package CSS stays in the Vite client graph, so FaceTheory can emit deterministic stylesheet and asset tags from the manifest.
+- The hydration bootstrap module matches the same client entry that pulled in the library code and CSS.
+
+Reference example:
+- `ts/examples/vite-ssr-svelte-library/`
+
+**INCORRECT**
+
+```ts
+return {
+  html: '<style>/* pasted library css */</style><div>...</div>',
+}
+```
+
+Why this is incorrect:
+- It bypasses the package asset graph and makes stylesheet delivery drift from the hydrated client bundle.
+- It creates a second, undocumented integration path that tests will not cover.
+
+## Pattern: Use `startFaceNavigation()` with a stable view container
+
+Problem:
+You want SPA-style navigation between FaceTheory routes without a full browser refresh, while keeping document attrs, head tags, and hydration data aligned with the server-rendered output.
+
+**CORRECT**
+
+```ts
+import { startFaceNavigation } from '@theory-cloud/facetheory';
+
+export async function hydrateFaceNavigation({ data, view }) {
+  renderIntoExistingClientRoot(view, data);
+}
+
+startFaceNavigation({
+  viewSelector: '[data-facetheory-view]',
+});
+```
+
+Why this is correct:
+- FaceTheory fetches the next route as HTML and reuses the existing server contract instead of inventing a second route payload format.
+- `lang`, `htmlAttrs`, `bodyAttrs`, and non-executable head tags stay synchronized with the rendered document.
+- Exporting `hydrateFaceNavigation(...)` lets the client module update an existing app root instead of forcing a hard reload.
+
+Compatibility note:
+- If the bootstrap module does not export `hydrateFaceNavigation(...)`, FaceTheory can still reload that module as a fallback so existing side-effect-based entrypoints continue to work, but that fallback will not preserve long-lived client state.
+
+**INCORRECT**
+
+```ts
+document.addEventListener('click', async (event) => {
+  // fetch('/next') and manually patch random DOM nodes
+});
+```
+
+Why this is incorrect:
+- It bypasses the tested FaceTheory navigation helpers and leaves head tags, hydration payloads, and document attrs unsynchronized.
+- It creates an ad hoc client router contract that other hosts and adapters cannot share.
+
 ## Pattern Selection Notes
 
 - Prefer published package exports over private source imports.

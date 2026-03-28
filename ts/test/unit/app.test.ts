@@ -178,6 +178,35 @@ test('FaceApp: parses request cookies from cookie headers by default', async () 
   });
 });
 
+test('FaceApp: emits document shell attrs through the public render contract', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          lang: 'ar',
+          htmlAttrs: { dir: 'rtl', 'data-theme': 'midnight' },
+          bodyAttrs: { class: 'shell-body', 'data-density': 'compact' },
+          html: '<div>ok</div>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  const body = decodeBody(resp.body as Uint8Array);
+
+  assert.ok(
+    body.includes('<html data-theme="midnight" dir="rtl" lang="ar">'),
+    body,
+  );
+  assert.ok(
+    body.includes('<body class="shell-body" data-density="compact"><div>ok</div></body>'),
+    body,
+  );
+});
+
 test('parseCookiesFromHeaders: supports mixed case cookie header names', () => {
   const parsed = parseCookiesFromHeaders({
     Cookie: ['token=xyz'],

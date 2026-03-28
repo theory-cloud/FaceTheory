@@ -1,0 +1,11 @@
+{
+  "name": "@theory-cloud/facetheory-svelte-library-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "svelte": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./styles.css": "./styles.css"
+  }
+}
