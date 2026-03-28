@@ -430,12 +430,14 @@
                 "dynamodb:DescribeTable"
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "CacheTableCDD8F844",
-                  "Arn"
-                ]
-              }
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CacheTableCDD8F844",
+                    "Arn"
+                  ]
+                }
+              ]
             },
             {
               "Action": [
@@ -443,12 +445,14 @@
                 "dynamodb:GetShardIterator"
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "CacheTableCDD8F844",
-                  "Arn"
-                ]
-              }
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CacheTableCDD8F844",
+                    "Arn"
+                  ]
+                }
+              ]
             },
             {
               "Action": [
@@ -505,7 +509,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "354cb2c853239b5f9654d42f622440576c383859db8b080cc26eb4da1acc0bb4.zip"
+          "S3Key": "69971338f92c8743b6a7116e0df1aa6ce8cab9602fe62b5a7cf15ac308bf35c7.zip"
         },
         "Environment": {
           "Variables": {
