@@ -4,12 +4,11 @@
 
 ## Install v0.1.1 <!-- x-release-please-version -->
 
-<!-- x-release-please-start-version -->
 ```bash
+export FACETHEORY_VERSION=0.1.1 # x-release-please-version
 npm install --save-exact \
-  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.1/theory-cloud-facetheory-0.1.1.tgz
+  "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
-<!-- x-release-please-end -->
 
 Install the peers that match your adapter surface:
 
@@ -66,12 +65,10 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 ## Documentation
 
-<!-- x-release-please-start-version -->
 - [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v0.1.1/docs/getting-started.md)
 - [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v0.1.1/docs/api-reference.md)
 - [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v0.1.1/docs/core-patterns.md)
 - [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v0.1.1/docs/testing-guide.md)
 - [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v0.1.1/docs/cdk/README.md)
-<!-- x-release-please-end -->
 
-The `v0.1.1` release also includes `facetheory-reference-0.1.1.tar.gz` with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->
+The `v0.1.1` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->

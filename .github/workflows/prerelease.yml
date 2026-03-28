@@ -140,4 +140,5 @@ jobs:
           fi
 
           echo "release-cleanup: deleting draft release and tag ${TAG_NAME}"
-          gh release delete "${TAG_NAME}" --yes --cleanup-tag
+          gh release delete "${TAG_NAME}" --yes || true
+          git push origin ":refs/tags/${TAG_NAME}" || true

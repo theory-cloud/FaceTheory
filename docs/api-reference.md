@@ -5,7 +5,7 @@ This reference summarizes the supported package exports, runtime contracts, and 
 ## Overview
 
 Package:
-- `@theory-cloud/facetheory` from `https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.1/theory-cloud-facetheory-0.1.1.tgz` <!-- x-release-please-version -->
+- `@theory-cloud/facetheory` from the versioned GitHub release asset shown below
 
 Runtime:
 - Node.js `>=24`
@@ -16,12 +16,11 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
-<!-- x-release-please-start-version -->
 ```bash
+export FACETHEORY_VERSION=0.1.1 # x-release-please-version
 npm install --save-exact \
-  https://github.com/theory-cloud/FaceTheory/releases/download/v0.1.1/theory-cloud-facetheory-0.1.1.tgz
+  "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
-<!-- x-release-please-end -->
 
 Adapter peers:
 - React routes require `react` and `react-dom`
