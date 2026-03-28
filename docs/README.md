@@ -21,9 +21,11 @@ This is the official documentation index for the canonical `docs/` surface.
 ## Scope
 
 Canonical root:
+
 - `docs/`
 
 Fixed ingestible docs:
+
 - `docs/README.md`
 - `docs/_concepts.yaml`
 - `docs/_patterns.yaml`
@@ -36,15 +38,18 @@ Fixed ingestible docs:
 - `docs/migration-guide.md`
 
 Fixed contract-only docs:
+
 - `docs/_contract.yaml`
 - `docs/development-guidelines.md`
 
 Sanctioned optional ingestible docs:
+
 - `docs/cdk/**`
 - `docs/migration/**`
 - `docs/llm-faq/**`
 
 Out of scope for canonical retrieval:
+
 - `docs/development/**`
 - `docs/planning/**`
 - `docs/internal/**`
