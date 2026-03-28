@@ -5,10 +5,12 @@ FaceTheory is a TypeScript runtime for SSR, SSG, and blocking ISR on Node.js `>=
 ## Prerequisites
 
 Required:
+
 - Node.js `>=24`
 - npm
 
 Optional:
+
 - AWS familiarity if you plan to use the reference deployment stacks
 - AppTheory and TableTheory if you want the documented AWS-first integration path
 
@@ -18,12 +20,11 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 
 ### Step 1: Install FaceTheory
 
-<!-- x-release-please-start-version -->
 ```bash
+export FACETHEORY_VERSION=0.2.0-rc # x-release-please-version
 npm install --save-exact \
-  https://github.com/theory-cloud/FaceTheory/releases/download/v0.2.0-rc/theory-cloud-facetheory-0.1.1.tgz
+  "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
-<!-- x-release-please-end -->
 
 ### Step 2: Install the peers that match your adapter surface
 
@@ -49,13 +50,13 @@ Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoin
 ## Build A Minimal App
 
 ```ts
-import { createFaceApp, type FaceModule } from '@theory-cloud/facetheory';
+import { createFaceApp, type FaceModule } from "@theory-cloud/facetheory";
 
 const faces: FaceModule[] = [
   {
-    route: '/',
-    mode: 'ssr',
-    render: async () => ({ html: '<h1>Hello FaceTheory</h1>' }),
+    route: "/",
+    mode: "ssr",
+    render: async () => ({ html: "<h1>Hello FaceTheory</h1>" }),
   },
 ];
 
@@ -63,6 +64,7 @@ const app = createFaceApp({ faces });
 ```
 
 Next, expose `app.handle()` through either:
+
 - `createLambdaUrlStreamingHandler({ app })` from `@theory-cloud/facetheory`, or
 - `createAppTheoryFaceHandler({ app })` plus AppTheory's Lambda Function URL streaming handler
 
@@ -71,7 +73,7 @@ Next, expose `app.handle()` through either:
 Direct Lambda Function URL handling:
 
 ```ts
-import { createLambdaUrlStreamingHandler } from '@theory-cloud/facetheory';
+import { createLambdaUrlStreamingHandler } from "@theory-cloud/facetheory";
 
 export const handler = createLambdaUrlStreamingHandler({ app });
 ```
@@ -81,12 +83,15 @@ This entrypoint is for AWS Lambda. Outside Lambda, either pass the optional `aws
 AppTheory entrypoint handling:
 
 ```ts
-import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
-import { createAppTheoryFaceHandler } from '@theory-cloud/facetheory/apptheory';
+import {
+  createApp,
+  createLambdaFunctionURLStreamingHandler,
+} from "@theory-cloud/apptheory";
+import { createAppTheoryFaceHandler } from "@theory-cloud/facetheory/apptheory";
 
 const runtime = createApp();
-runtime.get('/', createAppTheoryFaceHandler({ app }));
-runtime.get('/{proxy+}', createAppTheoryFaceHandler({ app }));
+runtime.get("/", createAppTheoryFaceHandler({ app }));
+runtime.get("/{proxy+}", createAppTheoryFaceHandler({ app }));
 
 export const handler = createLambdaFunctionURLStreamingHandler(runtime);
 ```
@@ -98,28 +103,29 @@ Package consumers should call `buildSsgSite()` directly. The repository-local CL
 Use the programmatic surface:
 
 ```ts
-import { buildSsgSite, type FaceModule } from '@theory-cloud/facetheory';
+import { buildSsgSite, type FaceModule } from "@theory-cloud/facetheory";
 
 const faces: FaceModule[] = [
   {
-    route: '/',
-    mode: 'ssg',
-    render: async () => ({ html: '<h1>Static FaceTheory</h1>' }),
+    route: "/",
+    mode: "ssg",
+    render: async () => ({ html: "<h1>Static FaceTheory</h1>" }),
   },
 ];
 
 await buildSsgSite({
   faces,
-  outDir: './dist',
+  outDir: "./dist",
 });
 ```
 
 Important default:
+
 - SSG disables real network `fetch()` calls unless `--allow-network` or a mocked `fetch` implementation is supplied.
 
 ## Reference Bundle
 
-The `v0.2.0-rc` GitHub release includes `facetheory-reference-0.1.1.tar.gz`. It contains: <!-- x-release-please-version -->
+The `v0.2.0-rc` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples

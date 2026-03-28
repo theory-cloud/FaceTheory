@@ -85,36 +85,36 @@ from pathlib import Path
 version = os.environ["EXPECTED_VERSION"]
 version_tag = f"v{version}"
 docs_base = f"https://github.com/theory-cloud/FaceTheory/blob/{version_tag}/docs"
-release_url = (
-    "https://github.com/theory-cloud/FaceTheory/releases/download/"
-    f"{version_tag}/theory-cloud-facetheory-{version}.tgz"
-)
 
 checks = {
     "README.md": [
         f"## Install {version_tag}",
-        release_url,
-        f"The `{version_tag}` GitHub release also ships `facetheory-reference-{version}.tar.gz`",
+        f"export FACETHEORY_VERSION={version}",
+        "theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz",
+        f"The `{version_tag}` GitHub release also ships the matching `facetheory-reference-${{FACETHEORY_VERSION}}.tar.gz` bundle",
     ],
     "docs/README.md": [
         f"The `{version_tag}` GitHub release ships the runtime tarball, a reference bundle with docs plus examples, and `SHA256SUMS.txt`",
     ],
     "docs/api-reference.md": [
-        release_url,
+        f"export FACETHEORY_VERSION={version}",
+        "theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz",
     ],
     "docs/getting-started.md": [
-        release_url,
-        f"The `{version_tag}` GitHub release includes `facetheory-reference-{version}.tar.gz`",
+        f"export FACETHEORY_VERSION={version}",
+        "theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz",
+        f"The `{version_tag}` GitHub release includes the matching `facetheory-reference-${{FACETHEORY_VERSION}}.tar.gz` bundle",
     ],
     "ts/README.md": [
         f"## Install {version_tag}",
-        release_url,
+        f"export FACETHEORY_VERSION={version}",
+        "theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz",
         f"{docs_base}/getting-started.md",
         f"{docs_base}/api-reference.md",
         f"{docs_base}/core-patterns.md",
         f"{docs_base}/testing-guide.md",
         f"{docs_base}/cdk/README.md",
-        f"The `{version_tag}` release also includes `facetheory-reference-{version}.tar.gz`",
+        f"The `{version_tag}` release also includes the matching `facetheory-reference-${{FACETHEORY_VERSION}}.tar.gz` bundle",
     ],
 }
 

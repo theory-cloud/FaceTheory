@@ -8,12 +8,11 @@ Canonical documentation lives under [docs/README.md](./docs/README.md).
 
 Install the exact GitHub release tarball:
 
-<!-- x-release-please-start-version -->
 ```bash
+export FACETHEORY_VERSION=0.2.0-rc # x-release-please-version
 npm install --save-exact \
-  https://github.com/theory-cloud/FaceTheory/releases/download/v0.2.0-rc/theory-cloud-facetheory-0.1.1.tgz
+  "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
-<!-- x-release-please-end -->
 
 Add the framework peers that match your adapter surface:
 
@@ -33,13 +32,13 @@ Optional companion packages from pinned GitHub releases:
 Create a minimal app:
 
 ```ts
-import { createFaceApp, type FaceModule } from '@theory-cloud/facetheory';
+import { createFaceApp, type FaceModule } from "@theory-cloud/facetheory";
 
 const faces: FaceModule[] = [
   {
-    route: '/',
-    mode: 'ssr',
-    render: async () => ({ html: '<h1>Hello FaceTheory</h1>' }),
+    route: "/",
+    mode: "ssr",
+    render: async () => ({ html: "<h1>Hello FaceTheory</h1>" }),
   },
 ];
 
@@ -49,15 +48,15 @@ export const app = createFaceApp({ faces });
 Expose it through Lambda Function URLs directly:
 
 ```ts
-import { createLambdaUrlStreamingHandler } from '@theory-cloud/facetheory';
-import { app } from './app';
+import { createLambdaUrlStreamingHandler } from "@theory-cloud/facetheory";
+import { app } from "./app";
 
 export const handler = createLambdaUrlStreamingHandler({ app });
 ```
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
-The `v0.2.0-rc` GitHub release also ships `facetheory-reference-0.1.1.tar.gz`, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+The `v0.2.0-rc` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
 
 ## Repository Development
 
@@ -69,6 +68,7 @@ npm test
 ```
 
 High-signal examples:
+
 - React streaming: `npm run example:streaming:serve`
 - Vue Vite SSR: `npm run example:vite:vue:build && npm run example:vite:vue:serve`
 - Svelte Vite SSR: `npm run example:vite:svelte:build && npm run example:vite:svelte:serve`
