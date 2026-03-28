@@ -2,10 +2,10 @@
 
 `@theory-cloud/facetheory` is a TypeScript runtime for AWS-first SSR, SSG, and blocking ISR on Node.js `>=24`, with package exports for React, Vue, and Svelte adapters plus AppTheory and TableTheory integration surfaces.
 
-## Install v0.2.0-rc.1 <!-- x-release-please-version -->
+## Install v0.2.0-rc.2 <!-- x-release-please-version -->
 
 ```bash
-export FACETHEORY_VERSION=0.2.0-rc.1 # x-release-please-version
+export FACETHEORY_VERSION=0.2.0-rc.2 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -67,11 +67,11 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 <!-- x-release-please-start-version -->
 
-- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v0.2.0-rc.1/docs/getting-started.md)
-- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v0.2.0-rc.1/docs/api-reference.md)
-- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v0.2.0-rc.1/docs/core-patterns.md)
-- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v0.2.0-rc.1/docs/testing-guide.md)
-- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v0.2.0-rc.1/docs/cdk/README.md)
+- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v0.2.0-rc.2/docs/getting-started.md)
+- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v0.2.0-rc.2/docs/api-reference.md)
+- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v0.2.0-rc.2/docs/core-patterns.md)
+- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v0.2.0-rc.2/docs/testing-guide.md)
+- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v0.2.0-rc.2/docs/cdk/README.md)
 <!-- x-release-please-end -->
 
-The `v0.2.0-rc.1` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->
+The `v0.2.0-rc.2` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->
