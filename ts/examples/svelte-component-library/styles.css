@@ -1,0 +1,54 @@
+.library-panel {
+  align-items: center;
+  background:
+    radial-gradient(circle at top left, rgba(239, 131, 84, 0.24), transparent 42%),
+    linear-gradient(135deg, #143642 0%, #0f2a33 100%);
+  border: 1px solid rgba(247, 243, 227, 0.2);
+  border-radius: 24px;
+  color: #f7f3e3;
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 1.5rem;
+}
+
+.library-panel__badge {
+  display: block;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.28));
+}
+
+.library-panel__content {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.library-panel__eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.library-panel__title {
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  line-height: 1.1;
+  margin: 0;
+}
+
+.library-panel__button {
+  background: #ef8354;
+  border: 0;
+  border-radius: 999px;
+  color: #1c1c1c;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  justify-self: start;
+  padding: 0.7rem 1rem;
+}
+
+.library-panel__slot {
+  color: rgba(247, 243, 227, 0.82);
+  font-size: 1rem;
+  line-height: 1.5;
+}

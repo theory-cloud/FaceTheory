@@ -70,6 +70,7 @@ High-signal examples:
 - React streaming: `npm run example:streaming:serve`
 - Vue Vite SSR: `npm run example:vite:vue:build && npm run example:vite:vue:serve`
 - Svelte Vite SSR: `npm run example:vite:svelte:build && npm run example:vite:svelte:serve`
+- Svelte external library host: `npm run example:vite:svelte:library:build && npm run example:vite:svelte:library:serve`
 - SSG: `npm run example:ssg:build && npm run example:ssg:serve`
 
 ## Repository Layout

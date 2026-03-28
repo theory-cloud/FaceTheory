@@ -1,0 +1,29 @@
+body {
+  background:
+    linear-gradient(180deg, rgba(247, 243, 227, 0.98), rgba(247, 243, 227, 0.9)),
+    linear-gradient(120deg, rgba(20, 54, 66, 0.12), rgba(239, 131, 84, 0.18));
+  color: #143642;
+  font-family: "Iowan Old Style", "Palatino Linotype", serif;
+  margin: 0;
+  min-height: 100vh;
+}
+
+.library-host {
+  display: grid;
+  gap: 1rem;
+  margin: 0 auto;
+  max-width: 52rem;
+  padding: 4rem 1.5rem 5rem;
+}
+
+.library-host__eyebrow {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.library-host__intro {
+  margin: 0;
+}

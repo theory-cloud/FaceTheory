@@ -207,6 +207,48 @@ Why this is incorrect:
 - It bypasses FaceTheory's document shell and can produce nested or invalid HTML.
 - It loses the shared escaping and merge rules that the runtime and tests enforce.
 
+## Pattern: Host packaged Svelte component libraries through the client entry
+
+Problem:
+You need FaceTheory's Svelte adapter to SSR and hydrate components that come from an external Svelte package, while also delivering the package CSS and any Vite-discovered assets coherently.
+
+**CORRECT**
+
+```ts
+// src/entry-client.ts
+import '@theory-cloud/facetheory-svelte-library-example/styles.css';
+
+// src/entry-server.ts
+const { headTags } = viteAssetsForEntry(manifest, 'src/entry-client.ts', {
+  includeAssets: true,
+});
+
+return {
+  headTags,
+  hydration: viteHydrationForEntry(manifest, 'src/entry-client.ts', data),
+};
+```
+
+Why this is correct:
+- The packaged library is imported like a normal dependency instead of being copied into the host app.
+- Package CSS stays in the Vite client graph, so FaceTheory can emit deterministic stylesheet and asset tags from the manifest.
+- The hydration bootstrap module matches the same client entry that pulled in the library code and CSS.
+
+Reference example:
+- `ts/examples/vite-ssr-svelte-library/`
+
+**INCORRECT**
+
+```ts
+return {
+  html: '<style>/* pasted library css */</style><div>...</div>',
+}
+```
+
+Why this is incorrect:
+- It bypasses the package asset graph and makes stylesheet delivery drift from the hydrated client bundle.
+- It creates a second, undocumented integration path that tests will not cover.
+
 ## Pattern Selection Notes
 
 - Prefer published package exports over private source imports.

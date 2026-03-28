@@ -126,6 +126,7 @@ Vue:
 Svelte:
 - `createSvelteFace()` wraps a `SvelteRenderInput`
 - `renderSvelte()` supports legacy `Component.render()` and Svelte 5 server rendering
+- Packaged Svelte libraries should import their CSS from the client entry and use `viteAssetsForEntry()` + `viteHydrationForEntry()` to keep SSR asset tags and hydration aligned
 
 ## ISR Storage And Cache APIs
 
