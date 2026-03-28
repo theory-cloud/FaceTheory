@@ -9,7 +9,7 @@
     "url": "git+https://github.com/theory-cloud/FaceTheory.git",
     "directory": "ts"
   },
-  "homepage": "https://github.com/theory-cloud/FaceTheory/tree/v0.1.1/docs",
+  "homepage": "https://github.com/theory-cloud/FaceTheory/tree/main/docs",
   "bugs": {
     "url": "https://github.com/theory-cloud/FaceTheory/issues"
   },
