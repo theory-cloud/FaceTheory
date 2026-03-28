@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 
 import { utf8 } from './bytes.js';
 import { renderFaceHead } from './head.js';
-import { renderHTMLDocument, streamHTMLDocument } from './html.js';
+import {
+  renderHTMLDocument,
+  streamHTMLDocument,
+  type HTMLDocumentParts,
+} from './html.js';
 import {
   createIsrRuntime,
   InMemoryHtmlStore,
@@ -332,6 +336,7 @@ async function toHTTPResponse(
   }
 
   const head = renderFaceHead(out, { cspNonce: req.cspNonce });
+  const documentParts = withDocumentShell(out);
 
   if (typeof out.html === 'string') {
     return {
@@ -340,6 +345,7 @@ async function toHTTPResponse(
       cookies,
       body: utf8(
         renderHTMLDocument({
+          ...documentParts,
           head,
           body: out.html,
         }),
@@ -349,11 +355,22 @@ async function toHTTPResponse(
   }
 
   const body = streamHTMLDocument({
+    ...documentParts,
     head,
     body: await preflightStream(out.html),
   });
 
   return { status, headers, cookies, body, isBase64: false };
+}
+
+function withDocumentShell(
+  out: FaceRenderResult,
+): Pick<HTMLDocumentParts, 'lang' | 'htmlAttrs' | 'bodyAttrs'> {
+  const parts: Pick<HTMLDocumentParts, 'lang' | 'htmlAttrs' | 'bodyAttrs'> = {};
+  if (out.lang !== undefined) parts.lang = out.lang;
+  if (out.htmlAttrs !== undefined) parts.htmlAttrs = out.htmlAttrs;
+  if (out.bodyAttrs !== undefined) parts.bodyAttrs = out.bodyAttrs;
+  return parts;
 }
 
 async function preflightStream(

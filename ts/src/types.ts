@@ -63,6 +63,9 @@ export interface FaceRenderResult {
   status?: number;
   headers?: Record<string, string | string[]>;
   cookies?: string[];
+  lang?: string;
+  htmlAttrs?: FaceAttributes;
+  bodyAttrs?: FaceAttributes;
   head?: FaceHead;
   headTags?: FaceHeadTag[];
   styleTags?: FaceStyleTag[];

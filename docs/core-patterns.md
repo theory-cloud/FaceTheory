@@ -170,6 +170,43 @@ Why this can be incorrect:
 - `shell` may emit before late styles from Suspense or async boundaries are available.
 - It is only appropriate when you have explicitly accepted that tradeoff.
 
+## Pattern: Set document-shell attrs in the render contract
+
+Problem:
+The host needs root-level document semantics such as `lang`, `dir`, theme, or body classes without bypassing FaceTheory's HTML emitters.
+
+**CORRECT**
+
+```ts
+{
+  route: '/',
+  mode: 'ssr',
+  render: async () => ({
+    lang: 'ar',
+    htmlAttrs: { dir: 'rtl', 'data-theme': 'midnight' },
+    bodyAttrs: { class: 'dashboard-shell' },
+    html: '<div id="root">...</div>',
+  }),
+}
+```
+
+Why this is correct:
+- It uses the public render contract instead of raw string surgery around `<html>` or `<body>`.
+- The same attrs flow through buffered and streaming responses.
+- Attr output stays escaped and deterministic.
+
+**INCORRECT**
+
+```ts
+render: async () => ({
+  html: '<html dir="rtl"><body class="dashboard-shell">...</body></html>',
+})
+```
+
+Why this is incorrect:
+- It bypasses FaceTheory's document shell and can produce nested or invalid HTML.
+- It loses the shared escaping and merge rules that the runtime and tests enforce.
+
 ## Pattern Selection Notes
 
 - Prefer published package exports over private source imports.

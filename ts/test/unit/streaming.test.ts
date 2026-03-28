@@ -106,6 +106,33 @@ test('FaceApp: streaming + CSP nonce applies to hydration scripts', async () => 
   assert.ok(full.includes('src="/assets/entry.js"'));
 });
 
+test('FaceApp: streaming emits document shell attrs before the body stream', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          lang: 'fa',
+          htmlAttrs: { dir: 'rtl', 'data-theme': 'sand' },
+          bodyAttrs: { class: 'stream-shell' },
+          html: streamFromString('<div>streamed</div>'),
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  assert.ok(!(resp.body instanceof Uint8Array));
+
+  const firstChunk = await (resp.body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]().next();
+  assert.equal(firstChunk.done, false);
+  const first = new TextDecoder().decode(firstChunk.value);
+  assert.ok(first.includes('<html data-theme="sand" dir="rtl" lang="fa">'), first);
+  assert.ok(first.includes('<body class="stream-shell">'), first);
+  assert.ok(!first.includes('streamed'));
+});
+
 test('react adapter: streaming includes AntD + Emotion styles in head before body', async () => {
   function EmotionBox() {
     return jsx('div', { css: css`color: rgb(1, 2, 3);` }, 'Emotion');

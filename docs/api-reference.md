@@ -54,7 +54,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 | `FaceMode` | Rendering mode | One of `ssr`, `ssg`, or `isr`. |
 | `FaceRequest` | Normalized request input | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`. |
 | `FaceResponse` | Runtime response | Includes normalized headers, cookies array, status, body, and `isBase64`. |
-| `FaceRenderResult` | Render output before HTTP conversion | Supports `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. |
+| `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. |
 | `FaceContext` | Per-request context | Exposes normalized request, route params, and proxy match. |
 | `FaceAppOptions` | App constructor options | Accepts `faces`, optional ISR config, and optional observability hooks. |
 | `FaceIsrOptions` | ISR runtime tuning | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation. |
@@ -164,6 +164,27 @@ Use these helpers when a Vite SSR build needs deterministic asset tags and a mat
 Current behavior:
 - `dynamicImports` from Vite manifests are intentionally ignored
 - `includeAssets: true` adds preload or prefetch hints for manifest asset files
+
+## Document Shell Attrs
+
+`FaceRenderResult` can set document-level attrs directly:
+
+```ts
+return {
+  lang: 'ar',
+  htmlAttrs: { dir: 'rtl', 'data-theme': 'midnight' },
+  bodyAttrs: { class: 'app-shell', 'data-density': 'compact' },
+  html: '<div id="root">...</div>',
+};
+```
+
+Semantics:
+- `lang` writes the emitted `<html lang="...">` value
+- `htmlAttrs` and `bodyAttrs` are escaped and serialized like head attrs
+- attrs are emitted in sorted key order for deterministic output
+- explicit `lang` overrides `htmlAttrs.lang`
+- if neither surface sets `lang`, FaceTheory still emits `lang="en"`
+- buffered and streaming document paths use the same merge rules
 
 ## Observability Hooks
 
