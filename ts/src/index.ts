@@ -7,6 +7,7 @@ export * from './lambda-url.js';
 export * from './ops.js';
 export * from './router.js';
 export * from './security.js';
+export * from './spa.js';
 export * from './ssg.js';
 export * from './types.js';
 export * from './vite.js';

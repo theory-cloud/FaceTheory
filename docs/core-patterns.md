@@ -249,6 +249,45 @@ Why this is incorrect:
 - It bypasses the package asset graph and makes stylesheet delivery drift from the hydrated client bundle.
 - It creates a second, undocumented integration path that tests will not cover.
 
+## Pattern: Use `startFaceNavigation()` with a stable view container
+
+Problem:
+You want SPA-style navigation between FaceTheory routes without a full browser refresh, while keeping document attrs, head tags, and hydration data aligned with the server-rendered output.
+
+**CORRECT**
+
+```ts
+import { startFaceNavigation } from '@theory-cloud/facetheory';
+
+export async function hydrateFaceNavigation({ data, view }) {
+  renderIntoExistingClientRoot(view, data);
+}
+
+startFaceNavigation({
+  viewSelector: '[data-facetheory-view]',
+});
+```
+
+Why this is correct:
+- FaceTheory fetches the next route as HTML and reuses the existing server contract instead of inventing a second route payload format.
+- `lang`, `htmlAttrs`, `bodyAttrs`, and non-executable head tags stay synchronized with the rendered document.
+- Exporting `hydrateFaceNavigation(...)` lets the client module update an existing app root instead of forcing a hard reload.
+
+Compatibility note:
+- If the bootstrap module does not export `hydrateFaceNavigation(...)`, FaceTheory can still reload that module as a fallback so existing side-effect-based entrypoints continue to work, but that fallback will not preserve long-lived client state.
+
+**INCORRECT**
+
+```ts
+document.addEventListener('click', async (event) => {
+  // fetch('/next') and manually patch random DOM nodes
+});
+```
+
+Why this is incorrect:
+- It bypasses the tested FaceTheory navigation helpers and leaves head tags, hydration payloads, and document attrs unsynchronized.
+- It creates an ad hoc client router contract that other hosts and adapters cannot share.
+
 ## Pattern Selection Notes
 
 - Prefer published package exports over private source imports.
