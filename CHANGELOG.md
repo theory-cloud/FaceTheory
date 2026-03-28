@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0-rc.2](https://github.com/theory-cloud/FaceTheory/compare/v0.2.0-rc.1...v0.2.0-rc.2) (2026-03-28)
+
+
+### Bug Fixes
+
+* **ci:** allow staging premain sync prs ([e895398](https://github.com/theory-cloud/FaceTheory/commit/e895398c3c8e4ae8e978e9f8ed15f4b227ac6e71))
+
 ## [0.2.0-rc.1](https://github.com/theory-cloud/FaceTheory/compare/v0.2.0-rc...v0.2.0-rc.1) (2026-03-28)
 
 ### Features
