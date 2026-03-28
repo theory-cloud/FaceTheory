@@ -30,6 +30,39 @@ jobs:
             exit 0
           fi
 
+          mapfile -t changed_files < <(git diff --name-only --diff-filter=ACMR origin/premain...origin/staging)
+          if [[ "${#changed_files[@]}" -gt 0 ]]; then
+            infra_only="true"
+            for path in "${changed_files[@]}"; do
+              case "${path}" in
+                .github/workflows/* \
+                | .release-please-manifest*.json \
+                | release-please-config*.json \
+                | VERSION \
+                | Makefile \
+                | .gitignore \
+                | scripts/build-release-assets.sh \
+                | scripts/generate-checksums.sh \
+                | scripts/read-version.sh \
+                | scripts/render-release-notes.sh \
+                | scripts/verify-release-branch.sh \
+                | scripts/verify-ts-pack.sh \
+                | scripts/verify-version-alignment.sh)
+                  ;;
+                *)
+                  infra_only="false"
+                  break
+                  ;;
+              esac
+            done
+
+            if [[ "${infra_only}" == "true" ]]; then
+              echo "prerelease-ready: OK (release infrastructure only change)"
+              printf '%s\n' "${changed_files[@]}"
+              exit 0
+            fi
+          fi
+
           echo "prerelease-ready: FAIL"
           echo "No user-facing conventional commits (feat:/fix:/perf:) found in ${range}."
           echo "release-please will skip, so no new prerelease tag will be cut."
