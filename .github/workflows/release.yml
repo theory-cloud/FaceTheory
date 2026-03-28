@@ -53,6 +53,13 @@ jobs:
 
           git fetch origin main --force
           git fetch origin premain --force || true
+
+          # Existing draft tags may predate a synchronized VERSION file.
+          # Normalize the workspace copy so verification/build scripts use the requested tag version.
+          if [[ -f VERSION ]]; then
+            printf '%s # x-release-please-version\n' "${TAG_NAME#v}" > VERSION
+          fi
+
           scripts/verify-release-branch.sh "${TAG_NAME}"
 
           export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
