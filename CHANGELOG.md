@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/theory-cloud/FaceTheory/compare/v0.3.1...v0.3.2) (2026-04-05)
+
+
+### Bug Fixes
+
+* address code scanning alerts and bump theory deps ([7635d33](https://github.com/theory-cloud/FaceTheory/commit/7635d33bf06cc4072b4db72b7871df857f047ec4))
+
 ## [0.3.1](https://github.com/theory-cloud/FaceTheory/compare/v0.3.0...v0.3.1) (2026-03-28)
 
 
