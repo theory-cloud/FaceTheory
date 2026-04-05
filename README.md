@@ -4,12 +4,29 @@ FaceTheory is a TypeScript runtime for AWS-first SSR, SSG, and blocking ISR with
 
 Canonical documentation lives under [docs/README.md](./docs/README.md).
 
-## Install v0.3.0 <!-- x-release-please-version -->
+## Status
+
+FaceTheory is pre-1.0 and under active development. The runtime covers SSR, SSG, and blocking ISR with adapter
+support for React, Vue, and Svelte. First production use is underway at [Pay Theory](https://paytheory.com)
+(checkout page). See [CHANGELOG](CHANGELOG.md) for release history.
+
+## Theory Cloud
+
+FaceTheory is the client application layer of the
+[Theory Cloud](https://github.com/theory-cloud/AppTheory/blob/main/THEORY_CLOUD.md) stack. It builds on
+[TableTheory](https://github.com/theory-cloud/TableTheory) (data access, ISR cache schema) and
+[AppTheory](https://github.com/theory-cloud/AppTheory) (serverless runtime, CDK constructs).
+
+The single-path philosophy extends to client delivery: one way to render, one way to cache, one way to deploy.
+FaceTheory's ISR implementation uses TableTheory for cache metadata and regeneration leases, ensuring the same
+deterministic patterns that govern the backend also govern the frontend.
+
+## Install v0.3.2 <!-- x-release-please-version -->
 
 Install the exact GitHub release tarball:
 
 ```bash
-export FACETHEORY_VERSION=0.3.0 # x-release-please-version
+export FACETHEORY_VERSION=0.3.2 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -23,9 +40,9 @@ Add the framework peers that match your adapter surface:
 
 Optional companion packages from pinned GitHub releases:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v0.17.1/theory-cloud-apptheory-0.17.1.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v0.17.1/theory-cloud-apptheory-cdk-0.17.1.tgz`
-- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.4.2/theory-cloud-tabletheory-ts-1.4.2.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v0.19.2/theory-cloud-apptheory-0.19.2.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v0.19.2/theory-cloud-apptheory-cdk-0.19.2.tgz`
+- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.5.2/theory-cloud-tabletheory-ts-1.5.2.tgz`
 
 ## Quickstart
 
@@ -56,7 +73,7 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
-The `v0.3.0` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+The `v0.3.2` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
 
 ## Repository Development
 

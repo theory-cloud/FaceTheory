@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.2](https://github.com/theory-cloud/FaceTheory/compare/v0.3.1...v0.3.2) (2026-04-05)
+
+
+### Bug Fixes
+
+* address code scanning alerts and bump theory deps ([7635d33](https://github.com/theory-cloud/FaceTheory/commit/7635d33bf06cc4072b4db72b7871df857f047ec4))
+
+## [0.3.1](https://github.com/theory-cloud/FaceTheory/compare/v0.3.0...v0.3.1) (2026-03-28)
+
+
+### Bug Fixes
+
+* resolve dependabot alerts ([2ff47f0](https://github.com/theory-cloud/FaceTheory/commit/2ff47f0cc1b64c8b53591c647033a73b2a287771))
+
 ## [0.3.0](https://github.com/theory-cloud/FaceTheory/compare/v0.2.0...v0.3.0) (2026-03-28)
 
 
