@@ -4,6 +4,23 @@ FaceTheory is a TypeScript runtime for AWS-first SSR, SSG, and blocking ISR with
 
 Canonical documentation lives under [docs/README.md](./docs/README.md).
 
+## Status
+
+FaceTheory is pre-1.0 and under active development. The runtime covers SSR, SSG, and blocking ISR with adapter
+support for React, Vue, and Svelte. First production use is underway at [Pay Theory](https://paytheory.com)
+(checkout page). See [CHANGELOG](CHANGELOG.md) for release history.
+
+## Theory Cloud
+
+FaceTheory is the client application layer of the
+[Theory Cloud](https://github.com/theory-cloud/AppTheory/blob/main/THEORY_CLOUD.md) stack. It builds on
+[TableTheory](https://github.com/theory-cloud/TableTheory) (data access, ISR cache schema) and
+[AppTheory](https://github.com/theory-cloud/AppTheory) (serverless runtime, CDK constructs).
+
+The single-path philosophy extends to client delivery: one way to render, one way to cache, one way to deploy.
+FaceTheory's ISR implementation uses TableTheory for cache metadata and regeneration leases, ensuring the same
+deterministic patterns that govern the backend also govern the frontend.
+
 ## Install v0.3.2 <!-- x-release-please-version -->
 
 Install the exact GitHub release tarball:
@@ -23,9 +40,9 @@ Add the framework peers that match your adapter surface:
 
 Optional companion packages from pinned GitHub releases:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v0.17.1/theory-cloud-apptheory-0.17.1.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v0.17.1/theory-cloud-apptheory-cdk-0.17.1.tgz`
-- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.4.2/theory-cloud-tabletheory-ts-1.4.2.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v0.19.2/theory-cloud-apptheory-0.19.2.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v0.19.2/theory-cloud-apptheory-cdk-0.19.2.tgz`
+- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.5.2/theory-cloud-tabletheory-ts-1.5.2.tgz`
 
 ## Quickstart
 
