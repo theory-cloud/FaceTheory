@@ -5,6 +5,8 @@ import { css, jsx } from '@emotion/react';
 import { Button } from 'antd';
 import * as React from 'react';
 
+import { assertDocumentTagNonces } from '../helpers/csp.js';
+
 import { streamFromString, utf8 } from '../../src/bytes.js';
 import { createFaceApp } from '../../src/app.js';
 import { createReactStreamFace } from '../../src/adapters/react.js';
@@ -40,7 +42,15 @@ function createLateStylesTree(delayMs: number): React.ReactElement {
           'section',
           null,
           React.createElement(Button, { type: 'primary' }, 'Late AntD'),
-          jsx('div', { css: css`color: #123abc;` }, 'Late Emotion'),
+          jsx(
+            'div',
+            {
+              css: css`
+                color: #123abc;
+              `,
+            },
+            'Late Emotion',
+          ),
         );
       },
     };
@@ -72,7 +82,9 @@ test('FaceApp: wraps streaming HTML in full document with head first', async () 
 
   assert.ok(!(resp.body instanceof Uint8Array));
 
-  const firstChunk = await (resp.body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]().next();
+  const firstChunk = await (resp.body as AsyncIterable<Uint8Array>)
+    [Symbol.asyncIterator]()
+    .next();
   assert.equal(firstChunk.done, false);
   const first = new TextDecoder().decode(firstChunk.value);
   assert.ok(first.startsWith('<!doctype html>'));
@@ -99,7 +111,11 @@ test('FaceApp: streaming + CSP nonce applies to hydration scripts', async () => 
     ],
   });
 
-  const resp = await app.handle({ method: 'GET', path: '/', cspNonce: 'nonce-stream' });
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/',
+    cspNonce: 'nonce-stream',
+  });
   const full = new TextDecoder().decode(await collectBody(resp.body));
   assert.ok(full.includes('id="__FACETHEORY_DATA__"'));
   assert.ok(full.includes('nonce="nonce-stream"'));
@@ -125,17 +141,30 @@ test('FaceApp: streaming emits document shell attrs before the body stream', asy
   const resp = await app.handle({ method: 'GET', path: '/' });
   assert.ok(!(resp.body instanceof Uint8Array));
 
-  const firstChunk = await (resp.body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]().next();
+  const firstChunk = await (resp.body as AsyncIterable<Uint8Array>)
+    [Symbol.asyncIterator]()
+    .next();
   assert.equal(firstChunk.done, false);
   const first = new TextDecoder().decode(firstChunk.value);
-  assert.ok(first.includes('<html data-theme="sand" dir="rtl" lang="fa">'), first);
+  assert.ok(
+    first.includes('<html data-theme="sand" dir="rtl" lang="fa">'),
+    first,
+  );
   assert.ok(first.includes('<body class="stream-shell">'), first);
   assert.ok(!first.includes('streamed'));
 });
 
 test('react adapter: streaming includes AntD + Emotion styles in head before body', async () => {
   function EmotionBox() {
-    return jsx('div', { css: css`color: rgb(1, 2, 3);` }, 'Emotion');
+    return jsx(
+      'div',
+      {
+        css: css`
+          color: rgb(1, 2, 3);
+        `,
+      },
+      'Emotion',
+    );
   }
 
   const app = createFaceApp({
@@ -162,7 +191,11 @@ test('react adapter: streaming includes AntD + Emotion styles in head before bod
     ],
   });
 
-  const resp = await app.handle({ method: 'GET', path: '/', cspNonce: 'nonce-stream-styles' });
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/',
+    cspNonce: 'nonce-stream-styles',
+  });
   assert.ok(!(resp.body instanceof Uint8Array));
 
   const it = (resp.body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
@@ -176,7 +209,9 @@ test('react adapter: streaming includes AntD + Emotion styles in head before bod
   assert.ok(first.includes('<title>Stream Styles</title>'));
   assert.ok(first.includes('data-emotion='));
   assert.ok(first.includes('nonce="nonce-stream-styles"'));
-  assert.ok(first.includes('data-rc-order=') || first.includes('data-rc-priority='));
+  assert.ok(
+    first.includes('data-rc-order=') || first.includes('data-rc-priority='),
+  );
   assert.ok(!first.includes('Emotion'));
   assert.ok(!first.includes('OK'));
 
@@ -202,16 +237,25 @@ test('react adapter: default all-ready style strategy captures late Suspense sty
         render: () => createLateStylesTree(20),
         renderOptions: {
           headTags: [{ type: 'title', text: 'Late Styles' }],
-          integrations: [createAntdIntegration({ hashed: false }), createEmotionIntegration()],
+          integrations: [
+            createAntdIntegration({ hashed: false }),
+            createEmotionIntegration(),
+          ],
         },
       }),
     ],
   });
 
-  const resp = await app.handle({ method: 'GET', path: '/', cspNonce: 'nonce-r5-all-ready' });
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/',
+    cspNonce: 'nonce-r5-all-ready',
+  });
   assert.ok(!(resp.body instanceof Uint8Array));
 
-  const iterator = (resp.body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
+  const iterator = (resp.body as AsyncIterable<Uint8Array>)[
+    Symbol.asyncIterator
+  ]();
   const firstChunk = await iterator.next();
   assert.equal(firstChunk.done, false);
 
@@ -247,7 +291,10 @@ test('react adapter: shell strategy is configurable and does not include late st
         render: () => createLateStylesTree(20),
         renderOptions: {
           styleStrategy: 'shell',
-          integrations: [createAntdIntegration({ hashed: false }), createEmotionIntegration()],
+          integrations: [
+            createAntdIntegration({ hashed: false }),
+            createEmotionIntegration(),
+          ],
         },
       }),
     ],
@@ -256,7 +303,9 @@ test('react adapter: shell strategy is configurable and does not include late st
   const resp = await app.handle({ method: 'GET', path: '/' });
   assert.ok(!(resp.body instanceof Uint8Array));
 
-  const iterator = (resp.body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
+  const iterator = (resp.body as AsyncIterable<Uint8Array>)[
+    Symbol.asyncIterator
+  ]();
   const firstChunk = await iterator.next();
   assert.equal(firstChunk.done, false);
 
@@ -277,24 +326,27 @@ test('react adapter: streaming applies CSP nonce to all inline style/script tags
         render: () => createLateStylesTree(20),
         renderOptions: {
           styleStrategy: 'shell',
-          hydration: { data: { hello: 'world' }, bootstrapModule: '/assets/entry-client.js' },
-          integrations: [createAntdIntegration({ hashed: false }), createEmotionIntegration()],
+          hydration: {
+            data: { hello: 'world' },
+            bootstrapModule: '/assets/entry-client.js',
+          },
+          integrations: [
+            createAntdIntegration({ hashed: false }),
+            createEmotionIntegration(),
+          ],
         },
       }),
     ],
   });
 
-  const response = await app.handle({ method: 'GET', path: '/', cspNonce: nonce });
+  const response = await app.handle({
+    method: 'GET',
+    path: '/',
+    cspNonce: nonce,
+  });
   const full = new TextDecoder().decode(await collectBody(response.body));
 
-  const styleTags = Array.from(full.matchAll(/<style\b[^>]*>/g)).map((match) => match[0]);
-  const scriptTags = Array.from(full.matchAll(/<script\b[^>]*>/g)).map((match) => match[0]);
-
-  assert.ok(styleTags.length > 0);
-  assert.ok(scriptTags.length > 0);
-  for (const tag of [...styleTags, ...scriptTags]) {
-    assert.ok(tag.includes(`nonce="${nonce}"`), `missing nonce on tag: ${tag}`);
-  }
+  assertDocumentTagNonces(full, nonce, 1, 1);
 });
 
 test('FaceApp: streaming body error emits marker and closes document', async () => {
