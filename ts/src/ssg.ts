@@ -4,7 +4,11 @@ import path from 'node:path';
 import { createFaceApp } from './app.js';
 import { renderHTMLDocument } from './html.js';
 import type { FaceBody, FaceModule, Headers } from './types.js';
-import { normalizePath } from './types.js';
+import {
+  normalizePath,
+  trimLeadingSlashes,
+  trimOuterSlashes,
+} from './types.js';
 
 export type SsgTrailingSlashPolicy = 'always' | 'never';
 
@@ -65,13 +69,16 @@ const DEFAULT_404_HTML = renderHTMLDocument({
   body: '<h1>Not Found</h1><template data-facetheory-ssg-404="true"></template>',
 });
 
-export async function buildSsgSite(options: BuildSsgSiteOptions): Promise<BuildSsgSiteResult> {
+export async function buildSsgSite(
+  options: BuildSsgSiteOptions,
+): Promise<BuildSsgSiteResult> {
   const outDir = path.resolve(options.outDir);
   const clean = options.clean ?? true;
   const trailingSlash = options.trailingSlash ?? 'always';
   const write404Fallback = options.write404Fallback ?? true;
   const emitHydrationData = options.emitHydrationData ?? false;
-  const assetManifestPath = options.assetManifestPath ?? DEFAULT_ASSET_MANIFEST_PATH;
+  const assetManifestPath =
+    options.assetManifestPath ?? DEFAULT_ASSET_MANIFEST_PATH;
   const allowNetwork = options.allowNetwork ?? false;
   const fetchImpl = options.fetch;
 
@@ -113,7 +120,8 @@ export async function buildSsgSite(options: BuildSsgSiteOptions): Promise<BuildS
         const html = new TextDecoder().decode(body);
         const file = ssgFilePathForRoute(page.path, trailingSlash);
         const contentType =
-          firstHeaderValue(response.headers, 'content-type') ?? 'text/html; charset=utf-8';
+          firstHeaderValue(response.headers, 'content-type') ??
+          'text/html; charset=utf-8';
 
         await writeOutFile(outDir, file, html);
 
@@ -167,7 +175,11 @@ export async function buildSsgSite(options: BuildSsgSiteOptions): Promise<BuildS
   }
 
   const manifestFile = '.facetheory/ssg-manifest.json';
-  await writeOutFile(outDir, manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeOutFile(
+    outDir,
+    manifestFile,
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
 
   return {
     outDir,
@@ -177,11 +189,15 @@ export async function buildSsgSite(options: BuildSsgSiteOptions): Promise<BuildS
   };
 }
 
-export async function planSsgPages(faces: FaceModule[]): Promise<PlannedPage[]> {
+export async function planSsgPages(
+  faces: FaceModule[],
+): Promise<PlannedPage[]> {
   const ssgFaces = faces
     .filter((face) => face.mode === 'ssg')
     .slice()
-    .sort((left, right) => normalizePath(left.route).localeCompare(normalizePath(right.route)));
+    .sort((left, right) =>
+      normalizePath(left.route).localeCompare(normalizePath(right.route)),
+    );
 
   const planned: PlannedPage[] = [];
   const seenPaths = new Set<string>();
@@ -189,7 +205,9 @@ export async function planSsgPages(faces: FaceModule[]): Promise<PlannedPage[]> 
   for (const face of ssgFaces) {
     const routePattern = normalizePath(face.route);
     const routeSegments = parseRouteSegments(routePattern);
-    const hasDynamicSegments = routeSegments.some((segment) => segment.kind !== 'static');
+    const hasDynamicSegments = routeSegments.some(
+      (segment) => segment.kind !== 'static',
+    );
 
     if (!hasDynamicSegments) {
       const pathForRoute = normalizePath(routePattern);
@@ -215,7 +233,10 @@ export async function planSsgPages(faces: FaceModule[]): Promise<PlannedPage[]> 
           `generateStaticParams() for route "${routePattern}" returned a non-object entry`,
         );
       }
-      const resolvedPath = resolveRoutePath(routeSegments, params as Record<string, string>);
+      const resolvedPath = resolveRoutePath(
+        routeSegments,
+        params as Record<string, string>,
+      );
       pathsForFace.push(resolvedPath);
     }
 
@@ -239,7 +260,7 @@ export function ssgFilePathForRoute(
   const normalized = normalizePath(routePath);
   if (normalized === '/') return 'index.html';
 
-  const stripped = normalized.replace(/^\/+/, '').replace(/\/+$/, '');
+  const stripped = trimOuterSlashes(normalized);
   if (!stripped) return 'index.html';
   if (trailingSlash === 'never') return `${stripped}.html`;
   return `${stripped}/index.html`;
@@ -247,7 +268,7 @@ export function ssgFilePathForRoute(
 
 export function ssgHydrationDataFilePathForRoute(routePath: string): string {
   const normalized = normalizePath(routePath);
-  const stripped = normalized.replace(/^\/+/, '').replace(/\/+$/, '');
+  const stripped = trimOuterSlashes(normalized);
   if (!stripped) return '_facetheory/data/index.json';
   return `_facetheory/data/${stripped}.json`;
 }
@@ -256,12 +277,14 @@ function parseRouteSegments(routePattern: string): SsgRouteSegment[] {
   const normalized = normalizePath(routePattern);
   if (normalized === '/') return [];
 
-  const parts = normalized.replace(/^\/+/, '').split('/');
+  const parts = trimLeadingSlashes(normalized).split('/');
   return parts.map((part) => {
     if (part.startsWith('{') && part.endsWith('}')) {
       const token = part.slice(1, -1);
-      if (token.endsWith('+')) return { kind: 'proxy_plus', value: token.slice(0, -1) };
-      if (token.endsWith('*')) return { kind: 'proxy_star', value: token.slice(0, -1) };
+      if (token.endsWith('+'))
+        return { kind: 'proxy_plus', value: token.slice(0, -1) };
+      if (token.endsWith('*'))
+        return { kind: 'proxy_star', value: token.slice(0, -1) };
       return { kind: 'param', value: token };
     }
     return { kind: 'static', value: part };
@@ -339,7 +362,11 @@ function firstHeaderValue(headers: Headers, key: string): string | null {
   return values[0] ?? null;
 }
 
-async function writeOutFile(outDir: string, relativePath: string, content: string): Promise<void> {
+async function writeOutFile(
+  outDir: string,
+  relativePath: string,
+  content: string,
+): Promise<void> {
   const absolutePath = path.resolve(outDir, relativePath);
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, content);

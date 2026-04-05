@@ -1,7 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto';
 
-import type { FaceContext, FaceModule, FaceResponse, Headers } from './types.js';
-import { canonicalizeHeaders, normalizePath } from './types.js';
+import type {
+  FaceContext,
+  FaceModule,
+  FaceResponse,
+  Headers,
+} from './types.js';
+import {
+  canonicalizeHeaders,
+  normalizePath,
+  trimLeadingSlashes,
+  trimOuterSlashes,
+} from './types.js';
 
 const HTML_CONTENT_TYPE = 'text/html; charset=utf-8';
 const DEFAULT_REVALIDATE_SECONDS = 60;
@@ -82,7 +92,9 @@ export interface ReleaseIsrLeaseInput {
 
 export interface IsrMetaStore {
   get: (cacheKey: string) => Promise<IsrMetaRecord | null>;
-  tryAcquireLease: (input: TryAcquireIsrLeaseInput) => Promise<TryAcquireIsrLeaseResult>;
+  tryAcquireLease: (
+    input: TryAcquireIsrLeaseInput,
+  ) => Promise<TryAcquireIsrLeaseResult>;
   commitGeneration: (input: CommitIsrGenerationInput) => Promise<void>;
   releaseLease: (input: ReleaseIsrLeaseInput) => Promise<void>;
 }
@@ -163,7 +175,10 @@ class IsrLeaseConflictError extends Error {
 }
 
 export class InMemoryHtmlStore implements HtmlStore {
-  private readonly objects = new Map<string, { body: Uint8Array; etag: string | null }>();
+  private readonly objects = new Map<
+    string,
+    { body: Uint8Array; etag: string | null }
+  >();
 
   async read(key: string): Promise<HtmlStoreReadResult | null> {
     const entry = this.objects.get(key);
@@ -192,8 +207,12 @@ export class InMemoryIsrMetaStore implements IsrMetaStore {
     return record ? cloneIsrMetaRecord(record) : null;
   }
 
-  async tryAcquireLease(input: TryAcquireIsrLeaseInput): Promise<TryAcquireIsrLeaseResult> {
-    const current = this.records.get(input.cacheKey) ?? createDefaultMetaRecord(input.cacheKey);
+  async tryAcquireLease(
+    input: TryAcquireIsrLeaseInput,
+  ): Promise<TryAcquireIsrLeaseResult> {
+    const current =
+      this.records.get(input.cacheKey) ??
+      createDefaultMetaRecord(input.cacheKey);
     const hasActiveLease =
       current.leaseToken !== null &&
       current.leaseOwner !== null &&
@@ -235,7 +254,9 @@ export class InMemoryIsrMetaStore implements IsrMetaStore {
       current.leaseOwner !== input.leaseOwner ||
       current.leaseToken !== input.leaseToken
     ) {
-      throw new IsrLeaseConflictError(`ISR lease lost for cache key "${input.cacheKey}"`);
+      throw new IsrLeaseConflictError(
+        `ISR lease lost for cache key "${input.cacheKey}"`,
+      );
     }
 
     const next: IsrMetaRecord = {
@@ -257,7 +278,11 @@ export class InMemoryIsrMetaStore implements IsrMetaStore {
   async releaseLease(input: ReleaseIsrLeaseInput): Promise<void> {
     const current = this.records.get(input.cacheKey);
     if (!current) return;
-    if (current.leaseOwner !== input.leaseOwner || current.leaseToken !== input.leaseToken) return;
+    if (
+      current.leaseOwner !== input.leaseOwner ||
+      current.leaseToken !== input.leaseToken
+    )
+      return;
 
     this.records.set(input.cacheKey, {
       ...current,
@@ -337,7 +362,9 @@ export class S3HtmlStore implements HtmlStore {
   }
 
   private objectKey(key: string): string {
-    return this.keyPrefix.length > 0 ? `${this.keyPrefix}${stripLeadingSlash(key)}` : stripLeadingSlash(key);
+    return this.keyPrefix.length > 0
+      ? `${this.keyPrefix}${stripLeadingSlash(key)}`
+      : stripLeadingSlash(key);
   }
 }
 
@@ -345,7 +372,9 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
   const runtimeOptions = normalizeRuntimeOptions(options);
   return {
     handleFace: async (input) => {
-      const revalidateSeconds = normalizeRevalidateSeconds(input.face.revalidateSeconds);
+      const revalidateSeconds = normalizeRevalidateSeconds(
+        input.face.revalidateSeconds,
+      );
       const tenant = resolveTenant(runtimeOptions, input.ctx);
       const cacheKey = runtimeOptions.cacheKey({
         tenant,
@@ -356,7 +385,13 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
       const existing = await runtimeOptions.metaStore.get(cacheKey);
 
       if (existing && isFresh(existing, currentNow)) {
-        const cachedFresh = await cachedResponseFromRecord(runtimeOptions, existing, 'hit', currentNow, false);
+        const cachedFresh = await cachedResponseFromRecord(
+          runtimeOptions,
+          existing,
+          'hit',
+          currentNow,
+          false,
+        );
         if (cachedFresh) return cachedFresh;
       }
 
@@ -383,7 +418,8 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
 
       const staleRecord = existing ?? acquire.record;
       if (runtimeOptions.lockContentionPolicy === 'wait') {
-        const deadline = runtimeOptions.now() + runtimeOptions.regenerationWaitTimeoutMs;
+        const deadline =
+          runtimeOptions.now() + runtimeOptions.regenerationWaitTimeoutMs;
         const waited = await waitForRegeneratedRecord(
           runtimeOptions,
           cacheKey,
@@ -444,7 +480,10 @@ export function defaultIsrCacheKey(input: IsrCacheKeyInput): string {
   const routePattern = normalizePath(input.routePattern);
   const paramParts = Object.keys(input.params)
     .sort((left, right) => left.localeCompare(right))
-    .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(String(input.params[key]))}`);
+    .map(
+      (key) =>
+        `${encodeURIComponent(key)}=${encodeURIComponent(String(input.params[key]))}`,
+    );
   return `${input.tenant}::${routePattern}?${paramParts.join('&')}`;
 }
 
@@ -453,9 +492,15 @@ export function blockingIsrCacheControl(
   options: IsrCacheControlOptions = {},
 ): string {
   const safeRevalidate = normalizeRevalidateSeconds(revalidateSeconds);
-  const browserMaxAge = normalizeNonNegativeInt(options.browserMaxAgeSeconds, 0);
+  const browserMaxAge = normalizeNonNegativeInt(
+    options.browserMaxAgeSeconds,
+    0,
+  );
   const sharedMaxAge = normalizeNonNegativeInt(options.sharedMaxAgeSeconds, 0);
-  const staleIfError = normalizeNonNegativeInt(options.staleIfErrorSeconds, safeRevalidate);
+  const staleIfError = normalizeNonNegativeInt(
+    options.staleIfErrorSeconds,
+    safeRevalidate,
+  );
   return `public, max-age=${browserMaxAge}, s-maxage=${sharedMaxAge}, stale-if-error=${staleIfError}, must-revalidate`;
 }
 
@@ -480,7 +525,11 @@ async function regenerateAndCommit(
       throw new Error(`ISR regeneration produced status ${prepared.status}`);
     }
 
-    const htmlPointer = buildHtmlPointer(cacheKey, generatedAt, runtimeOptions.htmlPointerPrefix);
+    const htmlPointer = buildHtmlPointer(
+      cacheKey,
+      generatedAt,
+      runtimeOptions.htmlPointerPrefix,
+    );
     const write = await runtimeOptions.htmlStore.write({
       key: htmlPointer,
       body: prepared.body,
@@ -517,7 +566,13 @@ async function regenerateAndCommit(
     );
   } catch (err) {
     if (runtimeOptions.failurePolicy === 'serve-stale') {
-      const stale = await cachedResponseFromRecord(runtimeOptions, staleRecord, 'stale', runtimeOptions.now(), true);
+      const stale = await cachedResponseFromRecord(
+        runtimeOptions,
+        staleRecord,
+        'stale',
+        runtimeOptions.now(),
+        true,
+      );
       if (stale) return stale;
     }
     throw err;
@@ -601,7 +656,9 @@ function responseFromStoredHtml(
   };
 }
 
-function normalizeRuntimeOptions(input: FaceIsrOptions): CreateIsrRuntimeOptions {
+function normalizeRuntimeOptions(
+  input: FaceIsrOptions,
+): CreateIsrRuntimeOptions {
   const htmlStore = input.htmlStore ?? new InMemoryHtmlStore();
   const metaStore = input.metaStore ?? new InMemoryIsrMetaStore();
 
@@ -610,14 +667,20 @@ function normalizeRuntimeOptions(input: FaceIsrOptions): CreateIsrRuntimeOptions
     metaStore,
     now: input.now ?? (() => Date.now()),
     createLeaseOwner: input.createLeaseOwner ?? (() => randomUUID()),
-    leaseDurationMs: normalizeNonNegativeInt(input.leaseDurationMs, DEFAULT_LEASE_DURATION_MS),
+    leaseDurationMs: normalizeNonNegativeInt(
+      input.leaseDurationMs,
+      DEFAULT_LEASE_DURATION_MS,
+    ),
     regenerationWaitTimeoutMs: normalizeNonNegativeInt(
       input.regenerationWaitTimeoutMs,
       DEFAULT_REGEN_WAIT_TIMEOUT_MS,
     ),
     regenerationPollIntervalMs: Math.max(
       1,
-      normalizeNonNegativeInt(input.regenerationPollIntervalMs, DEFAULT_REGEN_POLL_INTERVAL_MS),
+      normalizeNonNegativeInt(
+        input.regenerationPollIntervalMs,
+        DEFAULT_REGEN_POLL_INTERVAL_MS,
+      ),
     ),
     failurePolicy: input.failurePolicy ?? 'serve-stale',
     lockContentionPolicy: input.lockContentionPolicy ?? 'wait',
@@ -630,7 +693,10 @@ function normalizeRuntimeOptions(input: FaceIsrOptions): CreateIsrRuntimeOptions
   };
 }
 
-function resolveTenant(runtimeOptions: CreateIsrRuntimeOptions, ctx: FaceContext): string {
+function resolveTenant(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  ctx: FaceContext,
+): string {
   const rawTenant = runtimeOptions.tenantKey(ctx);
   const tenant = String(rawTenant ?? '').trim();
   return tenant.length > 0 ? tenant : 'default';
@@ -642,8 +708,15 @@ function defaultTenantKey(ctx: FaceContext): string {
   return String(first).trim() || 'default';
 }
 
-function buildHtmlPointer(cacheKey: string, generatedAt: number, prefix: string): string {
-  const digest = createHash('sha256').update(cacheKey).digest('hex').slice(0, 24);
+function buildHtmlPointer(
+  cacheKey: string,
+  generatedAt: number,
+  prefix: string,
+): string {
+  const digest = createHash('sha256')
+    .update(cacheKey)
+    .digest('hex')
+    .slice(0, 24);
   return `${prefix}${digest}/${generatedAt}-${randomUUID()}.html`;
 }
 
@@ -695,30 +768,37 @@ function normalizeRevalidateSeconds(value: number | undefined): number {
   return Math.max(0, numeric);
 }
 
-function normalizeNonNegativeInt(value: number | undefined, fallback: number): number {
+function normalizeNonNegativeInt(
+  value: number | undefined,
+  fallback: number,
+): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.max(0, Math.trunc(numeric));
 }
 
 function normalizeObjectPrefix(value: string): string {
-  const cleaned = String(value).trim().replace(/^\/+/, '').replace(/\/+$/, '');
+  const cleaned = trimOuterSlashes(String(value).trim());
   if (!cleaned) return '';
   return `${cleaned}/`;
 }
 
 function stripLeadingSlash(value: string): string {
-  return String(value).replace(/^\/+/, '');
+  return trimLeadingSlashes(value);
 }
 
-async function prepareFreshResponse(response: FaceResponse): Promise<PreparedFreshResponse> {
+async function prepareFreshResponse(
+  response: FaceResponse,
+): Promise<PreparedFreshResponse> {
   if (response.isBase64) {
     throw new Error('ISR does not support FaceResponse.isBase64=true');
   }
 
   const headers = canonicalizeHeaders(response.headers);
   const status = normalizeStatus(response.status);
-  const contentType = normalizeContentType(firstHeaderValue(headers, 'content-type'));
+  const contentType = normalizeContentType(
+    firstHeaderValue(headers, 'content-type'),
+  );
   const etag = firstHeaderValue(headers, 'etag');
   const body = await collectBody(response.body);
 
@@ -737,9 +817,7 @@ function firstHeaderValue(headers: Headers, key: string): string | null {
   return first === undefined ? null : String(first);
 }
 
-async function collectBody(
-  body: FaceResponse['body'],
-): Promise<Uint8Array> {
+async function collectBody(body: FaceResponse['body']): Promise<Uint8Array> {
   if (body instanceof Uint8Array) return body;
 
   const chunks: Uint8Array[] = [];
@@ -769,7 +847,8 @@ async function toUint8Array(
   const chunks: Uint8Array[] = [];
   let total = 0;
   for await (const chunk of input) {
-    const normalizedChunk = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+    const normalizedChunk =
+      chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
     chunks.push(normalizedChunk);
     total += normalizedChunk.length;
   }
