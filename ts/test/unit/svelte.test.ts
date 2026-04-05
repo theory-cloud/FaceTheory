@@ -6,6 +6,8 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { assertDocumentTagNonces } from '../helpers/csp.js';
+
 import { createFaceApp } from '../../src/app.js';
 import { createSvelteFace } from '../../src/svelte/index.js';
 
@@ -108,11 +110,21 @@ test('svelte adapter: integration hooks provide deterministic head/style orderin
           renderOptions: {
             head: { title: 'Svelte Integration Title' },
             headTags: [
-              { type: 'link', attrs: { rel: 'stylesheet', href: '/options-svelte.css' } },
-              { type: 'script', attrs: { id: 'options-inline' }, body: 'window.__SVELTE_OPTIONS__=1;' },
+              {
+                type: 'link',
+                attrs: { rel: 'stylesheet', href: '/options-svelte.css' },
+              },
+              {
+                type: 'script',
+                attrs: { id: 'options-inline' },
+                body: 'window.__SVELTE_OPTIONS__=1;',
+              },
             ],
             styleTags: [
-              { cssText: '.from-options{font-weight:bold;}', attrs: { id: 'style-options' } },
+              {
+                cssText: '.from-options{font-weight:bold;}',
+                attrs: { id: 'style-options' },
+              },
             ],
             hydration: {
               data: { framework: 'svelte' },
@@ -129,16 +141,27 @@ test('svelte adapter: integration hooks provide deterministic head/style orderin
                   },
                 }),
                 contribute: () => ({
-                  headTags: [{ type: 'link', attrs: { rel: 'stylesheet', href: '/integration-a.css' } }],
+                  headTags: [
+                    {
+                      type: 'link',
+                      attrs: { rel: 'stylesheet', href: '/integration-a.css' },
+                    },
+                  ],
                   styleTags: [
-                    { cssText: '.from-int{letter-spacing:1px;}', attrs: { id: 'style-int' } },
+                    {
+                      cssText: '.from-int{letter-spacing:1px;}',
+                      attrs: { id: 'style-int' },
+                    },
                   ],
                 }),
                 finalize: (out) => ({
                   ...out,
                   headTags: [
                     ...(out.headTags ?? []),
-                    { type: 'link', attrs: { rel: 'stylesheet', href: '/integration-b.css' } },
+                    {
+                      type: 'link',
+                      attrs: { rel: 'stylesheet', href: '/integration-b.css' },
+                    },
                   ],
                 }),
               },
@@ -149,7 +172,11 @@ test('svelte adapter: integration hooks provide deterministic head/style orderin
     });
 
     const nonce = 'nonce-svelte-r6';
-    const resp = await app.handle({ method: 'GET', path: '/', cspNonce: nonce });
+    const resp = await app.handle({
+      method: 'GET',
+      path: '/',
+      cspNonce: nonce,
+    });
     const body = new TextDecoder().decode(resp.body as Uint8Array);
 
     assert.ok(body.includes('<title>Svelte Integration Title</title>'));
@@ -169,14 +196,7 @@ test('svelte adapter: integration hooks provide deterministic head/style orderin
     assert.ok(idxStyleInt >= 0 && idxStyleOptions >= 0);
     assert.ok(idxStyleInt < idxStyleOptions);
 
-    const styleTags = Array.from(body.matchAll(/<style\b[^>]*>/g)).map((match) => match[0]);
-    const scriptTags = Array.from(body.matchAll(/<script\b[^>]*>/g)).map((match) => match[0]);
-
-    assert.ok(styleTags.length >= 3);
-    assert.ok(scriptTags.length >= 2);
-    for (const tag of [...styleTags, ...scriptTags]) {
-      assert.ok(tag.includes(`nonce="${nonce}"`), `missing nonce on tag: ${tag}`);
-    }
+    assertDocumentTagNonces(body, nonce, 3, 2);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

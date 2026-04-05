@@ -8,6 +8,9 @@ on:
       - premain
       - main
 
+permissions:
+  contents: read
+
 jobs:
   prerelease-readiness:
     name: Prerelease readiness (staging -> premain)

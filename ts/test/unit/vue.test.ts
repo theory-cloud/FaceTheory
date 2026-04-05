@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { assertDocumentTagNonces } from '../helpers/csp.js';
+
 import { createFaceApp } from '../../src/app.js';
 import { createVueFace, h } from '../../src/vue/index.js';
 
@@ -32,14 +34,27 @@ test('vue adapter: integration hooks provide deterministic head/style ordering a
         route: '/',
         mode: 'ssr',
         load: async () => ({ message: 'Vue Integration' }),
-        render: (_ctx, data) => h('main', { class: 'from-int from-options' }, (data as any).message),
+        render: (_ctx, data) =>
+          h('main', { class: 'from-int from-options' }, (data as any).message),
         renderOptions: {
           head: { title: 'Vue Integration Title' },
           headTags: [
-            { type: 'link', attrs: { rel: 'stylesheet', href: '/options.css' } },
-            { type: 'script', attrs: { id: 'options-inline' }, body: 'window.__VUE_OPTIONS__=1;' },
+            {
+              type: 'link',
+              attrs: { rel: 'stylesheet', href: '/options.css' },
+            },
+            {
+              type: 'script',
+              attrs: { id: 'options-inline' },
+              body: 'window.__VUE_OPTIONS__=1;',
+            },
           ],
-          styleTags: [{ cssText: '.from-options{color:rgb(20,30,40);}', attrs: { id: 'style-options' } }],
+          styleTags: [
+            {
+              cssText: '.from-options{color:rgb(20,30,40);}',
+              attrs: { id: 'style-options' },
+            },
+          ],
           hydration: {
             data: { framework: 'vue' },
             bootstrapModule: '/assets/vue-entry.js',
@@ -49,16 +64,27 @@ test('vue adapter: integration hooks provide deterministic head/style ordering a
               name: 'vue-wrap-contrib-finalize',
               wrapTree: (tree) => h('section', { class: 'wrapped' }, [tree]),
               contribute: () => ({
-                headTags: [{ type: 'link', attrs: { rel: 'stylesheet', href: '/integration-a.css' } }],
+                headTags: [
+                  {
+                    type: 'link',
+                    attrs: { rel: 'stylesheet', href: '/integration-a.css' },
+                  },
+                ],
                 styleTags: [
-                  { cssText: '.from-int{color:rgb(1,2,3);}', attrs: { id: 'style-int' } },
+                  {
+                    cssText: '.from-int{color:rgb(1,2,3);}',
+                    attrs: { id: 'style-int' },
+                  },
                 ],
               }),
               finalize: (out) => ({
                 ...out,
                 headTags: [
                   ...(out.headTags ?? []),
-                  { type: 'link', attrs: { rel: 'stylesheet', href: '/integration-b.css' } },
+                  {
+                    type: 'link',
+                    attrs: { rel: 'stylesheet', href: '/integration-b.css' },
+                  },
                 ],
               }),
             },
@@ -89,12 +115,5 @@ test('vue adapter: integration hooks provide deterministic head/style ordering a
   assert.ok(idxStyleInt >= 0 && idxStyleOptions >= 0);
   assert.ok(idxStyleInt < idxStyleOptions);
 
-  const styleTags = Array.from(body.matchAll(/<style\b[^>]*>/g)).map((match) => match[0]);
-  const scriptTags = Array.from(body.matchAll(/<script\b[^>]*>/g)).map((match) => match[0]);
-
-  assert.ok(styleTags.length >= 2);
-  assert.ok(scriptTags.length >= 2);
-  for (const tag of [...styleTags, ...scriptTags]) {
-    assert.ok(tag.includes(`nonce="${nonce}"`), `missing nonce on tag: ${tag}`);
-  }
+  assertDocumentTagNonces(body, nonce, 2, 2);
 });
