@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/theory-cloud/FaceTheory/compare/v0.3.2...v0.4.0) (2026-04-11)
+
+
+### Features
+
+* implement Svelte and Vue component libraries for stitch-shell, stitch-admin, and stitch-hosted-auth with unified token management. ([0bc5445](https://github.com/theory-cloud/FaceTheory/commit/0bc54452cf1a8db80c746656145072ba168c7379))
+* **react:** add Stitch control-plane shell primitives ([6f1ac53](https://github.com/theory-cloud/FaceTheory/commit/6f1ac536f1171d614fa05803ba6ff75c9742ffde))
+* **react:** add Stitch dense admin primitives ([335a88f](https://github.com/theory-cloud/FaceTheory/commit/335a88fd02acba3f11d60b6bb64405eb12de93c8))
+* **react:** add Stitch hosted-auth primitives ([cf74b20](https://github.com/theory-cloud/FaceTheory/commit/cf74b20cc091b5f7f2bf24fb46b0513d3a863b4d))
+* **react:** add Stitch token bridge for AntD theme and CSS variables ([a7623fc](https://github.com/theory-cloud/FaceTheory/commit/a7623fc5a4e11420f10cbb9098cc3ee431b2484e))
+
+
+### Bug Fixes
+
+* clear stitch ui lint regressions ([e98480a](https://github.com/theory-cloud/FaceTheory/commit/e98480ad79b4d30d8842318eed41dfe258cbf365))
+
 ## [0.3.2](https://github.com/theory-cloud/FaceTheory/compare/v0.3.1...v0.3.2) (2026-04-05)
 
 
