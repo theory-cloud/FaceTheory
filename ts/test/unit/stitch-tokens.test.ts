@@ -2,11 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  stitchCssVarsToRootBlock as reactStitchCssVarsToRootBlock,
+  stitchToCssVars as reactStitchToCssVars,
+} from '../../src/react/stitch-tokens/index.js';
+import {
   stitchCssVarsToRootBlock,
-  stitchToAntdTheme,
   stitchToCssVars,
   type StitchTokenSet,
-} from '../../src/react/stitch-tokens/index.js';
+} from '../../src/stitch-tokens/index.js';
+import { stitchToAntdTheme } from '../../src/react/stitch-tokens/index.js';
 
 const m3aFixture: StitchTokenSet = {
   mode: 'light',
@@ -164,4 +168,12 @@ test('stitch-tokens: stitchCssVarsToRootBlock renders a valid :root block', () =
   assert.match(block, /\n {2}--stitch-color-primary: #1f108e;\n/);
   assert.match(block, /\n {2}--stitch-radius-md: 6px;\n/);
   assert.match(block, /}\n?$/);
+});
+
+test('stitch-tokens: React subpath re-exports the shared token helpers', () => {
+  const vars = stitchToCssVars(m3aFixture);
+  assert.deepEqual(reactStitchToCssVars(m3aFixture), vars);
+
+  const block = stitchCssVarsToRootBlock(vars);
+  assert.equal(reactStitchCssVarsToRootBlock(vars), block);
 });

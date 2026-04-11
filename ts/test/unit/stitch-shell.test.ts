@@ -13,9 +13,10 @@ import {
   Shell,
   StatCard,
   SummaryStrip,
-  resolveActiveNav,
+  resolveActiveNav as reactResolveActiveNav,
   type NavItem,
 } from '../../src/react/stitch-shell/index.js';
+import { resolveActiveNav } from '../../src/stitch-shell/index.js';
 
 const h = React.createElement;
 
@@ -78,6 +79,13 @@ test('resolveActiveNav: unmatched pathname returns empty result', () => {
   assert.equal(result.activeKey, undefined);
   assert.deepEqual(result.breadcrumbs, []);
   assert.equal(result.pageTitle, undefined);
+});
+
+test('resolveActiveNav: React subpath re-exports the shared resolver', () => {
+  assert.deepEqual(
+    reactResolveActiveNav('/partners/new', sampleNav),
+    resolveActiveNav('/partners/new', sampleNav),
+  );
 });
 
 async function renderSSR(element: React.ReactElement): Promise<string> {

@@ -1,10 +1,6 @@
-export type {
-  NavItem,
-  BreadcrumbNode,
-  ResolvedNav,
-} from './nav-types.js';
+export type { NavItem, BreadcrumbNode, ResolvedNav } from './nav-types.js';
 
-export { resolveActiveNav } from './resolve-nav.js';
+export { resolveActiveNav } from '../../stitch-shell/index.js';
 
 export {
   Shell,
