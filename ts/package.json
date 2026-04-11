@@ -67,6 +67,10 @@
       "types": "./dist/react/stitch-shell/index.d.ts",
       "import": "./dist/react/stitch-shell/index.js"
     },
+    "./react/stitch-hosted-auth": {
+      "types": "./dist/react/stitch-hosted-auth/index.d.ts",
+      "import": "./dist/react/stitch-hosted-auth/index.js"
+    },
     "./vue": {
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue/index.js"
