@@ -2,6 +2,7 @@ import type { Component } from 'svelte';
 
 export type { NavItem, BreadcrumbNode, ResolvedNav } from './nav-types.js';
 export { resolveActiveNav } from '../../stitch-shell/index.js';
+export type { CalloutVariant } from '../../stitch-shell/callout-types.js';
 
 export interface SidebarProps {
   nav: import('./nav-types.js').NavItem[];
@@ -53,6 +54,13 @@ export interface SummaryStripProps {
   columns?: number | 'auto';
 }
 
+export interface CalloutProps {
+  variant?: import('../../stitch-shell/callout-types.js').CalloutVariant;
+  title?: unknown;
+  icon?: unknown;
+  actions?: unknown;
+}
+
 export declare const Shell: Component<ShellProps>;
 export declare const Sidebar: Component<SidebarProps>;
 export declare const Topbar: Component<TopbarProps>;
@@ -65,3 +73,4 @@ export declare const Section: Component<SectionProps>;
 export declare const Panel: Component<PanelProps>;
 export declare const StatCard: Component<StatCardProps>;
 export declare const SummaryStrip: Component<SummaryStripProps>;
+export declare const Callout: Component<CalloutProps>;

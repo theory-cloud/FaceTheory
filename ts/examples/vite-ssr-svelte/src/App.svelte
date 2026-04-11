@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    Callout,
     PageFrame,
     Panel,
     Section,
@@ -18,13 +19,18 @@
     PasskeyCTA,
   } from '../../../src/svelte/stitch-hosted-auth/index.js';
   import {
+    CopyableCode,
     DataTable,
     DestructiveConfirm,
     DetailPanel,
+    FilterChipGroup,
     FormRow,
     FormSection,
+    InlineKeyValueList,
+    LogStream,
     SplitForm,
     StatusTag,
+    Tabs,
   } from '../../../src/svelte/stitch-admin/index.js';
 
   export let message: string;
@@ -71,6 +77,11 @@
       <Panel>inside panel</Panel>
     </SummaryStrip>
 
+    <Callout variant="warning" title="Stale manifest">
+      Incoming policy changes have not been redeployed to the regional edge fleet yet.
+      <button slot="actions" type="button">Refresh</button>
+    </Callout>
+
     <Section title="Hosted auth" description="Passkey-first primitives">
       <AuthCard title="Sign in to Autheory" description="Use your passkey or password">
         <a slot="headerAction" href="/signup">Sign up</a>
@@ -116,6 +127,25 @@
     </Section>
 
     <Section title="Admin primitives" description="Dense control-plane surfaces">
+      <Tabs
+        activeKey="policies"
+        items={[
+          { key: 'policies', label: 'Knowledge Policies', count: 8 },
+          { key: 'catalog', label: 'Knowledge Catalog', count: 12 },
+        ]}
+      >
+        <div class="svelte-inline svelte-app">policies body</div>
+      </Tabs>
+
+      <FilterChipGroup
+        chips={[
+          { key: 'status', label: 'status: active' },
+          { key: 'manifest', label: 'manifest: stale', count: 2 },
+        ]}
+      >
+        <a slot="trailing" href="#clear">Clear all</a>
+      </FilterChipGroup>
+
       <DetailPanel
         title="Acme Corp"
         description="Tenant overview"
@@ -133,6 +163,16 @@
         <button slot="toolbar-right" type="button">New partner</button>
         <button slot="rowActions" let:record data-key={record.key} type="button">Edit</button>
       </DataTable>
+
+      <InlineKeyValueList
+        entries={[
+          { key: 'org', label: 'ORG', value: 'org_882910' },
+          { key: 'wksp', label: 'WKSP', value: 'ws_prod_01' },
+          { key: 'client', label: 'CLIENT', value: 'cli_99x_z2' },
+        ]}
+      />
+
+      <CopyableCode code="lab.theorymcp.ai/theorycloud/mcp" />
 
       <SplitForm>
         <FormRow
@@ -154,9 +194,31 @@
       </SplitForm>
 
       <div class="svelte-inline svelte-app">
+        <StatusTag variant="allow" />
+        <StatusTag variant="deny" />
+        <StatusTag variant="warning" />
         <StatusTag variant="active" label="Active · 12 members" />
         <DestructiveConfirm title="Delete tenant?" requireText="acme-prod" />
       </div>
+
+      <LogStream
+        variant="terminal"
+        title="repair_logs_tty1"
+        entries={[
+          {
+            id: '1',
+            timestamp: '14:02:11',
+            level: 'debug',
+            message: 'Initiating global state handshake...',
+          },
+          {
+            id: '2',
+            timestamp: '14:02:12',
+            level: 'success',
+            message: 'Handshake SUCCESS',
+          },
+        ]}
+      />
     </Section>
   </PageFrame>
 </Shell>

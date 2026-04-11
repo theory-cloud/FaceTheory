@@ -4,14 +4,19 @@ import test from 'node:test';
 import { createFaceApp } from '../../src/app.js';
 import { createVueFace, h } from '../../src/vue/index.js';
 import {
+  CopyableCode,
   DataTable,
   DestructiveConfirm,
   DetailPanel,
+  FilterChipGroup,
   FormRow,
   FormSection,
+  InlineKeyValueList,
+  LogStream,
   PropertyGrid,
   SplitForm,
   StatusTag,
+  Tabs,
 } from '../../src/vue/stitch-admin/index.js';
 
 async function renderSSR(vnode: ReturnType<typeof h>): Promise<string> {
@@ -131,4 +136,85 @@ test('vue stitch-admin: detail, form, status, and destructive primitives render 
   assert.ok(body.includes('facetheory-stitch-status-tag-active'));
   assert.ok(body.includes('Active · 12 members'));
   assert.ok(body.includes('Type &quot;acme-prod&quot; to confirm'));
+});
+
+test('vue stitch-admin: tabs, chips, key-value rows, copy code, logs, and policy variants render parity markers', async () => {
+  const body = await renderSSR(
+    h('div', null, [
+      h(
+        Tabs,
+        {
+          activeKey: 'policies',
+          items: [
+            { key: 'policies', label: 'Knowledge Policies', count: 8 },
+            { key: 'catalog', label: 'Knowledge Catalog', count: 12 },
+          ],
+        },
+        {
+          default: () =>
+            h('div', { 'data-testid': 'policies-body' }, 'policies body'),
+        },
+      ),
+      h(
+        FilterChipGroup,
+        {
+          chips: [
+            { key: 'status', label: 'status: active' },
+            { key: 'manifest', label: 'manifest: stale', count: 2 },
+          ],
+        },
+        {
+          trailing: () => h('a', { href: '#clear' }, 'Clear all'),
+        },
+      ),
+      h(InlineKeyValueList, {
+        entries: [
+          { key: 'org', label: 'ORG', value: 'org_882910' },
+          { key: 'wksp', label: 'WKSP', value: 'ws_prod_01' },
+        ],
+      }),
+      h(CopyableCode, { code: 'lab.theorymcp.ai/theorycloud/mcp' }),
+      h(LogStream, {
+        variant: 'terminal',
+        title: 'repair_logs_tty1',
+        entries: [
+          {
+            id: '1',
+            timestamp: '14:02:11',
+            level: 'debug',
+            message: 'Initiating global state handshake...',
+          },
+          {
+            id: '2',
+            timestamp: '14:02:12',
+            level: 'success',
+            message: 'Handshake SUCCESS',
+          },
+        ],
+      }),
+      h(StatusTag, { variant: 'allow' }),
+      h(StatusTag, { variant: 'deny' }),
+      h(StatusTag, { variant: 'warning' }),
+    ]),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-tabs'));
+  assert.ok(body.includes('facetheory-stitch-tabs-count'));
+  assert.ok(body.includes('policies body'));
+  assert.ok(body.includes('facetheory-stitch-filter-chip-group'));
+  assert.ok(body.includes('facetheory-stitch-filter-chip-remove'));
+  assert.ok(body.includes('Clear all'));
+  assert.ok(body.includes('facetheory-stitch-inline-key-value-list'));
+  assert.ok(body.includes('org_882910'));
+  assert.ok(body.includes('facetheory-stitch-copyable-code'));
+  assert.ok(body.includes('aria-label="Copy"'));
+  assert.ok(body.includes('facetheory-stitch-log-stream-terminal'));
+  assert.ok(body.includes('repair_logs_tty1'));
+  assert.ok(body.includes('Handshake SUCCESS'));
+  assert.ok(body.includes('facetheory-stitch-status-tag-allow'));
+  assert.ok(body.includes('facetheory-stitch-status-tag-deny'));
+  assert.ok(body.includes('facetheory-stitch-status-tag-warning'));
+  assert.ok(body.includes('Allow'));
+  assert.ok(body.includes('Deny'));
+  assert.ok(body.includes('Warning'));
 });

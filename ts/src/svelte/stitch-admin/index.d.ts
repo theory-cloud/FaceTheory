@@ -23,12 +23,32 @@ export interface PropertyItem {
   span?: 'half' | 'full';
 }
 
-export type StatusVariant =
-  | 'active'
-  | 'pending'
-  | 'suspended'
-  | 'archived'
-  | 'error';
+export interface TabItem
+  extends Omit<import('../../stitch-admin/tabs-types.js').TabItem, 'label' | 'icon'> {
+  label: unknown;
+  icon?: unknown;
+}
+
+export interface FilterChipConfig
+  extends Omit<import('../../stitch-admin/filter-types.js').FilterChipConfig, 'label'> {
+  label: unknown;
+}
+
+export interface KeyValueEntry {
+  key: string;
+  label: unknown;
+  value: unknown;
+}
+
+export type LogLevel = import('../../stitch-admin/log-types.js').LogLevel;
+
+export interface LogEntry
+  extends Omit<import('../../stitch-admin/log-types.js').LogEntry, 'message' | 'actor'> {
+  message: unknown;
+  actor?: unknown;
+}
+
+export type StatusVariant = import('../../stitch-admin/status-types.js').StatusVariant;
 
 export interface DataTableProps {
   rowKey: string | ((record: Record<string, unknown>) => string);
@@ -79,6 +99,47 @@ export interface DestructiveConfirmProps {
   loading?: boolean;
 }
 
+export interface TabsProps {
+  items: TabItem[];
+  activeKey?: string;
+  defaultActiveKey?: string;
+  onChange?: (key: string) => void;
+  variant?: 'line' | 'card';
+}
+
+export interface FilterChipProps extends Omit<FilterChipConfig, 'key'> {
+  onClick?: () => void;
+  onRemove?: () => void;
+}
+
+export interface FilterChipGroupProps {
+  chips: FilterChipConfig[];
+  onChipClick?: (key: string) => void;
+  onChipRemove?: (key: string) => void;
+  trailing?: unknown;
+}
+
+export interface InlineKeyValueListProps {
+  entries: KeyValueEntry[];
+  labelWidth?: number | string;
+  valueMono?: boolean;
+}
+
+export interface CopyableCodeProps {
+  code: string;
+  copyLabel?: string;
+  size?: 'sm' | 'md';
+  onCopy?: (code: string) => void;
+}
+
+export interface LogStreamProps {
+  entries: LogEntry[];
+  variant?: 'plain' | 'terminal';
+  title?: unknown;
+  formatTimestamp?: (value: string | number) => string;
+  maxHeight?: number | string;
+}
+
 export declare const DataTable: Component<DataTableProps>;
 export declare const DetailPanel: Component<DetailPanelProps>;
 export declare const PropertyGrid: Component<PropertyGridProps>;
@@ -87,3 +148,9 @@ export declare const FormSection: Component<FormSectionProps>;
 export declare const SplitForm: Component<SplitFormProps>;
 export declare const StatusTag: Component<StatusTagProps>;
 export declare const DestructiveConfirm: Component<DestructiveConfirmProps>;
+export declare const Tabs: Component<TabsProps>;
+export declare const FilterChip: Component<FilterChipProps>;
+export declare const FilterChipGroup: Component<FilterChipGroupProps>;
+export declare const InlineKeyValueList: Component<InlineKeyValueListProps>;
+export declare const CopyableCode: Component<CopyableCodeProps>;
+export declare const LogStream: Component<LogStreamProps>;

@@ -1,14 +1,10 @@
 import { defineComponent, h, ref } from 'vue';
 import type { PropType } from 'vue';
+import type { StatusVariant } from '../../stitch-admin/status-types.js';
 
 import { renderPropContent, vnodeChildProp } from '../stitch-common.js';
 
-export type StatusVariant =
-  | 'active'
-  | 'pending'
-  | 'suspended'
-  | 'archived'
-  | 'error';
+export type { StatusVariant } from '../../stitch-admin/status-types.js';
 
 interface StatusPalette {
   background: string;
@@ -42,13 +38,28 @@ const statusPalette: Record<StatusVariant, StatusPalette> = {
     color: 'var(--stitch-color-on-error-container, #93000a)',
     label: 'Error',
   },
+  warning: {
+    background: 'var(--stitch-color-secondary-container, #ffecc0)',
+    color: 'var(--stitch-color-on-secondary-container, #3f2e00)',
+    label: 'Warning',
+  },
+  allow: {
+    background: 'var(--stitch-color-tertiary-container, #004c45)',
+    color: 'var(--stitch-color-on-tertiary-container, #52c1b4)',
+    label: 'Allow',
+  },
+  deny: {
+    background: 'var(--stitch-color-error-container, #ffdad6)',
+    color: 'var(--stitch-color-on-error-container, #93000a)',
+    label: 'Deny',
+  },
 };
 
 export const StatusTag = defineComponent({
   name: 'FaceTheoryVueStatusTag',
   props: {
     variant: {
-      type: String as () => StatusVariant,
+      type: String as PropType<StatusVariant>,
       required: true,
     },
     label: vnodeChildProp,
