@@ -63,6 +63,10 @@
       "types": "./dist/react/stitch-tokens/index.d.ts",
       "import": "./dist/react/stitch-tokens/index.js"
     },
+    "./react/stitch-shell": {
+      "types": "./dist/react/stitch-shell/index.d.ts",
+      "import": "./dist/react/stitch-shell/index.js"
+    },
     "./vue": {
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue/index.js"

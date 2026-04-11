@@ -1,0 +1,224 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import * as React from 'react';
+
+import { createFaceApp } from '../../src/app.js';
+import { createReactFace } from '../../src/adapters/react.js';
+import { createAntdIntegration } from '../../src/react/antd.js';
+import {
+  PageFrame,
+  Panel,
+  Section,
+  Shell,
+  StatCard,
+  SummaryStrip,
+  resolveActiveNav,
+  type NavItem,
+} from '../../src/react/stitch-shell/index.js';
+
+const h = React.createElement;
+
+const sampleNav: NavItem[] = [
+  { key: '/dashboard', label: 'Dashboard', path: '/dashboard' },
+  {
+    key: 'partners-group',
+    label: 'Partners',
+    children: [
+      { key: '/partners', label: 'All partners', path: '/partners' },
+      { key: '/partners/new', label: 'New partner', path: '/partners/new' },
+    ],
+  },
+  { key: '/staff', label: 'Staff', path: '/staff' },
+  { key: '/settings', label: 'Settings', path: '/settings', hidden: true },
+];
+
+test('resolveActiveNav: exact path match selects the correct leaf', () => {
+  const result = resolveActiveNav('/dashboard', sampleNav);
+  assert.equal(result.activeKey, '/dashboard');
+  assert.equal(result.pageTitle, 'Dashboard');
+  assert.deepEqual(
+    result.breadcrumbs.map((b) => b.key),
+    ['/dashboard'],
+  );
+});
+
+test('resolveActiveNav: nested child is matched and breadcrumb walks up the group', () => {
+  const result = resolveActiveNav('/partners/new', sampleNav);
+  assert.equal(result.activeKey, '/partners/new');
+  assert.deepEqual(
+    result.breadcrumbs.map((b) => b.key),
+    ['partners-group', '/partners/new'],
+  );
+  assert.equal(result.pageTitle, 'New partner');
+});
+
+test('resolveActiveNav: longest-prefix wins when a sub-route is active', () => {
+  // /partners/123 matches /partners (length 9), the leaf wins over the group.
+  const result = resolveActiveNav('/partners/123', sampleNav);
+  assert.equal(result.activeKey, '/partners');
+  assert.deepEqual(
+    result.breadcrumbs.map((b) => b.key),
+    ['partners-group', '/partners'],
+  );
+});
+
+test('resolveActiveNav: /partners/new beats /partners when path is /partners/new/foo', () => {
+  const result = resolveActiveNav('/partners/new/foo', sampleNav);
+  assert.equal(result.activeKey, '/partners/new');
+});
+
+test('resolveActiveNav: hidden items still participate in breadcrumb resolution', () => {
+  const result = resolveActiveNav('/settings', sampleNav);
+  assert.equal(result.activeKey, '/settings');
+});
+
+test('resolveActiveNav: unmatched pathname returns empty result', () => {
+  const result = resolveActiveNav('/nowhere', sampleNav);
+  assert.equal(result.activeKey, undefined);
+  assert.deepEqual(result.breadcrumbs, []);
+  assert.equal(result.pageTitle, undefined);
+});
+
+async function renderSSR(element: React.ReactElement): Promise<string> {
+  const app = createFaceApp({
+    faces: [
+      createReactFace({
+        route: '/',
+        mode: 'ssr',
+        render: () => element,
+        renderOptions: {
+          integrations: [createAntdIntegration({ hashed: false })],
+        },
+      }),
+    ],
+  });
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  return new TextDecoder().decode(resp.body as Uint8Array);
+}
+
+test('Shell renders sidebar, topbar, and content region', async () => {
+  const body = await renderSSR(
+    h(Shell, {
+      nav: sampleNav,
+      activeKey: '/dashboard',
+      brand: h('span', { 'data-testid': 'brand' }, 'Autheory'),
+      topbarRight: h('span', { 'data-testid': 'user' }, 'Jane Doe'),
+      children: h('div', { 'data-testid': 'content' }, 'hello world'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-shell'));
+  assert.ok(body.includes('facetheory-stitch-sidebar'));
+  assert.ok(body.includes('facetheory-stitch-topbar'));
+  assert.ok(body.includes('hello world'));
+  assert.ok(body.includes('Autheory'));
+  assert.ok(body.includes('Jane Doe'));
+  assert.ok(body.includes('Dashboard'));
+});
+
+test('Shell hides nav items marked hidden', async () => {
+  const body = await renderSSR(
+    h(Shell, {
+      nav: sampleNav,
+      activeKey: '/dashboard',
+      children: h('div', null, 'content'),
+    }),
+  );
+  // The hidden Settings item must not appear in the sidebar.
+  const sidebarStart = body.indexOf('facetheory-stitch-sidebar-menu');
+  const sidebarEnd = body.indexOf('facetheory-stitch-shell-content');
+  const sidebarSlice = body.slice(sidebarStart, sidebarEnd);
+  assert.ok(!sidebarSlice.includes('Settings'));
+});
+
+test('PageFrame renders breadcrumb, title, description, actions, and body', async () => {
+  const body = await renderSSR(
+    h(PageFrame, {
+      breadcrumbs: [
+        { key: 'root', label: 'Home', path: '/' },
+        { key: 'partners', label: 'Partners', path: '/partners' },
+        { key: 'acme', label: 'Acme Corp' },
+      ],
+      title: 'Acme Corp',
+      description: 'Partner details and security posture',
+      actions: h('button', { 'data-testid': 'edit' }, 'Edit'),
+      children: h('p', null, 'page body'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-page-frame'));
+  assert.ok(body.includes('facetheory-stitch-breadcrumb'));
+  assert.ok(body.includes('Acme Corp'));
+  assert.ok(body.includes('Partner details and security posture'));
+  assert.ok(body.includes('Edit'));
+  assert.ok(body.includes('page body'));
+});
+
+test('Section renders title, description, actions, and children', async () => {
+  const body = await renderSSR(
+    h(Section, {
+      title: 'Active sessions',
+      description: '12 total',
+      actions: h('button', null, 'Revoke all'),
+      children: h('ul', null, h('li', null, 'session-1')),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-section'));
+  assert.ok(body.includes('Active sessions'));
+  assert.ok(body.includes('12 total'));
+  assert.ok(body.includes('Revoke all'));
+  assert.ok(body.includes('session-1'));
+});
+
+test('Panel uses CSS variables for surface + radius', async () => {
+  const body = await renderSSR(
+    h(Panel, { children: h('span', null, 'inside panel') }),
+  );
+  assert.ok(body.includes('facetheory-stitch-panel'));
+  assert.ok(body.includes('inside panel'));
+  assert.ok(body.includes('--stitch-color-surface-container-lowest'));
+  assert.ok(body.includes('--stitch-radius-xl'));
+});
+
+test('SummaryStrip wraps StatCards in a responsive grid', async () => {
+  const body = await renderSSR(
+    h(SummaryStrip, {
+      children: [
+        h(StatCard, {
+          key: 'active',
+          label: 'Active users',
+          value: '1,204',
+          delta: { value: '+8%', trend: 'up' },
+        }),
+        h(StatCard, { key: 'sessions', label: 'Sessions', value: '98' }),
+      ],
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-summary-strip'));
+  assert.ok(body.includes('facetheory-stitch-stat-card'));
+  assert.ok(body.includes('Active users'));
+  assert.ok(body.includes('1,204'));
+  assert.ok(body.includes('+8%'));
+  assert.ok(body.includes('Sessions'));
+  assert.ok(body.includes('98'));
+});
+
+test('StatCard delta trend colors bind to Stitch tokens', async () => {
+  const body = await renderSSR(
+    h(
+      'div',
+      null,
+      h(StatCard, {
+        label: 'Up',
+        value: '1',
+        delta: { value: '+10%', trend: 'up' },
+      }),
+      h(StatCard, {
+        label: 'Down',
+        value: '2',
+        delta: { value: '-5%', trend: 'down' },
+      }),
+    ),
+  );
+  assert.ok(body.includes('--stitch-color-tertiary'));
+  assert.ok(body.includes('--stitch-color-error'));
+});
