@@ -59,6 +59,10 @@
       "types": "./dist/react/emotion.d.ts",
       "import": "./dist/react/emotion.js"
     },
+    "./react/stitch-tokens": {
+      "types": "./dist/react/stitch-tokens/index.d.ts",
+      "import": "./dist/react/stitch-tokens/index.js"
+    },
     "./vue": {
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue/index.js"

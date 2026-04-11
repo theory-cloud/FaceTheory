@@ -13,6 +13,7 @@ await import('./unit/react.test.js');
 await import('./unit/vite.test.js');
 await import('./unit/antd.test.js');
 await import('./unit/emotion.test.js');
+await import('./unit/stitch-tokens.test.js');
 await import('./unit/portal-fixtures.test.js');
 await import('./unit/antd-coverage.test.js');
 await import('./unit/portal-reference.test.js');
