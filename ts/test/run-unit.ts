@@ -16,6 +16,7 @@ await import('./unit/emotion.test.js');
 await import('./unit/stitch-tokens.test.js');
 await import('./unit/stitch-shell.test.js');
 await import('./unit/stitch-hosted-auth.test.js');
+await import('./unit/stitch-admin.test.js');
 await import('./unit/portal-fixtures.test.js');
 await import('./unit/antd-coverage.test.js');
 await import('./unit/portal-reference.test.js');
