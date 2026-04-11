@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/theory-cloud/FaceTheory/compare/v0.4.0...v0.5.0) (2026-04-11)
+
+
+### Features
+
+* align stitch control-plane primitives across frameworks ([853b66a](https://github.com/theory-cloud/FaceTheory/commit/853b66ab8ba4f7c96c004c9269d8dc5900ab6852))
+
 ## [0.4.0](https://github.com/theory-cloud/FaceTheory/compare/v0.3.2...v0.4.0) (2026-04-11)
 
 
