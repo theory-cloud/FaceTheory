@@ -30,6 +30,21 @@
       color: 'var(--stitch-color-on-error-container, #93000a)',
       label: 'Error',
     },
+    warning: {
+      background: 'var(--stitch-color-secondary-container, #ffecc0)',
+      color: 'var(--stitch-color-on-secondary-container, #3f2e00)',
+      label: 'Warning',
+    },
+    allow: {
+      background: 'var(--stitch-color-tertiary-container, #004c45)',
+      color: 'var(--stitch-color-on-tertiary-container, #52c1b4)',
+      label: 'Allow',
+    },
+    deny: {
+      background: 'var(--stitch-color-error-container, #ffdad6)',
+      color: 'var(--stitch-color-on-error-container, #93000a)',
+      label: 'Deny',
+    },
   };
 
   $: current = palette[variant];

@@ -51,6 +51,10 @@
       "types": "./dist/stitch-shell/index.d.ts",
       "import": "./dist/stitch-shell/index.js"
     },
+    "./stitch-admin": {
+      "types": "./dist/stitch-admin/index.d.ts",
+      "import": "./dist/stitch-admin/index.js"
+    },
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"

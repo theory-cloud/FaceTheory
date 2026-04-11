@@ -17,3 +17,28 @@ export {
   StatusTag,
   type StatusVariant,
 } from './destructive.js';
+
+export { Tabs, type TabItem, type TabsProps } from './tabs.js';
+
+export {
+  FilterChip,
+  FilterChipGroup,
+  type FilterChipConfig,
+  type FilterChipProps,
+  type FilterChipGroupProps,
+} from './filter-chips.js';
+
+export {
+  InlineKeyValueList,
+  type InlineKeyValueListProps,
+  type KeyValueEntry,
+} from './key-value-list.js';
+
+export { CopyableCode, type CopyableCodeProps } from './copyable-code.js';
+
+export {
+  LogStream,
+  type LogEntry,
+  type LogLevel,
+  type LogStreamProps,
+} from './log-stream.js';

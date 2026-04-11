@@ -9,10 +9,21 @@ export { default as SplitForm } from './SplitForm.svelte';
 
 export { default as DestructiveConfirm } from './DestructiveConfirm.svelte';
 export { default as StatusTag } from './StatusTag.svelte';
+export { default as Tabs } from './Tabs.svelte';
+export { default as FilterChip } from './FilterChip.svelte';
+export { default as FilterChipGroup } from './FilterChipGroup.svelte';
+export { default as InlineKeyValueList } from './InlineKeyValueList.svelte';
+export { default as CopyableCode } from './CopyableCode.svelte';
+export { default as LogStream } from './LogStream.svelte';
 
 export type {
   DataTableToolbarSlots,
   DataTableColumn,
+  FilterChipConfig,
+  KeyValueEntry,
+  LogEntry,
+  LogLevel,
   PropertyItem,
   StatusVariant,
+  TabItem,
 } from './types.js';

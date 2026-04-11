@@ -7,3 +7,5 @@ export { Shell, Sidebar, Topbar } from './shell.js';
 export { PageFrame, PageTitle, Breadcrumb } from './page-frame.js';
 
 export { Section, Panel, StatCard, SummaryStrip } from './sections.js';
+
+export { Callout, type CalloutProps, type CalloutVariant } from './callout.js';

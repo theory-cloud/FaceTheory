@@ -7,6 +7,7 @@ import { createFaceApp } from '../../src/app.js';
 import { createReactFace } from '../../src/adapters/react.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
 import {
+  Callout,
   PageFrame,
   Panel,
   Section,
@@ -229,4 +230,53 @@ test('StatCard delta trend colors bind to Stitch tokens', async () => {
   );
   assert.ok(body.includes('--stitch-color-tertiary'));
   assert.ok(body.includes('--stitch-color-error'));
+});
+
+test('Callout renders title, content, and an accent-bound variant class', async () => {
+  const body = await renderSSR(
+    h(Callout, {
+      variant: 'info',
+      title: 'L7 Slug Priority',
+      children: h(
+        'p',
+        null,
+        'Incoming requests are first matched against the primary slug.',
+      ),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-callout'));
+  assert.ok(body.includes('facetheory-stitch-callout-info'));
+  assert.ok(body.includes('L7 Slug Priority'));
+  assert.ok(body.includes('primary slug'));
+});
+
+test('Callout danger variant takes role="alert" for assistive tech', async () => {
+  const body = await renderSSR(
+    h(Callout, {
+      variant: 'danger',
+      title: 'Manifest snapshot corrupted',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-callout-danger'));
+  assert.ok(body.includes('role="alert"'));
+});
+
+test('Callout info variant uses role="note" instead of alert', async () => {
+  const body = await renderSSR(
+    h(Callout, { variant: 'info', title: 'Just a note' }),
+  );
+  assert.ok(body.includes('role="note"'));
+  assert.ok(!/facetheory-stitch-callout-info[^>]*role="alert"/.test(body));
+});
+
+test('Callout renders an actions slot when provided', async () => {
+  const body = await renderSSR(
+    h(Callout, {
+      variant: 'warning',
+      title: 'Stale manifest',
+      actions: h('button', { 'data-testid': 'refresh' }, 'Refresh'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-callout-actions'));
+  assert.ok(body.includes('Refresh'));
 });

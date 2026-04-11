@@ -7,14 +7,20 @@ import { createFaceApp } from '../../src/app.js';
 import { createReactFace } from '../../src/adapters/react.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
 import {
+  CopyableCode,
   DataTable,
   DestructiveConfirm,
   DetailPanel,
+  FilterChip,
+  FilterChipGroup,
   FormRow,
   FormSection,
+  InlineKeyValueList,
+  LogStream,
   PropertyGrid,
   SplitForm,
   StatusTag,
+  Tabs,
 } from '../../src/react/stitch-admin/index.js';
 
 const h = React.createElement;
@@ -61,8 +67,7 @@ test('DataTable renders toolbar slots, rows, and the row-actions column', async 
         center: h('input', { placeholder: 'Search' }),
         right: h('button', null, 'New partner'),
       },
-      rowActions: (record) =>
-        h('button', { 'data-key': record.key }, 'Edit'),
+      rowActions: (record) => h('button', { 'data-key': record.key }, 'Edit'),
     }),
   );
   assert.ok(body.includes('facetheory-stitch-data-table'));
@@ -173,11 +178,29 @@ test('FormSection wraps FormRows with a heading and description', async () => {
 });
 
 test('StatusTag renders each variant with the correct class and default label', async () => {
-  const variants = ['active', 'pending', 'suspended', 'archived', 'error'] as const;
+  const variants = [
+    'active',
+    'pending',
+    'suspended',
+    'archived',
+    'error',
+    'warning',
+    'allow',
+    'deny',
+  ] as const;
   for (const variant of variants) {
     const body = await renderSSR(h(StatusTag, { variant }));
     assert.ok(body.includes(`facetheory-stitch-status-tag-${variant}`));
   }
+});
+
+test('StatusTag policy variants render their default labels', async () => {
+  const allow = await renderSSR(h(StatusTag, { variant: 'allow' }));
+  assert.ok(allow.includes('Allow'));
+  const deny = await renderSSR(h(StatusTag, { variant: 'deny' }));
+  assert.ok(deny.includes('Deny'));
+  const warning = await renderSSR(h(StatusTag, { variant: 'warning' }));
+  assert.ok(warning.includes('Warning'));
 });
 
 test('StatusTag supports a custom label override', async () => {
@@ -210,4 +233,191 @@ test('DestructiveConfirm with requireText renders a guarded text input', async (
   );
   // JSX escapes quotes to &quot; in HTML output.
   assert.ok(body.includes('Type &quot;acme-prod&quot; to confirm'));
+});
+
+test('Tabs renders labels, count badges, and the active panel content', async () => {
+  const body = await renderSSR(
+    h(Tabs, {
+      activeKey: 'policies',
+      items: [
+        { key: 'policies', label: 'Knowledge Policies', count: 8 },
+        { key: 'catalog', label: 'Knowledge Catalog', count: 12 },
+      ],
+      children: h('div', { 'data-testid': 'policies-body' }, 'policies body'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-tabs'));
+  assert.ok(body.includes('facetheory-stitch-tabs-label'));
+  assert.ok(body.includes('Knowledge Policies'));
+  assert.ok(body.includes('Knowledge Catalog'));
+  // Count badges render inside a facetheory class.
+  assert.ok(body.includes('facetheory-stitch-tabs-count'));
+  assert.ok(body.includes('policies body'));
+});
+
+test('Tabs uses defaultActiveKey when activeKey is omitted', async () => {
+  const body = await renderSSR(
+    h(Tabs, {
+      defaultActiveKey: 'catalog',
+      items: [
+        { key: 'policies', label: 'Policies' },
+        { key: 'catalog', label: 'Catalog' },
+      ],
+      children: h('div', { 'data-testid': 'catalog-body' }, 'catalog body'),
+    }),
+  );
+  assert.ok(body.includes('catalog body'));
+});
+
+test('Tabs hides items flagged hidden', async () => {
+  const body = await renderSSR(
+    h(Tabs, {
+      items: [
+        { key: 'policies', label: 'Policies' },
+        { key: 'catalog', label: 'Catalog', hidden: true },
+      ],
+    }),
+  );
+  assert.ok(body.includes('Policies'));
+  assert.ok(!body.includes('Catalog'));
+});
+
+test('FilterChip renders label, count, and a removal affordance', async () => {
+  const body = await renderSSR(
+    h(FilterChip, {
+      key: 'status-active',
+      label: 'status: active',
+      count: 124,
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-filter-chip'));
+  assert.ok(body.includes('status: active'));
+  assert.ok(body.includes('124'));
+  assert.ok(body.includes('facetheory-stitch-filter-chip-remove'));
+});
+
+test('FilterChipGroup lays out multiple chips with a trailing slot', async () => {
+  const body = await renderSSR(
+    h(FilterChipGroup, {
+      chips: [
+        { key: 'status', label: 'status: active' },
+        { key: 'manifest', label: 'manifest: stale', count: 2 },
+      ],
+      trailing: h('a', { href: '#clear' }, 'Clear all'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-filter-chip-group'));
+  assert.ok(body.includes('status: active'));
+  assert.ok(body.includes('manifest: stale'));
+  assert.ok(body.includes('Clear all'));
+});
+
+test('FilterChip omits the remove affordance when removable is false', async () => {
+  const body = await renderSSR(
+    h(FilterChip, {
+      key: 'system',
+      label: 'system: locked',
+      removable: false,
+    }),
+  );
+  assert.ok(body.includes('system: locked'));
+  assert.ok(!body.includes('facetheory-stitch-filter-chip-remove'));
+});
+
+test('InlineKeyValueList renders dense label/value rows', async () => {
+  const body = await renderSSR(
+    h(InlineKeyValueList, {
+      entries: [
+        { key: 'org', label: 'ORG', value: 'org_882910' },
+        { key: 'wksp', label: 'WKSP', value: 'ws_prod_01' },
+        { key: 'client', label: 'CLIENT', value: 'cli_99x_z2' },
+      ],
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-inline-key-value-list'));
+  assert.ok(body.includes('ORG'));
+  assert.ok(body.includes('org_882910'));
+  assert.ok(body.includes('WKSP'));
+  assert.ok(body.includes('cli_99x_z2'));
+});
+
+test('CopyableCode renders the code chip and a copy button', async () => {
+  const body = await renderSSR(
+    h(CopyableCode, { code: 'lab.theorymcp.ai/theorycloud/mcp' }),
+  );
+  assert.ok(body.includes('facetheory-stitch-copyable-code'));
+  assert.ok(body.includes('lab.theorymcp.ai/theorycloud/mcp'));
+  assert.ok(body.includes('facetheory-stitch-copyable-code-button'));
+  assert.ok(body.includes('aria-label="Copy"'));
+});
+
+test('CopyableCode separates visible content from copy payload via children', async () => {
+  const body = await renderSSR(
+    h(CopyableCode, {
+      code: 'tenant_7f3a9c2b',
+      children: h('span', null, 'tenant_7f3a…9c2b'),
+    }),
+  );
+  assert.ok(body.includes('tenant_7f3a…9c2b'));
+});
+
+test('LogStream plain variant renders each row with a level class', async () => {
+  const body = await renderSSR(
+    h(LogStream, {
+      entries: [
+        {
+          id: '1',
+          timestamp: '09:42:12',
+          level: 'info',
+          message: 'Created demo-sandbox-01',
+        },
+        {
+          id: '2',
+          timestamp: '09:15:00',
+          level: 'warn',
+          actor: 'System_Bot',
+          message: 'Archived legacy-test-env',
+        },
+        {
+          id: '3',
+          timestamp: '08:00:05',
+          level: 'error',
+          message: 'ERROR: key_0x4f2 invalid checksum',
+        },
+      ],
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-log-stream-plain'));
+  assert.ok(body.includes('facetheory-stitch-log-stream-row-info'));
+  assert.ok(body.includes('facetheory-stitch-log-stream-row-warn'));
+  assert.ok(body.includes('facetheory-stitch-log-stream-row-error'));
+  assert.ok(body.includes('Created demo-sandbox-01'));
+  assert.ok(body.includes('System_Bot'));
+});
+
+test('LogStream terminal variant renders window chrome and a title', async () => {
+  const body = await renderSSR(
+    h(LogStream, {
+      variant: 'terminal',
+      title: 'repair_logs_tty1',
+      entries: [
+        {
+          id: '1',
+          timestamp: '14:02:11',
+          level: 'debug',
+          message: 'Initiating global state handshake...',
+        },
+        {
+          id: '2',
+          timestamp: '14:02:12',
+          level: 'success',
+          message: 'Handshake SUCCESS',
+        },
+      ],
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-log-stream-terminal'));
+  assert.ok(body.includes('facetheory-stitch-log-stream-chrome'));
+  assert.ok(body.includes('repair_logs_tty1'));
+  assert.ok(body.includes('Handshake SUCCESS'));
 });

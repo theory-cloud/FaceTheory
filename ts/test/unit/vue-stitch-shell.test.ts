@@ -4,6 +4,7 @@ import test from 'node:test';
 import { createFaceApp } from '../../src/app.js';
 import { createVueFace, h } from '../../src/vue/index.js';
 import {
+  Callout,
   PageFrame,
   Panel,
   Section,
@@ -129,4 +130,39 @@ test('vue stitch-shell: PageFrame and section primitives render tokenized conten
   assert.ok(body.includes('facetheory-stitch-stat-card'));
   assert.ok(body.includes('inside panel'));
   assert.ok(body.includes('--stitch-color-tertiary'));
+});
+
+test('vue stitch-shell: Callout renders variant classes, note/alert roles, and actions', async () => {
+  const body = await renderSSR(
+    h('div', null, [
+      h(
+        Callout,
+        {
+          variant: 'info',
+          title: 'L7 Slug Priority',
+        },
+        {
+          default: () =>
+            h(
+              'p',
+              null,
+              'Incoming requests are first matched against the primary slug.',
+            ),
+        },
+      ),
+      h(Callout, {
+        variant: 'warning',
+        title: 'Stale manifest',
+        actions: h('button', null, 'Refresh'),
+      }),
+    ]),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-callout'));
+  assert.ok(body.includes('facetheory-stitch-callout-info'));
+  assert.ok(body.includes('facetheory-stitch-callout-warning'));
+  assert.ok(body.includes('role="note"'));
+  assert.ok(body.includes('role="alert"'));
+  assert.ok(body.includes('facetheory-stitch-callout-actions'));
+  assert.ok(body.includes('Refresh'));
 });

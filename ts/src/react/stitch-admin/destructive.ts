@@ -1,15 +1,11 @@
 import * as React from 'react';
 import { Button, Input } from 'antd';
 import type { ButtonProps } from 'antd';
+import type { StatusVariant } from '../../stitch-admin/status-types.js';
 
 const h = React.createElement;
 
-export type StatusVariant =
-  | 'active'
-  | 'pending'
-  | 'suspended'
-  | 'archived'
-  | 'error';
+export type { StatusVariant } from '../../stitch-admin/status-types.js';
 
 interface StatusPalette {
   background: string;
@@ -42,6 +38,21 @@ const STATUS_PALETTE: Record<StatusVariant, StatusPalette> = {
     background: 'var(--stitch-color-error-container, #ffdad6)',
     color: 'var(--stitch-color-on-error-container, #93000a)',
     label: 'Error',
+  },
+  warning: {
+    background: 'var(--stitch-color-secondary-container, #ffecc0)',
+    color: 'var(--stitch-color-on-secondary-container, #3f2e00)',
+    label: 'Warning',
+  },
+  allow: {
+    background: 'var(--stitch-color-tertiary-container, #004c45)',
+    color: 'var(--stitch-color-on-tertiary-container, #52c1b4)',
+    label: 'Allow',
+  },
+  deny: {
+    background: 'var(--stitch-color-error-container, #ffdad6)',
+    color: 'var(--stitch-color-on-error-container, #93000a)',
+    label: 'Deny',
   },
 };
 

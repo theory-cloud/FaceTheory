@@ -57,6 +57,7 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 - `@theory-cloud/facetheory/aws-s3` AWS SDK S3 HTML store adapter
 - `@theory-cloud/facetheory/stitch-tokens` shared Stitch design-token helpers for React, Vue, and Svelte apps
 - `@theory-cloud/facetheory/stitch-shell` shared Stitch navigation contracts and active-route resolution
+- `@theory-cloud/facetheory/stitch-admin` shared Stitch dense-admin contracts
 - `@theory-cloud/facetheory/react` React buffered and streaming helpers
 - `@theory-cloud/facetheory/react/antd` Ant Design integration
 - `@theory-cloud/facetheory/react/emotion` Emotion integration

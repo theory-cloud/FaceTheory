@@ -30,3 +30,5 @@ export {
   type StatCardProps,
   type SummaryStripProps,
 } from './sections.js';
+
+export { Callout, type CalloutProps, type CalloutVariant } from './callout.js';

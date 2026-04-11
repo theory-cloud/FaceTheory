@@ -59,8 +59,14 @@ test(
     );
     assert.ok(body.includes('facetheory-stitch-shell'));
     assert.ok(body.includes('facetheory-stitch-auth-card'));
+    assert.ok(body.includes('facetheory-stitch-callout-warning'));
+    assert.ok(body.includes('facetheory-stitch-tabs'));
+    assert.ok(body.includes('facetheory-stitch-filter-chip-group'));
     assert.ok(body.includes('facetheory-stitch-data-table'));
+    assert.ok(body.includes('facetheory-stitch-inline-key-value-list'));
+    assert.ok(body.includes('facetheory-stitch-copyable-code'));
     assert.ok(body.includes('facetheory-stitch-destructive-confirm'));
+    assert.ok(body.includes('facetheory-stitch-log-stream-terminal'));
     assert.ok(body.includes('id="__FACETHEORY_DATA__"'));
     assert.ok(body.includes('type="module"'));
     assert.ok(body.includes('id="svelte-inline-style"'));
