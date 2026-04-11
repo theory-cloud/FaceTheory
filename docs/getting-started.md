@@ -39,10 +39,10 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v0.17.1/theory-cloud-apptheory-0.17.1.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v0.22.0/theory-cloud-apptheory-0.22.0.tgz
 
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.4.2/theory-cloud-tabletheory-ts-1.4.2.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.5.3/theory-cloud-tabletheory-ts-1.5.3.tgz
 ```
 
 Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoint. Use TableTheory when you want the documented production ISR metadata store adapter.
