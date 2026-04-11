@@ -96,6 +96,58 @@ runtime.get("/{proxy+}", createAppTheoryFaceHandler({ app }));
 export const handler = createLambdaFunctionURLStreamingHandler(runtime);
 ```
 
+## Add Stitch Control-Plane Primitives
+
+FaceTheory's Stitch UI surface is split into shared contracts plus framework-specific visual primitives:
+
+- `@theory-cloud/facetheory/stitch-shell` exposes shared navigation helpers and `CalloutVariant`
+- `@theory-cloud/facetheory/stitch-admin` exposes shared dense-admin contracts such as `TabItem`, `FilterChipConfig`, `LogEntry`, `LogLevel`, and `StatusVariant`
+- React visual primitives live under `@theory-cloud/facetheory/react/stitch-shell` and `@theory-cloud/facetheory/react/stitch-admin`
+- Vue visual primitives live under `@theory-cloud/facetheory/vue/stitch-shell` and `@theory-cloud/facetheory/vue/stitch-admin`
+- Svelte visual primitives live under `@theory-cloud/facetheory/svelte/stitch-shell` and `@theory-cloud/facetheory/svelte/stitch-admin`
+
+The component names are intentionally parallel across frameworks, so the same conceptual surface exists everywhere:
+
+- Shell/layout: `Shell`, `PageFrame`, `Section`, `Panel`, `SummaryStrip`, `Callout`
+- Dense admin: `Tabs`, `FilterChip`, `FilterChipGroup`, `InlineKeyValueList`, `CopyableCode`, `LogStream`
+
+Example composition:
+
+```ts
+import type {
+  FilterChipConfig,
+  LogEntry,
+  TabItem,
+} from '@theory-cloud/facetheory/stitch-admin';
+import { Callout } from '@theory-cloud/facetheory/react/stitch-shell';
+import {
+  FilterChipGroup,
+  LogStream,
+  Tabs,
+} from '@theory-cloud/facetheory/react/stitch-admin';
+
+const tabs: TabItem[] = [
+  { key: 'policies', label: 'Policies', count: 8 },
+  { key: 'catalog', label: 'Catalog', count: 12 },
+];
+
+const filters: FilterChipConfig[] = [
+  { key: 'status', label: 'status: active' },
+  { key: 'manifest', label: 'manifest: stale', count: 2 },
+];
+
+const logs: LogEntry[] = [
+  { id: '1', timestamp: '14:02:11', level: 'debug', message: 'Repair started' },
+  { id: '2', timestamp: '14:02:12', level: 'success', message: 'Repair completed' },
+];
+
+// In React, render <Callout />, <Tabs />, <FilterChipGroup />, and <LogStream />
+// from the React adapter paths above. In Vue and Svelte, keep the same shared
+// data contracts and switch only the adapter import path.
+```
+
+Use the shared contract subpaths for data shape and semantic variants. Use the adapter-matched subpaths for actual components. That keeps the React, Vue, and Svelte surfaces in lockstep instead of letting one host drift into framework-local shapes.
+
 ## Static Generation Quickstart
 
 Package consumers should call `buildSsgSite()` directly. The repository-local CLI remains available in the reference bundle if you want to study or adapt the example flow.
