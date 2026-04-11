@@ -1,5 +1,5 @@
 import { defineComponent, h } from 'vue';
-import type { PropType } from 'vue';
+import type { PropType, VNodeChild } from 'vue';
 
 import {
   renderDefaultSlot,
@@ -133,7 +133,7 @@ export const StatCard = defineComponent({
     value: { ...vnodeChildProp, required: true },
     delta: {
       type: Object as PropType<
-        { value: unknown; trend?: 'up' | 'down' | 'flat' } | undefined
+        { value: VNodeChild; trend?: 'up' | 'down' | 'flat' } | undefined
       >,
       required: false,
     },
@@ -216,7 +216,7 @@ export const StatCard = defineComponent({
                               color: trendColor[props.delta.trend ?? 'flat'],
                             },
                           },
-                          props.delta.value as any,
+                          renderPropContent(props.delta.value),
                         )
                       : null,
                   ],

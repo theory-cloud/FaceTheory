@@ -11,9 +11,9 @@ export interface SidebarProps {
   onNavigate?: (path: string, key: string) => void;
 }
 
-export interface TopbarProps {}
+export type TopbarProps = Record<string, never>;
 
-export interface ShellProps extends SidebarProps {}
+export type ShellProps = SidebarProps;
 
 export interface BreadcrumbProps {
   items: import('./nav-types.js').BreadcrumbNode[];

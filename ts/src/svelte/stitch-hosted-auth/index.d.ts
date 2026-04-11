@@ -49,7 +49,7 @@ export interface ConsentItemProps {
   granted?: boolean;
 }
 
-export interface ConsentListProps {}
+export type ConsentListProps = Record<string, never>;
 
 export type AuthStateVariant = 'info' | 'success' | 'warning' | 'error';
 

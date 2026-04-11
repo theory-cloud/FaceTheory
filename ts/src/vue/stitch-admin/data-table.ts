@@ -1,4 +1,5 @@
 import { defineComponent, h } from 'vue';
+import { isVNode } from 'vue';
 import type { PropType, VNodeChild } from 'vue';
 
 import { renderPropContent, vnodeChildProp } from '../stitch-common.js';
@@ -11,10 +12,10 @@ export interface DataTableToolbarSlots {
 
 export interface DataTableColumn<RecordType extends object = object> {
   key?: string;
-  title: unknown;
+  title: VNodeChild;
   dataIndex?: keyof RecordType | string;
   align?: 'left' | 'center' | 'right';
-  render?: (value: unknown, record: RecordType, index: number) => unknown;
+  render?: (value: unknown, record: RecordType, index: number) => VNodeChild;
 }
 
 type RowKey<RecordType extends object> =
@@ -35,6 +36,15 @@ function cellValue<RecordType extends object>(
 ): unknown {
   if (column.dataIndex === undefined) return undefined;
   return record[column.dataIndex as keyof RecordType];
+}
+
+function resolveCellContent(value: unknown): VNodeChild[] {
+  if (value === undefined || value === null) return [];
+  if (Array.isArray(value)) return value as VNodeChild[];
+  if (isVNode(value) || typeof value === 'string' || typeof value === 'number')
+    return [value];
+  if (typeof value === 'boolean') return [String(value)];
+  return [String(value)];
 }
 
 export const DataTable = defineComponent({
@@ -61,7 +71,7 @@ export const DataTable = defineComponent({
     emptyLabel: vnodeChildProp,
     rowActions: {
       type: Function as PropType<
-        | ((record: Record<string, unknown>, index: number) => unknown)
+        | ((record: Record<string, unknown>, index: number) => VNodeChild)
         | undefined
       >,
       required: false,
@@ -188,7 +198,7 @@ export const DataTable = defineComponent({
                                   'var(--stitch-color-on-surface-variant, #464553)',
                               },
                             },
-                            column.title as any,
+                            renderPropContent(column.title),
                           ),
                         ),
                         hasRowActions
@@ -224,8 +234,10 @@ export const DataTable = defineComponent({
                               },
                             },
                             column.render
-                              ? column.render(value, record, index)
-                              : (value as any),
+                              ? renderPropContent(
+                                  column.render(value, record, index),
+                                )
+                              : resolveCellContent(value),
                           );
                         }),
                         hasRowActions
@@ -239,7 +251,9 @@ export const DataTable = defineComponent({
                               },
                               slots.rowActions?.({ record, index }) ??
                                 (props.rowActions
-                                  ? (props.rowActions(record, index) as any)
+                                  ? renderPropContent(
+                                      props.rowActions(record, index),
+                                    )
                                   : []),
                             )
                           : null,

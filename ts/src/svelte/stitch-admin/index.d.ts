@@ -61,7 +61,7 @@ export interface FormSectionProps {
   description?: unknown;
 }
 
-export interface SplitFormProps {}
+export type SplitFormProps = Record<string, never>;
 
 export interface StatusTagProps {
   variant: StatusVariant;

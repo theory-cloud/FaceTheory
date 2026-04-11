@@ -1,12 +1,12 @@
 import { defineComponent, h } from 'vue';
-import type { PropType } from 'vue';
+import type { PropType, VNodeChild } from 'vue';
 
 import { renderPropContent, vnodeChildProp } from '../stitch-common.js';
 
 export interface PropertyItem {
   key: string;
-  label: unknown;
-  value: unknown;
+  label: VNodeChild;
+  value: VNodeChild;
   span?: 'half' | 'full';
 }
 
@@ -64,7 +64,7 @@ export const PropertyGrid = defineComponent({
                     margin: 0,
                   },
                 },
-                item.label as any,
+                renderPropContent(item.label),
               ),
               h(
                 'dd',
@@ -76,7 +76,7 @@ export const PropertyGrid = defineComponent({
                     wordBreak: 'break-word',
                   },
                 },
-                item.value as any,
+                renderPropContent(item.value),
               ),
             ],
           ),
