@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/theory-cloud/FaceTheory/compare/v0.5.0...v0.5.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* **ci:** fail main PRs that would skip release-please ([1666068](https://github.com/theory-cloud/FaceTheory/commit/1666068d09299c3532a395085e5d93bcb1b37bef))
+
 ## [0.5.0](https://github.com/theory-cloud/FaceTheory/compare/v0.4.0...v0.5.0) (2026-04-11)
 
 
