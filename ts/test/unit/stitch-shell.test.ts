@@ -117,6 +117,7 @@ test('Shell renders sidebar, topbar, and content region', async () => {
     }),
   );
   assert.ok(body.includes('facetheory-stitch-shell'));
+  assert.ok(body.includes('ant-layout-has-sider'));
   assert.ok(body.includes('facetheory-stitch-sidebar'));
   assert.ok(body.includes('facetheory-stitch-topbar'));
   assert.ok(body.includes('hello world'));
@@ -140,7 +141,21 @@ test('Shell hides nav items marked hidden', async () => {
   assert.ok(!sidebarSlice.includes('Settings'));
 });
 
-test('PageFrame renders breadcrumb, title, description, actions, and body', async () => {
+test('Shell renders anchor nav items when no client navigation handler is provided', async () => {
+  const body = await renderSSR(
+    h(Shell, {
+      nav: sampleNav,
+      activeKey: '/dashboard',
+      openKeys: ['partners-group'],
+      children: h('div', null, 'content'),
+    }),
+  );
+  assert.ok(body.includes('href="/dashboard"'));
+  assert.ok(body.includes('href="/partners"'));
+  assert.ok(body.includes('href="/partners/new"'));
+});
+
+test('PageFrame renders breadcrumb anchors without a client navigation handler', async () => {
   const body = await renderSSR(
     h(PageFrame, {
       breadcrumbs: [
@@ -156,6 +171,8 @@ test('PageFrame renders breadcrumb, title, description, actions, and body', asyn
   );
   assert.ok(body.includes('facetheory-stitch-page-frame'));
   assert.ok(body.includes('facetheory-stitch-breadcrumb'));
+  assert.ok(body.includes('href="/"'));
+  assert.ok(body.includes('href="/partners"'));
   assert.ok(body.includes('Acme Corp'));
   assert.ok(body.includes('Partner details and security posture'));
   assert.ok(body.includes('Edit'));

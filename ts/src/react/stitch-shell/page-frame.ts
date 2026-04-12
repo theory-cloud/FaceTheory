@@ -15,23 +15,22 @@ export function Breadcrumb(props: BreadcrumbProps): React.ReactElement | null {
   if (items.length === 0) return null;
 
   const antItems = items.map((node) => {
-    if (node.path !== undefined && onNavigate) {
-      return {
-        key: node.key,
-        title: h(
-          'a',
-          {
-            onClick: (event: React.MouseEvent) => {
-              event.preventDefault();
-              onNavigate(node);
-            },
-            href: node.path,
-          },
-          node.label,
-        ),
+    if (node.path === undefined) return { key: node.key, title: node.label };
+
+    const anchorProps: React.AnchorHTMLAttributes<HTMLAnchorElement> = {
+      href: node.path,
+    };
+    if (onNavigate !== undefined) {
+      anchorProps.onClick = (event) => {
+        event.preventDefault();
+        onNavigate(node);
       };
     }
-    return { key: node.key, title: node.label };
+
+    return {
+      key: node.key,
+      title: h('a', anchorProps, node.label),
+    };
   });
 
   return h(AntBreadcrumb, {

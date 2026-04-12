@@ -16,10 +16,14 @@
         >
       {/if}
 
-      {#if node.path && onNavigate}
+      {#if node.path}
         <a
           href={node.path}
-          on:click|preventDefault={() => onNavigate?.(node)}
+          on:click={(event) => {
+            if (!onNavigate) return;
+            event.preventDefault();
+            onNavigate(node);
+          }}
         >
           {node.label}
         </a>

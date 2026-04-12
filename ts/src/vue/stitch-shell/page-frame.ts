@@ -44,15 +44,19 @@ export const Breadcrumb = defineComponent({
                 '›',
               )
             : null,
-          node.path !== undefined && props.onNavigate
+          node.path !== undefined
             ? h(
                 'a',
                 {
                   href: node.path,
-                  onClick: (event: MouseEvent) => {
-                    event.preventDefault();
-                    props.onNavigate?.(node);
-                  },
+                  ...(props.onNavigate !== undefined
+                    ? {
+                        onClick: (event: MouseEvent) => {
+                          event.preventDefault();
+                          props.onNavigate?.(node);
+                        },
+                      }
+                    : {}),
                 },
                 node.label,
               )
