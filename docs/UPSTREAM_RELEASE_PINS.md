@@ -7,8 +7,8 @@ This file records the currently pinned versions and the exact install strings we
 
 ## Pins
 
-- AppTheory (TypeScript): `v0.24.0`
-- AppTheory (CDK): `v0.24.0`
+- AppTheory (TypeScript): `v0.24.1`
+- AppTheory (CDK): `v0.24.1`
 - TableTheory (TypeScript): `v1.5.3`
 
 ## Install (npm)
@@ -16,7 +16,7 @@ This file records the currently pinned versions and the exact install strings we
 ```bash
   # AppTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v0.24.0/theory-cloud-apptheory-0.24.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v0.24.1/theory-cloud-apptheory-0.24.1.tgz
 
   # TableTheory (TS)
 npm install --save-exact \
@@ -24,7 +24,7 @@ npm install --save-exact \
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v0.24.0/theory-cloud-apptheory-cdk-0.24.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v0.24.1/theory-cloud-apptheory-cdk-0.24.1.tgz
 ```
 
 ## package.json Snippet (Pinned)
@@ -35,7 +35,7 @@ registry installs:
 ```json
 {
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.24.0/theory-cloud-apptheory-0.24.0.tgz",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.24.1/theory-cloud-apptheory-0.24.1.tgz",
     "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.3/theory-cloud-tabletheory-ts-1.5.3.tgz"
   },
   "overrides": {

@@ -14,8 +14,8 @@
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1005.0",
     "@aws-sdk/client-s3": "^3.1005.0",
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.24.0/theory-cloud-apptheory-0.24.0.tgz",
-    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v0.24.0/theory-cloud-apptheory-cdk-0.24.0.tgz",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.24.1/theory-cloud-apptheory-0.24.1.tgz",
+    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v0.24.1/theory-cloud-apptheory-cdk-0.24.1.tgz",
     "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.3/theory-cloud-tabletheory-ts-1.5.3.tgz",
     "@types/node": "^24.12.0",
     "aws-cdk-lib": "2.244.0",
