@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/theory-cloud/FaceTheory/compare/v0.5.2...v0.5.3) (2026-04-12)
+
+
+### Bug Fixes
+
+* restore stitch shell SSR navigation fallbacks ([c48520c](https://github.com/theory-cloud/FaceTheory/commit/c48520c4cc28d03fde66c1b5372b9d34d21d269b))
+
 ## [0.5.2](https://github.com/theory-cloud/FaceTheory/compare/v0.5.1...v0.5.2) (2026-04-12)
 
 
