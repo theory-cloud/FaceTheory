@@ -321,6 +321,7 @@ Why this is correct:
 - Shared data contracts and semantic variants come from the framework-neutral `stitch-admin` and `stitch-shell` subpaths.
 - Visual primitives come from the matching framework adapter path.
 - The same conceptual primitives now exist across React, Vue, and Svelte, so porting a control-plane screen does not require redesigning the UI contract.
+- For shells and page frames, `path` remains the source of truth for SSR-safe anchor navigation, while `onNavigate` is only an optional interception layer for hydrated routers.
 
 **INCORRECT**
 

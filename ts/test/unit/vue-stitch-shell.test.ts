@@ -125,6 +125,8 @@ test('vue stitch-shell: PageFrame and section primitives render tokenized conten
 
   assert.ok(body.includes('facetheory-stitch-page-frame'));
   assert.ok(body.includes('facetheory-stitch-breadcrumb'));
+  assert.ok(body.includes('href="/"'));
+  assert.ok(body.includes('href="/partners"'));
   assert.ok(body.includes('facetheory-stitch-section'));
   assert.ok(body.includes('facetheory-stitch-summary-strip'));
   assert.ok(body.includes('facetheory-stitch-stat-card'));

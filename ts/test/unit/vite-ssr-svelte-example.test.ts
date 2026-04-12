@@ -58,6 +58,9 @@ test(
       `unexpected html: ${body.slice(0, 220)}`,
     );
     assert.ok(body.includes('facetheory-stitch-shell'));
+    assert.ok(body.includes('href="/"'));
+    assert.ok(body.includes('href="/dashboard"'));
+    assert.ok(body.includes('href="/partners"'));
     assert.ok(body.includes('facetheory-stitch-auth-card'));
     assert.ok(body.includes('facetheory-stitch-callout-warning'));
     assert.ok(body.includes('facetheory-stitch-tabs'));

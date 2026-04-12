@@ -8,35 +8,46 @@ const h = React.createElement;
 
 type MenuItemType = NonNullable<MenuProps['items']>[number];
 
-function navToMenuItems(items: NavItem[]): MenuItemType[] {
+function renderNavLabel(
+  item: NavItem,
+  onNavigate: ((path: string, key: string) => void) | undefined,
+): React.ReactNode {
+  const path = item.path;
+  if (path === undefined) return item.label;
+
+  const anchorProps: React.AnchorHTMLAttributes<HTMLAnchorElement> = {
+    href: path,
+  };
+  if (onNavigate !== undefined) {
+    anchorProps.onClick = (event) => {
+      event.preventDefault();
+      onNavigate(path, item.key);
+    };
+  }
+
+  return h('a', anchorProps, item.label);
+}
+
+function navToMenuItems(
+  items: NavItem[],
+  onNavigate: ((path: string, key: string) => void) | undefined,
+): MenuItemType[] {
   const out: MenuItemType[] = [];
   for (const item of items) {
     if (item.hidden) continue;
     const children =
       item.children && item.children.length > 0
-        ? navToMenuItems(item.children)
+        ? navToMenuItems(item.children, onNavigate)
         : undefined;
     const menuItem: Record<string, unknown> = {
       key: item.key,
-      label: item.label,
+      label: renderNavLabel(item, onNavigate),
     };
     if (item.icon !== undefined) menuItem.icon = item.icon;
     if (children && children.length > 0) menuItem.children = children;
     out.push(menuItem as unknown as MenuItemType);
   }
   return out;
-}
-
-function flattenKeyToPath(items: NavItem[]): Map<string, string> {
-  const map = new Map<string, string>();
-  const walk = (list: NavItem[]) => {
-    for (const item of list) {
-      if (item.path !== undefined) map.set(item.key, item.path);
-      if (item.children) walk(item.children);
-    }
-  };
-  walk(items);
-  return map;
 }
 
 export interface SidebarProps {
@@ -55,18 +66,11 @@ export function Sidebar(props: SidebarProps): React.ReactElement {
   const { nav, activeKey, openKeys, collapsed, onNavigate, brand, footer } =
     props;
 
-  const items = React.useMemo(() => navToMenuItems(nav), [nav]);
-  const keyToPath = React.useMemo(() => flattenKeyToPath(nav), [nav]);
-
-  const handleClick: MenuProps['onClick'] = (info) => {
-    const path = keyToPath.get(String(info.key));
-    if (path !== undefined && onNavigate) onNavigate(path, String(info.key));
-  };
+  const items = React.useMemo(() => navToMenuItems(nav, onNavigate), [nav, onNavigate]);
 
   const menuProps: MenuProps = {
     mode: 'inline',
     items,
-    onClick: handleClick,
     style: { borderInlineEnd: 'none', background: 'transparent' },
   };
   if (activeKey !== undefined) menuProps.selectedKeys = [activeKey];
@@ -224,6 +228,7 @@ export function Shell(props: ShellProps): React.ReactElement {
     Layout,
     {
       className: 'facetheory-stitch-shell',
+      hasSider: true,
       style: { minHeight: '100vh' },
     },
     h(Sidebar, sidebarProps),

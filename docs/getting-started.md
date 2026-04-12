@@ -148,6 +148,8 @@ const logs: LogEntry[] = [
 
 Use the shared contract subpaths for data shape and semantic variants. Use the adapter-matched subpaths for actual components. That keeps the React, Vue, and Svelte surfaces in lockstep instead of letting one host drift into framework-local shapes.
 
+For control-plane navigation, treat `path` as the SSR-safe baseline contract for nav items and breadcrumbs. Use `onNavigate` only as an optional client-side interception hook; if a host never hydrates, links with `path` must still work as normal anchors.
+
 ## Static Generation Quickstart
 
 Package consumers should call `buildSsgSite()` directly. The repository-local CLI remains available in the reference bundle if you want to study or adapt the example flow.
