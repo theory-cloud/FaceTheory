@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.5](https://github.com/theory-cloud/FaceTheory/compare/v0.5.4...v0.5.5) (2026-04-13)
+
+
+### Bug Fixes
+
+* align facetheory with apptheory v0.24.3 and tabletheory v1.5.4 ([6367eff](https://github.com/theory-cloud/FaceTheory/commit/6367effbd06617df2531f596efac4b0bf9001dd5))
+
 ## [0.5.4](https://github.com/theory-cloud/FaceTheory/compare/v0.5.3...v0.5.4) (2026-04-13)
 
 
