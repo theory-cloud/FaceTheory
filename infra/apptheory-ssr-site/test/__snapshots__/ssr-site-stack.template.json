@@ -355,7 +355,21 @@
         "SsrFunctionServiceRoleF0484DAB"
       ]
     },
-    "SsrFunctionAllowCloudFrontInvokeFunctionViaUrl8D4F8C8A": {
+    "SsrFunctioninvokefunctionurlBB9A2B69": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunctionUrl",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "SsrFunctionD22C6F1E",
+            "Arn"
+          ]
+        },
+        "FunctionUrlAuthType": "NONE",
+        "Principal": "*"
+      }
+    },
+    "SsrFunctioninvokefunctionCE3E5B81": {
       "Type": "AWS::Lambda::Permission",
       "Properties": {
         "Action": "lambda:InvokeFunction",
@@ -366,26 +380,7 @@
           ]
         },
         "InvokedViaFunctionUrl": true,
-        "Principal": "cloudfront.amazonaws.com",
-        "SourceArn": {
-          "Fn::Join": [
-            "",
-            [
-              "arn:",
-              {
-                "Ref": "AWS::Partition"
-              },
-              ":cloudfront::",
-              {
-                "Ref": "AWS::AccountId"
-              },
-              ":distribution/",
-              {
-                "Ref": "SiteDistribution390DED28"
-              }
-            ]
-          ]
-        }
+        "Principal": "*"
       }
     },
     "AssetsDeploymentImmutableAwsCliLayer40CE6A61": {
@@ -819,7 +814,7 @@
     "SiteSsrUrl2D74149D": {
       "Type": "AWS::Lambda::Url",
       "Properties": {
-        "AuthType": "AWS_IAM",
+        "AuthType": "NONE",
         "InvokeMode": "RESPONSE_STREAM",
         "TargetFunctionArn": {
           "Fn::GetAtt": [
@@ -1009,49 +1004,6 @@
               "Protection": true
             }
           }
-        }
-      }
-    },
-    "SiteDistributionOrigin1FunctionUrlOriginAccessControlFF5C1633": {
-      "Type": "AWS::CloudFront::OriginAccessControl",
-      "Properties": {
-        "OriginAccessControlConfig": {
-          "Name": "FaceTheoryAppTheorySsrSiteDinctionUrlOriginAccessControl506FC69E",
-          "OriginAccessControlOriginType": "lambda",
-          "SigningBehavior": "always",
-          "SigningProtocol": "sigv4"
-        }
-      }
-    },
-    "SiteDistributionOrigin1InvokeFromApiForFaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA468D34E14C": {
-      "Type": "AWS::Lambda::Permission",
-      "Properties": {
-        "Action": "lambda:InvokeFunctionUrl",
-        "FunctionName": {
-          "Fn::GetAtt": [
-            "SiteSsrUrl2D74149D",
-            "FunctionArn"
-          ]
-        },
-        "Principal": "cloudfront.amazonaws.com",
-        "SourceArn": {
-          "Fn::Join": [
-            "",
-            [
-              "arn:",
-              {
-                "Ref": "AWS::Partition"
-              },
-              ":cloudfront::",
-              {
-                "Ref": "AWS::AccountId"
-              },
-              ":distribution/",
-              {
-                "Ref": "SiteDistribution390DED28"
-              }
-            ]
-          ]
         }
       }
     },
@@ -1359,13 +1311,7 @@
                   }
                 ]
               },
-              "Id": "FaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA46",
-              "OriginAccessControlId": {
-                "Fn::GetAtt": [
-                  "SiteDistributionOrigin1FunctionUrlOriginAccessControlFF5C1633",
-                  "Id"
-                ]
-              }
+              "Id": "FaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA46"
             },
             {
               "DomainName": {
