@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets ensure-release-branches test-ensure-release-branches stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets ensure-release-branches test-ensure-release-branches stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets rubric
 
 ts-build:
 	cd ts && npm run build
@@ -38,5 +38,14 @@ stage-theorycloud-facetheory-subtree:
 
 verify-theorycloud-facetheory-subtree:
 	./scripts/verify_theorycloud_facetheory_subtree.sh "$${THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR:-/tmp/facetheory-theorycloud}"
+
+sync-theorycloud-facetheory-subtree:
+	./scripts/sync_theorycloud_facetheory_subtree.sh --stage "$${THEORYCLOUD_STAGE:-lab}" --output "$${THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR:-/tmp/facetheory-theorycloud}"
+
+trigger-theorycloud-publish:
+	./scripts/trigger_theorycloud_publish.sh --stage "$${THEORYCLOUD_STAGE:-lab}"
+
+test-theorycloud-targets:
+	./scripts/test-theorycloud-targets.sh
 
 rubric: ts-typecheck ts-lint ts-test verify-version-alignment verify-ts-pack
