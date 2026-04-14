@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets ensure-release-branches test-ensure-release-branches stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets ensure-release-branches test-ensure-release-branches stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
 
 ts-build:
 	cd ts && npm run build
@@ -47,5 +47,8 @@ trigger-theorycloud-publish:
 
 test-theorycloud-targets:
 	./scripts/test-theorycloud-targets.sh
+
+test-trigger-theorycloud-publish-awscurl:
+	./scripts/test-trigger-theorycloud-publish-awscurl.sh
 
 rubric: ts-typecheck ts-lint ts-test verify-version-alignment verify-ts-pack
