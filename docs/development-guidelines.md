@@ -24,3 +24,15 @@ This document is contract-only.
 - `docs/testing-guide.md` stays aligned with real verification commands and evidence expectations.
 - `docs/troubleshooting.md` captures recurring failures with a practical fix and a verification step.
 - Documentation updates ship in the same change set as interface or behavior changes whenever possible.
+
+## TheoryCloud shared-subtree rollout prerequisites
+
+- The protected-merge publisher for FaceTheory lives at `.github/workflows/theorycloud-facetheory-subtree-publish.yml`.
+- That workflow path is part of the IAM trust contract. Do not rename or move it without coordinating the matching OIDC trust-policy update first.
+- Approved merges are enforced by repository protections on `premain` and `main`; the workflow intentionally runs on post-merge `push`, not `pull_request.closed`.
+- Stage mapping is fixed: `premain -> lab` and `main -> live`.
+- Required repository variables for the workflow are `THEORYCLOUD_AWS_ROLE_ARN_LAB` and `THEORYCLOUD_AWS_ROLE_ARN_LIVE`. `AWS_REGION` may be set explicitly, but the workflow defaults to `us-east-1`.
+- The workflow and helper scripts are the source of truth for the FaceTheory shared-subtree path. The generic KnowledgeTheory workflow/template docs are not authoritative here because they still describe the older `<prefix>/docs/` publish shape.
+- FaceTheory syncs only `theorycloud/facetheory/` with docs-root-relative content and a subtree `source-manifest.json`; it must never upload `theorycloud/facetheory/docs/...`.
+- External rollout prerequisites live outside this repo: KT #12 stage-scoped OIDC roles, S3 permissions restricted to `theorycloud/facetheory/`, and execute-api invoke permissions only for `POST /v1/internal/publish/theorycloud`.
+- Before treating the workflow as ready, confirm the protected branches require review, code-owner review, signed commits, and the expected status checks so direct pushes cannot bypass the approved-merge-only contract.
