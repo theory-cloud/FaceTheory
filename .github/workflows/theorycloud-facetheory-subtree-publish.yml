@@ -39,28 +39,59 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-      THEORYCLOUD_STAGE: ${{ github.ref_name == 'premain' && 'lab' || github.ref_name == 'main' && 'live' || '' }}
-      AWS_ROLE_ARN: ${{ github.ref_name == 'premain' && vars.THEORYCLOUD_AWS_ROLE_ARN_LAB || github.ref_name == 'main' && vars.THEORYCLOUD_AWS_ROLE_ARN_LIVE || '' }}
-      THEORYCLOUD_PUBLISH_REASON: ${{ format('github:{0}:{1}', github.repository, github.ref_name) }}
+      AWS_REGION: us-east-1
     steps:
       - name: Checkout protected branch head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
+      - name: Resolve no-vars stage rollout configuration
+        run: |
+          set -euo pipefail
+
+          case "${GITHUB_REF_NAME}" in
+            premain)
+              {
+                printf 'THEORYCLOUD_STAGE=lab\n'
+                printf 'AWS_ROLE_ARN=%s\n' 'arn:aws:iam::787107040121:role/KnowledgeTheory-TheoryCloud-FaceTheory-lab-Publisher'
+              } >> "${GITHUB_ENV}"
+              ;;
+            main)
+              {
+                printf 'THEORYCLOUD_STAGE=live\n'
+                printf 'AWS_ROLE_ARN=%s\n' 'arn:aws:iam::787107040121:role/KnowledgeTheory-TheoryCloud-FaceTheory-live-Publisher'
+              } >> "${GITHUB_ENV}"
+              ;;
+            *)
+              echo "unsupported protected branch ref: ${GITHUB_REF_NAME}" >&2
+              exit 1
+              ;;
+          esac
+
+          printf 'THEORYCLOUD_PUBLISH_REASON=%s\n' "github:${GITHUB_REPOSITORY}:${GITHUB_REF_NAME}" >> "${GITHUB_ENV}"
+
       - name: Validate publish workflow configuration
         run: |
           set -euo pipefail
 
-          : "${AWS_REGION:?missing vars.AWS_REGION (or default)}"
+          : "${AWS_REGION:?missing AWS region}"
           : "${THEORYCLOUD_STAGE:?missing stage resolution}"
-          : "${AWS_ROLE_ARN:?missing stage-scoped AWS role ARN}"
+          : "${AWS_ROLE_ARN:?missing literal stage-scoped AWS role ARN}"
 
           case "${THEORYCLOUD_STAGE}" in
             lab|live) ;;
             *)
               echo "unsupported theorycloud stage: ${THEORYCLOUD_STAGE}" >&2
+              exit 1
+              ;;
+          esac
+
+          case "${THEORYCLOUD_STAGE}:${AWS_ROLE_ARN}" in
+            lab:arn:aws:iam::787107040121:role/KnowledgeTheory-TheoryCloud-FaceTheory-lab-Publisher) ;;
+            live:arn:aws:iam::787107040121:role/KnowledgeTheory-TheoryCloud-FaceTheory-live-Publisher) ;;
+            *)
+              echo "unexpected role binding for stage ${THEORYCLOUD_STAGE}: ${AWS_ROLE_ARN}" >&2
               exit 1
               ;;
           esac

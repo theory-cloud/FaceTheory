@@ -143,6 +143,18 @@ jobs:
           bash -n scripts/sync_theorycloud_facetheory_subtree.sh
           bash -n scripts/trigger_theorycloud_publish.sh
           bash -n scripts/test-theorycloud-targets.sh
+      - name: Verify no-vars publisher workflow contract
+        run: |
+          set -euo pipefail
+
+          workflow=".github/workflows/theorycloud-facetheory-subtree-publish.yml"
+          grep -Fq 'arn:aws:iam::787107040121:role/KnowledgeTheory-TheoryCloud-FaceTheory-lab-Publisher' "${workflow}"
+          grep -Fq 'arn:aws:iam::787107040121:role/KnowledgeTheory-TheoryCloud-FaceTheory-live-Publisher' "${workflow}"
+
+          if grep -Fq 'vars.THEORYCLOUD_AWS_ROLE_ARN_' "${workflow}"; then
+            echo "theorycloud-subtree: FAIL (publisher workflow still references vars-based role selection)" >&2
+            exit 1
+          fi
       - name: Verify subtree staging + provenance
         run: |
           bash scripts/stage_theorycloud_facetheory_subtree.sh --output /tmp/facetheory-theorycloud
