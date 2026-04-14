@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
-import { parseCookiesFromHeaders } from '../../src/types.js';
+import { parseCookiesFromHeaders, parseQueryString } from '../../src/types.js';
 
 function decodeBody(body: Uint8Array): string {
   return new TextDecoder().decode(body);
@@ -37,7 +37,9 @@ test('FaceApp: propagates x-request-id and injects one when missing', async () =
         route: '/',
         mode: 'ssr',
         render: (ctx) => {
-          seen = String(ctx.request.headers['x-request-id']?.[0] ?? '').trim() || null;
+          seen =
+            String(ctx.request.headers['x-request-id']?.[0] ?? '').trim() ||
+            null;
           return { html: '<div>ok</div>' };
         },
       },
@@ -85,8 +87,14 @@ test('FaceApp: load/render errors return deterministic 500 HTML', async () => {
   assert.equal(renderResp.status, 500);
   assert.ok(loadResp.body instanceof Uint8Array);
   assert.ok(renderResp.body instanceof Uint8Array);
-  assert.equal(loadResp.headers['content-type']?.[0], 'text/html; charset=utf-8');
-  assert.equal(renderResp.headers['content-type']?.[0], 'text/html; charset=utf-8');
+  assert.equal(
+    loadResp.headers['content-type']?.[0],
+    'text/html; charset=utf-8',
+  );
+  assert.equal(
+    renderResp.headers['content-type']?.[0],
+    'text/html; charset=utf-8',
+  );
 
   const loadHtml = decodeBody(loadResp.body as Uint8Array);
   const renderHtml = decodeBody(renderResp.body as Uint8Array);
@@ -202,7 +210,9 @@ test('FaceApp: emits document shell attrs through the public render contract', a
     body,
   );
   assert.ok(
-    body.includes('<body class="shell-body" data-density="compact"><div>ok</div></body>'),
+    body.includes(
+      '<body class="shell-body" data-density="compact"><div>ok</div></body>',
+    ),
     body,
   );
 });
@@ -218,6 +228,38 @@ test('parseCookiesFromHeaders: supports mixed case cookie header names', () => {
     token: 'xyz',
     theme: 'dark',
   });
+});
+
+test('parseQueryString: preserves special keys without prototype mutation', () => {
+  const parsed = parseQueryString(
+    '__proto__=first&constructor=second&__proto__=third',
+  );
+
+  assert.equal(Object.getPrototypeOf(parsed), Object.prototype);
+  assert.equal(Object.prototype.hasOwnProperty.call(parsed, '__proto__'), true);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(parsed, 'constructor'),
+    true,
+  );
+  assert.deepEqual(parsed['__proto__'], ['first', 'third']);
+  assert.deepEqual(parsed['constructor'], ['second']);
+  assert.equal(({} as Record<string, unknown>)['first'], undefined);
+});
+
+test('parseCookiesFromHeaders: preserves special keys without prototype mutation', () => {
+  const parsed = parseCookiesFromHeaders({
+    cookie: ['__proto__=polluted; constructor=shadowed'],
+  });
+
+  assert.equal(Object.getPrototypeOf(parsed), Object.prototype);
+  assert.equal(Object.prototype.hasOwnProperty.call(parsed, '__proto__'), true);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(parsed, 'constructor'),
+    true,
+  );
+  assert.equal(parsed['__proto__'], 'polluted');
+  assert.equal(parsed['constructor'], 'shadowed');
+  assert.equal(({} as Record<string, unknown>)['polluted'], undefined);
 });
 
 test('FaceApp: streaming body error before first chunk falls back to buffered 500', async () => {
@@ -243,5 +285,9 @@ test('FaceApp: streaming body error before first chunk falls back to buffered 50
   assert.equal(resp.status, 500);
   assert.ok(resp.body instanceof Uint8Array);
   assert.equal(resp.headers['content-type']?.[0], 'text/html; charset=utf-8');
-  assert.ok(decodeBody(resp.body as Uint8Array).includes('<h1>Internal Server Error</h1>'));
+  assert.ok(
+    decodeBody(resp.body as Uint8Array).includes(
+      '<h1>Internal Server Error</h1>',
+    ),
+  );
 });

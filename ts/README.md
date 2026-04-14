@@ -2,10 +2,10 @@
 
 `@theory-cloud/facetheory` is a TypeScript runtime for AWS-first SSR, SSG, and blocking ISR on Node.js `>=24`, with package exports for React, Vue, and Svelte adapters plus AppTheory and TableTheory integration surfaces.
 
-## Install v0.3.2 <!-- x-release-please-version -->
+## Install v0.5.5 <!-- x-release-please-version -->
 
 ```bash
-export FACETHEORY_VERSION=0.3.2 # x-release-please-version
+export FACETHEORY_VERSION=0.5.5 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -19,9 +19,9 @@ Install the peers that match your adapter surface:
 
 Optional companion packages:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v0.17.1/theory-cloud-apptheory-0.17.1.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v0.17.1/theory-cloud-apptheory-cdk-0.17.1.tgz`
-- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.4.2/theory-cloud-tabletheory-ts-1.4.2.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v0.24.3/theory-cloud-apptheory-0.24.3.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v0.24.3/theory-cloud-apptheory-cdk-0.24.3.tgz`
+- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.5.4/theory-cloud-tabletheory-ts-1.5.4.tgz`
 
 ## Minimal App
 
@@ -55,23 +55,36 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 - `@theory-cloud/facetheory` core runtime, SSG helpers, Lambda Function URL adapter, and ISR stores
 - `@theory-cloud/facetheory/apptheory` AppTheory request/response adapter
 - `@theory-cloud/facetheory/aws-s3` AWS SDK S3 HTML store adapter
+- `@theory-cloud/facetheory/stitch-tokens` shared Stitch design-token helpers for React, Vue, and Svelte apps
+- `@theory-cloud/facetheory/stitch-shell` shared Stitch navigation contracts and active-route resolution
+- `@theory-cloud/facetheory/stitch-admin` shared Stitch dense-admin contracts
 - `@theory-cloud/facetheory/react` React buffered and streaming helpers
 - `@theory-cloud/facetheory/react/antd` Ant Design integration
 - `@theory-cloud/facetheory/react/emotion` Emotion integration
 - `@theory-cloud/facetheory/react/antd-emotion` AntD token integration
+- `@theory-cloud/facetheory/react/stitch-tokens` React AntD theme bridge plus the shared token helpers
+- `@theory-cloud/facetheory/react/stitch-shell` React shell/layout primitives built on the shared Stitch navigation helpers
+- `@theory-cloud/facetheory/react/stitch-hosted-auth` React hosted-auth primitives
+- `@theory-cloud/facetheory/react/stitch-admin` React dense-admin primitives
 - `@theory-cloud/facetheory/vue` Vue adapter
+- `@theory-cloud/facetheory/vue/stitch-shell` Vue shell/layout primitives built on the shared Stitch navigation helpers
+- `@theory-cloud/facetheory/vue/stitch-hosted-auth` Vue hosted-auth primitives
+- `@theory-cloud/facetheory/vue/stitch-admin` Vue dense-admin primitives
 - `@theory-cloud/facetheory/svelte` Svelte adapter
+- `@theory-cloud/facetheory/svelte/stitch-shell` Svelte shell/layout primitives built on the shared Stitch navigation helpers
+- `@theory-cloud/facetheory/svelte/stitch-hosted-auth` Svelte hosted-auth primitives
+- `@theory-cloud/facetheory/svelte/stitch-admin` Svelte dense-admin primitives
 - `@theory-cloud/facetheory/tabletheory` TableTheory ISR metadata adapter
 
 ## Documentation
 
 <!-- x-release-please-start-version -->
 
-- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v0.3.2/docs/getting-started.md)
-- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v0.3.2/docs/api-reference.md)
-- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v0.3.2/docs/core-patterns.md)
-- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v0.3.2/docs/testing-guide.md)
-- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v0.3.2/docs/cdk/README.md)
+- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v0.5.5/docs/getting-started.md)
+- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v0.5.5/docs/api-reference.md)
+- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v0.5.5/docs/core-patterns.md)
+- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v0.5.5/docs/testing-guide.md)
+- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v0.5.5/docs/cdk/README.md)
 <!-- x-release-please-end -->
 
-The `v0.3.2` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->
+The `v0.5.5` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->

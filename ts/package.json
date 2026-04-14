@@ -1,6 +1,6 @@
 {
   "name": "@theory-cloud/facetheory",
-  "version": "0.3.2",
+  "version": "0.5.5",
   "description": "AWS-first SSR, SSG, and blocking ISR runtime for Node.js with React, Vue, and Svelte adapters.",
   "license": "Apache-2.0",
   "type": "module",
@@ -43,6 +43,18 @@
       "types": "./dist/apptheory/index.d.ts",
       "import": "./dist/apptheory/index.js"
     },
+    "./stitch-tokens": {
+      "types": "./dist/stitch-tokens/index.d.ts",
+      "import": "./dist/stitch-tokens/index.js"
+    },
+    "./stitch-shell": {
+      "types": "./dist/stitch-shell/index.d.ts",
+      "import": "./dist/stitch-shell/index.js"
+    },
+    "./stitch-admin": {
+      "types": "./dist/stitch-admin/index.d.ts",
+      "import": "./dist/stitch-admin/index.js"
+    },
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
@@ -59,13 +71,56 @@
       "types": "./dist/react/emotion.d.ts",
       "import": "./dist/react/emotion.js"
     },
+    "./react/stitch-tokens": {
+      "types": "./dist/react/stitch-tokens/index.d.ts",
+      "import": "./dist/react/stitch-tokens/index.js"
+    },
+    "./react/stitch-shell": {
+      "types": "./dist/react/stitch-shell/index.d.ts",
+      "import": "./dist/react/stitch-shell/index.js"
+    },
+    "./react/stitch-hosted-auth": {
+      "types": "./dist/react/stitch-hosted-auth/index.d.ts",
+      "import": "./dist/react/stitch-hosted-auth/index.js"
+    },
+    "./react/stitch-admin": {
+      "types": "./dist/react/stitch-admin/index.d.ts",
+      "import": "./dist/react/stitch-admin/index.js"
+    },
     "./vue": {
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue/index.js"
     },
+    "./vue/stitch-shell": {
+      "types": "./dist/vue/stitch-shell/index.d.ts",
+      "import": "./dist/vue/stitch-shell/index.js"
+    },
+    "./vue/stitch-hosted-auth": {
+      "types": "./dist/vue/stitch-hosted-auth/index.d.ts",
+      "import": "./dist/vue/stitch-hosted-auth/index.js"
+    },
+    "./vue/stitch-admin": {
+      "types": "./dist/vue/stitch-admin/index.d.ts",
+      "import": "./dist/vue/stitch-admin/index.js"
+    },
     "./svelte": {
       "types": "./dist/svelte/index.d.ts",
       "import": "./dist/svelte/index.js"
+    },
+    "./svelte/stitch-shell": {
+      "types": "./dist/svelte/stitch-shell/index.d.ts",
+      "svelte": "./dist/svelte/stitch-shell/index.js",
+      "import": "./dist/svelte/stitch-shell/index.js"
+    },
+    "./svelte/stitch-hosted-auth": {
+      "types": "./dist/svelte/stitch-hosted-auth/index.d.ts",
+      "svelte": "./dist/svelte/stitch-hosted-auth/index.js",
+      "import": "./dist/svelte/stitch-hosted-auth/index.js"
+    },
+    "./svelte/stitch-admin": {
+      "types": "./dist/svelte/stitch-admin/index.d.ts",
+      "svelte": "./dist/svelte/stitch-admin/index.js",
+      "import": "./dist/svelte/stitch-admin/index.js"
     },
     "./tabletheory": {
       "types": "./dist/tabletheory/index.d.ts",
@@ -73,15 +128,15 @@
     }
   },
   "peerDependencies": {
+    "@emotion/cache": ">=11",
+    "@emotion/react": ">=11",
+    "@emotion/server": ">=11",
+    "@vue/server-renderer": ">=3",
+    "antd": ">=5",
     "react": ">=18",
     "react-dom": ">=18",
-    "antd": ">=5",
-    "@emotion/react": ">=11",
-    "@emotion/cache": ">=11",
-    "@emotion/server": ">=11",
-    "vue": ">=3",
-    "@vue/server-renderer": ">=3",
-    "svelte": ">=4"
+    "svelte": ">=4",
+    "vue": ">=3"
   },
   "peerDependenciesMeta": {
     "antd": {
@@ -107,7 +162,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-svelte-sources.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
@@ -129,16 +184,16 @@
     "example:vite:svelte:library:serve": "tsx examples/vite-ssr-svelte-library/node-server.ts"
   },
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.19.2/theory-cloud-apptheory-0.19.2.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.2/theory-cloud-tabletheory-ts-1.5.2.tgz",
     "@aws-sdk/client-s3": "^3.1005.0",
-    "@eslint/js": "^10.0.1",
-    "@sveltejs/vite-plugin-svelte": "^6.2.0",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/server": "^11.11.0",
-    "@types/node": "^24.12.0",
+    "@eslint/js": "^10.0.1",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.24.3/theory-cloud-apptheory-0.24.3.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.4/theory-cloud-tabletheory-ts-1.5.4.tgz",
     "@types/jsdom": "^28.0.0",
+    "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
@@ -154,12 +209,12 @@
     "svelte": "^5.53.9",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1",
+    "vite": "^8.0.8",
     "vue": "^3.5.30"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.2/theory-cloud-tabletheory-ts-1.5.2.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.4/theory-cloud-tabletheory-ts-1.5.4.tgz"
     }
   }
 }

@@ -288,6 +288,54 @@ Why this is incorrect:
 - It bypasses the tested FaceTheory navigation helpers and leaves head tags, hydration payloads, and document attrs unsynchronized.
 - It creates an ad hoc client router contract that other hosts and adapters cannot share.
 
+## Pattern: Keep Stitch contracts shared and adapter imports matched
+
+Problem:
+You need dense control-plane UI across React, Vue, and Svelte without letting one framework invent a different tab/filter/log/status surface.
+
+**CORRECT**
+
+```ts
+import type {
+  FilterChipConfig,
+  LogEntry,
+  StatusVariant,
+  TabItem,
+} from '@theory-cloud/facetheory/stitch-admin';
+import { Callout } from '@theory-cloud/facetheory/vue/stitch-shell';
+import {
+  CopyableCode,
+  FilterChipGroup,
+  InlineKeyValueList,
+  LogStream,
+  Tabs,
+} from '@theory-cloud/facetheory/vue/stitch-admin';
+
+const tabs: TabItem[] = [{ key: 'catalog', label: 'Catalog', count: 12 }];
+const filters: FilterChipConfig[] = [{ key: 'status', label: 'status: active' }];
+const logs: LogEntry[] = [{ id: '1', timestamp: '09:42:12', level: 'info', message: 'Created demo-sandbox-01' }];
+const status: StatusVariant = 'allow';
+```
+
+Why this is correct:
+- Shared data contracts and semantic variants come from the framework-neutral `stitch-admin` and `stitch-shell` subpaths.
+- Visual primitives come from the matching framework adapter path.
+- The same conceptual primitives now exist across React, Vue, and Svelte, so porting a control-plane screen does not require redesigning the UI contract.
+- For shells and page frames, `path` remains the source of truth for SSR-safe anchor navigation, while `onNavigate` is only an optional interception layer for hydrated routers.
+
+**INCORRECT**
+
+```ts
+import { Tabs, LogStream } from '@theory-cloud/facetheory/react/stitch-admin';
+
+type StatusVariant = 'active' | 'paused' | 'mystery';
+```
+
+Why this is incorrect:
+- Pulling React primitives into a Vue or Svelte host bypasses the adapter contract and breaks cross-framework parity.
+- Re-declaring local tab/filter/log/status variants lets one application drift away from the shared Stitch surface.
+- Ad hoc contracts make it harder to keep docs, tests, and framework adapters aligned in future changes.
+
 ## Pattern Selection Notes
 
 - Prefer published package exports over private source imports.

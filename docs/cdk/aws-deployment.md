@@ -56,6 +56,7 @@ Requirements:
 - rewrite extensionless paths to S3 HTML keys
 - preserve the original viewer path for Lambda failover routing
 - keep SSR cache headers explicit and conservative
+- when using `AppTheorySsrSite`, treat `staticPathPatterns` as HTML sections, `directS3PathPatterns` as raw data/object paths, and `ssrPathPatterns` as Lambda-only dynamic routes
 
 ### Strategy B: Explicit Static Behaviors
 

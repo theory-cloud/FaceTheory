@@ -20,6 +20,11 @@ SSR/SSG/ISR.
 AppTheory CDK ships `AppTheorySsrSite`, which implements this topology and wires recommended environment variables onto
 your SSR Lambda function.
 
+When using `AppTheorySsrSite` in `ssg-isr` mode:
+- use `staticPathPatterns` for cacheable extensionless HTML sections that should stay on S3
+- use `directS3PathPatterns` for raw object/data paths such as `/.vite/*` and `/_facetheory/data/*`
+- use `ssrPathPatterns` for same-origin dynamic routes that must bypass the S3-primary origin group and go straight to Lambda
+
 Reference example (FaceTheory repo):
 - `infra/apptheory-ssr-site/`
 - `infra/apptheory-ssg-isr-site/` (SSG origin-group + ISR example)

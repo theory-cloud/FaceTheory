@@ -1,5 +1,63 @@
 # Changelog
 
+## [0.5.5](https://github.com/theory-cloud/FaceTheory/compare/v0.5.4...v0.5.5) (2026-04-13)
+
+
+### Bug Fixes
+
+* align facetheory with apptheory v0.24.3 and tabletheory v1.5.4 ([6367eff](https://github.com/theory-cloud/FaceTheory/commit/6367effbd06617df2531f596efac4b0bf9001dd5))
+
+## [0.5.4](https://github.com/theory-cloud/FaceTheory/compare/v0.5.3...v0.5.4) (2026-04-13)
+
+
+### Bug Fixes
+
+* align facetheory with apptheory v0.24.2 ([9e963fc](https://github.com/theory-cloud/FaceTheory/commit/9e963fc529eee59a52680e0e337349e29ffa0acf))
+
+## [0.5.3](https://github.com/theory-cloud/FaceTheory/compare/v0.5.2...v0.5.3) (2026-04-12)
+
+
+### Bug Fixes
+
+* restore stitch shell SSR navigation fallbacks ([c48520c](https://github.com/theory-cloud/FaceTheory/commit/c48520c4cc28d03fde66c1b5372b9d34d21d269b))
+
+## [0.5.2](https://github.com/theory-cloud/FaceTheory/compare/v0.5.1...v0.5.2) (2026-04-12)
+
+
+### Bug Fixes
+
+* align facetheory with apptheory v0.24.1 ([453854d](https://github.com/theory-cloud/FaceTheory/commit/453854df403a5f4545eaff790dc1956d61d0caea))
+
+## [0.5.1](https://github.com/theory-cloud/FaceTheory/compare/v0.5.0...v0.5.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* **ci:** fail main PRs that would skip release-please ([1666068](https://github.com/theory-cloud/FaceTheory/commit/1666068d09299c3532a395085e5d93bcb1b37bef))
+
+## [0.5.0](https://github.com/theory-cloud/FaceTheory/compare/v0.4.0...v0.5.0) (2026-04-11)
+
+
+### Features
+
+* align stitch control-plane primitives across frameworks ([853b66a](https://github.com/theory-cloud/FaceTheory/commit/853b66ab8ba4f7c96c004c9269d8dc5900ab6852))
+
+## [0.4.0](https://github.com/theory-cloud/FaceTheory/compare/v0.3.2...v0.4.0) (2026-04-11)
+
+
+### Features
+
+* implement Svelte and Vue component libraries for stitch-shell, stitch-admin, and stitch-hosted-auth with unified token management. ([0bc5445](https://github.com/theory-cloud/FaceTheory/commit/0bc54452cf1a8db80c746656145072ba168c7379))
+* **react:** add Stitch control-plane shell primitives ([6f1ac53](https://github.com/theory-cloud/FaceTheory/commit/6f1ac536f1171d614fa05803ba6ff75c9742ffde))
+* **react:** add Stitch dense admin primitives ([335a88f](https://github.com/theory-cloud/FaceTheory/commit/335a88fd02acba3f11d60b6bb64405eb12de93c8))
+* **react:** add Stitch hosted-auth primitives ([cf74b20](https://github.com/theory-cloud/FaceTheory/commit/cf74b20cc091b5f7f2bf24fb46b0513d3a863b4d))
+* **react:** add Stitch token bridge for AntD theme and CSS variables ([a7623fc](https://github.com/theory-cloud/FaceTheory/commit/a7623fc5a4e11420f10cbb9098cc3ee431b2484e))
+
+
+### Bug Fixes
+
+* clear stitch ui lint regressions ([e98480a](https://github.com/theory-cloud/FaceTheory/commit/e98480ad79b4d30d8842318eed41dfe258cbf365))
+
 ## [0.3.2](https://github.com/theory-cloud/FaceTheory/compare/v0.3.1...v0.3.2) (2026-04-05)
 
 
