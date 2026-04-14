@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets ensure-release-branches test-ensure-release-branches rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets ensure-release-branches test-ensure-release-branches stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree rubric
 
 ts-build:
 	cd ts && npm run build
@@ -32,5 +32,11 @@ ensure-release-branches:
 
 test-ensure-release-branches:
 	./scripts/test-ensure-release-branches.sh
+
+stage-theorycloud-facetheory-subtree:
+	./scripts/stage_theorycloud_facetheory_subtree.sh --output "$${THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR:-/tmp/facetheory-theorycloud}"
+
+verify-theorycloud-facetheory-subtree:
+	./scripts/verify_theorycloud_facetheory_subtree.sh "$${THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR:-/tmp/facetheory-theorycloud}"
 
 rubric: ts-typecheck ts-lint ts-test verify-version-alignment verify-ts-pack
