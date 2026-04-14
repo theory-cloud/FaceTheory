@@ -13,6 +13,7 @@ Environment:
   THEORYCLOUD_STAGE                          Stage name. Default: lab
   THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR  Staging root directory. Default: /tmp/facetheory-theorycloud
   THEORYCLOUD_FACETHEORY_SOURCE_S3_URI       Optional override for the subtree destination S3 URI
+  KT_SOURCE_S3_URI                           Alternate override for the subtree destination S3 URI
   THEORYCLOUD_S3_SYNC_DELETE                 Default: true. When true, prune objects under theorycloud/facetheory/
   THEORYCLOUD_S3_SYNC_DRY_RUN                Default: false. When true, print the sync plan without calling AWS
 EOF_USAGE
@@ -45,7 +46,7 @@ require_s3_uri() {
 
 STAGE="${THEORYCLOUD_STAGE:-lab}"
 OUTPUT_DIR="${THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR:-/tmp/facetheory-theorycloud}"
-SOURCE_S3_URI="${THEORYCLOUD_FACETHEORY_SOURCE_S3_URI:-}"
+SOURCE_S3_URI="${THEORYCLOUD_FACETHEORY_SOURCE_S3_URI:-${KT_SOURCE_S3_URI:-}}"
 SYNC_DELETE="${THEORYCLOUD_S3_SYNC_DELETE:-true}"
 SYNC_DRY_RUN="${THEORYCLOUD_S3_SYNC_DRY_RUN:-false}"
 
