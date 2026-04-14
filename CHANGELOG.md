@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.6-rc](https://github.com/theory-cloud/FaceTheory/compare/v0.5.5...v0.5.6-rc) (2026-04-14)
+
+
+### Bug Fixes
+
+* **ci:** align release-please prerelease baseline ([44ec54c](https://github.com/theory-cloud/FaceTheory/commit/44ec54cfd73b21ce6f9fb767235103ea7c67300e))
+* **ci:** realign premain release-please baseline ([2326658](https://github.com/theory-cloud/FaceTheory/commit/2326658e2a69c2b8947f3082d7b6bf504b54e97f))
+* **ci:** use awscurl-compatible publish invocation ([b169fec](https://github.com/theory-cloud/FaceTheory/commit/b169fec1f6d87a96d852ff530c0421f0fbbc01ba))
+
 ## [0.5.5](https://github.com/theory-cloud/FaceTheory/compare/v0.5.4...v0.5.5) (2026-04-13)
 
 
