@@ -96,7 +96,10 @@ export interface FaceModule {
   generateStaticParams?: () => Promise<Array<Record<string, string>>>;
   revalidateSeconds?: number;
   load?: (ctx: FaceContext) => Promise<unknown>;
-  render: (ctx: FaceContext, data: unknown) => Promise<FaceRenderResult> | FaceRenderResult;
+  render: (
+    ctx: FaceContext,
+    data: unknown,
+  ) => Promise<FaceRenderResult> | FaceRenderResult;
 }
 
 export function normalizePath(path: string): string {
@@ -109,13 +112,53 @@ export function normalizePath(path: string): string {
   return value;
 }
 
+function setOwnEnumerableValue<T>(
+  record: Record<string, T>,
+  key: string,
+  value: T,
+): void {
+  Object.defineProperty(record, key, {
+    value,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+}
+
+function hasOwnEnumerableValue(record: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+export function trimLeadingSlashes(value: string): string {
+  const normalized = String(value ?? '');
+  let start = 0;
+  while (start < normalized.length && normalized.charCodeAt(start) === 47)
+    start += 1;
+  return normalized.slice(start);
+}
+
+export function trimTrailingSlashes(value: string): string {
+  const normalized = String(value ?? '');
+  let end = normalized.length;
+  while (end > 0 && normalized.charCodeAt(end - 1) === 47) end -= 1;
+  return normalized.slice(0, end);
+}
+
+export function trimOuterSlashes(value: string): string {
+  return trimTrailingSlashes(trimLeadingSlashes(value));
+}
+
 export function canonicalizeHeaders(headers: Headers | undefined): Headers {
   const out: Headers = {};
   if (!headers) return out;
   for (const [key, values] of Object.entries(headers)) {
     const lower = String(key).trim().toLowerCase();
     if (!lower) continue;
-    out[lower] = Array.isArray(values) ? values.map(String) : [String(values)];
+    setOwnEnumerableValue(
+      out,
+      lower,
+      Array.isArray(values) ? values.map(String) : [String(values)],
+    );
   }
   return out;
 }
@@ -124,7 +167,11 @@ export function cloneQuery(query: Query | undefined): Query {
   const out: Query = {};
   if (!query) return out;
   for (const [key, values] of Object.entries(query)) {
-    out[key] = Array.isArray(values) ? values.map(String) : [String(values)];
+    setOwnEnumerableValue(
+      out,
+      key,
+      Array.isArray(values) ? values.map(String) : [String(values)],
+    );
   }
   return out;
 }
@@ -137,11 +184,13 @@ export function parseQueryString(queryString: string): Query {
     queryString.startsWith('?') ? queryString.slice(1) : queryString,
   );
   for (const [key, value] of params) {
-    const existingValues = out[key];
+    const existingValues = hasOwnEnumerableValue(out, key)
+      ? out[key]
+      : undefined;
     if (existingValues) {
       existingValues.push(value);
     } else {
-      out[key] = [value];
+      setOwnEnumerableValue(out, key, [value]);
     }
   }
 
@@ -152,12 +201,14 @@ export function cloneCookies(cookies: CookieMap | undefined): CookieMap {
   const out: CookieMap = {};
   if (!cookies) return out;
   for (const [key, value] of Object.entries(cookies)) {
-    out[key] = String(value);
+    setOwnEnumerableValue(out, key, String(value));
   }
   return out;
 }
 
-export function parseCookiesFromHeaders(headers: Headers | undefined): CookieMap {
+export function parseCookiesFromHeaders(
+  headers: Headers | undefined,
+): CookieMap {
   const out: CookieMap = {};
   if (!headers) return out;
 
@@ -165,7 +216,10 @@ export function parseCookiesFromHeaders(headers: Headers | undefined): CookieMap
   for (const [headerName, headerValues] of Object.entries(headers)) {
     if (String(headerName).trim().toLowerCase() !== 'cookie') continue;
     cookieHeaderValues.push(
-      ...(Array.isArray(headerValues) ? headerValues : [String(headerValues)]).map(String),
+      ...(Array.isArray(headerValues)
+        ? headerValues
+        : [String(headerValues)]
+      ).map(String),
     );
   }
 
@@ -186,9 +240,9 @@ export function parseCookiesFromHeaders(headers: Headers | undefined): CookieMap
       }
 
       try {
-        out[name] = decodeURIComponent(value);
+        setOwnEnumerableValue(out, name, decodeURIComponent(value));
       } catch {
-        out[name] = value;
+        setOwnEnumerableValue(out, name, value);
       }
     }
   }

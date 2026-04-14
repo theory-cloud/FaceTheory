@@ -8,6 +8,9 @@ on:
       - premain
       - main
 
+permissions:
+  contents: read
+
 jobs:
   prerelease-readiness:
     name: Prerelease readiness (staging -> premain)
@@ -115,7 +118,7 @@ jobs:
         run: scripts/verify-ts-pack.sh
 
   rubric:
-    name: Rubric
+    name: rubric
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -126,3 +129,41 @@ jobs:
         run: cd ts && npm ci
       - name: Run full rubric
         run: make rubric
+
+
+  theorycloud-subtree:
+    name: TheoryCloud subtree publishing path
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Verify helper shell syntax
+        run: |
+          bash -n scripts/stage_theorycloud_facetheory_subtree.sh
+          bash -n scripts/verify_theorycloud_facetheory_subtree.sh
+          bash -n scripts/sync_theorycloud_facetheory_subtree.sh
+          bash -n scripts/trigger_theorycloud_publish.sh
+          bash -n scripts/test-theorycloud-targets.sh
+      - name: Verify no-vars publisher workflow contract
+        run: |
+          set -euo pipefail
+
+          workflow=".github/workflows/theorycloud-facetheory-subtree-publish.yml"
+          grep -Fq 'arn:aws:iam::787107040121:role/KnowledgeTheory-TheoryCloud-FaceTheory-lab-Publisher' "${workflow}"
+          grep -Fq 'arn:aws:iam::787107040121:role/KnowledgeTheory-TheoryCloud-FaceTheory-live-Publisher' "${workflow}"
+
+          if grep -Fq 'vars.THEORYCLOUD_AWS_ROLE_ARN_' "${workflow}"; then
+            echo "theorycloud-subtree: FAIL (publisher workflow still references vars-based role selection)" >&2
+            exit 1
+          fi
+      - name: Verify subtree staging + provenance
+        run: |
+          bash scripts/stage_theorycloud_facetheory_subtree.sh --output /tmp/facetheory-theorycloud
+          bash scripts/verify_theorycloud_facetheory_subtree.sh /tmp/facetheory-theorycloud
+      - name: Verify sync/publish helper dry runs
+        run: |
+          THEORYCLOUD_S3_SYNC_DRY_RUN=true bash scripts/sync_theorycloud_facetheory_subtree.sh --stage lab
+          THEORYCLOUD_S3_SYNC_DRY_RUN=true bash scripts/sync_theorycloud_facetheory_subtree.sh --stage live
+          THEORYCLOUD_PUBLISH_DRY_RUN=true bash scripts/trigger_theorycloud_publish.sh --stage lab --source-revision abc123def456 --idempotency-key ci-lab
+          THEORYCLOUD_PUBLISH_DRY_RUN=true bash scripts/trigger_theorycloud_publish.sh --stage live --source-revision abc123def456 --idempotency-key ci-live
+      - name: Verify shared rollout target fixtures
+        run: bash scripts/test-theorycloud-targets.sh
