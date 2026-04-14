@@ -143,6 +143,7 @@ jobs:
           bash -n scripts/sync_theorycloud_facetheory_subtree.sh
           bash -n scripts/trigger_theorycloud_publish.sh
           bash -n scripts/test-theorycloud-targets.sh
+          bash -n scripts/test-trigger-theorycloud-publish-awscurl.sh
       - name: Verify no-vars publisher workflow contract
         run: |
           set -euo pipefail
@@ -166,4 +167,6 @@ jobs:
           THEORYCLOUD_PUBLISH_DRY_RUN=true bash scripts/trigger_theorycloud_publish.sh --stage lab --source-revision abc123def456 --idempotency-key ci-lab
           THEORYCLOUD_PUBLISH_DRY_RUN=true bash scripts/trigger_theorycloud_publish.sh --stage live --source-revision abc123def456 --idempotency-key ci-live
       - name: Verify shared rollout target fixtures
-        run: bash scripts/test-theorycloud-targets.sh
+        run: |
+          bash scripts/test-theorycloud-targets.sh
+          bash scripts/test-trigger-theorycloud-publish-awscurl.sh
