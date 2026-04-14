@@ -112,21 +112,10 @@ export function normalizePath(path: string): string {
   return value;
 }
 
-function setOwnEnumerableValue<T>(
-  record: Record<string, T>,
-  key: string,
-  value: T,
-): void {
-  Object.defineProperty(record, key, {
-    value,
-    enumerable: true,
-    writable: true,
-    configurable: true,
-  });
-}
-
-function hasOwnEnumerableValue(record: object, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(record, key);
+function stringRecord<T>(
+  entries: Iterable<readonly [string, T]> = [],
+): Record<string, T> {
+  return Object.fromEntries(entries) as Record<string, T>;
 }
 
 export function trimLeadingSlashes(value: string): string {
@@ -149,68 +138,61 @@ export function trimOuterSlashes(value: string): string {
 }
 
 export function canonicalizeHeaders(headers: Headers | undefined): Headers {
-  const out: Headers = {};
-  if (!headers) return out;
+  if (!headers) return {};
+  const out = new Map<string, string[]>();
   for (const [key, values] of Object.entries(headers)) {
     const lower = String(key).trim().toLowerCase();
     if (!lower) continue;
-    setOwnEnumerableValue(
-      out,
+    out.set(
       lower,
       Array.isArray(values) ? values.map(String) : [String(values)],
     );
   }
-  return out;
+  return stringRecord(out);
 }
 
 export function cloneQuery(query: Query | undefined): Query {
-  const out: Query = {};
-  if (!query) return out;
+  if (!query) return {};
+  const out = new Map<string, string[]>();
   for (const [key, values] of Object.entries(query)) {
-    setOwnEnumerableValue(
-      out,
-      key,
-      Array.isArray(values) ? values.map(String) : [String(values)],
-    );
+    out.set(key, Array.isArray(values) ? values.map(String) : [String(values)]);
   }
-  return out;
+  return stringRecord(out);
 }
 
 export function parseQueryString(queryString: string): Query {
-  const out: Query = {};
-  if (!queryString) return out;
+  if (!queryString) return {};
+  const out = new Map<string, string[]>();
 
   const params = new URLSearchParams(
     queryString.startsWith('?') ? queryString.slice(1) : queryString,
   );
   for (const [key, value] of params) {
-    const existingValues = hasOwnEnumerableValue(out, key)
-      ? out[key]
-      : undefined;
+    const existingValues = out.get(key);
     if (existingValues) {
       existingValues.push(value);
     } else {
-      setOwnEnumerableValue(out, key, [value]);
+      out.set(key, [value]);
     }
   }
 
-  return out;
+  return stringRecord(out);
 }
 
 export function cloneCookies(cookies: CookieMap | undefined): CookieMap {
-  const out: CookieMap = {};
-  if (!cookies) return out;
+  if (!cookies) return {};
+  const out = new Map<string, string>();
   for (const [key, value] of Object.entries(cookies)) {
-    setOwnEnumerableValue(out, key, String(value));
+    out.set(key, String(value));
   }
-  return out;
+  return stringRecord(out);
 }
 
 export function parseCookiesFromHeaders(
   headers: Headers | undefined,
 ): CookieMap {
-  const out: CookieMap = {};
-  if (!headers) return out;
+  if (!headers) return {};
+  const out = new Map<string, string>();
 
   const cookieHeaderValues: string[] = [];
   for (const [headerName, headerValues] of Object.entries(headers)) {
@@ -240,12 +222,12 @@ export function parseCookiesFromHeaders(
       }
 
       try {
-        setOwnEnumerableValue(out, name, decodeURIComponent(value));
+        out.set(name, decodeURIComponent(value));
       } catch {
-        setOwnEnumerableValue(out, name, value);
+        out.set(name, value);
       }
     }
   }
 
-  return out;
+  return stringRecord(out);
 }

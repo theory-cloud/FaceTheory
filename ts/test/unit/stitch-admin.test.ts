@@ -1,0 +1,423 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import * as React from 'react';
+
+import { createFaceApp } from '../../src/app.js';
+import { createReactFace } from '../../src/adapters/react.js';
+import { createAntdIntegration } from '../../src/react/antd.js';
+import {
+  CopyableCode,
+  DataTable,
+  DestructiveConfirm,
+  DetailPanel,
+  FilterChip,
+  FilterChipGroup,
+  FormRow,
+  FormSection,
+  InlineKeyValueList,
+  LogStream,
+  PropertyGrid,
+  SplitForm,
+  StatusTag,
+  Tabs,
+} from '../../src/react/stitch-admin/index.js';
+
+const h = React.createElement;
+
+async function renderSSR(element: React.ReactElement): Promise<string> {
+  const app = createFaceApp({
+    faces: [
+      createReactFace({
+        route: '/',
+        mode: 'ssr',
+        render: () => element,
+        renderOptions: {
+          integrations: [createAntdIntegration({ hashed: false })],
+        },
+      }),
+    ],
+  });
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  return new TextDecoder().decode(resp.body as Uint8Array);
+}
+
+interface Partner {
+  key: string;
+  name: string;
+  status: string;
+}
+
+const samplePartners: Partner[] = [
+  { key: '1', name: 'Acme Corp', status: 'active' },
+  { key: '2', name: 'Globex', status: 'pending' },
+];
+
+test('DataTable renders toolbar slots, rows, and the row-actions column', async () => {
+  const body = await renderSSR(
+    h(DataTable<Partner>, {
+      rowKey: 'key',
+      dataSource: samplePartners,
+      columns: [
+        { key: 'name', dataIndex: 'name', title: 'Name' },
+        { key: 'status', dataIndex: 'status', title: 'Status' },
+      ],
+      toolbar: {
+        left: h('span', null, '2 partners'),
+        center: h('input', { placeholder: 'Search' }),
+        right: h('button', null, 'New partner'),
+      },
+      rowActions: (record) => h('button', { 'data-key': record.key }, 'Edit'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-data-table'));
+  assert.ok(body.includes('facetheory-stitch-data-table-toolbar'));
+  assert.ok(body.includes('2 partners'));
+  assert.ok(body.includes('Search'));
+  assert.ok(body.includes('New partner'));
+  assert.ok(body.includes('Acme Corp'));
+  assert.ok(body.includes('Globex'));
+  assert.ok(body.includes('data-key="1"'));
+  assert.ok(body.includes('data-key="2"'));
+});
+
+test('DataTable renders the empty state when dataSource is empty', async () => {
+  const body = await renderSSR(
+    h(DataTable<Partner>, {
+      rowKey: 'key',
+      dataSource: [],
+      columns: [{ key: 'name', dataIndex: 'name', title: 'Name' }],
+      emptyLabel: 'No partners yet',
+    }),
+  );
+  assert.ok(body.includes('No partners yet'));
+});
+
+test('PropertyGrid renders key/value pairs and respects span="full"', async () => {
+  const body = await renderSSR(
+    h(PropertyGrid, {
+      items: [
+        { key: 'id', label: 'Tenant ID', value: 'acme-prod' },
+        { key: 'created', label: 'Created', value: '2025-12-01' },
+        {
+          key: 'note',
+          label: 'Notes',
+          value: 'Full-width note that spans both columns',
+          span: 'full',
+        },
+      ],
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-property-grid'));
+  assert.ok(body.includes('Tenant ID'));
+  assert.ok(body.includes('acme-prod'));
+  assert.ok(body.includes('Full-width note'));
+});
+
+test('DetailPanel renders title, description, actions, and a PropertyGrid', async () => {
+  const body = await renderSSR(
+    h(DetailPanel, {
+      title: 'Acme Corp',
+      description: 'Tenant overview',
+      actions: h('button', null, 'Edit'),
+      properties: [
+        { key: 'id', label: 'Tenant ID', value: 'acme-prod' },
+        { key: 'plan', label: 'Plan', value: 'Enterprise' },
+      ],
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-detail-panel'));
+  assert.ok(body.includes('Acme Corp'));
+  assert.ok(body.includes('Tenant overview'));
+  assert.ok(body.includes('Enterprise'));
+});
+
+test('SplitForm + FormRow render label/description/control + error region', async () => {
+  const body = await renderSSR(
+    h(SplitForm, {
+      children: [
+        h(FormRow, {
+          key: 'email',
+          label: 'Email',
+          description: 'The admin contact for this tenant',
+          required: true,
+          children: h('input', { type: 'email', name: 'email' }),
+        }),
+        h(FormRow, {
+          key: 'slug',
+          label: 'Slug',
+          error: 'Slug is already taken',
+          children: h('input', { type: 'text', name: 'slug' }),
+        }),
+      ],
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-split-form'));
+  assert.ok(body.includes('facetheory-stitch-form-row'));
+  assert.ok(body.includes('Email'));
+  assert.ok(body.includes('The admin contact for this tenant'));
+  assert.ok(body.includes('Slug is already taken'));
+  assert.ok(body.includes('role="alert"'));
+  assert.ok(body.includes('*'));
+});
+
+test('FormSection wraps FormRows with a heading and description', async () => {
+  const body = await renderSSR(
+    h(FormSection, {
+      title: 'Authentication',
+      description: 'Control how users sign in to this tenant',
+      children: h(FormRow, {
+        label: 'Allow passwords',
+        children: h('input', { type: 'checkbox' }),
+      }),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-form-section'));
+  assert.ok(body.includes('Authentication'));
+  assert.ok(body.includes('Allow passwords'));
+});
+
+test('StatusTag renders each variant with the correct class and default label', async () => {
+  const variants = [
+    'active',
+    'pending',
+    'suspended',
+    'archived',
+    'error',
+    'warning',
+    'allow',
+    'deny',
+  ] as const;
+  for (const variant of variants) {
+    const body = await renderSSR(h(StatusTag, { variant }));
+    assert.ok(body.includes(`facetheory-stitch-status-tag-${variant}`));
+  }
+});
+
+test('StatusTag policy variants render their default labels', async () => {
+  const allow = await renderSSR(h(StatusTag, { variant: 'allow' }));
+  assert.ok(allow.includes('Allow'));
+  const deny = await renderSSR(h(StatusTag, { variant: 'deny' }));
+  assert.ok(deny.includes('Deny'));
+  const warning = await renderSSR(h(StatusTag, { variant: 'warning' }));
+  assert.ok(warning.includes('Warning'));
+});
+
+test('StatusTag supports a custom label override', async () => {
+  const body = await renderSSR(
+    h(StatusTag, { variant: 'active', label: 'Active · 12 members' }),
+  );
+  assert.ok(body.includes('Active · 12 members'));
+});
+
+test('DestructiveConfirm renders title, description, and default button labels', async () => {
+  const body = await renderSSR(
+    h(DestructiveConfirm, {
+      title: 'Delete partner?',
+      description: 'This permanently removes Acme Corp and its members.',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-destructive-confirm'));
+  assert.ok(body.includes('Delete partner?'));
+  assert.ok(body.includes('permanently removes Acme Corp'));
+  assert.ok(body.includes('Cancel'));
+  assert.ok(body.includes('Delete'));
+});
+
+test('DestructiveConfirm with requireText renders a guarded text input', async () => {
+  const body = await renderSSR(
+    h(DestructiveConfirm, {
+      title: 'Delete tenant?',
+      requireText: 'acme-prod',
+    }),
+  );
+  // JSX escapes quotes to &quot; in HTML output.
+  assert.ok(body.includes('Type &quot;acme-prod&quot; to confirm'));
+});
+
+test('Tabs renders labels, count badges, and the active panel content', async () => {
+  const body = await renderSSR(
+    h(Tabs, {
+      activeKey: 'policies',
+      items: [
+        { key: 'policies', label: 'Knowledge Policies', count: 8 },
+        { key: 'catalog', label: 'Knowledge Catalog', count: 12 },
+      ],
+      children: h('div', { 'data-testid': 'policies-body' }, 'policies body'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-tabs'));
+  assert.ok(body.includes('facetheory-stitch-tabs-label'));
+  assert.ok(body.includes('Knowledge Policies'));
+  assert.ok(body.includes('Knowledge Catalog'));
+  // Count badges render inside a facetheory class.
+  assert.ok(body.includes('facetheory-stitch-tabs-count'));
+  assert.ok(body.includes('policies body'));
+});
+
+test('Tabs uses defaultActiveKey when activeKey is omitted', async () => {
+  const body = await renderSSR(
+    h(Tabs, {
+      defaultActiveKey: 'catalog',
+      items: [
+        { key: 'policies', label: 'Policies' },
+        { key: 'catalog', label: 'Catalog' },
+      ],
+      children: h('div', { 'data-testid': 'catalog-body' }, 'catalog body'),
+    }),
+  );
+  assert.ok(body.includes('catalog body'));
+});
+
+test('Tabs hides items flagged hidden', async () => {
+  const body = await renderSSR(
+    h(Tabs, {
+      items: [
+        { key: 'policies', label: 'Policies' },
+        { key: 'catalog', label: 'Catalog', hidden: true },
+      ],
+    }),
+  );
+  assert.ok(body.includes('Policies'));
+  assert.ok(!body.includes('Catalog'));
+});
+
+test('FilterChip renders label, count, and a removal affordance', async () => {
+  const body = await renderSSR(
+    h(FilterChip, {
+      key: 'status-active',
+      label: 'status: active',
+      count: 124,
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-filter-chip'));
+  assert.ok(body.includes('status: active'));
+  assert.ok(body.includes('124'));
+  assert.ok(body.includes('facetheory-stitch-filter-chip-remove'));
+});
+
+test('FilterChipGroup lays out multiple chips with a trailing slot', async () => {
+  const body = await renderSSR(
+    h(FilterChipGroup, {
+      chips: [
+        { key: 'status', label: 'status: active' },
+        { key: 'manifest', label: 'manifest: stale', count: 2 },
+      ],
+      trailing: h('a', { href: '#clear' }, 'Clear all'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-filter-chip-group'));
+  assert.ok(body.includes('status: active'));
+  assert.ok(body.includes('manifest: stale'));
+  assert.ok(body.includes('Clear all'));
+});
+
+test('FilterChip omits the remove affordance when removable is false', async () => {
+  const body = await renderSSR(
+    h(FilterChip, {
+      key: 'system',
+      label: 'system: locked',
+      removable: false,
+    }),
+  );
+  assert.ok(body.includes('system: locked'));
+  assert.ok(!body.includes('facetheory-stitch-filter-chip-remove'));
+});
+
+test('InlineKeyValueList renders dense label/value rows', async () => {
+  const body = await renderSSR(
+    h(InlineKeyValueList, {
+      entries: [
+        { key: 'org', label: 'ORG', value: 'org_882910' },
+        { key: 'wksp', label: 'WKSP', value: 'ws_prod_01' },
+        { key: 'client', label: 'CLIENT', value: 'cli_99x_z2' },
+      ],
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-inline-key-value-list'));
+  assert.ok(body.includes('ORG'));
+  assert.ok(body.includes('org_882910'));
+  assert.ok(body.includes('WKSP'));
+  assert.ok(body.includes('cli_99x_z2'));
+});
+
+test('CopyableCode renders the code chip and a copy button', async () => {
+  const body = await renderSSR(
+    h(CopyableCode, { code: 'lab.theorymcp.ai/theorycloud/mcp' }),
+  );
+  assert.ok(body.includes('facetheory-stitch-copyable-code'));
+  assert.ok(body.includes('lab.theorymcp.ai/theorycloud/mcp'));
+  assert.ok(body.includes('facetheory-stitch-copyable-code-button'));
+  assert.ok(body.includes('aria-label="Copy"'));
+});
+
+test('CopyableCode separates visible content from copy payload via children', async () => {
+  const body = await renderSSR(
+    h(CopyableCode, {
+      code: 'tenant_7f3a9c2b',
+      children: h('span', null, 'tenant_7f3a…9c2b'),
+    }),
+  );
+  assert.ok(body.includes('tenant_7f3a…9c2b'));
+});
+
+test('LogStream plain variant renders each row with a level class', async () => {
+  const body = await renderSSR(
+    h(LogStream, {
+      entries: [
+        {
+          id: '1',
+          timestamp: '09:42:12',
+          level: 'info',
+          message: 'Created demo-sandbox-01',
+        },
+        {
+          id: '2',
+          timestamp: '09:15:00',
+          level: 'warn',
+          actor: 'System_Bot',
+          message: 'Archived legacy-test-env',
+        },
+        {
+          id: '3',
+          timestamp: '08:00:05',
+          level: 'error',
+          message: 'ERROR: key_0x4f2 invalid checksum',
+        },
+      ],
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-log-stream-plain'));
+  assert.ok(body.includes('facetheory-stitch-log-stream-row-info'));
+  assert.ok(body.includes('facetheory-stitch-log-stream-row-warn'));
+  assert.ok(body.includes('facetheory-stitch-log-stream-row-error'));
+  assert.ok(body.includes('Created demo-sandbox-01'));
+  assert.ok(body.includes('System_Bot'));
+});
+
+test('LogStream terminal variant renders window chrome and a title', async () => {
+  const body = await renderSSR(
+    h(LogStream, {
+      variant: 'terminal',
+      title: 'repair_logs_tty1',
+      entries: [
+        {
+          id: '1',
+          timestamp: '14:02:11',
+          level: 'debug',
+          message: 'Initiating global state handshake...',
+        },
+        {
+          id: '2',
+          timestamp: '14:02:12',
+          level: 'success',
+          message: 'Handshake SUCCESS',
+        },
+      ],
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-log-stream-terminal'));
+  assert.ok(body.includes('facetheory-stitch-log-stream-chrome'));
+  assert.ok(body.includes('repair_logs_tty1'));
+  assert.ok(body.includes('Handshake SUCCESS'));
+});
