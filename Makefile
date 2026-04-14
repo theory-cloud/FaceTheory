@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets ensure-release-branches test-ensure-release-branches rubric
 
 ts-build:
 	cd ts && npm run build
@@ -26,5 +26,11 @@ verify-ts-pack:
 
 build-release-assets:
 	./scripts/build-release-assets.sh "$$(./scripts/read-version.sh)" dist
+
+ensure-release-branches:
+	./scripts/ensure-release-branches.sh
+
+test-ensure-release-branches:
+	./scripts/test-ensure-release-branches.sh
 
 rubric: ts-typecheck ts-lint ts-test verify-version-alignment verify-ts-pack

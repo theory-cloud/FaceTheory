@@ -20,3 +20,5 @@ ts/*.tgz
 
 reference/
 .theory/
+
+.codex/
