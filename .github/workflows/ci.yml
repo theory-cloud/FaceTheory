@@ -22,65 +22,21 @@ jobs:
           fetch-depth: 0
       - name: Verify user-facing conventional commits exist
         run: |
-          set -euo pipefail
-
           git fetch origin premain staging --force
-          range="origin/premain..origin/staging"
+          scripts/verify-release-readiness.sh origin/premain origin/staging prerelease
 
-          echo "Checking commits in ${range}..."
-          if git log --format=%s "${range}" | grep -Eq '^(feat|fix|perf)(\([^)]+\))?(!)?: '; then
-            echo "prerelease-ready: OK"
-            exit 0
-          fi
-
-          mapfile -t changed_files < <(git diff --name-only --diff-filter=ACMR origin/premain...origin/staging)
-          if [[ "${#changed_files[@]}" -gt 0 ]]; then
-            release_sync_only="true"
-            for path in "${changed_files[@]}"; do
-              case "${path}" in
-                .github/workflows/* \
-                | .release-please-manifest*.json \
-                | release-please-config*.json \
-                | VERSION \
-                | CHANGELOG.md \
-                | README.md \
-                | Makefile \
-                | .gitignore \
-                | docs/README.md \
-                | docs/api-reference.md \
-                | docs/getting-started.md \
-                | scripts/build-release-assets.sh \
-                | scripts/generate-checksums.sh \
-                | scripts/read-version.sh \
-                | scripts/render-release-notes.sh \
-                | scripts/verify-release-branch.sh \
-                | scripts/verify-ts-pack.sh \
-                | scripts/verify-version-alignment.sh \
-                | ts/README.md \
-                | ts/package-lock.json \
-                | ts/package.json)
-                  ;;
-                *)
-                  release_sync_only="false"
-                  break
-                  ;;
-              esac
-            done
-
-            if [[ "${release_sync_only}" == "true" ]]; then
-              echo "prerelease-ready: OK (release sync only change)"
-              printf '%s\n' "${changed_files[@]}"
-              exit 0
-            fi
-          fi
-
-          echo "prerelease-ready: FAIL"
-          echo "No user-facing conventional commits (feat:/fix:/perf:) found in ${range}."
-          echo "release-please will skip, so no new prerelease tag will be cut."
-          echo
-          echo "Commit subjects:"
-          git log --format=%s "${range}" || true
-          exit 1
+  release-readiness:
+    name: Release readiness (PR -> main)
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Verify user-facing conventional commits exist
+        run: |
+          git fetch origin "${{ github.event.pull_request.base.ref }}" --force
+          scripts/verify-release-readiness.sh "origin/${{ github.event.pull_request.base.ref }}" HEAD release
 
   version-alignment:
     name: Version alignment

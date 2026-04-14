@@ -20,44 +20,79 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
-test('vite SSR svelte example: builds client+server and renders without missing assets', { concurrency: false }, async () => {
-  const cwd = path.resolve('.');
+test(
+  'vite SSR svelte example: builds client+server and renders without missing assets',
+  { concurrency: false },
+  async () => {
+    const cwd = path.resolve('.');
 
-  const distDir = path.resolve('examples/vite-ssr-svelte/dist');
-  await rm(distDir, { recursive: true, force: true });
+    const distDir = path.resolve('examples/vite-ssr-svelte/dist');
+    await rm(distDir, { recursive: true, force: true });
 
-  await execFileAsync('npm', ['run', 'example:vite:svelte:build'], { cwd });
+    await execFileAsync('npm', ['run', 'example:vite:svelte:build'], { cwd });
 
-  const manifestPath = path.resolve('examples/vite-ssr-svelte/dist/client/.vite/manifest.json');
-  const manifestRaw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(manifestRaw) as ViteManifest;
-  assert.ok(manifest['src/entry-client.ts']);
+    const manifestPath = path.resolve(
+      'examples/vite-ssr-svelte/dist/client/.vite/manifest.json',
+    );
+    const manifestRaw = await readFile(manifestPath, 'utf8');
+    const manifest = JSON.parse(manifestRaw) as ViteManifest;
+    assert.ok(manifest['src/entry-client.ts']);
 
-  const serverEntryPath = path.resolve('examples/vite-ssr-svelte/dist/server/entry-server.js');
-  assert.ok(await exists(serverEntryPath));
+    const serverEntryPath = path.resolve(
+      'examples/vite-ssr-svelte/dist/server/entry-server.js',
+    );
+    assert.ok(await exists(serverEntryPath));
 
-  const serverMod = await import(pathToFileURL(serverEntryPath).href);
-  const app = serverMod.createViteSvelteSSRExampleApp(manifest);
+    const serverMod = await import(pathToFileURL(serverEntryPath).href);
+    const app = serverMod.createViteSvelteSSRExampleApp(manifest);
 
-  const resp = await app.handle({ method: 'GET', path: '/' });
-  const body = new TextDecoder().decode(resp.body as Uint8Array);
+    const resp = await app.handle({ method: 'GET', path: '/' });
+    const body = new TextDecoder().decode(resp.body as Uint8Array);
 
-  assert.ok(body.includes('Svelte SSR Example'), `unexpected html: ${body.slice(0, 220)}`);
-  assert.ok(body.includes('Hello from server'), `unexpected html: ${body.slice(0, 220)}`);
-  assert.ok(body.includes('id="__FACETHEORY_DATA__"'));
-  assert.ok(body.includes('type="module"'));
-  assert.ok(body.includes('id="svelte-inline-style"'));
+    assert.ok(
+      body.includes('Svelte SSR Example'),
+      `unexpected html: ${body.slice(0, 220)}`,
+    );
+    assert.ok(
+      body.includes('Hello from server'),
+      `unexpected html: ${body.slice(0, 220)}`,
+    );
+    assert.ok(body.includes('facetheory-stitch-shell'));
+    assert.ok(body.includes('href="/"'));
+    assert.ok(body.includes('href="/dashboard"'));
+    assert.ok(body.includes('href="/partners"'));
+    assert.ok(body.includes('facetheory-stitch-auth-card'));
+    assert.ok(body.includes('facetheory-stitch-callout-warning'));
+    assert.ok(body.includes('facetheory-stitch-tabs'));
+    assert.ok(body.includes('facetheory-stitch-filter-chip-group'));
+    assert.ok(body.includes('facetheory-stitch-data-table'));
+    assert.ok(body.includes('facetheory-stitch-inline-key-value-list'));
+    assert.ok(body.includes('facetheory-stitch-copyable-code'));
+    assert.ok(body.includes('facetheory-stitch-destructive-confirm'));
+    assert.ok(body.includes('facetheory-stitch-log-stream-terminal'));
+    assert.ok(body.includes('id="__FACETHEORY_DATA__"'));
+    assert.ok(body.includes('type="module"'));
+    assert.ok(body.includes('id="svelte-inline-style"'));
 
-  const injectedPaths = new Set<string>();
-  for (const match of body.matchAll(/<(?:link|script)\b[^>]*(?:href|src)="([^"]+)"/g)) {
-    const candidate = match[1];
-    if (!candidate || !candidate.startsWith('/')) continue;
-    injectedPaths.add(candidate);
-  }
-  assert.ok(injectedPaths.size > 0);
+    const injectedPaths = new Set<string>();
+    for (const match of body.matchAll(
+      /<(?:link|script)\b[^>]*(?:href|src)="([^"]+)"/g,
+    )) {
+      const candidate = match[1];
+      if (!candidate || !candidate.startsWith('/')) continue;
+      injectedPaths.add(candidate);
+    }
+    assert.ok(injectedPaths.size > 0);
 
-  for (const injectedPath of injectedPaths) {
-    const builtPath = path.resolve('examples/vite-ssr-svelte/dist/client', `.${injectedPath}`);
-    assert.ok(await exists(builtPath), `missing built asset: ${injectedPath}`);
-  }
-});
+    for (const injectedPath of injectedPaths) {
+      const builtPath = path.resolve(
+        'examples/vite-ssr-svelte/dist/client',
+        `.${injectedPath}`,
+      );
+      assert.ok(
+        await exists(builtPath),
+        `missing built asset: ${injectedPath}`,
+      );
+    }
+  },
+);
