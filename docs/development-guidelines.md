@@ -25,6 +25,16 @@ This document is contract-only.
 - `docs/troubleshooting.md` captures recurring failures with a practical fix and a verification step.
 - Documentation updates ship in the same change set as interface or behavior changes whenever possible.
 
+## Release branch promotion contract
+
+- The human promotion path is `staging -> premain -> main`.
+- `premain` accepts promotion PRs from `staging`. The current release-please prerelease branch remains the temporary automation exception while version/changelog preparation still depends on it.
+- `main` accepts promotion PRs from `staging` or `premain`. The current release-please stable branch remains the temporary automation exception while stable version/changelog preparation still depends on it.
+- A `premain -> main` promotion is valid only after the current `premain` head already has a published RC tag. The promotion guard requires the `premain` `VERSION` to be an RC semver and the matching `vX.Y.Z-rc[.N]` tag to point at the current `premain` head.
+- After a stable release lands on `main`, `main` must be back-merged into `staging` before any additional work lands on `staging`.
+- If the `main -> staging` back-merge conflicts, resolve it in a branch that already contains the current `main` head, then PR that conflict-resolution branch into `staging`.
+- Repo-local CI owns these promotion-path checks. Release Please remains limited to version/changelog automation and does not replace branch-management policy.
+
 ## TheoryCloud shared-subtree rollout prerequisites
 
 - The protected-merge publisher for FaceTheory lives at `.github/workflows/theorycloud-facetheory-subtree-publish.yml`.
@@ -38,4 +48,4 @@ This document is contract-only.
 - The workflow and helper scripts are the source of truth for the FaceTheory shared-subtree path. The generic KnowledgeTheory workflow/template docs are not authoritative here because they still describe the older `<prefix>/docs/` publish shape.
 - FaceTheory syncs only `theorycloud/facetheory/` with docs-root-relative content and a subtree `source-manifest.json`; it must never upload `theorycloud/facetheory/docs/...`.
 - External rollout prerequisites live outside this repo: KT #12 stage-scoped OIDC roles, S3 permissions restricted to `theorycloud/facetheory/`, and execute-api invoke permissions only for `POST /v1/internal/publish/theorycloud`.
-- Before treating the workflow as ready, confirm the protected branches require review, code-owner review, signed commits, and the expected status checks so direct pushes cannot bypass the approved-merge-only contract.
+- Before treating the workflow as ready, confirm the protected branches require review, code-owner review, signed commits, and the expected status checks (`Promotion path policy`, `Prerelease readiness (staging -> premain)`, `Release readiness (PR -> main)`, and `rubric`) so direct pushes cannot bypass the approved-merge-only contract.

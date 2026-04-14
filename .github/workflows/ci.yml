@@ -12,6 +12,28 @@ permissions:
   contents: read
 
 jobs:
+  promotion-policy:
+    name: Promotion path policy
+    if: github.event_name == 'pull_request' && contains(fromJSON('["staging","premain","main"]'), github.event.pull_request.base.ref)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Verify promotion policy helper
+        run: |
+          bash -n scripts/verify-branch-promotion-policy.sh
+          bash -n scripts/test-verify-branch-promotion-policy.sh
+          bash scripts/test-verify-branch-promotion-policy.sh
+      - name: Verify protected-branch promotion route
+        run: |
+          git fetch origin main premain staging "${{ github.event.pull_request.head.ref }}" --tags --force
+          scripts/verify-branch-promotion-policy.sh \
+            "origin/${{ github.event.pull_request.base.ref }}" \
+            "origin/${{ github.event.pull_request.head.ref }}" \
+            "${{ github.event.pull_request.base.ref }}" \
+            "${{ github.event.pull_request.head.ref }}"
+
   prerelease-readiness:
     name: Prerelease readiness (staging -> premain)
     if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'premain' && github.event.pull_request.head.ref == 'staging'

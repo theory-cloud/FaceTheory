@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets ensure-release-branches test-ensure-release-branches stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets ensure-release-branches test-ensure-release-branches verify-branch-promotion-policy test-verify-branch-promotion-policy stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
 
 ts-build:
 	cd ts && npm run build
@@ -32,6 +32,12 @@ ensure-release-branches:
 
 test-ensure-release-branches:
 	./scripts/test-ensure-release-branches.sh
+
+verify-branch-promotion-policy:
+	./scripts/verify-branch-promotion-policy.sh "$${BASE_REF:?BASE_REF is required}" "$${HEAD_REF:?HEAD_REF is required}" "$${BASE_BRANCH:?BASE_BRANCH is required}" "$${HEAD_BRANCH:?HEAD_BRANCH is required}"
+
+test-verify-branch-promotion-policy:
+	./scripts/test-verify-branch-promotion-policy.sh
 
 stage-theorycloud-facetheory-subtree:
 	./scripts/stage_theorycloud_facetheory_subtree.sh --output "$${THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR:-/tmp/facetheory-theorycloud}"

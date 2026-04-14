@@ -38,13 +38,24 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
       | docs/api-reference.md \
       | docs/getting-started.md \
       | scripts/build-release-assets.sh \
+      | scripts/ensure-release-branches.sh \
       | scripts/generate-checksums.sh \
       | scripts/read-version.sh \
       | scripts/render-release-notes.sh \
+      | scripts/test-ensure-release-branches.sh \
+      | scripts/test-theorycloud-targets.sh \
+      | scripts/test-trigger-theorycloud-publish-awscurl.sh \
+      | scripts/test-verify-branch-promotion-policy.sh \
+      | scripts/trigger_theorycloud_publish.sh \
+      | scripts/verify-branch-promotion-policy.sh \
       | scripts/verify-release-branch.sh \
       | scripts/verify-release-readiness.sh \
+      | scripts/verify_theorycloud_facetheory_subtree.sh \
       | scripts/verify-ts-pack.sh \
       | scripts/verify-version-alignment.sh \
+      | scripts/stage_theorycloud_facetheory_subtree.sh \
+      | scripts/sync_theorycloud_facetheory_subtree.sh \
+      | docs/development-guidelines.md \
       | ts/README.md \
       | ts/package-lock.json \
       | ts/package.json)

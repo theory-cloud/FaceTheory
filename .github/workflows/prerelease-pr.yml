@@ -1,5 +1,10 @@
 name: Prerelease PR (premain)
 
+# This workflow remains a temporary automation exception to the human promotion
+# rule that `premain` receives promotion PRs from `staging`. Release Please still
+# prepares the prerelease version/changelog bump on its own branch until that
+# flow is redesigned.
+
 on:
   push:
     branches: ["premain"]

@@ -1,5 +1,10 @@
 name: Release PR (main)
 
+# This workflow remains a temporary automation exception to the human promotion
+# rule that `main` receives promotion PRs from `staging` or `premain`. Release
+# Please still prepares the stable version/changelog bump on its own branch until
+# that flow is redesigned.
+
 on:
   push:
     branches: ["main"]
