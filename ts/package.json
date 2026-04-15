@@ -1,6 +1,6 @@
 {
   "name": "@theory-cloud/facetheory",
-  "version": "0.5.6",
+  "version": "0.5.6-rc.1",
   "description": "AWS-first SSR, SSG, and blocking ISR runtime for Node.js with React, Vue, and Svelte adapters.",
   "license": "Apache-2.0",
   "type": "module",
@@ -190,8 +190,8 @@
     "@emotion/server": "^11.11.0",
     "@eslint/js": "^10.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.24.3/theory-cloud-apptheory-0.24.3.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.4/theory-cloud-tabletheory-ts-1.5.4.tgz",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.24.5/theory-cloud-apptheory-0.24.5.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.5/theory-cloud-tabletheory-ts-1.5.5.tgz",
     "@types/jsdom": "^28.0.0",
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
@@ -214,7 +214,7 @@
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.4/theory-cloud-tabletheory-ts-1.5.4.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.5/theory-cloud-tabletheory-ts-1.5.5.tgz"
     }
   }
 }
