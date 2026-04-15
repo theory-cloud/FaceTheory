@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.7](https://github.com/theory-cloud/FaceTheory/compare/v0.5.6...v0.5.7) (2026-04-15)
+
+
+### Bug Fixes
+
+* **deps:** align apptheory v0.24.5 and tabletheory v1.5.5 ([771e2e8](https://github.com/theory-cloud/FaceTheory/commit/771e2e8ae5db829955a2406118baf306488c53db))
+* **deps:** back-merge main and align AppTheory/TableTheory pins ([39a6d03](https://github.com/theory-cloud/FaceTheory/commit/39a6d034e2640e1b7a9411538494a58545c54dd4))
+
 ## [0.5.6-rc.1](https://github.com/theory-cloud/FaceTheory/compare/v0.5.6-rc...v0.5.6-rc.1) (2026-04-15)
 
 
