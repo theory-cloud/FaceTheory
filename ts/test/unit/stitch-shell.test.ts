@@ -7,6 +7,7 @@ import { createFaceApp } from '../../src/app.js';
 import { createReactFace } from '../../src/adapters/react.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
 import {
+  BrandHeader,
   Callout,
   PageFrame,
   Panel,
@@ -14,6 +15,7 @@ import {
   Shell,
   StatCard,
   SummaryStrip,
+  Topbar,
   resolveActiveNav as reactResolveActiveNav,
   type NavItem,
 } from '../../src/react/stitch-shell/index.js';
@@ -296,4 +298,242 @@ test('Callout renders an actions slot when provided', async () => {
   );
   assert.ok(body.includes('facetheory-stitch-callout-actions'));
   assert.ok(body.includes('Refresh'));
+});
+
+test('Topbar renders logo and surfaceLabel on the left edge in order', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      logo: h('span', { 'data-testid': 'logo' }, 'LOGO'),
+      surfaceLabel: h('span', { 'data-testid': 'surface' }, '[Core]'),
+      left: h('span', { 'data-testid': 'title' }, 'Dashboard'),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  const logoIdx = body.indexOf('LOGO');
+  const surfaceIdx = body.indexOf('[Core]');
+  const titleIdx = body.indexOf('Dashboard');
+  assert.ok(logoIdx !== -1 && surfaceIdx !== -1 && titleIdx !== -1);
+  assert.ok(logoIdx < surfaceIdx, 'logo renders before surfaceLabel');
+  assert.ok(surfaceIdx < titleIdx, 'surfaceLabel renders before left');
+});
+
+test('Topbar omits logo/surfaceLabel wrappers when not provided', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      left: h('span', null, 'Dashboard'),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('Dashboard'));
+  assert.ok(!body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(!body.includes('facetheory-stitch-topbar-surface-label'));
+});
+
+test('Topbar omits wrappers when logo/surfaceLabel/left are falsy (false, null, "")', async () => {
+  // Regression guard for the common `cond && <Node />` / `cond && "text"`
+  // idiom: when the guard is falsy the expression yields false / null /
+  // "" rather than undefined. The wrapper chrome (and left-edge gap) must
+  // not render in those cases.
+  for (const falsy of [false, null, ''] as const) {
+    const body = await renderSSR(
+      h(Topbar, {
+        logo: falsy as unknown as React.ReactNode,
+        surfaceLabel: falsy as unknown as React.ReactNode,
+        left: falsy as unknown as React.ReactNode,
+        right: h('span', null, 'user'),
+      }),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-logo'),
+      `falsy logo (${JSON.stringify(falsy)}) must not render the wrapper`,
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-surface-label'),
+      `falsy surfaceLabel (${JSON.stringify(falsy)}) must not render the wrapper`,
+    );
+  }
+});
+
+test('Topbar omits wrappers when logo/surfaceLabel are arrays-of-falsies or empty fragments', async () => {
+  // Beyond scalar falsies, downstream composition often produces ReactNode
+  // shapes like `[false]`, `[null, false]`, or `<></>`. These all emit no
+  // visible content and must not leave empty chrome + 12px gap behind.
+  const emptyShapes: ReadonlyArray<{ label: string; value: React.ReactNode }> =
+    [
+      { label: 'array of falsy scalars', value: [false, null, undefined] },
+      { label: 'empty fragment', value: h(React.Fragment) },
+      {
+        label: 'fragment wrapping only falsies',
+        value: h(React.Fragment, null, false, null, undefined),
+      },
+    ];
+  for (const shape of emptyShapes) {
+    const body = await renderSSR(
+      h(Topbar, {
+        logo: shape.value,
+        surfaceLabel: shape.value,
+        right: h('span', null, 'user'),
+      }),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-logo'),
+      `${shape.label}: logo wrapper must not render`,
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-surface-label'),
+      `${shape.label}: surface-label wrapper must not render`,
+    );
+  }
+});
+
+test('Topbar still renders wrappers when arrays / fragments contain renderable content', async () => {
+  // Positive guard so the array / fragment helpers do not over-eagerly
+  // skip wrappers when content is present alongside falsy placeholders.
+  const body = await renderSSR(
+    h(Topbar, {
+      logo: [false, h('span', { key: 'l' }, 'LOGO')],
+      surfaceLabel: h(React.Fragment, null, null, '[Core]'),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('LOGO'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  assert.ok(body.includes('[Core]'));
+});
+
+test('Shell forwards topbarLogo and topbarSurfaceLabel into the Topbar', async () => {
+  const body = await renderSSR(
+    h(Shell, {
+      nav: sampleNav,
+      activeKey: '/dashboard',
+      topbarLogo: h('span', { 'data-testid': 'shell-logo' }, 'TC'),
+      topbarSurfaceLabel: h(
+        'span',
+        { 'data-testid': 'shell-surface' },
+        '[MCP]',
+      ),
+      children: h('div', null, 'content'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  assert.ok(body.includes('TC'));
+  assert.ok(body.includes('[MCP]'));
+});
+
+test('BrandHeader renders logo + wordmark without a surface chip by default', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', { 'data-testid': 'logo' }, '◆'),
+      wordmark: 'Theory Cloud',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-brand-header'));
+  assert.ok(body.includes('facetheory-stitch-brand-header-logo'));
+  assert.ok(body.includes('facetheory-stitch-brand-header-wordmark'));
+  assert.ok(body.includes('Theory Cloud'));
+  assert.ok(!body.includes('facetheory-stitch-brand-header-surface-label'));
+});
+
+test('BrandHeader omits the surface chip when surfaceLabel is falsy (false, null, "")', async () => {
+  // Regression guard for the `cond && "[MCP]"` idiom: when `cond` is
+  // falsy the expression evaluates to the falsy value, not undefined.
+  // The chip wrapper must not render.
+  for (const falsy of [false, null, ''] as const) {
+    const body = await renderSSR(
+      h(BrandHeader, {
+        logo: h('span', null, '◆'),
+        wordmark: 'Theory Cloud',
+        surfaceLabel: falsy as unknown as React.ReactNode,
+      }),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-brand-header-surface-label'),
+      `falsy surfaceLabel (${JSON.stringify(falsy)}) must not render the chip wrapper`,
+    );
+  }
+});
+
+test('BrandHeader omits the surface chip for arrays-of-falsies and empty fragments', async () => {
+  const emptyShapes: ReadonlyArray<{ label: string; value: React.ReactNode }> =
+    [
+      { label: 'array of falsy scalars', value: [false, null, undefined] },
+      { label: 'empty fragment', value: h(React.Fragment) },
+      {
+        label: 'fragment wrapping only falsies',
+        value: h(React.Fragment, null, null, false),
+      },
+    ];
+  for (const shape of emptyShapes) {
+    const body = await renderSSR(
+      h(BrandHeader, {
+        logo: h('span', null, '◆'),
+        wordmark: 'Theory Cloud',
+        surfaceLabel: shape.value,
+      }),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-brand-header-surface-label'),
+      `${shape.label}: chip wrapper must not render`,
+    );
+  }
+});
+
+test('BrandHeader renders a surface chip when surfaceLabel is provided', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: '[Core]',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-brand-header-surface-label'));
+  assert.ok(body.includes('[Core]'));
+});
+
+test('BrandHeader surfaceTone binds chip background via stitch CSS variables', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: '[MCP]',
+      surfaceTone: 'secondary',
+    }),
+  );
+  assert.ok(body.includes('--stitch-color-secondary-container'));
+  assert.ok(body.includes('--stitch-color-on-secondary-container'));
+  assert.ok(body.includes('data-surface-tone="secondary"'));
+});
+
+test('BrandHeader without surfaceTone falls back to neutral surface-container tokens', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: 'Ops',
+    }),
+  );
+  // The chip binds to the shared surface-container-high token when no tone is supplied.
+  assert.ok(body.includes('--stitch-color-surface-container-high'));
+});
+
+test('BrandHeader composes with Topbar via the logo slot', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      logo: h(BrandHeader, {
+        logo: h('span', { 'data-testid': 'brand-logo' }, '◆'),
+        wordmark: 'Theory Cloud',
+        surfaceLabel: '[Auth]',
+        surfaceTone: 'tertiary',
+      }),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-brand-header'));
+  assert.ok(body.includes('[Auth]'));
+  assert.ok(body.includes('--stitch-color-tertiary-container'));
 });

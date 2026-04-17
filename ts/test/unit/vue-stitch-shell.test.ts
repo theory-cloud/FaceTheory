@@ -3,7 +3,9 @@ import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
 import { createVueFace, h } from '../../src/vue/index.js';
+import { Fragment as VueFragment } from 'vue';
 import {
+  BrandHeader,
   Callout,
   PageFrame,
   Panel,
@@ -11,6 +13,7 @@ import {
   Shell,
   StatCard,
   SummaryStrip,
+  Topbar,
   resolveActiveNav,
   type NavItem,
 } from '../../src/vue/stitch-shell/index.js';
@@ -167,4 +170,242 @@ test('vue stitch-shell: Callout renders variant classes, note/alert roles, and a
   assert.ok(body.includes('role="alert"'));
   assert.ok(body.includes('facetheory-stitch-callout-actions'));
   assert.ok(body.includes('Refresh'));
+});
+
+test('vue stitch-shell: Topbar renders logo and surfaceLabel on the left edge in order', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      logo: h('span', { 'data-testid': 'logo' }, 'LOGO'),
+      surfaceLabel: h('span', { 'data-testid': 'surface' }, '[Core]'),
+      left: h('span', { 'data-testid': 'title' }, 'Dashboard'),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  const logoIdx = body.indexOf('LOGO');
+  const surfaceIdx = body.indexOf('[Core]');
+  const titleIdx = body.indexOf('Dashboard');
+  assert.ok(logoIdx !== -1 && surfaceIdx !== -1 && titleIdx !== -1);
+  assert.ok(logoIdx < surfaceIdx, 'logo renders before surfaceLabel');
+  assert.ok(surfaceIdx < titleIdx, 'surfaceLabel renders before left');
+});
+
+test('vue stitch-shell: Topbar omits logo/surfaceLabel wrappers when not provided', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      left: h('span', null, 'Dashboard'),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('Dashboard'));
+  assert.ok(!body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(!body.includes('facetheory-stitch-topbar-surface-label'));
+});
+
+test('vue stitch-shell: Topbar omits wrappers when logo/surfaceLabel/left are falsy (false, null, "")', async () => {
+  // Vue parity regression guard for the React test of the same name.
+  // Downstream apps compose chrome through the `cond && node` idiom; the
+  // wrapper must not leave empty flex children when the guard is falsy.
+  const falsyValues: Array<false | null | ''> = [false, null, ''];
+  for (const falsy of falsyValues) {
+    const body = await renderSSR(
+      h(
+        Topbar,
+        {
+          logo: falsy,
+          surfaceLabel: falsy,
+          left: falsy,
+          right: h('span', null, 'user'),
+        } as Record<string, unknown>,
+      ),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-logo'),
+      `falsy logo (${JSON.stringify(falsy)}) must not render the wrapper`,
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-surface-label'),
+      `falsy surfaceLabel (${JSON.stringify(falsy)}) must not render the wrapper`,
+    );
+  }
+});
+
+test('vue stitch-shell: Topbar omits wrappers for arrays-of-falsies and empty fragments', async () => {
+  const emptyShapes: Array<{ label: string; value: unknown }> = [
+    { label: 'array of falsy scalars', value: [false, null, undefined] },
+    { label: 'empty fragment', value: h(VueFragment) },
+    {
+      label: 'fragment wrapping only falsies',
+      value: h(VueFragment, null, [false, null]),
+    },
+  ];
+  for (const shape of emptyShapes) {
+    const body = await renderSSR(
+      h(
+        Topbar,
+        {
+          logo: shape.value,
+          surfaceLabel: shape.value,
+          right: h('span', null, 'user'),
+        } as Record<string, unknown>,
+      ),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-logo'),
+      `${shape.label}: logo wrapper must not render`,
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-surface-label'),
+      `${shape.label}: surface-label wrapper must not render`,
+    );
+  }
+});
+
+test('vue stitch-shell: Topbar still renders wrappers when arrays / fragments contain renderable content', async () => {
+  const body = await renderSSR(
+    h(
+      Topbar,
+      {
+        logo: [false, h('span', null, 'LOGO')],
+        surfaceLabel: h(VueFragment, null, [null, '[Core]']),
+        right: h('span', null, 'user'),
+      } as Record<string, unknown>,
+    ),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('LOGO'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  assert.ok(body.includes('[Core]'));
+});
+
+test('vue stitch-shell: Shell forwards topbarLogo and topbarSurfaceLabel into Topbar', async () => {
+  const body = await renderSSR(
+    h(
+      Shell,
+      {
+        nav: sampleNav,
+        activeKey: '/dashboard',
+        topbarLogo: h('span', { 'data-testid': 'shell-logo' }, 'TC'),
+        topbarSurfaceLabel: h(
+          'span',
+          { 'data-testid': 'shell-surface' },
+          '[MCP]',
+        ),
+      },
+      {
+        default: () => h('div', null, 'content'),
+      },
+    ),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  assert.ok(body.includes('TC'));
+  assert.ok(body.includes('[MCP]'));
+});
+
+test('vue stitch-shell: BrandHeader renders logo + wordmark without a surface chip by default', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-brand-header'));
+  assert.ok(body.includes('facetheory-stitch-brand-header-logo'));
+  assert.ok(body.includes('facetheory-stitch-brand-header-wordmark'));
+  assert.ok(body.includes('Theory Cloud'));
+  assert.ok(!body.includes('facetheory-stitch-brand-header-surface-label'));
+});
+
+test('vue stitch-shell: BrandHeader omits the surface chip when surfaceLabel is falsy (false, null, "")', async () => {
+  const falsyValues: Array<false | null | ''> = [false, null, ''];
+  for (const falsy of falsyValues) {
+    const body = await renderSSR(
+      h(
+        BrandHeader,
+        {
+          logo: h('span', null, '◆'),
+          wordmark: 'Theory Cloud',
+          surfaceLabel: falsy,
+        } as Record<string, unknown>,
+      ),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-brand-header-surface-label'),
+      `falsy surfaceLabel (${JSON.stringify(falsy)}) must not render the chip wrapper`,
+    );
+  }
+});
+
+test('vue stitch-shell: BrandHeader omits the surface chip for arrays-of-falsies and empty fragments', async () => {
+  const emptyShapes: Array<{ label: string; value: unknown }> = [
+    { label: 'array of falsy scalars', value: [false, null, undefined] },
+    { label: 'empty fragment', value: h(VueFragment) },
+    {
+      label: 'fragment wrapping only falsies',
+      value: h(VueFragment, null, [false, null]),
+    },
+  ];
+  for (const shape of emptyShapes) {
+    const body = await renderSSR(
+      h(
+        BrandHeader,
+        {
+          logo: h('span', null, '◆'),
+          wordmark: 'Theory Cloud',
+          surfaceLabel: shape.value,
+        } as Record<string, unknown>,
+      ),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-brand-header-surface-label'),
+      `${shape.label}: chip wrapper must not render`,
+    );
+  }
+});
+
+test('vue stitch-shell: BrandHeader surfaceTone binds chip background via stitch CSS variables', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: '[MCP]',
+      surfaceTone: 'secondary',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-brand-header-surface-label'));
+  assert.ok(body.includes('[MCP]'));
+  assert.ok(body.includes('--stitch-color-secondary-container'));
+  assert.ok(body.includes('--stitch-color-on-secondary-container'));
+  assert.ok(body.includes('data-surface-tone="secondary"'));
+});
+
+test('vue stitch-shell: BrandHeader without surfaceTone falls back to neutral surface-container tokens', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: 'Ops',
+    }),
+  );
+  assert.ok(body.includes('--stitch-color-surface-container-high'));
+});
+
+test('vue stitch-shell: BrandHeader composes with Topbar via the logo slot', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      logo: h(BrandHeader, {
+        logo: h('span', null, '◆'),
+        wordmark: 'Theory Cloud',
+        surfaceLabel: '[Auth]',
+        surfaceTone: 'tertiary',
+      }),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-brand-header'));
+  assert.ok(body.includes('[Auth]'));
+  assert.ok(body.includes('--stitch-color-tertiary-container'));
 });
