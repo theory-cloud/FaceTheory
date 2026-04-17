@@ -4,6 +4,7 @@ import type { ViteManifest } from '../../../src/vite.js';
 import { viteAssetsForEntry, viteHydrationForEntry } from '../../../src/vite.js';
 
 import App from './App.svelte';
+import AppBrand from './AppBrand.svelte';
 
 export function createViteSvelteSSRExampleApp(manifest: ViteManifest) {
   return createFaceApp({
@@ -15,6 +16,36 @@ export function createViteSvelteSSRExampleApp(manifest: ViteManifest) {
         render: (_ctx, data) => ({
           component: App,
           props: { message: (data as { message: string }).message },
+        }),
+        renderOptions: async (_ctx, data) => {
+          const { headTags } = viteAssetsForEntry(manifest, 'src/entry-client.ts', {
+            includeAssets: true,
+          });
+          const hydration = viteHydrationForEntry(manifest, 'src/entry-client.ts', data);
+          return {
+            headTags: [...headTags, { type: 'title', text: 'FaceTheory Svelte SSR' }],
+            styleTags: [
+              {
+                cssText: '.svelte-inline{color:rgb(214,80,121);}',
+                attrs: { id: 'svelte-inline-style' },
+              },
+            ],
+            hydration,
+          };
+        },
+      }),
+      // Second route exercises the positive Shell -> Topbar slot-forwarding
+      // path for topbarLogo / topbarSurfaceLabel so the test can assert the
+      // chrome appears when the consumer provides them.
+      createSvelteFace({
+        route: '/brand',
+        mode: 'ssr',
+        load: async () => ({ message: 'from server' }),
+        render: (_ctx, data) => ({
+          component: AppBrand,
+          props: {
+            message: (data as { message: string }).message,
+          },
         }),
         renderOptions: async (_ctx, data) => {
           const { headTags } = viteAssetsForEntry(manifest, 'src/entry-client.ts', {

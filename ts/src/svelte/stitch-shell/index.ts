@@ -16,4 +16,6 @@ export { default as StatCard } from './StatCard.svelte';
 export { default as SummaryStrip } from './SummaryStrip.svelte';
 export { default as Callout } from './Callout.svelte';
 
+export { default as BrandHeader } from './BrandHeader.svelte';
+
 export type { CalloutVariant } from '../../stitch-shell/callout-types.js';

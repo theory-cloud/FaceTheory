@@ -6,6 +6,51 @@ import type { NavItem } from './nav-types.js';
 
 const h = React.createElement;
 
+/**
+ * True when `value` is a ReactNode that should produce visible output.
+ *
+ * Handles the statically detectable "nothing to render" shapes so optional
+ * chrome wrappers do not leak into the SSR output when a caller composes
+ * through any of:
+ *
+ *  - Scalar non-rendering children: `undefined`, `null`, `false`, `true`,
+ *    `''` (the four values React treats as gaps plus the empty string
+ *    which emits no visible output). This covers the common
+ *    `cond && <Node />` and `cond && 'text'` idioms, which yield these
+ *    scalars when the guard is falsy.
+ *  - Arrays: renderable if *any* element is renderable (recursive). A
+ *    `[false, null]` array collapses to no output.
+ *  - Empty React Fragments: `<></>` and fragments whose children recurse
+ *    to no renderable nodes.
+ *
+ * Limitation: React elements whose *component function* returns null
+ * (e.g. `<OptionalBrand />` where `OptionalBrand` returns `null` based on
+ * runtime state) cannot be detected here without invoking the component's
+ * render function, which would double-run hooks and side effects. For
+ * that case, callers should compose conditionally at the call site
+ * (`logo={shouldShow && <OptionalBrand />}`) so the falsy value hits
+ * this helper directly.
+ */
+function isRenderableNode(value: React.ReactNode): boolean {
+  if (
+    value === undefined ||
+    value === null ||
+    value === false ||
+    value === true ||
+    value === ''
+  ) {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some(isRenderableNode);
+  }
+  if (React.isValidElement(value) && value.type === React.Fragment) {
+    const children = (value.props as { children?: React.ReactNode }).children;
+    return isRenderableNode(children);
+  }
+  return true;
+}
+
 type MenuItemType = NonNullable<MenuProps['items']>[number];
 
 function renderNavLabel(
@@ -131,6 +176,19 @@ export function Sidebar(props: SidebarProps): React.ReactElement {
 }
 
 export interface TopbarProps {
+  /**
+   * Brand logo slot, rendered at the far left of the bar. Brand-agnostic:
+   * accepts any ReactNode (icon, img, component). Rendered before
+   * `surfaceLabel` and `left`, in that order.
+   */
+  logo?: React.ReactNode;
+  /**
+   * Surface label slot (for example a "surface chip" identifying Core / MCP /
+   * Auth or any consumer-defined classification). Rendered immediately to the
+   * right of `logo` and before `left`. FaceTheory provides the slot only and
+   * makes no styling claims about the chip itself.
+   */
+  surfaceLabel?: React.ReactNode;
   /** Left-aligned slot; typically the current page title or search. */
   left?: React.ReactNode;
   /** Center slot; typically contextual actions or filters. */
@@ -140,7 +198,7 @@ export interface TopbarProps {
 }
 
 export function Topbar(props: TopbarProps): React.ReactElement {
-  const { left, center, right } = props;
+  const { logo, surfaceLabel, left, center, right } = props;
   return h(
     Layout.Header,
     {
@@ -155,7 +213,42 @@ export function Topbar(props: TopbarProps): React.ReactElement {
         lineHeight: 'normal',
       },
     },
-    h('div', { style: { flex: 1, minWidth: 0 } }, left ?? null),
+    h(
+      'div',
+      {
+        className: 'facetheory-stitch-topbar-left',
+        style: {
+          flex: 1,
+          minWidth: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+        },
+      },
+      isRenderableNode(logo)
+        ? h(
+            'div',
+            {
+              className: 'facetheory-stitch-topbar-logo',
+              style: { display: 'flex', alignItems: 'center' },
+            },
+            logo,
+          )
+        : null,
+      isRenderableNode(surfaceLabel)
+        ? h(
+            'div',
+            {
+              className: 'facetheory-stitch-topbar-surface-label',
+              style: { display: 'flex', alignItems: 'center' },
+            },
+            surfaceLabel,
+          )
+        : null,
+      isRenderableNode(left)
+        ? h('div', { style: { minWidth: 0 } }, left)
+        : null,
+    ),
     h(
       'div',
       { style: { flex: 1, display: 'flex', justifyContent: 'center' } },
@@ -184,6 +277,10 @@ export interface ShellProps {
   onNavigate?: (path: string, key: string) => void;
   brand?: React.ReactNode;
   sidebarFooter?: React.ReactNode;
+  /** Passes through to Topbar `logo`. Brand-agnostic. */
+  topbarLogo?: React.ReactNode;
+  /** Passes through to Topbar `surfaceLabel`. Brand-agnostic. */
+  topbarSurfaceLabel?: React.ReactNode;
   topbarLeft?: React.ReactNode;
   topbarCenter?: React.ReactNode;
   topbarRight?: React.ReactNode;
@@ -205,6 +302,8 @@ export function Shell(props: ShellProps): React.ReactElement {
     onNavigate,
     brand,
     sidebarFooter,
+    topbarLogo,
+    topbarSurfaceLabel,
     topbarLeft,
     topbarCenter,
     topbarRight,
@@ -220,6 +319,9 @@ export function Shell(props: ShellProps): React.ReactElement {
   if (sidebarFooter !== undefined) sidebarProps.footer = sidebarFooter;
 
   const topbarProps: TopbarProps = {};
+  if (topbarLogo !== undefined) topbarProps.logo = topbarLogo;
+  if (topbarSurfaceLabel !== undefined)
+    topbarProps.surfaceLabel = topbarSurfaceLabel;
   if (topbarLeft !== undefined) topbarProps.left = topbarLeft;
   if (topbarCenter !== undefined) topbarProps.center = topbarCenter;
   if (topbarRight !== undefined) topbarProps.right = topbarRight;

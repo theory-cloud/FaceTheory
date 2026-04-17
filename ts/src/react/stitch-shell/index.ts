@@ -32,3 +32,5 @@ export {
 } from './sections.js';
 
 export { Callout, type CalloutProps, type CalloutVariant } from './callout.js';
+
+export { BrandHeader, type BrandHeaderProps } from './brand-header.js';

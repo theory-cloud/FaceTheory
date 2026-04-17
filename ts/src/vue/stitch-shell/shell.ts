@@ -1,4 +1,4 @@
-import { defineComponent, h } from 'vue';
+import { defineComponent, Fragment, h } from 'vue';
 import type { PropType, VNode } from 'vue';
 
 import type { NavItem } from './nav-types.js';
@@ -7,6 +7,47 @@ import {
   renderPropContent,
   vnodeChildProp,
 } from '../stitch-common.js';
+
+/**
+ * True when `value` is a VNodeChild that should produce visible output.
+ *
+ * Handles the statically detectable "nothing to render" shapes so optional
+ * chrome wrappers do not leak into the SSR output when a caller composes
+ * through any of:
+ *
+ *  - Scalar non-rendering children: `undefined`, `null`, `false`, `true`,
+ *    and `''` (the empty string renders as an empty text node).
+ *  - Arrays: renderable if *any* element is renderable (recursive).
+ *  - Vue Fragment VNodes with no renderable children.
+ *
+ * Limitation: VNodes whose *component render function* returns nothing at
+ * runtime (e.g. `h(OptionalBrand)` where `OptionalBrand` returns `null`)
+ * cannot be detected here without invoking the render function, which
+ * would double-run lifecycle hooks. For that case, callers should compose
+ * conditionally at the call site (`logo: shouldShow && h(OptionalBrand)`)
+ * so the falsy value hits this helper directly.
+ */
+function isRenderableChild(value: unknown): boolean {
+  if (
+    value === undefined ||
+    value === null ||
+    value === false ||
+    value === true ||
+    value === ''
+  ) {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some(isRenderableChild);
+  }
+  if (typeof value === 'object' && value !== null && 'type' in value) {
+    const vnode = value as { type: unknown; children?: unknown };
+    if (vnode.type === Fragment) {
+      return isRenderableChild(vnode.children);
+    }
+  }
+  return true;
+}
 
 function groupOpen(item: NavItem, openKeys: string[] | undefined): boolean {
   if (!item.children || item.children.length === 0) return false;
@@ -192,6 +233,19 @@ export const Sidebar = defineComponent({
 export const Topbar = defineComponent({
   name: 'FaceTheoryVueTopbar',
   props: {
+    /**
+     * Brand logo slot, rendered at the far left of the bar. Brand-agnostic:
+     * accepts any VNodeChild (icon, img, component). Rendered before
+     * `surfaceLabel` and `left`, in that order.
+     */
+    logo: vnodeChildProp,
+    /**
+     * Surface label slot (for example a "surface chip" identifying
+     * Core / MCP / Auth or any consumer-defined classification). Rendered
+     * immediately to the right of `logo` and before `left`. FaceTheory
+     * provides the slot only and makes no styling claims about the chip.
+     */
+    surfaceLabel: vnodeChildProp,
     left: vnodeChildProp,
     center: vnodeChildProp,
     right: vnodeChildProp,
@@ -215,8 +269,45 @@ export const Topbar = defineComponent({
         [
           h(
             'div',
-            { style: { flex: 1, minWidth: 0 } },
-            renderPropContent(props.left),
+            {
+              class: 'facetheory-stitch-topbar-left',
+              style: {
+                flex: 1,
+                minWidth: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              },
+            },
+            [
+              isRenderableChild(props.logo)
+                ? h(
+                    'div',
+                    {
+                      class: 'facetheory-stitch-topbar-logo',
+                      style: { display: 'flex', alignItems: 'center' },
+                    },
+                    renderPropContent(props.logo),
+                  )
+                : null,
+              isRenderableChild(props.surfaceLabel)
+                ? h(
+                    'div',
+                    {
+                      class: 'facetheory-stitch-topbar-surface-label',
+                      style: { display: 'flex', alignItems: 'center' },
+                    },
+                    renderPropContent(props.surfaceLabel),
+                  )
+                : null,
+              isRenderableChild(props.left)
+                ? h(
+                    'div',
+                    { style: { minWidth: 0 } },
+                    renderPropContent(props.left),
+                  )
+                : null,
+            ],
           ),
           h(
             'div',
@@ -261,6 +352,10 @@ export const Shell = defineComponent({
     },
     brand: vnodeChildProp,
     sidebarFooter: vnodeChildProp,
+    /** Passes through to Topbar `logo`. Brand-agnostic. */
+    topbarLogo: vnodeChildProp,
+    /** Passes through to Topbar `surfaceLabel`. Brand-agnostic. */
+    topbarSurfaceLabel: vnodeChildProp,
     topbarLeft: vnodeChildProp,
     topbarCenter: vnodeChildProp,
     topbarRight: vnodeChildProp,
@@ -307,6 +402,8 @@ export const Shell = defineComponent({
             },
             [
               h(Topbar, {
+                logo: props.topbarLogo,
+                surfaceLabel: props.topbarSurfaceLabel,
                 left: props.topbarLeft,
                 center: props.topbarCenter,
                 right: props.topbarRight,
