@@ -61,6 +61,13 @@ export interface CalloutProps {
   actions?: unknown;
 }
 
+export interface BrandHeaderProps {
+  logo?: unknown;
+  wordmark?: unknown;
+  surfaceLabel?: unknown;
+  surfaceTone?: string;
+}
+
 export declare const Shell: Component<ShellProps>;
 export declare const Sidebar: Component<SidebarProps>;
 export declare const Topbar: Component<TopbarProps>;
@@ -74,3 +81,5 @@ export declare const Panel: Component<PanelProps>;
 export declare const StatCard: Component<StatCardProps>;
 export declare const SummaryStrip: Component<SummaryStripProps>;
 export declare const Callout: Component<CalloutProps>;
+
+export declare const BrandHeader: Component<BrandHeaderProps>;

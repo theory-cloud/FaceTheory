@@ -7,6 +7,7 @@ import { createFaceApp } from '../../src/app.js';
 import { createReactFace } from '../../src/adapters/react.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
 import {
+  BrandHeader,
   Callout,
   PageFrame,
   Panel,
@@ -348,4 +349,74 @@ test('Shell forwards topbarLogo and topbarSurfaceLabel into the Topbar', async (
   assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
   assert.ok(body.includes('TC'));
   assert.ok(body.includes('[MCP]'));
+});
+
+test('BrandHeader renders logo + wordmark without a surface chip by default', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', { 'data-testid': 'logo' }, '◆'),
+      wordmark: 'Theory Cloud',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-brand-header'));
+  assert.ok(body.includes('facetheory-stitch-brand-header-logo'));
+  assert.ok(body.includes('facetheory-stitch-brand-header-wordmark'));
+  assert.ok(body.includes('Theory Cloud'));
+  assert.ok(!body.includes('facetheory-stitch-brand-header-surface-label'));
+});
+
+test('BrandHeader renders a surface chip when surfaceLabel is provided', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: '[Core]',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-brand-header-surface-label'));
+  assert.ok(body.includes('[Core]'));
+});
+
+test('BrandHeader surfaceTone binds chip background via stitch CSS variables', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: '[MCP]',
+      surfaceTone: 'secondary',
+    }),
+  );
+  assert.ok(body.includes('--stitch-color-secondary-container'));
+  assert.ok(body.includes('--stitch-color-on-secondary-container'));
+  assert.ok(body.includes('data-surface-tone="secondary"'));
+});
+
+test('BrandHeader without surfaceTone falls back to neutral surface-container tokens', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: 'Ops',
+    }),
+  );
+  // The chip binds to the shared surface-container-high token when no tone is supplied.
+  assert.ok(body.includes('--stitch-color-surface-container-high'));
+});
+
+test('BrandHeader composes with Topbar via the logo slot', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      logo: h(BrandHeader, {
+        logo: h('span', { 'data-testid': 'brand-logo' }, '◆'),
+        wordmark: 'Theory Cloud',
+        surfaceLabel: '[Auth]',
+        surfaceTone: 'tertiary',
+      }),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-brand-header'));
+  assert.ok(body.includes('[Auth]'));
+  assert.ok(body.includes('--stitch-color-tertiary-container'));
 });
