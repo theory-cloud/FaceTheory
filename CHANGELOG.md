@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.6.0-rc.1](https://github.com/theory-cloud/FaceTheory/compare/v0.5.6-rc.1...v0.6.0-rc.1) (2026-04-17)
+
+
+### Features
+
+* **stitch-shell:** add BrandHeader component ([e8fc4b3](https://github.com/theory-cloud/FaceTheory/commit/e8fc4b33800bc44704c23404a3cceb85e09e30a0))
+* **stitch-shell:** add logo and surfaceLabel slots to Topbar (React) ([ed5fb27](https://github.com/theory-cloud/FaceTheory/commit/ed5fb275eb60b2ade3e1e294eb2dc91dbf2f8a2c))
+* **stitch-shell:** add logo and surfaceLabel slots to Topbar (Svelte) ([485c72c](https://github.com/theory-cloud/FaceTheory/commit/485c72c1d91c1a1fa9d501e2a674afbad4516098))
+* **stitch-shell:** mirror logo/surfaceLabel slots and BrandHeader on Vue ([915a814](https://github.com/theory-cloud/FaceTheory/commit/915a814b960478af7dbb28f02941b57c1571fe27))
+* **stitch-tokens:** add optional surface dimension to StitchTokenSet ([5dcae36](https://github.com/theory-cloud/FaceTheory/commit/5dcae360253e84e999a5e3f8b7efd9b2fb46bd47))
+* **stitch-tokens:** surface CSS var prefix through shell integration ([3c0a1e2](https://github.com/theory-cloud/FaceTheory/commit/3c0a1e2bedbd71965735638e4dc97adf672f9281))
+* **stitch:** Theory Cloud design-system primitives (tcd-facetheory-primitives) ([0cb7d16](https://github.com/theory-cloud/FaceTheory/commit/0cb7d162f8282d270f798af510dc8b094c6d2cdd))
+
+
+### Bug Fixes
+
+* **deps:** bump AppTheory pin to v0.24.6 ([c1ffaa0](https://github.com/theory-cloud/FaceTheory/commit/c1ffaa08c8976abae067c0fe41afd1bcb2eda441))
+* **stitch-shell:** extend isRenderable helpers to arrays and empty fragments ([0abfe32](https://github.com/theory-cloud/FaceTheory/commit/0abfe32159d03b0eb79d69a741a2ad385a7d64d3))
+* **stitch-shell:** honor non-rendering falsy children in brand primitives ([a02d439](https://github.com/theory-cloud/FaceTheory/commit/a02d43946afbb91db727787070e4e75679682204))
+* **stitch-shell:** make Svelte Shell topbar brand slots conditional ([bcc8810](https://github.com/theory-cloud/FaceTheory/commit/bcc881075ba7ccc2c5829c3145b8373e64678207))
+
 ## [0.5.7](https://github.com/theory-cloud/FaceTheory/compare/v0.5.6...v0.5.7) (2026-04-15)
 
 
