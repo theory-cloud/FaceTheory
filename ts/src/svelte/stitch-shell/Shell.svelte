@@ -21,6 +21,8 @@
 
   <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
     <Topbar>
+      <slot name="topbarLogo" slot="logo" />
+      <slot name="topbarSurfaceLabel" slot="surfaceLabel" />
       <div slot="left"><slot name="topbarLeft" /></div>
       <div slot="center"><slot name="topbarCenter" /></div>
       <div slot="right"><slot name="topbarRight" /></div>
