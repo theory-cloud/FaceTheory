@@ -131,6 +131,19 @@ export function Sidebar(props: SidebarProps): React.ReactElement {
 }
 
 export interface TopbarProps {
+  /**
+   * Brand logo slot, rendered at the far left of the bar. Brand-agnostic:
+   * accepts any ReactNode (icon, img, component). Rendered before
+   * `surfaceLabel` and `left`, in that order.
+   */
+  logo?: React.ReactNode;
+  /**
+   * Surface label slot (for example a "surface chip" identifying Core / MCP /
+   * Auth or any consumer-defined classification). Rendered immediately to the
+   * right of `logo` and before `left`. FaceTheory provides the slot only and
+   * makes no styling claims about the chip itself.
+   */
+  surfaceLabel?: React.ReactNode;
   /** Left-aligned slot; typically the current page title or search. */
   left?: React.ReactNode;
   /** Center slot; typically contextual actions or filters. */
@@ -140,7 +153,7 @@ export interface TopbarProps {
 }
 
 export function Topbar(props: TopbarProps): React.ReactElement {
-  const { left, center, right } = props;
+  const { logo, surfaceLabel, left, center, right } = props;
   return h(
     Layout.Header,
     {
@@ -155,7 +168,40 @@ export function Topbar(props: TopbarProps): React.ReactElement {
         lineHeight: 'normal',
       },
     },
-    h('div', { style: { flex: 1, minWidth: 0 } }, left ?? null),
+    h(
+      'div',
+      {
+        className: 'facetheory-stitch-topbar-left',
+        style: {
+          flex: 1,
+          minWidth: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+        },
+      },
+      logo !== undefined
+        ? h(
+            'div',
+            {
+              className: 'facetheory-stitch-topbar-logo',
+              style: { display: 'flex', alignItems: 'center' },
+            },
+            logo,
+          )
+        : null,
+      surfaceLabel !== undefined
+        ? h(
+            'div',
+            {
+              className: 'facetheory-stitch-topbar-surface-label',
+              style: { display: 'flex', alignItems: 'center' },
+            },
+            surfaceLabel,
+          )
+        : null,
+      left !== undefined ? h('div', { style: { minWidth: 0 } }, left) : null,
+    ),
     h(
       'div',
       { style: { flex: 1, display: 'flex', justifyContent: 'center' } },
@@ -184,6 +230,10 @@ export interface ShellProps {
   onNavigate?: (path: string, key: string) => void;
   brand?: React.ReactNode;
   sidebarFooter?: React.ReactNode;
+  /** Passes through to Topbar `logo`. Brand-agnostic. */
+  topbarLogo?: React.ReactNode;
+  /** Passes through to Topbar `surfaceLabel`. Brand-agnostic. */
+  topbarSurfaceLabel?: React.ReactNode;
   topbarLeft?: React.ReactNode;
   topbarCenter?: React.ReactNode;
   topbarRight?: React.ReactNode;
@@ -205,6 +255,8 @@ export function Shell(props: ShellProps): React.ReactElement {
     onNavigate,
     brand,
     sidebarFooter,
+    topbarLogo,
+    topbarSurfaceLabel,
     topbarLeft,
     topbarCenter,
     topbarRight,
@@ -220,6 +272,9 @@ export function Shell(props: ShellProps): React.ReactElement {
   if (sidebarFooter !== undefined) sidebarProps.footer = sidebarFooter;
 
   const topbarProps: TopbarProps = {};
+  if (topbarLogo !== undefined) topbarProps.logo = topbarLogo;
+  if (topbarSurfaceLabel !== undefined)
+    topbarProps.surfaceLabel = topbarSurfaceLabel;
   if (topbarLeft !== undefined) topbarProps.left = topbarLeft;
   if (topbarCenter !== undefined) topbarProps.center = topbarCenter;
   if (topbarRight !== undefined) topbarProps.right = topbarRight;

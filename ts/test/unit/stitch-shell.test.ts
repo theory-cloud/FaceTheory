@@ -14,6 +14,7 @@ import {
   Shell,
   StatCard,
   SummaryStrip,
+  Topbar,
   resolveActiveNav as reactResolveActiveNav,
   type NavItem,
 } from '../../src/react/stitch-shell/index.js';
@@ -296,4 +297,55 @@ test('Callout renders an actions slot when provided', async () => {
   );
   assert.ok(body.includes('facetheory-stitch-callout-actions'));
   assert.ok(body.includes('Refresh'));
+});
+
+test('Topbar renders logo and surfaceLabel on the left edge in order', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      logo: h('span', { 'data-testid': 'logo' }, 'LOGO'),
+      surfaceLabel: h('span', { 'data-testid': 'surface' }, '[Core]'),
+      left: h('span', { 'data-testid': 'title' }, 'Dashboard'),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  const logoIdx = body.indexOf('LOGO');
+  const surfaceIdx = body.indexOf('[Core]');
+  const titleIdx = body.indexOf('Dashboard');
+  assert.ok(logoIdx !== -1 && surfaceIdx !== -1 && titleIdx !== -1);
+  assert.ok(logoIdx < surfaceIdx, 'logo renders before surfaceLabel');
+  assert.ok(surfaceIdx < titleIdx, 'surfaceLabel renders before left');
+});
+
+test('Topbar omits logo/surfaceLabel wrappers when not provided', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      left: h('span', null, 'Dashboard'),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('Dashboard'));
+  assert.ok(!body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(!body.includes('facetheory-stitch-topbar-surface-label'));
+});
+
+test('Shell forwards topbarLogo and topbarSurfaceLabel into the Topbar', async () => {
+  const body = await renderSSR(
+    h(Shell, {
+      nav: sampleNav,
+      activeKey: '/dashboard',
+      topbarLogo: h('span', { 'data-testid': 'shell-logo' }, 'TC'),
+      topbarSurfaceLabel: h(
+        'span',
+        { 'data-testid': 'shell-surface' },
+        '[MCP]',
+      ),
+      children: h('div', null, 'content'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  assert.ok(body.includes('TC'));
+  assert.ok(body.includes('[MCP]'));
 });
