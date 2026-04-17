@@ -4,6 +4,7 @@ import test from 'node:test';
 import { createFaceApp } from '../../src/app.js';
 import { createVueFace, h } from '../../src/vue/index.js';
 import {
+  BrandHeader,
   Callout,
   PageFrame,
   Panel,
@@ -11,6 +12,7 @@ import {
   Shell,
   StatCard,
   SummaryStrip,
+  Topbar,
   resolveActiveNav,
   type NavItem,
 } from '../../src/vue/stitch-shell/index.js';
@@ -167,4 +169,119 @@ test('vue stitch-shell: Callout renders variant classes, note/alert roles, and a
   assert.ok(body.includes('role="alert"'));
   assert.ok(body.includes('facetheory-stitch-callout-actions'));
   assert.ok(body.includes('Refresh'));
+});
+
+test('vue stitch-shell: Topbar renders logo and surfaceLabel on the left edge in order', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      logo: h('span', { 'data-testid': 'logo' }, 'LOGO'),
+      surfaceLabel: h('span', { 'data-testid': 'surface' }, '[Core]'),
+      left: h('span', { 'data-testid': 'title' }, 'Dashboard'),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  const logoIdx = body.indexOf('LOGO');
+  const surfaceIdx = body.indexOf('[Core]');
+  const titleIdx = body.indexOf('Dashboard');
+  assert.ok(logoIdx !== -1 && surfaceIdx !== -1 && titleIdx !== -1);
+  assert.ok(logoIdx < surfaceIdx, 'logo renders before surfaceLabel');
+  assert.ok(surfaceIdx < titleIdx, 'surfaceLabel renders before left');
+});
+
+test('vue stitch-shell: Topbar omits logo/surfaceLabel wrappers when not provided', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      left: h('span', null, 'Dashboard'),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('Dashboard'));
+  assert.ok(!body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(!body.includes('facetheory-stitch-topbar-surface-label'));
+});
+
+test('vue stitch-shell: Shell forwards topbarLogo and topbarSurfaceLabel into Topbar', async () => {
+  const body = await renderSSR(
+    h(
+      Shell,
+      {
+        nav: sampleNav,
+        activeKey: '/dashboard',
+        topbarLogo: h('span', { 'data-testid': 'shell-logo' }, 'TC'),
+        topbarSurfaceLabel: h(
+          'span',
+          { 'data-testid': 'shell-surface' },
+          '[MCP]',
+        ),
+      },
+      {
+        default: () => h('div', null, 'content'),
+      },
+    ),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  assert.ok(body.includes('TC'));
+  assert.ok(body.includes('[MCP]'));
+});
+
+test('vue stitch-shell: BrandHeader renders logo + wordmark without a surface chip by default', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-brand-header'));
+  assert.ok(body.includes('facetheory-stitch-brand-header-logo'));
+  assert.ok(body.includes('facetheory-stitch-brand-header-wordmark'));
+  assert.ok(body.includes('Theory Cloud'));
+  assert.ok(!body.includes('facetheory-stitch-brand-header-surface-label'));
+});
+
+test('vue stitch-shell: BrandHeader surfaceTone binds chip background via stitch CSS variables', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: '[MCP]',
+      surfaceTone: 'secondary',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-brand-header-surface-label'));
+  assert.ok(body.includes('[MCP]'));
+  assert.ok(body.includes('--stitch-color-secondary-container'));
+  assert.ok(body.includes('--stitch-color-on-secondary-container'));
+  assert.ok(body.includes('data-surface-tone="secondary"'));
+});
+
+test('vue stitch-shell: BrandHeader without surfaceTone falls back to neutral surface-container tokens', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: 'Ops',
+    }),
+  );
+  assert.ok(body.includes('--stitch-color-surface-container-high'));
+});
+
+test('vue stitch-shell: BrandHeader composes with Topbar via the logo slot', async () => {
+  const body = await renderSSR(
+    h(Topbar, {
+      logo: h(BrandHeader, {
+        logo: h('span', null, '◆'),
+        wordmark: 'Theory Cloud',
+        surfaceLabel: '[Auth]',
+        surfaceTone: 'tertiary',
+      }),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('facetheory-stitch-brand-header'));
+  assert.ok(body.includes('[Auth]'));
+  assert.ok(body.includes('--stitch-color-tertiary-container'));
 });

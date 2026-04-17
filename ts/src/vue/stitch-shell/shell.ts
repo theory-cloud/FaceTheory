@@ -192,6 +192,19 @@ export const Sidebar = defineComponent({
 export const Topbar = defineComponent({
   name: 'FaceTheoryVueTopbar',
   props: {
+    /**
+     * Brand logo slot, rendered at the far left of the bar. Brand-agnostic:
+     * accepts any VNodeChild (icon, img, component). Rendered before
+     * `surfaceLabel` and `left`, in that order.
+     */
+    logo: vnodeChildProp,
+    /**
+     * Surface label slot (for example a "surface chip" identifying
+     * Core / MCP / Auth or any consumer-defined classification). Rendered
+     * immediately to the right of `logo` and before `left`. FaceTheory
+     * provides the slot only and makes no styling claims about the chip.
+     */
+    surfaceLabel: vnodeChildProp,
     left: vnodeChildProp,
     center: vnodeChildProp,
     right: vnodeChildProp,
@@ -215,8 +228,45 @@ export const Topbar = defineComponent({
         [
           h(
             'div',
-            { style: { flex: 1, minWidth: 0 } },
-            renderPropContent(props.left),
+            {
+              class: 'facetheory-stitch-topbar-left',
+              style: {
+                flex: 1,
+                minWidth: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              },
+            },
+            [
+              props.logo !== undefined
+                ? h(
+                    'div',
+                    {
+                      class: 'facetheory-stitch-topbar-logo',
+                      style: { display: 'flex', alignItems: 'center' },
+                    },
+                    renderPropContent(props.logo),
+                  )
+                : null,
+              props.surfaceLabel !== undefined
+                ? h(
+                    'div',
+                    {
+                      class: 'facetheory-stitch-topbar-surface-label',
+                      style: { display: 'flex', alignItems: 'center' },
+                    },
+                    renderPropContent(props.surfaceLabel),
+                  )
+                : null,
+              props.left !== undefined
+                ? h(
+                    'div',
+                    { style: { minWidth: 0 } },
+                    renderPropContent(props.left),
+                  )
+                : null,
+            ],
           ),
           h(
             'div',
@@ -261,6 +311,10 @@ export const Shell = defineComponent({
     },
     brand: vnodeChildProp,
     sidebarFooter: vnodeChildProp,
+    /** Passes through to Topbar `logo`. Brand-agnostic. */
+    topbarLogo: vnodeChildProp,
+    /** Passes through to Topbar `surfaceLabel`. Brand-agnostic. */
+    topbarSurfaceLabel: vnodeChildProp,
     topbarLeft: vnodeChildProp,
     topbarCenter: vnodeChildProp,
     topbarRight: vnodeChildProp,
@@ -307,6 +361,8 @@ export const Shell = defineComponent({
             },
             [
               h(Topbar, {
+                logo: props.topbarLogo,
+                surfaceLabel: props.topbarSurfaceLabel,
                 left: props.topbarLeft,
                 center: props.topbarCenter,
                 right: props.topbarRight,
