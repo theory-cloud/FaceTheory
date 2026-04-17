@@ -177,3 +177,28 @@ test('stitch-tokens: React subpath re-exports the shared token helpers', () => {
   const block = stitchCssVarsToRootBlock(vars);
   assert.equal(reactStitchCssVarsToRootBlock(vars), block);
 });
+
+test('stitch-tokens: surface dimension is optional and omitted by default', () => {
+  const vars = stitchToCssVars(m3aFixture);
+  assert.ok(!('--stitch-surface' in vars));
+});
+
+test('stitch-tokens: surface dimension emits --stitch-surface when set', () => {
+  const vars = stitchToCssVars({ ...m3aFixture, surface: 'auth' });
+  assert.equal(vars['--stitch-surface'], 'auth');
+});
+
+test('stitch-tokens: surface dimension honors custom prefix', () => {
+  const vars = stitchToCssVars(
+    { ...m3aFixture, surface: 'core' },
+    { prefix: '--tc' },
+  );
+  assert.equal(vars['--tc-surface'], 'core');
+  assert.ok(!('--stitch-surface' in vars));
+});
+
+test('stitch-tokens: surface dimension accepts free-form strings (no enum)', () => {
+  // FaceTheory ships no enumerated vocabulary — consumers pick the string.
+  const vars = stitchToCssVars({ ...m3aFixture, surface: 'my-custom-name' });
+  assert.equal(vars['--stitch-surface'], 'my-custom-name');
+});

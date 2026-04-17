@@ -37,6 +37,13 @@ export function stitchToCssVars(
   out[`${prefix}-spacing-unit`] = `${tokens.spacing.baseUnit}px`;
   out[`${prefix}-mode`] = tokens.mode;
 
+  // Optional surface classification. Brand-agnostic: consumers choose the
+  // vocabulary (e.g. "core", "mcp", "auth"); FaceTheory only emits the value
+  // through the CSS variable channel so downstream components can key off it.
+  if (tokens.surface !== undefined) {
+    out[`${prefix}-surface`] = tokens.surface;
+  }
+
   return out;
 }
 
