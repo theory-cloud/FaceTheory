@@ -34,7 +34,17 @@
       ? `var(--stitch-color-on-${surfaceTone}-container, var(--stitch-color-on-surface, #131b2e))`
       : 'var(--stitch-color-on-surface, #131b2e)';
 
-  $: hasSurfaceLabel = Boolean($$slots.surfaceLabel) || surfaceLabel !== undefined;
+  // Match the React / Vue `isRenderableNode` semantics: the surface-chip
+  // wrapper only renders when the caller actually passes visible content.
+  // `undefined`, `null`, `false`, and `''` are Svelte "non-rendering"
+  // values — treating them as no-content preserves the `cond && text`
+  // composition idiom downstream consumers reach for.
+  $: hasSurfaceLabelProp =
+    surfaceLabel !== undefined &&
+    surfaceLabel !== null &&
+    (surfaceLabel as unknown) !== false &&
+    surfaceLabel !== '';
+  $: hasSurfaceLabel = Boolean($$slots.surfaceLabel) || hasSurfaceLabelProp;
 </script>
 
 <div

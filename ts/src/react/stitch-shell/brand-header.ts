@@ -2,6 +2,17 @@ import * as React from 'react';
 
 const h = React.createElement;
 
+/**
+ * True when `value` is a ReactNode that should produce visible output —
+ * i.e. not one of the React "non-rendering children" (`undefined`, `null`,
+ * `false`) and not an empty string. Used for optional chrome wrappers so
+ * the common `cond && node` idiom does not leave empty chip chrome when
+ * the guard is falsy.
+ */
+function isRenderableNode(value: React.ReactNode): boolean {
+  return value !== undefined && value !== null && value !== false && value !== '';
+}
+
 export interface BrandHeaderProps {
   /**
    * Brand logo node (icon, image, or custom component). Brand-agnostic —
@@ -87,7 +98,7 @@ export function BrandHeader(props: BrandHeaderProps): React.ReactElement {
       },
       wordmark,
     ),
-    surfaceLabel !== undefined
+    isRenderableNode(surfaceLabel)
       ? h(
           'span',
           {

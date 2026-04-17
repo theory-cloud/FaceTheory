@@ -6,6 +6,19 @@ import type { NavItem } from './nav-types.js';
 
 const h = React.createElement;
 
+/**
+ * True when `value` is a ReactNode that should produce visible output —
+ * i.e. not one of the React "non-rendering children" (`undefined`, `null`,
+ * `false`) and not an empty string (which renders as an empty text node
+ * with no visible content). Used to decide whether optional chrome
+ * wrappers should render: the common JSX idiom `cond && <Node />` yields
+ * `false` / `null` / `""` when the guard is falsy, and those must not
+ * leave empty wrappers behind.
+ */
+function isRenderableNode(value: React.ReactNode): boolean {
+  return value !== undefined && value !== null && value !== false && value !== '';
+}
+
 type MenuItemType = NonNullable<MenuProps['items']>[number];
 
 function renderNavLabel(
@@ -180,7 +193,7 @@ export function Topbar(props: TopbarProps): React.ReactElement {
           gap: '12px',
         },
       },
-      logo !== undefined
+      isRenderableNode(logo)
         ? h(
             'div',
             {
@@ -190,7 +203,7 @@ export function Topbar(props: TopbarProps): React.ReactElement {
             logo,
           )
         : null,
-      surfaceLabel !== undefined
+      isRenderableNode(surfaceLabel)
         ? h(
             'div',
             {
@@ -200,7 +213,9 @@ export function Topbar(props: TopbarProps): React.ReactElement {
             surfaceLabel,
           )
         : null,
-      left !== undefined ? h('div', { style: { minWidth: 0 } }, left) : null,
+      isRenderableNode(left)
+        ? h('div', { style: { minWidth: 0 } }, left)
+        : null,
     ),
     h(
       'div',

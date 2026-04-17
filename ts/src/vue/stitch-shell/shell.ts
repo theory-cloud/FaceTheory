@@ -1,5 +1,5 @@
 import { defineComponent, h } from 'vue';
-import type { PropType, VNode } from 'vue';
+import type { PropType, VNode, VNodeChild } from 'vue';
 
 import type { NavItem } from './nav-types.js';
 import {
@@ -7,6 +7,17 @@ import {
   renderPropContent,
   vnodeChildProp,
 } from '../stitch-common.js';
+
+/**
+ * True when `value` is a VNodeChild that should produce visible output —
+ * i.e. not one of the Vue "non-rendering children" (`undefined`, `null`,
+ * `false`) and not an empty string. Used for optional chrome wrappers so
+ * the common `cond && node` idiom does not leave empty chrome when the
+ * guard is falsy.
+ */
+function isRenderableChild(value: VNodeChild | undefined): boolean {
+  return value !== undefined && value !== null && value !== false && value !== '';
+}
 
 function groupOpen(item: NavItem, openKeys: string[] | undefined): boolean {
   if (!item.children || item.children.length === 0) return false;
@@ -239,7 +250,7 @@ export const Topbar = defineComponent({
               },
             },
             [
-              props.logo !== undefined
+              isRenderableChild(props.logo)
                 ? h(
                     'div',
                     {
@@ -249,7 +260,7 @@ export const Topbar = defineComponent({
                     renderPropContent(props.logo),
                   )
                 : null,
-              props.surfaceLabel !== undefined
+              isRenderableChild(props.surfaceLabel)
                 ? h(
                     'div',
                     {
@@ -259,7 +270,7 @@ export const Topbar = defineComponent({
                     renderPropContent(props.surfaceLabel),
                   )
                 : null,
-              props.left !== undefined
+              isRenderableChild(props.left)
                 ? h(
                     'div',
                     { style: { minWidth: 0 } },

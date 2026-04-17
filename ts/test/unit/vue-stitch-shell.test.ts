@@ -202,6 +202,34 @@ test('vue stitch-shell: Topbar omits logo/surfaceLabel wrappers when not provide
   assert.ok(!body.includes('facetheory-stitch-topbar-surface-label'));
 });
 
+test('vue stitch-shell: Topbar omits wrappers when logo/surfaceLabel/left are falsy (false, null, "")', async () => {
+  // Vue parity regression guard for the React test of the same name.
+  // Downstream apps compose chrome through the `cond && node` idiom; the
+  // wrapper must not leave empty flex children when the guard is falsy.
+  const falsyValues: Array<false | null | ''> = [false, null, ''];
+  for (const falsy of falsyValues) {
+    const body = await renderSSR(
+      h(
+        Topbar,
+        {
+          logo: falsy,
+          surfaceLabel: falsy,
+          left: falsy,
+          right: h('span', null, 'user'),
+        } as Record<string, unknown>,
+      ),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-logo'),
+      `falsy logo (${JSON.stringify(falsy)}) must not render the wrapper`,
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-surface-label'),
+      `falsy surfaceLabel (${JSON.stringify(falsy)}) must not render the wrapper`,
+    );
+  }
+});
+
 test('vue stitch-shell: Shell forwards topbarLogo and topbarSurfaceLabel into Topbar', async () => {
   const body = await renderSSR(
     h(
@@ -239,6 +267,26 @@ test('vue stitch-shell: BrandHeader renders logo + wordmark without a surface ch
   assert.ok(body.includes('facetheory-stitch-brand-header-wordmark'));
   assert.ok(body.includes('Theory Cloud'));
   assert.ok(!body.includes('facetheory-stitch-brand-header-surface-label'));
+});
+
+test('vue stitch-shell: BrandHeader omits the surface chip when surfaceLabel is falsy (false, null, "")', async () => {
+  const falsyValues: Array<false | null | ''> = [false, null, ''];
+  for (const falsy of falsyValues) {
+    const body = await renderSSR(
+      h(
+        BrandHeader,
+        {
+          logo: h('span', null, '◆'),
+          wordmark: 'Theory Cloud',
+          surfaceLabel: falsy,
+        } as Record<string, unknown>,
+      ),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-brand-header-surface-label'),
+      `falsy surfaceLabel (${JSON.stringify(falsy)}) must not render the chip wrapper`,
+    );
+  }
 });
 
 test('vue stitch-shell: BrandHeader surfaceTone binds chip background via stitch CSS variables', async () => {

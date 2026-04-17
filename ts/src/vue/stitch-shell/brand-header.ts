@@ -1,6 +1,18 @@
 import { defineComponent, h } from 'vue';
+import type { VNodeChild } from 'vue';
 
 import { renderPropContent, vnodeChildProp } from '../stitch-common.js';
+
+/**
+ * True when `value` is a VNodeChild that should produce visible output —
+ * i.e. not one of the Vue "non-rendering children" (`undefined`, `null`,
+ * `false`) and not an empty string. Used for optional chrome wrappers so
+ * the common `cond && node` idiom does not leave empty chip chrome when
+ * the guard is falsy.
+ */
+function isRenderableChild(value: VNodeChild | undefined): boolean {
+  return value !== undefined && value !== null && value !== false && value !== '';
+}
 
 export interface BrandHeaderProps {
   /**
@@ -95,7 +107,7 @@ export const BrandHeader = defineComponent({
             },
             renderPropContent(props.wordmark),
           ),
-          props.surfaceLabel !== undefined
+          isRenderableChild(props.surfaceLabel)
             ? h(
                 'span',
                 {

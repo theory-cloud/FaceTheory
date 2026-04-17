@@ -331,6 +331,31 @@ test('Topbar omits logo/surfaceLabel wrappers when not provided', async () => {
   assert.ok(!body.includes('facetheory-stitch-topbar-surface-label'));
 });
 
+test('Topbar omits wrappers when logo/surfaceLabel/left are falsy (false, null, "")', async () => {
+  // Regression guard for the common `cond && <Node />` / `cond && "text"`
+  // idiom: when the guard is falsy the expression yields false / null /
+  // "" rather than undefined. The wrapper chrome (and left-edge gap) must
+  // not render in those cases.
+  for (const falsy of [false, null, ''] as const) {
+    const body = await renderSSR(
+      h(Topbar, {
+        logo: falsy as unknown as React.ReactNode,
+        surfaceLabel: falsy as unknown as React.ReactNode,
+        left: falsy as unknown as React.ReactNode,
+        right: h('span', null, 'user'),
+      }),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-logo'),
+      `falsy logo (${JSON.stringify(falsy)}) must not render the wrapper`,
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-surface-label'),
+      `falsy surfaceLabel (${JSON.stringify(falsy)}) must not render the wrapper`,
+    );
+  }
+});
+
 test('Shell forwards topbarLogo and topbarSurfaceLabel into the Topbar', async () => {
   const body = await renderSSR(
     h(Shell, {
@@ -363,6 +388,25 @@ test('BrandHeader renders logo + wordmark without a surface chip by default', as
   assert.ok(body.includes('facetheory-stitch-brand-header-wordmark'));
   assert.ok(body.includes('Theory Cloud'));
   assert.ok(!body.includes('facetheory-stitch-brand-header-surface-label'));
+});
+
+test('BrandHeader omits the surface chip when surfaceLabel is falsy (false, null, "")', async () => {
+  // Regression guard for the `cond && "[MCP]"` idiom: when `cond` is
+  // falsy the expression evaluates to the falsy value, not undefined.
+  // The chip wrapper must not render.
+  for (const falsy of [false, null, ''] as const) {
+    const body = await renderSSR(
+      h(BrandHeader, {
+        logo: h('span', null, '◆'),
+        wordmark: 'Theory Cloud',
+        surfaceLabel: falsy as unknown as React.ReactNode,
+      }),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-brand-header-surface-label'),
+      `falsy surfaceLabel (${JSON.stringify(falsy)}) must not render the chip wrapper`,
+    );
+  }
 });
 
 test('BrandHeader renders a surface chip when surfaceLabel is provided', async () => {
