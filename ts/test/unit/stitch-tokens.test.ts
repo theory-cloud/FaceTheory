@@ -177,3 +177,79 @@ test('stitch-tokens: React subpath re-exports the shared token helpers', () => {
   const block = stitchCssVarsToRootBlock(vars);
   assert.equal(reactStitchCssVarsToRootBlock(vars), block);
 });
+
+test('stitch-tokens: surface dimension is optional and omitted by default', () => {
+  const vars = stitchToCssVars(m3aFixture);
+  assert.ok(!('--stitch-surface' in vars));
+});
+
+test('stitch-tokens: surface dimension emits --stitch-surface when set', () => {
+  const vars = stitchToCssVars({ ...m3aFixture, surface: 'auth' });
+  assert.equal(vars['--stitch-surface'], 'auth');
+});
+
+test('stitch-tokens: surface dimension honors custom prefix', () => {
+  const vars = stitchToCssVars(
+    { ...m3aFixture, surface: 'core' },
+    { prefix: '--tc' },
+  );
+  assert.equal(vars['--tc-surface'], 'core');
+  assert.ok(!('--stitch-surface' in vars));
+});
+
+test('stitch-tokens: surface dimension accepts free-form strings (no enum)', () => {
+  // FaceTheory ships no enumerated vocabulary — consumers pick the string.
+  const vars = stitchToCssVars({ ...m3aFixture, surface: 'my-custom-name' });
+  assert.equal(vars['--stitch-surface'], 'my-custom-name');
+});
+
+test('stitch-tokens: additionalPrefixes emits tokens under extra prefixes', () => {
+  const vars = stitchToCssVars(m3aFixture, {
+    prefix: '--tc',
+    additionalPrefixes: ['--stitch'],
+  });
+  // Primary (branded) prefix emits all tokens.
+  assert.equal(vars['--tc-color-primary'], '#1f108e');
+  assert.equal(vars['--tc-font-body'], 'Inter');
+  assert.equal(vars['--tc-radius-md'], '6px');
+  // Additional (default) prefix emits a parallel set so built-in components
+  // still resolve via their hard-coded var(--stitch-*, ...) fallbacks.
+  assert.equal(vars['--stitch-color-primary'], '#1f108e');
+  assert.equal(vars['--stitch-font-body'], 'Inter');
+  assert.equal(vars['--stitch-radius-md'], '6px');
+});
+
+test('stitch-tokens: additionalPrefixes deduplicates when overlapping with primary', () => {
+  const vars = stitchToCssVars(m3aFixture, {
+    prefix: '--stitch',
+    additionalPrefixes: ['--stitch', '--tc'],
+  });
+  // Primary is emitted once even when repeated in additionalPrefixes.
+  assert.equal(vars['--stitch-color-primary'], '#1f108e');
+  assert.equal(vars['--tc-color-primary'], '#1f108e');
+});
+
+test('stitch-tokens: additionalPrefixes carries through surface and typography', () => {
+  const vars = stitchToCssVars(
+    { ...m3aFixture, surface: 'auth' },
+    { prefix: '--tc', additionalPrefixes: ['--stitch'] },
+  );
+  assert.equal(vars['--tc-surface'], 'auth');
+  assert.equal(vars['--stitch-surface'], 'auth');
+  assert.equal(vars['--tc-font-display'], 'Space Grotesk');
+  assert.equal(vars['--stitch-font-display'], 'Space Grotesk');
+});
+
+test('stitch-tokens: built-in stitch-shell components read default --stitch- prefix', () => {
+  // Guardrail: dual-prefix emission must include --stitch-* so the
+  // built-in stitch-shell components keep resolving via their hard-coded
+  // var(--stitch-*, fallback) declarations. Regression guard.
+  const vars = stitchToCssVars(m3aFixture, {
+    prefix: '--tc',
+    additionalPrefixes: ['--stitch'],
+  });
+  const keys = Object.keys(vars);
+  assert.ok(keys.some((k) => k.startsWith('--stitch-color-')));
+  assert.ok(keys.some((k) => k.startsWith('--stitch-radius-')));
+  assert.ok(keys.some((k) => k.startsWith('--stitch-font-')));
+});
