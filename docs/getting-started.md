@@ -150,6 +150,26 @@ Use the shared contract subpaths for data shape and semantic variants. Use the a
 
 For control-plane navigation, treat `path` as the SSR-safe baseline contract for nav items and breadcrumbs. Use `onNavigate` only as an optional client-side interception hook; if a host never hydrates, links with `path` must still work as normal anchors.
 
+### Brand-agnostic surface primitives
+
+FaceTheory provides a small set of brand-agnostic primitives that a consumer design system can wire up into a branded header without reaching into adapter internals. These exist in the React, Vue, and Svelte `stitch-shell` subpaths with parallel signatures.
+
+- `Topbar` has optional `logo` and `surfaceLabel` slots (or props on Vue / React) rendered on the left edge in the order `[logo][surfaceLabel][left]`. `Shell` passes through the same as `topbarLogo` / `topbarSurfaceLabel` so consumers using the full Shell fill both without touching Topbar directly. FaceTheory makes no styling claims about the logo or chip content — it only provides the slot.
+- `BrandHeader` renders a caller-supplied logo + wordmark with an optional surface-chip label. Signature: `{ logo, wordmark, surfaceLabel?, surfaceTone? }`. When `surfaceTone` is set, the chip binds its background / foreground to `--stitch-color-{surfaceTone}-container` and `--stitch-color-on-{surfaceTone}-container`. The tone name is free-form so the consuming brand pack owns the vocabulary.
+- `StitchTokenSet` accepts an optional `surface?: string` field that emits as `--{prefix}-surface` through `stitchToCssVars`. Brand-agnostic classification hook; FaceTheory ships no enumerated vocabulary.
+- `StitchCssVarOptions.additionalPrefixes?: string[]` emits the token record under extra CSS variable prefixes in the same pass. Consumers that want a branded prefix (e.g. `--tc-*`) should include `--stitch` in the emitted set so FaceTheory's built-in stitch-shell components keep resolving through their hard-coded `var(--stitch-*, fallback)` declarations:
+
+  ```ts
+  import { stitchToCssVars } from "@theory-cloud/facetheory/stitch-tokens";
+
+  const vars = stitchToCssVars(brandTokens, {
+    prefix: "--tc",
+    additionalPrefixes: ["--stitch"],
+  });
+  ```
+
+Each adapter's `BrandHeader` composes cleanly as the `logo` value of its Topbar, or as a standalone header outside the Shell.
+
 ## Static Generation Quickstart
 
 Package consumers should call `buildSsgSite()` directly. The repository-local CLI remains available in the reference bundle if you want to study or adapt the example flow.
