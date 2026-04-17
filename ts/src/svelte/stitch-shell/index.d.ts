@@ -12,7 +12,10 @@ export interface SidebarProps {
   onNavigate?: (path: string, key: string) => void;
 }
 
-export type TopbarProps = Record<string, never>;
+export interface TopbarProps {
+  showLogo?: boolean;
+  showSurfaceLabel?: boolean;
+}
 
 export type ShellProps = SidebarProps;
 

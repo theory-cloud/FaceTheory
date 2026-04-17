@@ -61,6 +61,35 @@ test(
     assert.ok(body.includes('href="/"'));
     assert.ok(body.includes('href="/dashboard"'));
     assert.ok(body.includes('href="/partners"'));
+    // Regression guard for the Svelte Shell slot-forwarding pattern. The
+    // example App.svelte does not pass topbarLogo or topbarSurfaceLabel, so
+    // the Topbar must not render the logo / surface-label wrapper chrome
+    // (which would otherwise contribute phantom empty flex children and the
+    // 12px left-edge gap).
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-logo'),
+      'unexpected topbar logo wrapper when no topbarLogo slot was provided',
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-surface-label'),
+      'unexpected topbar surface-label wrapper when no topbarSurfaceLabel slot was provided',
+    );
+
+    // Positive path: the /brand face renders App.svelte with
+    // topbarLogo / topbarSurfaceLabel slots filled. The Shell must forward
+    // them and Topbar must render the wrapper chrome around the caller
+    // content.
+    const brandResp = await app.handle({ method: 'GET', path: '/brand' });
+    const brandBody = new TextDecoder().decode(brandResp.body as Uint8Array);
+    assert.ok(
+      brandBody.includes('facetheory-stitch-topbar-logo'),
+      'expected topbar logo wrapper when topbarLogo slot was provided',
+    );
+    assert.ok(
+      brandBody.includes('facetheory-stitch-topbar-surface-label'),
+      'expected topbar surface-label wrapper when topbarSurfaceLabel slot was provided',
+    );
+    assert.ok(brandBody.includes('[Auth]'));
     assert.ok(body.includes('facetheory-stitch-auth-card'));
     assert.ok(body.includes('facetheory-stitch-callout-warning'));
     assert.ok(body.includes('facetheory-stitch-tabs'));
