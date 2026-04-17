@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
 import { createVueFace, h } from '../../src/vue/index.js';
+import { Fragment as VueFragment } from 'vue';
 import {
   BrandHeader,
   Callout,
@@ -230,6 +231,54 @@ test('vue stitch-shell: Topbar omits wrappers when logo/surfaceLabel/left are fa
   }
 });
 
+test('vue stitch-shell: Topbar omits wrappers for arrays-of-falsies and empty fragments', async () => {
+  const emptyShapes: Array<{ label: string; value: unknown }> = [
+    { label: 'array of falsy scalars', value: [false, null, undefined] },
+    { label: 'empty fragment', value: h(VueFragment) },
+    {
+      label: 'fragment wrapping only falsies',
+      value: h(VueFragment, null, [false, null]),
+    },
+  ];
+  for (const shape of emptyShapes) {
+    const body = await renderSSR(
+      h(
+        Topbar,
+        {
+          logo: shape.value,
+          surfaceLabel: shape.value,
+          right: h('span', null, 'user'),
+        } as Record<string, unknown>,
+      ),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-logo'),
+      `${shape.label}: logo wrapper must not render`,
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-surface-label'),
+      `${shape.label}: surface-label wrapper must not render`,
+    );
+  }
+});
+
+test('vue stitch-shell: Topbar still renders wrappers when arrays / fragments contain renderable content', async () => {
+  const body = await renderSSR(
+    h(
+      Topbar,
+      {
+        logo: [false, h('span', null, 'LOGO')],
+        surfaceLabel: h(VueFragment, null, [null, '[Core]']),
+        right: h('span', null, 'user'),
+      } as Record<string, unknown>,
+    ),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('LOGO'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  assert.ok(body.includes('[Core]'));
+});
+
 test('vue stitch-shell: Shell forwards topbarLogo and topbarSurfaceLabel into Topbar', async () => {
   const body = await renderSSR(
     h(
@@ -285,6 +334,33 @@ test('vue stitch-shell: BrandHeader omits the surface chip when surfaceLabel is 
     assert.ok(
       !body.includes('facetheory-stitch-brand-header-surface-label'),
       `falsy surfaceLabel (${JSON.stringify(falsy)}) must not render the chip wrapper`,
+    );
+  }
+});
+
+test('vue stitch-shell: BrandHeader omits the surface chip for arrays-of-falsies and empty fragments', async () => {
+  const emptyShapes: Array<{ label: string; value: unknown }> = [
+    { label: 'array of falsy scalars', value: [false, null, undefined] },
+    { label: 'empty fragment', value: h(VueFragment) },
+    {
+      label: 'fragment wrapping only falsies',
+      value: h(VueFragment, null, [false, null]),
+    },
+  ];
+  for (const shape of emptyShapes) {
+    const body = await renderSSR(
+      h(
+        BrandHeader,
+        {
+          logo: h('span', null, '◆'),
+          wordmark: 'Theory Cloud',
+          surfaceLabel: shape.value,
+        } as Record<string, unknown>,
+      ),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-brand-header-surface-label'),
+      `${shape.label}: chip wrapper must not render`,
     );
   }
 });

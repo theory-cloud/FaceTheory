@@ -356,6 +356,54 @@ test('Topbar omits wrappers when logo/surfaceLabel/left are falsy (false, null, 
   }
 });
 
+test('Topbar omits wrappers when logo/surfaceLabel are arrays-of-falsies or empty fragments', async () => {
+  // Beyond scalar falsies, downstream composition often produces ReactNode
+  // shapes like `[false]`, `[null, false]`, or `<></>`. These all emit no
+  // visible content and must not leave empty chrome + 12px gap behind.
+  const emptyShapes: ReadonlyArray<{ label: string; value: React.ReactNode }> =
+    [
+      { label: 'array of falsy scalars', value: [false, null, undefined] },
+      { label: 'empty fragment', value: h(React.Fragment) },
+      {
+        label: 'fragment wrapping only falsies',
+        value: h(React.Fragment, null, false, null, undefined),
+      },
+    ];
+  for (const shape of emptyShapes) {
+    const body = await renderSSR(
+      h(Topbar, {
+        logo: shape.value,
+        surfaceLabel: shape.value,
+        right: h('span', null, 'user'),
+      }),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-logo'),
+      `${shape.label}: logo wrapper must not render`,
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-topbar-surface-label'),
+      `${shape.label}: surface-label wrapper must not render`,
+    );
+  }
+});
+
+test('Topbar still renders wrappers when arrays / fragments contain renderable content', async () => {
+  // Positive guard so the array / fragment helpers do not over-eagerly
+  // skip wrappers when content is present alongside falsy placeholders.
+  const body = await renderSSR(
+    h(Topbar, {
+      logo: [false, h('span', { key: 'l' }, 'LOGO')],
+      surfaceLabel: h(React.Fragment, null, null, '[Core]'),
+      right: h('span', null, 'user'),
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-topbar-logo'));
+  assert.ok(body.includes('LOGO'));
+  assert.ok(body.includes('facetheory-stitch-topbar-surface-label'));
+  assert.ok(body.includes('[Core]'));
+});
+
 test('Shell forwards topbarLogo and topbarSurfaceLabel into the Topbar', async () => {
   const body = await renderSSR(
     h(Shell, {
@@ -405,6 +453,31 @@ test('BrandHeader omits the surface chip when surfaceLabel is falsy (false, null
     assert.ok(
       !body.includes('facetheory-stitch-brand-header-surface-label'),
       `falsy surfaceLabel (${JSON.stringify(falsy)}) must not render the chip wrapper`,
+    );
+  }
+});
+
+test('BrandHeader omits the surface chip for arrays-of-falsies and empty fragments', async () => {
+  const emptyShapes: ReadonlyArray<{ label: string; value: React.ReactNode }> =
+    [
+      { label: 'array of falsy scalars', value: [false, null, undefined] },
+      { label: 'empty fragment', value: h(React.Fragment) },
+      {
+        label: 'fragment wrapping only falsies',
+        value: h(React.Fragment, null, null, false),
+      },
+    ];
+  for (const shape of emptyShapes) {
+    const body = await renderSSR(
+      h(BrandHeader, {
+        logo: h('span', null, '◆'),
+        wordmark: 'Theory Cloud',
+        surfaceLabel: shape.value,
+      }),
+    );
+    assert.ok(
+      !body.includes('facetheory-stitch-brand-header-surface-label'),
+      `${shape.label}: chip wrapper must not render`,
     );
   }
 });

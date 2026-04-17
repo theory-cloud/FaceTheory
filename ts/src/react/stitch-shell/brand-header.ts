@@ -3,14 +3,33 @@ import * as React from 'react';
 const h = React.createElement;
 
 /**
- * True when `value` is a ReactNode that should produce visible output —
- * i.e. not one of the React "non-rendering children" (`undefined`, `null`,
- * `false`) and not an empty string. Used for optional chrome wrappers so
- * the common `cond && node` idiom does not leave empty chip chrome when
- * the guard is falsy.
+ * True when `value` is a ReactNode that should produce visible output.
+ *
+ * See the sibling helper in `shell.ts` for the full semantics. In short:
+ * handles scalar non-rendering children (`undefined` / `null` / `false` /
+ * `true` / `''`), arrays (renderable if any element is renderable), and
+ * empty React Fragments. Components whose render function returns null
+ * are not detected here — callers should use the `cond && <Node />`
+ * pattern at the call site for runtime-null cases.
  */
 function isRenderableNode(value: React.ReactNode): boolean {
-  return value !== undefined && value !== null && value !== false && value !== '';
+  if (
+    value === undefined ||
+    value === null ||
+    value === false ||
+    value === true ||
+    value === ''
+  ) {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some(isRenderableNode);
+  }
+  if (React.isValidElement(value) && value.type === React.Fragment) {
+    const children = (value.props as { children?: React.ReactNode }).children;
+    return isRenderableNode(children);
+  }
+  return true;
 }
 
 export interface BrandHeaderProps {

@@ -7,16 +7,48 @@ import type { NavItem } from './nav-types.js';
 const h = React.createElement;
 
 /**
- * True when `value` is a ReactNode that should produce visible output —
- * i.e. not one of the React "non-rendering children" (`undefined`, `null`,
- * `false`) and not an empty string (which renders as an empty text node
- * with no visible content). Used to decide whether optional chrome
- * wrappers should render: the common JSX idiom `cond && <Node />` yields
- * `false` / `null` / `""` when the guard is falsy, and those must not
- * leave empty wrappers behind.
+ * True when `value` is a ReactNode that should produce visible output.
+ *
+ * Handles the statically detectable "nothing to render" shapes so optional
+ * chrome wrappers do not leak into the SSR output when a caller composes
+ * through any of:
+ *
+ *  - Scalar non-rendering children: `undefined`, `null`, `false`, `true`,
+ *    `''` (the four values React treats as gaps plus the empty string
+ *    which emits no visible output). This covers the common
+ *    `cond && <Node />` and `cond && 'text'` idioms, which yield these
+ *    scalars when the guard is falsy.
+ *  - Arrays: renderable if *any* element is renderable (recursive). A
+ *    `[false, null]` array collapses to no output.
+ *  - Empty React Fragments: `<></>` and fragments whose children recurse
+ *    to no renderable nodes.
+ *
+ * Limitation: React elements whose *component function* returns null
+ * (e.g. `<OptionalBrand />` where `OptionalBrand` returns `null` based on
+ * runtime state) cannot be detected here without invoking the component's
+ * render function, which would double-run hooks and side effects. For
+ * that case, callers should compose conditionally at the call site
+ * (`logo={shouldShow && <OptionalBrand />}`) so the falsy value hits
+ * this helper directly.
  */
 function isRenderableNode(value: React.ReactNode): boolean {
-  return value !== undefined && value !== null && value !== false && value !== '';
+  if (
+    value === undefined ||
+    value === null ||
+    value === false ||
+    value === true ||
+    value === ''
+  ) {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some(isRenderableNode);
+  }
+  if (React.isValidElement(value) && value.type === React.Fragment) {
+    const children = (value.props as { children?: React.ReactNode }).children;
+    return isRenderableNode(children);
+  }
+  return true;
 }
 
 type MenuItemType = NonNullable<MenuProps['items']>[number];

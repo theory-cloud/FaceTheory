@@ -36,15 +36,28 @@
 
   // Match the React / Vue `isRenderableNode` semantics: the surface-chip
   // wrapper only renders when the caller actually passes visible content.
-  // `undefined`, `null`, `false`, and `''` are Svelte "non-rendering"
-  // values — treating them as no-content preserves the `cond && text`
-  // composition idiom downstream consumers reach for.
-  $: hasSurfaceLabelProp =
-    surfaceLabel !== undefined &&
-    surfaceLabel !== null &&
-    (surfaceLabel as unknown) !== false &&
-    surfaceLabel !== '';
-  $: hasSurfaceLabel = Boolean($$slots.surfaceLabel) || hasSurfaceLabelProp;
+  // Treat `undefined`, `null`, `false`, `true`, and `''` as non-rendering,
+  // and recurse into arrays (an array of only non-renderable entries is
+  // itself non-renderable). This preserves the `cond && text` / array
+  // composition idioms downstream consumers reach for.
+  function isRenderable(value: unknown): boolean {
+    if (
+      value === undefined ||
+      value === null ||
+      value === false ||
+      value === true ||
+      value === ''
+    ) {
+      return false;
+    }
+    if (Array.isArray(value)) {
+      return value.some(isRenderable);
+    }
+    return true;
+  }
+
+  $: hasSurfaceLabel =
+    Boolean($$slots.surfaceLabel) || isRenderable(surfaceLabel);
 </script>
 
 <div

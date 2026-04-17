@@ -1,17 +1,37 @@
-import { defineComponent, h } from 'vue';
-import type { VNodeChild } from 'vue';
+import { defineComponent, Fragment, h } from 'vue';
 
 import { renderPropContent, vnodeChildProp } from '../stitch-common.js';
 
 /**
- * True when `value` is a VNodeChild that should produce visible output —
- * i.e. not one of the Vue "non-rendering children" (`undefined`, `null`,
- * `false`) and not an empty string. Used for optional chrome wrappers so
- * the common `cond && node` idiom does not leave empty chip chrome when
- * the guard is falsy.
+ * True when `value` is a VNodeChild that should produce visible output.
+ *
+ * See the sibling helper in `shell.ts` for the full semantics. In short:
+ * handles scalar non-rendering children (`undefined` / `null` / `false` /
+ * `true` / `''`), arrays (renderable if any element is renderable), and
+ * empty Vue Fragments. VNodes whose component render function returns
+ * nothing at runtime are not detected here — callers should use the
+ * `cond && node` pattern at the call site for runtime-null cases.
  */
-function isRenderableChild(value: VNodeChild | undefined): boolean {
-  return value !== undefined && value !== null && value !== false && value !== '';
+function isRenderableChild(value: unknown): boolean {
+  if (
+    value === undefined ||
+    value === null ||
+    value === false ||
+    value === true ||
+    value === ''
+  ) {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some(isRenderableChild);
+  }
+  if (typeof value === 'object' && value !== null && 'type' in value) {
+    const vnode = value as { type: unknown; children?: unknown };
+    if (vnode.type === Fragment) {
+      return isRenderableChild(vnode.children);
+    }
+  }
+  return true;
 }
 
 export interface BrandHeaderProps {

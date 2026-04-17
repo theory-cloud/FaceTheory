@@ -1,5 +1,5 @@
-import { defineComponent, h } from 'vue';
-import type { PropType, VNode, VNodeChild } from 'vue';
+import { defineComponent, Fragment, h } from 'vue';
+import type { PropType, VNode } from 'vue';
 
 import type { NavItem } from './nav-types.js';
 import {
@@ -9,14 +9,44 @@ import {
 } from '../stitch-common.js';
 
 /**
- * True when `value` is a VNodeChild that should produce visible output —
- * i.e. not one of the Vue "non-rendering children" (`undefined`, `null`,
- * `false`) and not an empty string. Used for optional chrome wrappers so
- * the common `cond && node` idiom does not leave empty chrome when the
- * guard is falsy.
+ * True when `value` is a VNodeChild that should produce visible output.
+ *
+ * Handles the statically detectable "nothing to render" shapes so optional
+ * chrome wrappers do not leak into the SSR output when a caller composes
+ * through any of:
+ *
+ *  - Scalar non-rendering children: `undefined`, `null`, `false`, `true`,
+ *    and `''` (the empty string renders as an empty text node).
+ *  - Arrays: renderable if *any* element is renderable (recursive).
+ *  - Vue Fragment VNodes with no renderable children.
+ *
+ * Limitation: VNodes whose *component render function* returns nothing at
+ * runtime (e.g. `h(OptionalBrand)` where `OptionalBrand` returns `null`)
+ * cannot be detected here without invoking the render function, which
+ * would double-run lifecycle hooks. For that case, callers should compose
+ * conditionally at the call site (`logo: shouldShow && h(OptionalBrand)`)
+ * so the falsy value hits this helper directly.
  */
-function isRenderableChild(value: VNodeChild | undefined): boolean {
-  return value !== undefined && value !== null && value !== false && value !== '';
+function isRenderableChild(value: unknown): boolean {
+  if (
+    value === undefined ||
+    value === null ||
+    value === false ||
+    value === true ||
+    value === ''
+  ) {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some(isRenderableChild);
+  }
+  if (typeof value === 'object' && value !== null && 'type' in value) {
+    const vnode = value as { type: unknown; children?: unknown };
+    if (vnode.type === Fragment) {
+      return isRenderableChild(vnode.children);
+    }
+  }
+  return true;
 }
 
 function groupOpen(item: NavItem, openKeys: string[] | undefined): boolean {
