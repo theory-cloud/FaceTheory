@@ -7,18 +7,25 @@ function kebab(value: string): string {
 export interface StitchCssVarOptions {
   /** CSS variable prefix. Defaults to `--stitch`. */
   prefix?: string;
+  /**
+   * Additional CSS variable prefixes to emit alongside `prefix`. Each entry
+   * produces a full copy of the token variables under that prefix.
+   *
+   * Typical use: emit both a consumer-branded prefix (e.g. `--tc`) and the
+   * Stitch-default `--stitch` prefix so FaceTheory's built-in stitch-shell
+   * components keep resolving via their hard-coded `var(--stitch-*, ...)`
+   * fallbacks while consumer-authored styles can read the branded vars too.
+   *
+   * Example:
+   *   stitchToCssVars(tokens, { prefix: '--tc', additionalPrefixes: ['--stitch'] })
+   */
+  additionalPrefixes?: string[];
 }
 
-/**
- * Converts a Stitch token set into a flat CSS variable record. Variable names
- * follow the Material-inspired naming used in the Stitch design doc
- * (`--stitch-color-surface-container-low`, `--stitch-font-body`, ...).
- */
-export function stitchToCssVars(
+function emitStitchVars(
   tokens: StitchTokenSet,
-  options: StitchCssVarOptions = {},
+  prefix: string,
 ): Record<string, string> {
-  const prefix = options.prefix ?? '--stitch';
   const out: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(tokens.palette)) {
@@ -42,6 +49,34 @@ export function stitchToCssVars(
   // through the CSS variable channel so downstream components can key off it.
   if (tokens.surface !== undefined) {
     out[`${prefix}-surface`] = tokens.surface;
+  }
+
+  return out;
+}
+
+/**
+ * Converts a Stitch token set into a flat CSS variable record. Variable names
+ * follow the Material-inspired naming used in the Stitch design doc
+ * (`--stitch-color-surface-container-low`, `--stitch-font-body`, ...).
+ *
+ * Pass `additionalPrefixes` to emit the same tokens under extra CSS variable
+ * prefixes. FaceTheory's built-in stitch-shell components hard-code
+ * `var(--stitch-*, ...)` fallbacks, so a consumer that wants a branded prefix
+ * should include `--stitch` in the emitted set to preserve compatibility.
+ */
+export function stitchToCssVars(
+  tokens: StitchTokenSet,
+  options: StitchCssVarOptions = {},
+): Record<string, string> {
+  const primary = options.prefix ?? '--stitch';
+  const additional = options.additionalPrefixes ?? [];
+  const seen = new Set<string>();
+  const out: Record<string, string> = {};
+
+  for (const prefix of [primary, ...additional]) {
+    if (seen.has(prefix)) continue;
+    seen.add(prefix);
+    Object.assign(out, emitStitchVars(tokens, prefix));
   }
 
   return out;
