@@ -190,8 +190,8 @@
     "@emotion/server": "^11.11.0",
     "@eslint/js": "^10.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.25.0/theory-cloud-apptheory-0.25.0.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.5/theory-cloud-tabletheory-ts-1.5.5.tgz",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v0.25.1/theory-cloud-apptheory-0.25.1.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.6.0/theory-cloud-tabletheory-ts-1.6.0.tgz",
     "@types/jsdom": "^28.0.0",
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
@@ -214,7 +214,7 @@
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.5.5/theory-cloud-tabletheory-ts-1.5.5.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.6.0/theory-cloud-tabletheory-ts-1.6.0.tgz"
     }
   }
 }
