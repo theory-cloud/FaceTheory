@@ -40,8 +40,8 @@ Add the framework peers that match your adapter surface:
 
 Optional companion packages from pinned GitHub releases:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v0.24.6/theory-cloud-apptheory-0.24.6.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v0.24.6/theory-cloud-apptheory-cdk-0.24.6.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v0.25.0/theory-cloud-apptheory-0.25.0.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v0.25.0/theory-cloud-apptheory-cdk-0.25.0.tgz`
 - TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.5.5/theory-cloud-tabletheory-ts-1.5.5.tgz`
 
 ## Quickstart

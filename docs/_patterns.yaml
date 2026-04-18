@@ -92,7 +92,7 @@ patterns:
     solution: "Use exact release asset URLs documented in the compatibility pins."
     correct_example: |
       npm install --save-exact \
-        https://github.com/theory-cloud/AppTheory/releases/download/v0.24.6/theory-cloud-apptheory-0.24.6.tgz
+        https://github.com/theory-cloud/AppTheory/releases/download/v0.25.0/theory-cloud-apptheory-0.25.0.tgz
       npm install --save-exact \
         https://github.com/theory-cloud/TableTheory/releases/download/v1.5.5/theory-cloud-tabletheory-ts-1.5.5.tgz
     anti_patterns:
