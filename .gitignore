@@ -22,3 +22,5 @@ reference/
 .theory/
 
 .codex/
+.mcp.json
+.claude
