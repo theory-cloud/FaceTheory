@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/theory-cloud/FaceTheory/compare/v0.6.0...v0.6.1) (2026-04-18)
+
+
+### Bug Fixes
+
+* **deps:** align AppTheory v0.25.1 and TableTheory v1.6.0 ([7b77ef2](https://github.com/theory-cloud/FaceTheory/commit/7b77ef238cbc7cb24b418d352430770d8e489e82))
+* **deps:** bump AppTheory pin to v0.25.0 ([994a34f](https://github.com/theory-cloud/FaceTheory/commit/994a34f2ad0be719b99fa37ae68cee29188b4fcd))
+
 ## [0.6.0-rc.2](https://github.com/theory-cloud/FaceTheory/compare/v0.6.0-rc.1...v0.6.0-rc.2) (2026-04-18)
 
 
