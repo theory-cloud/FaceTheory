@@ -287,6 +287,7 @@ function parseRouteSegments(routePattern: string): SsgRouteSegment[] {
         return { kind: 'proxy_star', value: token.slice(0, -1) };
       return { kind: 'param', value: token };
     }
+    assertSafeSsgPathSegment(part, `route "${routePattern}"`);
     return { kind: 'static', value: part };
   });
 }
@@ -316,6 +317,9 @@ function resolveRoutePath(
       if (proxyParts.length === 0) {
         throw new Error(`missing required proxy param "${segment.value}"`);
       }
+      proxyParts.forEach((part) =>
+        assertSafeSsgPathSegment(part, `param "${segment.value}"`),
+      );
       pathParts.push(...proxyParts.map((part) => encodeURIComponent(part)));
       continue;
     }
@@ -323,6 +327,9 @@ function resolveRoutePath(
     if (segment.kind === 'proxy_star') {
       if (!value) continue;
       const proxyParts = value.split('/').filter((part) => part.length > 0);
+      proxyParts.forEach((part) =>
+        assertSafeSsgPathSegment(part, `param "${segment.value}"`),
+      );
       pathParts.push(...proxyParts.map((part) => encodeURIComponent(part)));
       continue;
     }
@@ -330,6 +337,7 @@ function resolveRoutePath(
     if (!value) {
       throw new Error(`missing required route param "${segment.value}"`);
     }
+    assertSafeSsgPathSegment(value, `param "${segment.value}"`);
     pathParts.push(encodeURIComponent(value));
   }
 
@@ -368,8 +376,39 @@ async function writeOutFile(
   content: string,
 ): Promise<void> {
   const absolutePath = path.resolve(outDir, relativePath);
+  assertSafeSsgOutputPath(outDir, relativePath, absolutePath);
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, content);
+}
+
+function assertSafeSsgPathSegment(segment: string, source: string): void {
+  if (segment === '.' || segment === '..') {
+    throw new Error(
+      `SSG ${source} contains prohibited dot-segment "${segment}"; generateStaticParams() values must not escape the output root`,
+    );
+  }
+}
+
+function assertSafeSsgOutputPath(
+  outDir: string,
+  relativePath: string,
+  absolutePath: string,
+): void {
+  const normalizedRelative = relativePath.replaceAll('\\', '/');
+  for (const segment of normalizedRelative.split('/')) {
+    if (!segment) continue;
+    assertSafeSsgPathSegment(segment, `output path "${relativePath}"`);
+  }
+
+  const relativeToOutDir = path.relative(outDir, absolutePath);
+  if (
+    !relativeToOutDir ||
+    relativeToOutDir === '..' ||
+    relativeToOutDir.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativeToOutDir)
+  ) {
+    throw new Error(`SSG output path "${relativePath}" escapes outDir "${outDir}"`);
+  }
 }
 
 function extractHydrationDataJson(html: string): string | null {

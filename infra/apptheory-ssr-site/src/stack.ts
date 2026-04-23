@@ -104,6 +104,7 @@ exports.handler = awslambda.streamifyResponse(async (event, responseStream, cont
 
     this.site = new AppTheorySsrSite(this, 'Site', {
       ssrFunction,
+      ssrUrlAuthType: lambda.FunctionUrlAuthType.AWS_IAM,
       assetsBucket,
       assetsKeyPrefix: 'assets',
       // Vite commonly emits `.vite/manifest.json` in the client build output.
@@ -111,8 +112,6 @@ exports.handler = awslambda.streamifyResponse(async (event, responseStream, cont
       // Raw object/data paths stay on direct S3 behaviors; `staticPathPatterns` is now for
       // extensionless HTML sections in AppTheorySsrSite.
       directS3PathPatterns: ['/.vite/*', '/_facetheory/data/*'],
-      // FaceTheory multi-tenant header (optional).
-      ssrForwardHeaders: ['x-facetheory-tenant'],
       enableLogging: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,

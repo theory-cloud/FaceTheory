@@ -67,6 +67,7 @@ export const faces: FaceModule[] = [
 
 Why this is correct:
 - `ssg` is reserved for build-time output.
+- `generateStaticParams()` for SSG must resolve to normal path segments; dot-segments such as `.` and `..` are rejected rather than being written into the output tree.
 - `isr` is only used where regeneration is explicit and bounded.
 - `ssr` remains the fallback when freshness depends on request-time inputs.
 
@@ -152,6 +153,7 @@ createReactStreamFace({
 Why this is correct:
 - `all-ready` is the default and safest style extraction strategy.
 - The AntD token bridge runs before `createAntdIntegration()`, which matches the adapter contract.
+- Integrations can be declared once and reused because request-local mutable data should live in each integration's `createState()` hook rather than in module or closure state.
 
 **INCORRECT**
 
@@ -168,6 +170,7 @@ createReactStreamFace({
 
 Why this can be incorrect:
 - `shell` may emit before late styles from Suspense or async boundaries are available.
+- FaceTheory drains late `all-ready` failures so shell mode does not leak unhandled readiness rejections, but it still intentionally trades away late-style capture.
 - It is only appropriate when you have explicitly accepted that tradeoff.
 
 ## Pattern: Set document-shell attrs in the render contract
@@ -206,6 +209,45 @@ render: async () => ({
 Why this is incorrect:
 - It bypasses FaceTheory's document shell and can produce nested or invalid HTML.
 - It loses the shared escaping and merge rules that the runtime and tests enforce.
+
+## Pattern: Emit custom head styles through structured tags, not raw head HTML
+
+Problem:
+You need to inject a CSS-variable block or another custom `<style>` tag into the document head without bypassing FaceTheory's head/style emitters.
+
+**CORRECT**
+
+```ts
+import { stitchCssVarsToRootBlock, stitchToCssVars } from '@theory-cloud/facetheory/stitch-tokens';
+
+const vars = stitchToCssVars(tokens);
+
+render: async () => ({
+  styleTags: [{ cssText: stitchCssVarsToRootBlock(vars) }],
+  html: '<div id="root">...</div>',
+})
+```
+
+Why this is correct:
+- `stitchCssVarsToRootBlock()` returns raw CSS text, which matches `styleTags`.
+- FaceTheory still owns the `<style>` tag emission path, nonce injection, and head ordering.
+- The same contract works across buffered and streaming responses.
+
+**INCORRECT**
+
+```ts
+render: async () => ({
+  head: {
+    html: `<style>${stitchCssVarsToRootBlock(vars)}</style>`,
+  },
+  html: '<div id="root">...</div>',
+})
+```
+
+Why this is incorrect:
+- `head.html` is a raw HTML escape hatch inserted verbatim into `<head>`.
+- It bypasses FaceTheory's structured style-tag path and makes it easier to drift around escaping / nonce expectations.
+- `FaceHeadTag` with `type: 'raw'` has the same caveat and should stay a deliberate last resort.
 
 ## Pattern: Host packaged Svelte component libraries through the client entry
 
@@ -272,6 +314,7 @@ Why this is correct:
 - FaceTheory fetches the next route as HTML and reuses the existing server contract instead of inventing a second route payload format.
 - `lang`, `htmlAttrs`, `bodyAttrs`, and non-executable head tags stay synchronized with the rendered document.
 - Exporting `hydrateFaceNavigation(...)` lets the client module update an existing app root instead of forcing a hard reload.
+- Same-origin boundaries stay intact: redirected cross-origin responses, remote bootstrap modules, and cross-origin programmatic navigations fail closed before the current document is mutated.
 
 Compatibility note:
 - If the bootstrap module does not export `hydrateFaceNavigation(...)`, FaceTheory can still reload that module as a fallback so existing side-effect-based entrypoints continue to work, but that fallback will not preserve long-lived client state.

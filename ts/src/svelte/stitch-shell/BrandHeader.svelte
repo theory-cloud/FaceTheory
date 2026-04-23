@@ -13,26 +13,22 @@
                      content.
     - `surfaceLabel` Optional surface-chip label. Use the prop for strings,
                      or the `surfaceLabel` named slot for rich content.
-    - `surfaceTone`  Optional free-form tone hint. Binds the chip's
-                     background / foreground to
+    - `surfaceTone`  Optional tone hint. The value is normalized to a safe
+                     lowercase kebab-case token suffix before binding the
+                     chip's background / foreground to
                      `--stitch-color-{surfaceTone}-container` and
-                     `--stitch-color-on-{surfaceTone}-container`. Omit for a
-                     neutral chip. FaceTheory ships no enumerated vocabulary.
+                     `--stitch-color-on-{surfaceTone}-container`. Omit it (or
+                     provide a value that normalizes empty) for a neutral chip.
 -->
 <script lang="ts">
+  import { resolveSurfaceTone } from '../../stitch-shell/surface-tone.js';
+
   export let logo: unknown = undefined;
   export let wordmark: unknown = undefined;
   export let surfaceLabel: unknown = undefined;
   export let surfaceTone: string | undefined = undefined;
 
-  $: chipBg =
-    surfaceTone !== undefined
-      ? `var(--stitch-color-${surfaceTone}-container, var(--stitch-color-surface-container-high, #e2e7ff))`
-      : 'var(--stitch-color-surface-container-high, #e2e7ff)';
-  $: chipColor =
-    surfaceTone !== undefined
-      ? `var(--stitch-color-on-${surfaceTone}-container, var(--stitch-color-on-surface, #131b2e))`
-      : 'var(--stitch-color-on-surface, #131b2e)';
+  $: ({ normalizedTone, chipBg, chipColor } = resolveSurfaceTone(surfaceTone));
 
   // Match the React / Vue `isRenderableNode` semantics: the surface-chip
   // wrapper only renders when the caller actually passes visible content.
@@ -79,7 +75,7 @@
   {#if hasSurfaceLabel}
     <span
       class="facetheory-stitch-brand-header-surface-label"
-      data-surface-tone={surfaceTone}
+      data-surface-tone={normalizedTone}
       style={`display:inline-flex;align-items:center;padding:2px 10px;border-radius:var(--stitch-radius-sm, 4px);background:${chipBg};color:${chipColor};font-family:var(--stitch-font-label, inherit);font-size:11px;font-weight:600;letter-spacing:0.08em;`}
     >
       <slot name="surfaceLabel">{#if surfaceLabel !== undefined}{surfaceLabel}{/if}</slot>

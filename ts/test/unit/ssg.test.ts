@@ -173,6 +173,31 @@ test('ssg: denies network fetch by default', async () => {
   }
 });
 
+test('ssg: rejects dot-segment params that would escape the output root', async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-traversal-'));
+  const outDir = path.resolve(tempRoot, 'out');
+  const escapedCandidate = path.resolve(tempRoot, 'escape', 'index.html');
+
+  const faces: FaceModule[] = [
+    {
+      route: '/docs/{path+}',
+      mode: 'ssg',
+      generateStaticParams: async () => [{ path: '../../escape' }],
+      render: () => ({ html: '<main>bad</main>' }),
+    },
+  ];
+
+  try {
+    await assert.rejects(
+      buildSsgSite({ faces, outDir }),
+      /prohibited dot-segment|escapes outDir/i,
+    );
+    await assert.rejects(readFile(escapedCandidate, 'utf8'), /ENOENT/);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('ssg: allows explicit fetch mock', async () => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-mock-'));
   const outDir = path.resolve(tempRoot, 'out');

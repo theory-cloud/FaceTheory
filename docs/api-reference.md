@@ -19,7 +19,7 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
 ```bash
-export FACETHEORY_VERSION=0.6.1 # x-release-please-version
+export FACETHEORY_VERSION=1.0.0-rc.2 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -69,14 +69,20 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 
 | Interface          | Purpose                              | Notes                                                                                                                                               |
 | ------------------ | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FaceModule`       | Route definition                     | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`.                                                               |
+| `FaceModule`       | Route definition                     | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`. SSG params must resolve to normal route segments; dot-segments such as `.` and `..` are rejected. |
 | `FaceMode`         | Rendering mode                       | One of `ssr`, `ssg`, or `isr`.                                                                                                                      |
 | `FaceRequest`      | Normalized request input             | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`.                                                                     |
 | `FaceResponse`     | Runtime response                     | Includes normalized headers, cookies array, status, body, and `isBase64`.                                                                           |
-| `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. |
+| `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. `head.html` is a raw `<head>` escape hatch; prefer structured `headTags` / `styleTags` whenever possible. |
 | `FaceContext`      | Per-request context                  | Exposes normalized request, route params, and proxy match.                                                                                          |
 | `FaceAppOptions`   | App constructor options              | Accepts `faces`, optional ISR config, and optional observability hooks.                                                                             |
 | `FaceIsrOptions`   | ISR runtime tuning                   | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation.                        |
+
+Structured head/style emission is the supported default:
+
+- `headTags: [{ type: 'style', cssText, attrs? }]` and `styleTags` participate in FaceTheory's normal `<head>` serialization, escaping, and CSP nonce handling.
+- `FaceHeadTag` with `type: 'raw'` and `head.html` are raw HTML escape hatches inserted verbatim into `<head>`.
+- `stitchCssVarsToRootBlock()` returns raw CSS text, not a full `<style>` tag. Feed that string into `styleTags` or a `headTags` style entry rather than wrapping it and sending it through `head.html`.
 
 ## Core Usage
 
@@ -144,17 +150,19 @@ React:
 - `createReactFace()` for buffered SSR
 - `createReactStreamFace()` for streaming SSR
 - `renderReactStream(..., { styleStrategy: 'all-ready' | 'shell' })`
-- Integrations compose through `wrapTree`, `contribute`, and `finalize`
+- Integrations compose through `createState`, `wrapTree`, `contribute`, and `finalize`
+- Keep request-local mutable data inside `createState`; static integration instances can then be reused safely across renders
 
 Vue:
 
 - `createVueFace()` wraps a `VNode` render function into a `FaceModule`
-- `renderVue()` supports integration hooks plus `wrapApp`
+- `renderVue()` supports integration hooks plus `wrapApp`, and all of those hooks can share one request-local integration state object
 
 Svelte:
 
 - `createSvelteFace()` wraps a `SvelteRenderInput`
 - `renderSvelte()` supports legacy `Component.render()` and Svelte 5 server rendering
+- `renderSvelte()` passes the same request-local integration state through `wrapTree`, `contribute`, and `finalize`
 - Packaged Svelte libraries should import their CSS from the client entry and use `viteAssetsForEntry()` + `viteHydrationForEntry()` to keep SSR asset tags and hydration aligned
 
 ## ISR Storage And Cache APIs
@@ -178,6 +186,12 @@ Relevant helpers:
 - `defaultIsrCacheKey(input)`
 - `blockingIsrCacheControl(input)`
 - `isFresh(record, nowMs)`
+
+Default ISR partitioning:
+
+- `defaultIsrCacheKey(input)` now includes sorted route params **and** sorted query-string keys/values.
+- The default tenant resolver prefers `x-tenant-id` and falls back to legacy `x-facetheory-tenant`.
+- If HTML varies by request identity, cookies, auth, or other non-query inputs, supply an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
 
 Important deployment note:
 
@@ -208,16 +222,17 @@ Core helpers:
 
 - `readFaceHydrationData(document?)` reads the `__FACETHEORY_DATA__` payload from the current document
 - `parseFaceNavigationSnapshot(html, options)` converts a rendered FaceTheory document into a structured navigation snapshot
-- `fetchFaceNavigationSnapshot(url, options)` fetches and parses the next route as HTML
+- `fetchFaceNavigationSnapshot(url, options)` fetches and parses the next route as HTML and rejects redirected cross-origin responses when an `allowedOrigin` is supplied
 - `applyFaceNavigationSnapshot(snapshot, options)` syncs document attrs, non-executable head tags, and either the configured view container or the full body
-- `loadFaceNavigationModule(snapshot, options)` invokes an exported `hydrateFaceNavigation(...)` hook when present, or reloads the bootstrap module when the hook is absent
-- `startFaceNavigation(options)` intercepts same-origin links, fetches the next FaceTheory document, applies it, and triggers hydration
+- `loadFaceNavigationModule(snapshot, options)` invokes an exported `hydrateFaceNavigation(...)` hook when present, or reloads the bootstrap module when the hook is absent, but rejects cross-origin bootstrap modules
+- `startFaceNavigation(options)` intercepts same-origin links, rejects cross-origin programmatic navigations, fetches the next FaceTheory document, applies it, and triggers hydration
 
 Recommended host pattern:
 
 - wrap route content in a stable shell with a view container such as `data-facetheory-view`
 - export `hydrateFaceNavigation(context)` from the client bootstrap module when you need persistent app state across navigations
 - rely on the default module reload only as a compatibility fallback for existing entry modules that hydrate by top-level side effect
+- keep SPA navigation same-origin; redirects to another origin and remote hydration modules fail closed
 
 ## Document Shell Attrs
 
@@ -273,6 +288,9 @@ Supported flags:
 - `--emit-hydration-data`
 
 `buildSsgSite()` uses the same contract programmatically.
+
+Security note:
+- `generateStaticParams()` values must stay inside the declared route tree. Dot-segments such as `.` and `..` are rejected so SSG output cannot escape `outDir`.
 
 ## Deployment-Facing Environment Conventions
 

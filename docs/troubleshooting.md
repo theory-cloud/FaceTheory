@@ -9,6 +9,7 @@ Use this guide for recurring setup, build, and runtime failures that already hav
 | `npm ci` or scripts fail early | Node.js is below the required baseline | `ts/package.json` (`engines.node: >=24`) |
 | `npm run ssg` exits with usage errors | Missing or invalid CLI flags | `docs/api-reference.md` and `ts/src/ssg-cli.ts` |
 | SSG build fails during page generation | Network access was attempted without opting in | `buildSsgSite()` and SSG fetch guard behavior |
+| SSG build fails with dot-segment output errors | `generateStaticParams()` returned `.` / `..` path segments | `ts/src/ssg.ts` path validation and route params |
 | ISR object keys look duplicated | `S3HtmlStore.keyPrefix` and `htmlPointerPrefix` repeat the same prefix | `docs/core-patterns.md` and `docs/cdk/aws-deployment.md` |
 | React streaming misses late styles | `styleStrategy: shell` was used where `all-ready` was needed | `docs/core-patterns.md` |
 
@@ -77,6 +78,23 @@ npm run ssg -- --entry ./examples/ssg-basic/faces.ts --out ./tmp-ssg --allow-net
 
 Verification:
 - The build completes without the network guard error
+
+## Issue: SSG Build Fails With Dot-Segment Output Paths
+
+Symptoms:
+- `buildSsgSite()` throws about prohibited dot-segments
+- a dynamic SSG route uses values such as `.` or `..`
+
+Cause:
+- `generateStaticParams()` returned path data that would collapse or escape the SSG output tree.
+
+Solution:
+- return only normal route segments from `generateStaticParams()`
+- for catch-all routes, keep every segment inside the intended route subtree instead of using `.` / `..`
+
+Verification:
+- rerun the SSG build
+- confirm the build succeeds and output files remain under the configured `outDir`
 
 ## Issue: ISR HTML Keys Are Duplicated
 

@@ -6,6 +6,7 @@ import { JSDOM } from 'jsdom';
 import {
   applyFaceNavigationSnapshot,
   DEFAULT_FACE_VIEW_SELECTOR,
+  loadFaceNavigationModule,
   parseFaceNavigationSnapshot,
   readFaceHydrationData,
   startFaceNavigation,
@@ -199,6 +200,188 @@ test('spa helpers: startFaceNavigation intercepts links and invokes hydration ho
     ]);
   } finally {
     controller.stop();
+    dom.window.close();
+  }
+});
+
+test('spa helpers: startFaceNavigation rejects cross-origin programmatic navigation', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body class="shell">
+          <main data-facetheory-view><p>Home</p></main>
+        </body>
+      </html>`,
+    { url: 'http://localhost/' },
+  );
+
+  let fetchCalls = 0;
+  const errors: string[] = [];
+  const controller = startFaceNavigation({
+    document: dom.window.document,
+    window: dom.window as unknown as Window,
+    fetcher: async () => {
+      fetchCalls += 1;
+      return new Response('<!doctype html><html><head><title>Ignored</title></head><body></body></html>');
+    },
+    onError: (error) => {
+      errors.push(error instanceof Error ? error.message : String(error));
+    },
+  });
+
+  try {
+    await assert.rejects(
+      controller.navigate('https://evil.example/next'),
+      /FaceTheory SPA navigation requires same-origin URLs/,
+    );
+
+    assert.equal(fetchCalls, 0);
+    assert.equal(errors.length, 1);
+    assert.equal(dom.window.location.href, 'http://localhost/');
+    assert.equal(dom.window.document.title, 'Home');
+    assert.equal(
+      dom.window.document.querySelector(DEFAULT_FACE_VIEW_SELECTOR)?.textContent?.trim(),
+      'Home',
+    );
+  } finally {
+    controller.stop();
+    dom.window.close();
+  }
+});
+
+test('spa helpers: startFaceNavigation rejects redirected cross-origin snapshots before DOM mutation', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body class="shell">
+          <main data-facetheory-view><p>Home</p></main>
+        </body>
+      </html>`,
+    { url: 'http://localhost/' },
+  );
+
+  const controller = startFaceNavigation({
+    document: dom.window.document,
+    window: dom.window as unknown as Window,
+    onError: () => {},
+    fetcher: async () =>
+      ({
+        ok: true,
+        status: 200,
+        url: 'https://evil.example/next',
+        text: async () =>
+          '<!doctype html><html><head><title>Redirected</title></head><body><main data-facetheory-view><p>Bad</p></main></body></html>',
+      }) as Response,
+  });
+
+  try {
+    await assert.rejects(
+      controller.navigate('/next'),
+      /FaceTheory SPA navigation fetch resolved cross-origin/,
+    );
+
+    assert.equal(dom.window.location.href, 'http://localhost/');
+    assert.equal(dom.window.document.title, 'Home');
+    assert.equal(
+      dom.window.document.querySelector(DEFAULT_FACE_VIEW_SELECTOR)?.textContent?.trim(),
+      'Home',
+    );
+  } finally {
+    controller.stop();
+    dom.window.close();
+  }
+});
+
+test('spa helpers: startFaceNavigation rejects remote hydration modules before DOM mutation', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body class="shell">
+          <main data-facetheory-view><p>Home</p></main>
+        </body>
+      </html>`,
+    { url: 'http://localhost/' },
+  );
+
+  const controller = startFaceNavigation({
+    document: dom.window.document,
+    window: dom.window as unknown as Window,
+    onError: () => {},
+    fetcher: async () =>
+      new Response(
+        `<!doctype html>
+          <html lang="en">
+            <head>
+              <title>Next</title>
+              <script id="__FACETHEORY_DATA__" type="application/json">{"page":"next"}</script>
+              <script src="https://evil.example/assets/entry-client.js" type="module"></script>
+            </head>
+            <body class="shell-next">
+              <main data-facetheory-view><p>Next Page</p></main>
+            </body>
+          </html>`,
+        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+      ),
+  });
+
+  try {
+    await assert.rejects(
+      controller.navigate('/next'),
+      /FaceTheory SPA hydration module resolved cross-origin/,
+    );
+
+    assert.equal(dom.window.location.href, 'http://localhost/');
+    assert.equal(dom.window.document.title, 'Home');
+    assert.equal(
+      dom.window.document.querySelector(DEFAULT_FACE_VIEW_SELECTOR)?.textContent?.trim(),
+      'Home',
+    );
+  } finally {
+    controller.stop();
+    dom.window.close();
+  }
+});
+
+test('spa helpers: loadFaceNavigationModule rejects cross-origin bootstrap modules', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body class="shell">
+          <main data-facetheory-view><p>Home</p></main>
+        </body>
+      </html>`,
+    { url: 'http://localhost/' },
+  );
+
+  try {
+    const snapshot = parseFaceNavigationSnapshot(
+      `<!doctype html>
+        <html lang="en">
+          <head>
+            <title>Next</title>
+            <script id="__FACETHEORY_DATA__" type="application/json">{"page":"next"}</script>
+            <script src="https://evil.example/assets/entry-client.js" type="module"></script>
+          </head>
+          <body class="shell-next">
+            <main data-facetheory-view><p>Next Page</p></main>
+          </body>
+        </html>`,
+      {
+        parser: new dom.window.DOMParser(),
+        url: 'http://localhost/next',
+        viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
+      },
+    );
+
+    await assert.rejects(
+      loadFaceNavigationModule(snapshot, { document: dom.window.document }),
+      /FaceTheory SPA hydration module resolved cross-origin/,
+    );
+  } finally {
     dom.window.close();
   }
 });

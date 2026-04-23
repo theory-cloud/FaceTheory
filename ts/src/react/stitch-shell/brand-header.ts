@@ -1,5 +1,7 @@
 import * as React from 'react';
 
+import { resolveSurfaceTone } from '../../stitch-shell/surface-tone.js';
+
 const h = React.createElement;
 
 /**
@@ -54,8 +56,9 @@ export interface BrandHeaderProps {
    * background and foreground to the CSS variables
    * `--stitch-color-{surfaceTone}-container` and
    * `--stitch-color-on-{surfaceTone}-container`. The tone name is
-   * caller-chosen — FaceTheory ships no enumerated vocabulary. When omitted,
-   * the chip falls back to neutral surface-container tokens.
+   * caller-chosen and normalized to a safe lowercase kebab-case token suffix.
+   * When omitted or normalized to an empty suffix, the chip falls back to
+   * neutral surface-container tokens.
    */
   surfaceTone?: string;
 }
@@ -75,15 +78,7 @@ export interface BrandHeaderProps {
  */
 export function BrandHeader(props: BrandHeaderProps): React.ReactElement {
   const { logo, wordmark, surfaceLabel, surfaceTone } = props;
-
-  const chipBg =
-    surfaceTone !== undefined
-      ? `var(--stitch-color-${surfaceTone}-container, var(--stitch-color-surface-container-high, #e2e7ff))`
-      : 'var(--stitch-color-surface-container-high, #e2e7ff)';
-  const chipColor =
-    surfaceTone !== undefined
-      ? `var(--stitch-color-on-${surfaceTone}-container, var(--stitch-color-on-surface, #131b2e))`
-      : 'var(--stitch-color-on-surface, #131b2e)';
+  const { normalizedTone, chipBg, chipColor } = resolveSurfaceTone(surfaceTone);
 
   return h(
     'div',
@@ -122,7 +117,7 @@ export function BrandHeader(props: BrandHeaderProps): React.ReactElement {
           'span',
           {
             className: 'facetheory-stitch-brand-header-surface-label',
-            'data-surface-tone': surfaceTone,
+            'data-surface-tone': normalizedTone,
             style: {
               display: 'inline-flex',
               alignItems: 'center',
