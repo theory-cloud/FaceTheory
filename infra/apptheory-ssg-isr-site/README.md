@@ -10,6 +10,7 @@ Canonical operator guidance lives under [`../../docs/cdk/README.md`](../../docs/
 - signed Lambda Function URL fallback for SSR and ISR
 - request correlation headers
 - baseline security headers
+- escaped reflected request context on the SSR 404 example page
 - blocking ISR using FaceTheory HTML storage plus TableTheory metadata
 
 ## Build Requirement
