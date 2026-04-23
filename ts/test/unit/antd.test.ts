@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { Button, theme as antdTheme, Typography } from 'antd';
+import { Button, Menu, theme as antdTheme, Typography } from 'antd';
 import * as React from 'react';
 
 import { createFaceApp } from '../../src/app.js';
 import { createReactFace } from '../../src/adapters/react.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 test('antd integration: extracts SSR styles (and applies CSP nonce)', async () => {
   const app = createFaceApp({
@@ -71,3 +75,60 @@ test('antd integration: merges base theme + overrides (PayTheory theme pattern)'
   const body = new TextDecoder().decode(resp.body as Uint8Array);
   assert.ok(body.includes('#090807'));
 });
+
+test('antd integration: shared instances stay isolated across overlapping renders', async () => {
+  const sharedAntd = createAntdIntegration({ hashed: false });
+
+  const app = createFaceApp({
+    faces: [
+      createReactFace({
+        route: '/',
+        mode: 'ssr',
+        render: (ctx) => {
+          const kind = String(ctx.request.query.kind?.[0] ?? 'button');
+          if (kind === 'menu') {
+            return React.createElement(MenuFixture);
+          }
+          return React.createElement(Button, { type: 'primary' }, 'Primary request');
+        },
+        renderOptions: {
+          integrations: [
+            sharedAntd,
+            {
+              name: 'slow-contribute-gate',
+              contribute: async (ctx) => {
+                const delayMs = Number(ctx.request.query.delay?.[0] ?? '0');
+                if (delayMs > 0) await delay(delayMs);
+                return {};
+              },
+            },
+          ],
+        },
+      }),
+    ],
+  });
+
+  const [respA, respB] = await Promise.all([
+    app.handle({ method: 'GET', path: '/?kind=button&delay=40' }),
+    app.handle({ method: 'GET', path: '/?kind=menu&delay=0' }),
+  ]);
+
+  const bodyA = new TextDecoder().decode(respA.body as Uint8Array);
+  const bodyB = new TextDecoder().decode(respB.body as Uint8Array);
+
+  assert.ok(bodyA.includes('Primary request'));
+  assert.ok(!bodyA.includes('ant-menu'));
+  assert.ok(bodyB.includes('ant-menu'));
+  assert.ok(bodyB.includes('ant-menu-item-selected'));
+});
+
+function MenuFixture() {
+  return React.createElement(Menu, {
+    mode: 'inline',
+    selectedKeys: ['dashboard'],
+    items: [
+      { key: 'dashboard', label: 'Dashboard' },
+      { key: 'payments', label: 'Payments' },
+    ],
+  });
+}

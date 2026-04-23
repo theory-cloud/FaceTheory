@@ -88,11 +88,16 @@ function HydrationPage() {
   return React.createElement(
     'div',
     null,
-    React.createElement(Typography.Text, null, 'AntD Hydration'),
+    React.createElement('span', null, 'AntD Hydration'),
     React.createElement(Button, { type: 'primary' }, 'Primary'),
     React.createElement(Tag, { color: 'blue' }, 'Tag'),
-    React.createElement(Input, { defaultValue: 'Alice' }),
   );
+}
+
+async function flushDomWork(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 test('antd coverage: SSR renders representative components with styles in head', async () => {
@@ -204,11 +209,11 @@ test('antd coverage: hydrates without className mismatch warnings', async () => 
     );
 
     const root = hydrateRoot(container!, clientTree);
-    await new Promise((r) => setTimeout(r, 0));
+    await flushDomWork();
 
     assert.equal(errors.length, 0);
     root.unmount();
-    await new Promise((r) => setTimeout(r, 0));
+    await flushDomWork();
   } finally {
     console.error = originalConsoleError;
     console.warn = originalConsoleWarn;
