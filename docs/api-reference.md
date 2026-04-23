@@ -69,7 +69,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 
 | Interface          | Purpose                              | Notes                                                                                                                                               |
 | ------------------ | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FaceModule`       | Route definition                     | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`.                                                               |
+| `FaceModule`       | Route definition                     | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`. SSG params must resolve to normal route segments; dot-segments such as `.` and `..` are rejected. |
 | `FaceMode`         | Rendering mode                       | One of `ssr`, `ssg`, or `isr`.                                                                                                                      |
 | `FaceRequest`      | Normalized request input             | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`.                                                                     |
 | `FaceResponse`     | Runtime response                     | Includes normalized headers, cookies array, status, body, and `isBase64`.                                                                           |
@@ -274,6 +274,9 @@ Supported flags:
 - `--emit-hydration-data`
 
 `buildSsgSite()` uses the same contract programmatically.
+
+Security note:
+- `generateStaticParams()` values must stay inside the declared route tree. Dot-segments such as `.` and `..` are rejected so SSG output cannot escape `outDir`.
 
 ## Deployment-Facing Environment Conventions
 

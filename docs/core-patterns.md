@@ -67,6 +67,7 @@ export const faces: FaceModule[] = [
 
 Why this is correct:
 - `ssg` is reserved for build-time output.
+- `generateStaticParams()` for SSG must resolve to normal path segments; dot-segments such as `.` and `..` are rejected rather than being written into the output tree.
 - `isr` is only used where regeneration is explicit and bounded.
 - `ssr` remains the fallback when freshness depends on request-time inputs.
 
