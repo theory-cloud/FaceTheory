@@ -104,6 +104,12 @@ function ClientProviders({ children }: { children: React.ReactNode }) {
   );
 }
 
+async function flushDomWork(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 test('portal fixture harness: SSR renders portal-like components with AntD + Emotion styles', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (() => {
@@ -230,11 +236,11 @@ test('portal fixture harness: hydrates without React mismatch warnings', async (
     );
 
     // Allow effects/microtasks to run.
-    await new Promise((r) => setTimeout(r, 0));
+    await flushDomWork();
 
     assert.equal(errors.length, 0);
     root.unmount();
-    await new Promise((r) => setTimeout(r, 0));
+    await flushDomWork();
   } finally {
     console.error = originalConsoleError;
     dom.window.console.error = originalWindowConsoleError;
