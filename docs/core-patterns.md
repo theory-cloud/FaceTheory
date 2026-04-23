@@ -170,6 +170,7 @@ createReactStreamFace({
 
 Why this can be incorrect:
 - `shell` may emit before late styles from Suspense or async boundaries are available.
+- FaceTheory drains late `all-ready` failures so shell mode does not leak unhandled readiness rejections, but it still intentionally trades away late-style capture.
 - It is only appropriate when you have explicitly accepted that tradeoff.
 
 ## Pattern: Set document-shell attrs in the render contract

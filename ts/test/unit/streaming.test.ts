@@ -401,6 +401,50 @@ test('react adapter: integrations receive isolated per-render state across the r
   assert.ok(second.includes('id="style-state-2"'));
 });
 
+test('react adapter: shell strategy drains late readiness failures without unhandled rejections', async () => {
+  const lateFailure = new Error('late shell failure');
+  const LazyFailure = React.lazy(async () => {
+    await delay(20);
+    throw lateFailure;
+  });
+
+  const app = createFaceApp({
+    faces: [
+      createReactStreamFace({
+        route: '/',
+        mode: 'ssr',
+        render: () =>
+          React.createElement(
+            React.Suspense,
+            { fallback: React.createElement('p', null, 'Loading shell') },
+            React.createElement(LazyFailure),
+          ),
+        renderOptions: {
+          styleStrategy: 'shell',
+        },
+      }),
+    ],
+  });
+
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => {
+    unhandled.push(reason);
+  };
+  process.on('unhandledRejection', onUnhandled);
+
+  try {
+    const response = await app.handle({ method: 'GET', path: '/' });
+    const full = new TextDecoder().decode(await collectBody(response.body));
+
+    assert.ok(full.startsWith('<!doctype html>'));
+
+    await delay(50);
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+});
+
 test('react adapter: streaming applies CSP nonce to all inline style/script tags', async () => {
   const nonce = 'nonce-r5-inline';
   const app = createFaceApp({

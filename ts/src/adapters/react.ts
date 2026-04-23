@@ -165,6 +165,10 @@ export async function renderReactStream(
     rejectAllReady = reject;
   });
 
+  if (styleStrategy === 'shell') {
+    void allReady.catch(() => undefined);
+  }
+
   const settleShellReady = (): void => {
     if (shellSettled) return;
     shellSettled = true;
