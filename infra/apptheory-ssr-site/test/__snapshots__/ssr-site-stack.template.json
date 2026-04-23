@@ -355,21 +355,7 @@
         "SsrFunctionServiceRoleF0484DAB"
       ]
     },
-    "SsrFunctioninvokefunctionurlBB9A2B69": {
-      "Type": "AWS::Lambda::Permission",
-      "Properties": {
-        "Action": "lambda:InvokeFunctionUrl",
-        "FunctionName": {
-          "Fn::GetAtt": [
-            "SsrFunctionD22C6F1E",
-            "Arn"
-          ]
-        },
-        "FunctionUrlAuthType": "NONE",
-        "Principal": "*"
-      }
-    },
-    "SsrFunctioninvokefunctionCE3E5B81": {
+    "SsrFunctionAllowCloudFrontInvokeFunctionViaUrl8D4F8C8A": {
       "Type": "AWS::Lambda::Permission",
       "Properties": {
         "Action": "lambda:InvokeFunction",
@@ -380,7 +366,26 @@
           ]
         },
         "InvokedViaFunctionUrl": true,
-        "Principal": "*"
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":cloudfront::",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":distribution/",
+              {
+                "Ref": "SiteDistribution390DED28"
+              }
+            ]
+          ]
+        }
       }
     },
     "AssetsDeploymentImmutableAwsCliLayer40CE6A61": {
@@ -814,7 +819,7 @@
     "SiteSsrUrl2D74149D": {
       "Type": "AWS::Lambda::Url",
       "Properties": {
-        "AuthType": "NONE",
+        "AuthType": "AWS_IAM",
         "InvokeMode": "RESPONSE_STREAM",
         "TargetFunctionArn": {
           "Fn::GetAtt": [
@@ -841,8 +846,7 @@
               "x-apptheory-original-uri",
               "x-facetheory-original-uri",
               "x-request-id",
-              "x-tenant-id",
-              "x-facetheory-tenant"
+              "x-tenant-id"
             ]
           },
           "Name": "FaceTheoryAppTheorySsrSiteSsrOriginRequestPolicyE60347B7",
@@ -869,8 +873,7 @@
               "x-apptheory-original-uri",
               "x-facetheory-original-uri",
               "x-request-id",
-              "x-tenant-id",
-              "x-facetheory-tenant"
+              "x-tenant-id"
             ]
           },
           "Name": "FaceTheoryAppTheorySsrSiteHtmlOriginRequestPolicy46FBEFF3",
@@ -910,8 +913,7 @@
               "Headers": [
                 "x-apptheory-original-host",
                 "x-facetheory-original-host",
-                "x-tenant-id",
-                "x-facetheory-tenant"
+                "x-tenant-id"
               ]
             },
             "QueryStringsConfig": {
@@ -1004,6 +1006,49 @@
               "Protection": true
             }
           }
+        }
+      }
+    },
+    "SiteDistributionOrigin1FunctionUrlOriginAccessControlFF5C1633": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": "FaceTheoryAppTheorySsrSiteDinctionUrlOriginAccessControl506FC69E",
+          "OriginAccessControlOriginType": "lambda",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      }
+    },
+    "SiteDistributionOrigin1InvokeFromApiForFaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA468D34E14C": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunctionUrl",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "SiteSsrUrl2D74149D",
+            "FunctionArn"
+          ]
+        },
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":cloudfront::",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":distribution/",
+              {
+                "Ref": "SiteDistribution390DED28"
+              }
+            ]
+          ]
         }
       }
     },
@@ -1311,7 +1356,13 @@
                   }
                 ]
               },
-              "Id": "FaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA46"
+              "Id": "FaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA46",
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "SiteDistributionOrigin1FunctionUrlOriginAccessControlFF5C1633",
+                  "Id"
+                ]
+              }
             },
             {
               "DomainName": {

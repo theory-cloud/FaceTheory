@@ -24,6 +24,8 @@ When using `AppTheorySsrSite` in `ssg-isr` mode:
 - use `staticPathPatterns` for cacheable extensionless HTML sections that should stay on S3
 - use `directS3PathPatterns` for raw object/data paths such as `/.vite/*` and `/_facetheory/data/*`
 - use `ssrPathPatterns` for same-origin dynamic routes that must bypass the S3-primary origin group and go straight to Lambda
+- prefer an `AWS_IAM` Function URL origin for read-only SSR traffic rather than a public direct URL
+- do not forward viewer-supplied tenant headers by default; derive tenancy from trusted request context when possible
 
 Reference example (FaceTheory repo):
 - `infra/apptheory-ssr-site/`
@@ -109,6 +111,7 @@ Notes:
 - Keep static and dynamic origins separate so static hits do not traverse Lambda.
 - Use Origin Access Control for S3.
 - Use an origin request policy for Lambda that forwards only headers/cookies/query needed by app logic.
+- Avoid modeling viewer-supplied tenant headers as part of the default origin request contract.
 
 ## Cache and Header Policy by Rendering Mode
 

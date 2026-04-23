@@ -7,7 +7,7 @@ Canonical operator guidance lives under [`../../docs/cdk/README.md`](../../docs/
 ## What This Stack Demonstrates
 
 - SSG hits served from S3 through CloudFront
-- Lambda Function URL fallback for SSR and ISR
+- signed Lambda Function URL fallback for SSR and ISR
 - request correlation headers
 - baseline security headers
 - blocking ISR using FaceTheory HTML storage plus TableTheory metadata
@@ -36,4 +36,5 @@ npm run synth
 ## Deployment Notes
 
 - Use the canonical AWS deployment and operations docs for routing, cache, and smoke-test expectations.
+- This reference stack intentionally avoids forwarding viewer-supplied tenant headers by default; derive tenant identity from trusted request context if a deployment needs it.
 - Use this README for stack-local prerequisites and commands only.
