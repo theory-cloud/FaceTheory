@@ -155,7 +155,7 @@ For control-plane navigation, treat `path` as the SSR-safe baseline contract for
 FaceTheory provides a small set of brand-agnostic primitives that a consumer design system can wire up into a branded header without reaching into adapter internals. These exist in the React, Vue, and Svelte `stitch-shell` subpaths with parallel signatures.
 
 - `Topbar` has optional `logo` and `surfaceLabel` slots (or props on Vue / React) rendered on the left edge in the order `[logo][surfaceLabel][left]`. `Shell` passes through the same as `topbarLogo` / `topbarSurfaceLabel` so consumers using the full Shell fill both without touching Topbar directly. FaceTheory makes no styling claims about the logo or chip content — it only provides the slot.
-- `BrandHeader` renders a caller-supplied logo + wordmark with an optional surface-chip label. Signature: `{ logo, wordmark, surfaceLabel?, surfaceTone? }`. When `surfaceTone` is set, the chip binds its background / foreground to `--stitch-color-{surfaceTone}-container` and `--stitch-color-on-{surfaceTone}-container`. The tone name is free-form so the consuming brand pack owns the vocabulary.
+- `BrandHeader` renders a caller-supplied logo + wordmark with an optional surface-chip label. Signature: `{ logo, wordmark, surfaceLabel?, surfaceTone? }`. When `surfaceTone` is set, the chip binds its background / foreground to `--stitch-color-{surfaceTone}-container` and `--stitch-color-on-{surfaceTone}-container`, but FaceTheory normalizes the supplied tone to a safe lowercase kebab-case suffix first (for example `"Secondary Accent / Prod 2"` becomes `secondary-accent-prod-2`). If the tone normalizes empty, the chip falls back to the neutral surface-container tokens.
 - `StitchTokenSet` accepts an optional `surface?: string` field that emits as `--{prefix}-surface` through `stitchToCssVars`. Brand-agnostic classification hook; FaceTheory ships no enumerated vocabulary.
 - `StitchCssVarOptions.additionalPrefixes?: string[]` emits the token record under extra CSS variable prefixes in the same pass. Consumers that want a branded prefix (e.g. `--tc-*`) should include `--stitch` in the emitted set so FaceTheory's built-in stitch-shell components keep resolving through their hard-coded `var(--stitch-*, fallback)` declarations:
 
@@ -167,6 +167,8 @@ FaceTheory provides a small set of brand-agnostic primitives that a consumer des
     additionalPrefixes: ["--stitch"],
   });
   ```
+
+  If you need to serialize those vars into SSR `<style>` output, use `stitchCssVarsToRootBlock(vars)` as the `cssText` for a `styleTags` entry (or a `headTags` item with `type: "style"`). Do **not** wrap the returned string in `<style>...</style>` and pass it through `head.html`; `head.html` is a raw escape hatch, not the normal style-delivery path.
 
 Each adapter's `BrandHeader` composes cleanly as the `logo` value of its Topbar, or as a standalone header outside the Shell.
 

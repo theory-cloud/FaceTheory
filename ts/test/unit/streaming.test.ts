@@ -316,6 +316,135 @@ test('react adapter: shell strategy is configurable and does not include late st
   assert.ok(!first.includes('ant-btn'));
 });
 
+test('react adapter: integrations receive isolated per-render state across the render lifecycle', async () => {
+  let nextStateId = 0;
+  const app = createFaceApp({
+    faces: [
+      createReactStreamFace({
+        route: '/',
+        mode: 'ssr',
+        render: () => React.createElement('main', { className: 'from-int' }, 'Request state'),
+        renderOptions: {
+          integrations: [
+            {
+              name: 'react-request-state',
+              createState: () => ({ id: ++nextStateId }),
+              wrapTree: (tree, _ctx, state) =>
+                React.createElement(
+                  'section',
+                  { className: `wrapped-${String((state as { id: number }).id)}` },
+                  tree,
+                ),
+              contribute: (_ctx, state) => ({
+                headTags: [
+                  {
+                    type: 'meta',
+                    attrs: {
+                      name: 'request-state',
+                      content: String((state as { id: number }).id),
+                    },
+                  },
+                ],
+                styleTags: [
+                  {
+                    cssText: `.from-int-${String((state as { id: number }).id)}{color:rgb(4,5,6);}`,
+                    attrs: { id: `style-state-${String((state as { id: number }).id)}` },
+                  },
+                ],
+              }),
+              finalize: (out, _ctx, state) => ({
+                ...out,
+                headTags: [
+                  ...(out.headTags ?? []),
+                  {
+                    type: 'meta',
+                    attrs: {
+                      name: 'request-state-final',
+                      content: String((state as { id: number }).id),
+                    },
+                  },
+                ],
+              }),
+            },
+          ],
+        },
+      }),
+    ],
+  });
+
+  const first = new TextDecoder().decode(
+    await collectBody((await app.handle({ method: 'GET', path: '/' })).body),
+  );
+  assert.ok(first.includes('class="wrapped-1"'));
+  assert.match(
+    first,
+    /<meta[^>]*(?:name="request-state"[^>]*content="1"|content="1"[^>]*name="request-state")[^>]*>/,
+  );
+  assert.match(
+    first,
+    /<meta[^>]*(?:name="request-state-final"[^>]*content="1"|content="1"[^>]*name="request-state-final")[^>]*>/,
+  );
+  assert.ok(first.includes('id="style-state-1"'));
+
+  const second = new TextDecoder().decode(
+    await collectBody((await app.handle({ method: 'GET', path: '/' })).body),
+  );
+  assert.ok(second.includes('class="wrapped-2"'));
+  assert.match(
+    second,
+    /<meta[^>]*(?:name="request-state"[^>]*content="2"|content="2"[^>]*name="request-state")[^>]*>/,
+  );
+  assert.match(
+    second,
+    /<meta[^>]*(?:name="request-state-final"[^>]*content="2"|content="2"[^>]*name="request-state-final")[^>]*>/,
+  );
+  assert.ok(second.includes('id="style-state-2"'));
+});
+
+test('react adapter: shell strategy drains late readiness failures without unhandled rejections', async () => {
+  const lateFailure = new Error('late shell failure');
+  const LazyFailure = React.lazy(async () => {
+    await delay(20);
+    throw lateFailure;
+  });
+
+  const app = createFaceApp({
+    faces: [
+      createReactStreamFace({
+        route: '/',
+        mode: 'ssr',
+        render: () =>
+          React.createElement(
+            React.Suspense,
+            { fallback: React.createElement('p', null, 'Loading shell') },
+            React.createElement(LazyFailure),
+          ),
+        renderOptions: {
+          styleStrategy: 'shell',
+        },
+      }),
+    ],
+  });
+
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => {
+    unhandled.push(reason);
+  };
+  process.on('unhandledRejection', onUnhandled);
+
+  try {
+    const response = await app.handle({ method: 'GET', path: '/' });
+    const full = new TextDecoder().decode(await collectBody(response.body));
+
+    assert.ok(full.startsWith('<!doctype html>'));
+
+    await delay(50);
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+});
+
 test('react adapter: streaming applies CSP nonce to all inline style/script tags', async () => {
   const nonce = 'nonce-r5-inline';
   const app = createFaceApp({
