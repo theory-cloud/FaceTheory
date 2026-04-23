@@ -29,9 +29,17 @@ function contentTypeForPath(filePath: string): string {
   }
 }
 
+function decodeUrlPath(urlPath: string): string | null {
+  try {
+    return decodeURIComponent(urlPath);
+  } catch {
+    return null;
+  }
+}
+
 async function readStaticFile(root: string, urlPath: string): Promise<{ body: Uint8Array; type: string } | null> {
-  const decoded = decodeURIComponent(urlPath);
-  if (!decoded.startsWith('/')) return null;
+  const decoded = decodeUrlPath(urlPath);
+  if (!decoded?.startsWith('/')) return null;
   if (decoded.includes('\0')) return null;
 
   const safePath = decoded.replaceAll('\\', '/');
