@@ -7,6 +7,10 @@ import type { FaceAttributes, FaceStyleTag, UIIntegration } from '../types.js';
 type AntdConfigProviderProps = React.ComponentProps<typeof ConfigProvider>;
 type AntdThemeConfig = NonNullable<AntdConfigProviderProps['theme']>;
 
+interface AntdIntegrationState {
+  cache: ReturnType<typeof createCache>;
+}
+
 export interface AntdIntegrationOptions {
   /**
    * Ant Design ConfigProvider `theme.hashed`. Default: `false` for deterministic SSR.
@@ -109,13 +113,11 @@ function stylesFromExtractedHTML(extracted: string): FaceStyleTag[] {
 export function createAntdIntegration(
   options: AntdIntegrationOptions = {},
 ): UIIntegration<React.ReactElement> {
-  let cache: ReturnType<typeof createCache> | null = null;
-
   return {
     name: 'antd',
-    wrapTree: (tree) => {
-      cache = createCache();
-
+    createState: () => ({ cache: createCache() }),
+    wrapTree: (tree, _ctx, state) => {
+      const antdState = state as AntdIntegrationState;
       const configProviderProps = options.configProviderProps ?? ({} as AntdConfigProviderProps);
       const { theme: _themeFromProps, locale: _localeFromProps, ...configProviderRest } = configProviderProps;
 
@@ -148,7 +150,7 @@ export function createAntdIntegration(
 
       return React.createElement(
         StyleProvider,
-        { cache, ...(options.styleProviderProps ?? {}) },
+        { cache: antdState.cache, ...(options.styleProviderProps ?? {}) },
         React.createElement(
           ConfigProvider,
           finalConfigProviderProps,
@@ -156,9 +158,9 @@ export function createAntdIntegration(
         ),
       );
     },
-    finalize: (out) => {
-      if (!cache) return out;
-      const extracted = extractStyle(cache);
+    finalize: (out, _ctx, state) => {
+      const antdState = state as AntdIntegrationState;
+      const extracted = extractStyle(antdState.cache);
       const styleTags = stylesFromExtractedHTML(String(extracted));
       if (!styleTags.length) return out;
       return { ...out, styleTags: [...(out.styleTags ?? []), ...styleTags] };

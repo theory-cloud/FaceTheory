@@ -11,6 +11,10 @@ import { createAntdEmotionTokenIntegration } from '../../src/react/antd-emotion.
 import { createAntdIntegration } from '../../src/react/antd.js';
 import { createEmotionIntegration } from '../../src/react/emotion.js';
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function ThemedBox() {
   const theme = useTheme() as { color: string };
   return jsx('div', { css: css`color: ${theme.color};` }, 'Hello');
@@ -83,4 +87,53 @@ test('emotion integration: can consume Ant Design tokens (portal pattern)', asyn
   assert.ok(body.includes('data-emotion='));
   assert.ok(body.includes('nonce="nonce-bridge"'));
   assert.ok(body.includes('#010203'));
+});
+
+test('emotion integration: shared instances stay isolated across overlapping renders', async () => {
+  const sharedEmotion = createEmotionIntegration();
+
+  const app = createFaceApp({
+    faces: [
+      createReactFace({
+        route: '/',
+        mode: 'ssr',
+        render: (ctx) => {
+          const color = String(ctx.request.query.color?.[0] ?? 'rgb(0, 0, 0)');
+          return jsx(
+            'div',
+            { css: css`color: ${color};` },
+            color,
+          );
+        },
+        renderOptions: {
+          integrations: [
+            sharedEmotion,
+            {
+              name: 'slow-contribute-gate',
+              contribute: async () => {
+                await delay(20);
+                return {};
+              },
+            },
+          ],
+        },
+      }),
+    ],
+  });
+
+  const colorA = 'rgb(1, 2, 3)';
+  const colorB = 'rgb(9, 8, 7)';
+
+  const [respA, respB] = await Promise.all([
+    app.handle({ method: 'GET', path: '/?color=rgb(1,%202,%203)' }),
+    app.handle({ method: 'GET', path: '/?color=rgb(9,%208,%207)' }),
+  ]);
+
+  const bodyA = new TextDecoder().decode(respA.body as Uint8Array);
+  const bodyB = new TextDecoder().decode(respB.body as Uint8Array);
+
+  assert.ok(bodyA.includes(colorA));
+  assert.ok(!bodyA.includes(colorB));
+  assert.ok(bodyB.includes(colorB));
+  assert.ok(!bodyB.includes(colorA));
 });

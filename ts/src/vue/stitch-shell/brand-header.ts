@@ -1,5 +1,6 @@
 import { defineComponent, Fragment, h } from 'vue';
 
+import { resolveSurfaceTone } from '../../stitch-shell/surface-tone.js';
 import { renderPropContent, vnodeChildProp } from '../stitch-common.js';
 
 /**
@@ -56,8 +57,9 @@ export interface BrandHeaderProps {
    * background and foreground to the CSS variables
    * `--stitch-color-{surfaceTone}-container` and
    * `--stitch-color-on-{surfaceTone}-container`. The tone name is
-   * caller-chosen — FaceTheory ships no enumerated vocabulary. When omitted,
-   * the chip falls back to neutral surface-container tokens.
+   * caller-chosen and normalized to a safe lowercase kebab-case token suffix.
+   * When omitted or normalized to an empty suffix, the chip falls back to
+   * neutral surface-container tokens.
    */
   surfaceTone?: string;
 }
@@ -85,14 +87,7 @@ export const BrandHeader = defineComponent({
   },
   setup(props) {
     return () => {
-      const chipBg =
-        props.surfaceTone !== undefined
-          ? `var(--stitch-color-${props.surfaceTone}-container, var(--stitch-color-surface-container-high, #e2e7ff))`
-          : 'var(--stitch-color-surface-container-high, #e2e7ff)';
-      const chipColor =
-        props.surfaceTone !== undefined
-          ? `var(--stitch-color-on-${props.surfaceTone}-container, var(--stitch-color-on-surface, #131b2e))`
-          : 'var(--stitch-color-on-surface, #131b2e)';
+      const { normalizedTone, chipBg, chipColor } = resolveSurfaceTone(props.surfaceTone);
 
       return h(
         'div',
@@ -132,7 +127,7 @@ export const BrandHeader = defineComponent({
                 'span',
                 {
                   class: 'facetheory-stitch-brand-header-surface-label',
-                  'data-surface-tone': props.surfaceTone,
+                  'data-surface-tone': normalizedTone,
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',

@@ -21,7 +21,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=0.6.0-rc.2 # x-release-please-version
+export FACETHEORY_VERSION=0.6.1 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -39,10 +39,10 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v0.25.1/theory-cloud-apptheory-0.25.1.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.0.0/theory-cloud-apptheory-1.0.0.tgz
 
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.6.0/theory-cloud-tabletheory-ts-1.6.0.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.6.1/theory-cloud-tabletheory-ts-1.6.1.tgz
 ```
 
 Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoint. Use TableTheory when you want the documented production ISR metadata store adapter.
@@ -155,7 +155,7 @@ For control-plane navigation, treat `path` as the SSR-safe baseline contract for
 FaceTheory provides a small set of brand-agnostic primitives that a consumer design system can wire up into a branded header without reaching into adapter internals. These exist in the React, Vue, and Svelte `stitch-shell` subpaths with parallel signatures.
 
 - `Topbar` has optional `logo` and `surfaceLabel` slots (or props on Vue / React) rendered on the left edge in the order `[logo][surfaceLabel][left]`. `Shell` passes through the same as `topbarLogo` / `topbarSurfaceLabel` so consumers using the full Shell fill both without touching Topbar directly. FaceTheory makes no styling claims about the logo or chip content — it only provides the slot.
-- `BrandHeader` renders a caller-supplied logo + wordmark with an optional surface-chip label. Signature: `{ logo, wordmark, surfaceLabel?, surfaceTone? }`. When `surfaceTone` is set, the chip binds its background / foreground to `--stitch-color-{surfaceTone}-container` and `--stitch-color-on-{surfaceTone}-container`. The tone name is free-form so the consuming brand pack owns the vocabulary.
+- `BrandHeader` renders a caller-supplied logo + wordmark with an optional surface-chip label. Signature: `{ logo, wordmark, surfaceLabel?, surfaceTone? }`. When `surfaceTone` is set, the chip binds its background / foreground to `--stitch-color-{surfaceTone}-container` and `--stitch-color-on-{surfaceTone}-container`, but FaceTheory normalizes the supplied tone to a safe lowercase kebab-case suffix first (for example `"Secondary Accent / Prod 2"` becomes `secondary-accent-prod-2`). If the tone normalizes empty, the chip falls back to the neutral surface-container tokens.
 - `StitchTokenSet` accepts an optional `surface?: string` field that emits as `--{prefix}-surface` through `stitchToCssVars`. Brand-agnostic classification hook; FaceTheory ships no enumerated vocabulary.
 - `StitchCssVarOptions.additionalPrefixes?: string[]` emits the token record under extra CSS variable prefixes in the same pass. Consumers that want a branded prefix (e.g. `--tc-*`) should include `--stitch` in the emitted set so FaceTheory's built-in stitch-shell components keep resolving through their hard-coded `var(--stitch-*, fallback)` declarations:
 
@@ -167,6 +167,8 @@ FaceTheory provides a small set of brand-agnostic primitives that a consumer des
     additionalPrefixes: ["--stitch"],
   });
   ```
+
+  If you need to serialize those vars into SSR `<style>` output, use `stitchCssVarsToRootBlock(vars)` as the `cssText` for a `styleTags` entry (or a `headTags` item with `type: "style"`). Do **not** wrap the returned string in `<style>...</style>` and pass it through `head.html`; `head.html` is a raw escape hatch, not the normal style-delivery path.
 
 Each adapter's `BrandHeader` composes cleanly as the `logo` value of its Topbar, or as a standalone header outside the Shell.
 
@@ -197,9 +199,14 @@ Important default:
 
 - SSG disables real network `fetch()` calls unless `--allow-network` or a mocked `fetch` implementation is supplied.
 
+Important ISR default:
+
+- FaceTheory’s default ISR cache key now partitions by route params and query string, and the default tenant hint prefers `x-tenant-id` over legacy `x-facetheory-tenant`.
+- If cached HTML varies by auth/session/cookies/host-derived tenant, configure an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
+
 ## Reference Bundle
 
-The `v0.6.0-rc.2` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v0.6.1` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples

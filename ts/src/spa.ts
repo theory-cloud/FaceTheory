@@ -26,6 +26,7 @@ export interface ParseFaceNavigationSnapshotOptions extends SnapshotFaceDocument
 }
 
 export interface FetchFaceNavigationSnapshotOptions extends ParseFaceNavigationSnapshotOptions {
+  allowedOrigin?: string | URL;
   fetcher?: typeof fetch;
   requestInit?: RequestInit;
 }
@@ -51,6 +52,7 @@ export interface FaceNavigationBootstrapModule {
 }
 
 export interface LoadFaceNavigationModuleOptions {
+  allowedOrigin?: string | URL;
   document?: Document;
   importModule?: (specifier: string) => Promise<FaceNavigationBootstrapModule>;
   reloadOnMissingHook?: boolean;
@@ -151,6 +153,16 @@ export async function fetchFaceNavigationSnapshot(
     );
   }
 
+  const allowedOrigin = resolveAllowedNavigationOrigin(options.allowedOrigin);
+  if (allowedOrigin) {
+    assertSameOriginNavigationUrl(
+      response.url || String(url),
+      allowedOrigin,
+      resolveNavigationBaseHref(url, allowedOrigin),
+      'FaceTheory SPA navigation fetch resolved cross-origin',
+    );
+  }
+
   const parseOptions: ParseFaceNavigationSnapshotOptions = {
     url: response.url || String(url),
   };
@@ -196,6 +208,11 @@ export async function loadFaceNavigationModule(
   if (!snapshot.hydration?.bootstrapModule) return;
 
   const doc = options.document ?? document;
+  const allowedOrigin =
+    resolveAllowedNavigationOrigin(options.allowedOrigin) ??
+    doc.defaultView?.location.origin ??
+    resolveNavigationUrl(snapshot.url, 'http://localhost/').origin;
+  assertSameOriginHydrationModule(snapshot, allowedOrigin);
   const importModule = options.importModule ?? importFaceNavigationModule;
   const context = createBootstrapContext(
     snapshot,
@@ -245,8 +262,17 @@ export function startFaceNavigation(
     },
   ): Promise<FaceNavigationSnapshot> => {
     const url = new URL(String(urlInput), win.location.href);
+    assertSameOriginNavigationUrl(
+      url,
+      win.location.origin,
+      win.location.href,
+      'FaceTheory SPA navigation requires same-origin URLs',
+    );
     const winWithParser = win as Window & { DOMParser?: typeof DOMParser };
-    const fetchOptions: FetchFaceNavigationSnapshotOptions = { viewSelector };
+    const fetchOptions: FetchFaceNavigationSnapshotOptions = {
+      allowedOrigin: win.location.origin,
+      viewSelector,
+    };
     if (options.fetcher !== undefined) fetchOptions.fetcher = options.fetcher;
     if (options.requestInit !== undefined) fetchOptions.requestInit = options.requestInit;
     if (options.parser !== undefined) {
@@ -256,6 +282,7 @@ export function startFaceNavigation(
     }
 
     const snapshot = await fetchFaceNavigationSnapshot(url, fetchOptions);
+    assertSameOriginHydrationModule(snapshot, win.location.origin);
 
     if (options.render) {
       await options.render(
@@ -271,6 +298,7 @@ export function startFaceNavigation(
       applyFaceNavigationSnapshot(snapshot, applyOptions);
 
       const loadOptions: LoadFaceNavigationModuleOptions = {
+        allowedOrigin: win.location.origin,
         document: doc,
         viewSelector,
       };
@@ -358,6 +386,38 @@ function resolveSnapshotUrl(doc: Document, url: string | URL | undefined): strin
   }
 
   return doc.URL || doc.defaultView?.location.href || '';
+}
+
+function resolveAllowedNavigationOrigin(origin: string | URL | undefined): string | null {
+  if (origin === undefined) return null;
+  return new URL(String(origin)).origin;
+}
+
+function resolveNavigationBaseHref(url: string | URL, fallbackOrigin: string): string {
+  try {
+    return new URL(String(url)).toString();
+  } catch {
+    return new URL('/', fallbackOrigin).toString();
+  }
+}
+
+function resolveNavigationUrl(url: string | URL, baseHref: string): URL {
+  return new URL(String(url), baseHref);
+}
+
+function assertSameOriginNavigationUrl(
+  url: string | URL,
+  allowedOrigin: string,
+  baseHref: string,
+  reason: string,
+): URL {
+  const resolved = resolveNavigationUrl(url, baseHref);
+  if (resolved.origin !== allowedOrigin) {
+    throw new Error(
+      `${reason}: expected ${allowedOrigin}, received ${resolved.origin} (${resolved.toString()})`,
+    );
+  }
+  return resolved;
 }
 
 function readAttributes(element: Element): FaceAttributes {
@@ -459,6 +519,21 @@ function createBootstrapContext(
     url: new URL(snapshot.url, doc.defaultView?.location.href ?? 'http://localhost/'),
     view: doc.querySelector(viewSelector),
   };
+}
+
+function assertSameOriginHydrationModule(
+  snapshot: FaceNavigationSnapshot,
+  allowedOrigin: string,
+): void {
+  const specifier = snapshot.hydration?.bootstrapModule;
+  if (!specifier) return;
+
+  assertSameOriginNavigationUrl(
+    specifier,
+    allowedOrigin,
+    snapshot.url,
+    'FaceTheory SPA hydration module resolved cross-origin',
+  );
 }
 
 async function importFaceNavigationModule(

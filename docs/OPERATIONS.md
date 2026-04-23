@@ -11,6 +11,7 @@ This document describes production hardening guidance for FaceTheory apps and th
   - SSR responses should be explicitly non-cacheable (example: `cache-control: private, no-store`).
   - SSG HTML and hydration JSON should be served from S3 with explicit `cache-control`.
   - ISR responses must include an `x-facetheory-isr` state header (`hit` | `miss` | `stale` | `wait-hit`) and deterministic cache headers.
+  - Query-dependent ISR output now partitions by query string by default; request-personalized output still needs an explicit `cacheKey` / `tenantKey` or SSR.
 - Security headers:
   - Set baseline security headers at the CDN layer (HSTS, nosniff, frame-options, referrer-policy, permissions-policy).
   - Do not attempt to set a nonce-based CSP at CloudFront (nonces are per-request).
@@ -84,6 +85,12 @@ Recommended baseline (CDN layer preferred):
 The SSG/ISR example stack provisions these via `cloudfront.ResponseHeadersPolicy`:
 - `infra/apptheory-ssg-isr-site/src/stack.ts`
 
+### Tenant partitioning guidance
+
+- FaceTheory’s default ISR tenant resolver now prefers `x-tenant-id` and falls back to legacy `x-facetheory-tenant`.
+- Treat both as partition hints, not proof of identity.
+- If tenant identity is derived from a session, auth token, host mapping, or another trusted source, override `tenantKey` so cached HTML keys follow that trusted source instead of raw headers.
+
 ## Limits and Timeouts
 
 - Lambda timeout:
@@ -131,4 +138,3 @@ Mitigations (FaceTheory ISR options):
 - Increase `leaseDurationMs`.
 - Increase `regenerationWaitTimeoutMs` or switch `lockContentionPolicy` to `serve-stale`.
 - Ensure the regeneration path does not block on external dependencies without timeouts.
-

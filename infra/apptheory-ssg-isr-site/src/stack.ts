@@ -188,7 +188,6 @@ function handler(event) {
       headerBehavior: cloudfront.OriginRequestHeaderBehavior.allowList(
         'x-request-id',
         'x-facetheory-original-uri',
-        'x-facetheory-tenant',
       ),
       queryStringBehavior: cloudfront.OriginRequestQueryStringBehavior.all(),
       cookieBehavior: cloudfront.OriginRequestCookieBehavior.all(),

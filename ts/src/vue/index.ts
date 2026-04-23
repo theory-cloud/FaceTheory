@@ -1,6 +1,7 @@
 import { createSSRApp, h, type App, type VNode } from 'vue';
 import { renderToString } from '@vue/server-renderer';
 
+import { prepareUIIntegrations } from '../types.js';
 import type {
   FaceContext,
   FaceHead,
@@ -13,8 +14,9 @@ import type {
   UIIntegration,
 } from '../types.js';
 
-export interface VueUIIntegration extends UIIntegration<VNode> {
-  wrapApp?: (app: App, ctx: FaceContext) => void | Promise<void>;
+export interface VueUIIntegration<TState = unknown>
+  extends UIIntegration<VNode, TState> {
+  wrapApp?: (app: App, ctx: FaceContext, state: TState) => void | Promise<void>;
 }
 
 export interface RenderVueOptions {
@@ -33,25 +35,28 @@ export async function renderVue(
   vnode: VNode,
   options: RenderVueOptions = {},
 ): Promise<FaceRenderResult> {
-  const integrations = options.integrations ?? [];
+  const integrations = await prepareUIIntegrations<VNode, VueUIIntegration>(
+    options.integrations ?? [],
+    ctx,
+  );
 
   let tree = vnode;
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (!integration.wrapTree) continue;
-    tree = integration.wrapTree(tree, ctx);
+    tree = integration.wrapTree(tree, ctx, state);
   }
 
   const app = createSSRApp({ render: () => tree });
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (!integration.wrapApp) continue;
-    await integration.wrapApp(app, ctx);
+    await integration.wrapApp(app, ctx, state);
   }
 
   const integrationHeadTags: FaceHeadTag[] = [];
   const integrationStyleTags: FaceStyleTag[] = [];
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (!integration.contribute) continue;
-    const contribution = await integration.contribute(ctx);
+    const contribution = await integration.contribute(ctx, state);
     if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
     if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
   }
@@ -70,9 +75,9 @@ export async function renderVue(
   if (styleTags.length) out.styleTags = styleTags;
   if (options.hydration !== undefined) out.hydration = options.hydration;
 
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (!integration.finalize) continue;
-    out = await integration.finalize(out, ctx);
+    out = await integration.finalize(out, ctx, state);
   }
 
   return out;
