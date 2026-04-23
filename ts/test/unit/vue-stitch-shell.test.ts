@@ -365,20 +365,36 @@ test('vue stitch-shell: BrandHeader omits the surface chip for arrays-of-falsies
   }
 });
 
-test('vue stitch-shell: BrandHeader surfaceTone binds chip background via stitch CSS variables', async () => {
+test('vue stitch-shell: BrandHeader surfaceTone normalizes to safe stitch CSS variable suffixes', async () => {
   const body = await renderSSR(
     h(BrandHeader, {
       logo: h('span', null, '◆'),
       wordmark: 'Theory Cloud',
       surfaceLabel: '[MCP]',
-      surfaceTone: 'secondary',
+      surfaceTone: 'Secondary Accent / Prod 2',
     }),
   );
   assert.ok(body.includes('facetheory-stitch-brand-header-surface-label'));
   assert.ok(body.includes('[MCP]'));
-  assert.ok(body.includes('--stitch-color-secondary-container'));
-  assert.ok(body.includes('--stitch-color-on-secondary-container'));
-  assert.ok(body.includes('data-surface-tone="secondary"'));
+  assert.ok(body.includes('--stitch-color-secondary-accent-prod-2-container'));
+  assert.ok(body.includes('--stitch-color-on-secondary-accent-prod-2-container'));
+  assert.ok(body.includes('data-surface-tone="secondary-accent-prod-2"'));
+  assert.ok(!body.includes('Secondary Accent / Prod 2'));
+});
+
+test('vue stitch-shell: BrandHeader falls back to neutral tokens when surfaceTone normalizes empty', async () => {
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: '[Ops]',
+      surfaceTone: '***',
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-brand-header-surface-label'));
+  assert.ok(body.includes('--stitch-color-surface-container-high'));
+  assert.ok(body.includes('--stitch-color-on-surface'));
+  assert.ok(!body.includes('data-surface-tone='));
 });
 
 test('vue stitch-shell: BrandHeader without surfaceTone falls back to neutral surface-container tokens', async () => {
