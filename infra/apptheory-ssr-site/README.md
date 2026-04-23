@@ -7,7 +7,7 @@ Canonical operator guidance lives under [`../../docs/cdk/README.md`](../../docs/
 ## What This Stack Provisions
 
 - private S3 storage for assets
-- Lambda Function URL origin with response streaming
+- Lambda Function URL origin with response streaming and explicit `AWS_IAM` auth
 - CloudFront behaviors for assets, Vite manifests, optional hydration data, and SSR HTML
 
 ## Local Commands
@@ -33,4 +33,5 @@ npm run synth
 ## Deployment Notes
 
 - Deploy and smoke-test instructions should follow the canonical AWS docs first.
+- This reference stack intentionally does **not** forward viewer-supplied tenant headers such as `x-facetheory-tenant`.
 - Use this README for stack-local commands and folder context only.

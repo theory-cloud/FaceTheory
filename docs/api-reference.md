@@ -69,7 +69,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 
 | Interface          | Purpose                              | Notes                                                                                                                                               |
 | ------------------ | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FaceModule`       | Route definition                     | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`.                                                               |
+| `FaceModule`       | Route definition                     | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`. SSG params must resolve to normal route segments; dot-segments such as `.` and `..` are rejected. |
 | `FaceMode`         | Rendering mode                       | One of `ssr`, `ssg`, or `isr`.                                                                                                                      |
 | `FaceRequest`      | Normalized request input             | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`.                                                                     |
 | `FaceResponse`     | Runtime response                     | Includes normalized headers, cookies array, status, body, and `isBase64`.                                                                           |
@@ -179,6 +179,12 @@ Relevant helpers:
 - `blockingIsrCacheControl(input)`
 - `isFresh(record, nowMs)`
 
+Default ISR partitioning:
+
+- `defaultIsrCacheKey(input)` now includes sorted route params **and** sorted query-string keys/values.
+- The default tenant resolver prefers `x-tenant-id` and falls back to legacy `x-facetheory-tenant`.
+- If HTML varies by request identity, cookies, auth, or other non-query inputs, supply an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
+
 Important deployment note:
 
 - `S3HtmlStore.keyPrefix` is a physical S3 prefix
@@ -208,16 +214,17 @@ Core helpers:
 
 - `readFaceHydrationData(document?)` reads the `__FACETHEORY_DATA__` payload from the current document
 - `parseFaceNavigationSnapshot(html, options)` converts a rendered FaceTheory document into a structured navigation snapshot
-- `fetchFaceNavigationSnapshot(url, options)` fetches and parses the next route as HTML
+- `fetchFaceNavigationSnapshot(url, options)` fetches and parses the next route as HTML and rejects redirected cross-origin responses when an `allowedOrigin` is supplied
 - `applyFaceNavigationSnapshot(snapshot, options)` syncs document attrs, non-executable head tags, and either the configured view container or the full body
-- `loadFaceNavigationModule(snapshot, options)` invokes an exported `hydrateFaceNavigation(...)` hook when present, or reloads the bootstrap module when the hook is absent
-- `startFaceNavigation(options)` intercepts same-origin links, fetches the next FaceTheory document, applies it, and triggers hydration
+- `loadFaceNavigationModule(snapshot, options)` invokes an exported `hydrateFaceNavigation(...)` hook when present, or reloads the bootstrap module when the hook is absent, but rejects cross-origin bootstrap modules
+- `startFaceNavigation(options)` intercepts same-origin links, rejects cross-origin programmatic navigations, fetches the next FaceTheory document, applies it, and triggers hydration
 
 Recommended host pattern:
 
 - wrap route content in a stable shell with a view container such as `data-facetheory-view`
 - export `hydrateFaceNavigation(context)` from the client bootstrap module when you need persistent app state across navigations
 - rely on the default module reload only as a compatibility fallback for existing entry modules that hydrate by top-level side effect
+- keep SPA navigation same-origin; redirects to another origin and remote hydration modules fail closed
 
 ## Document Shell Attrs
 
@@ -273,6 +280,9 @@ Supported flags:
 - `--emit-hydration-data`
 
 `buildSsgSite()` uses the same contract programmatically.
+
+Security note:
+- `generateStaticParams()` values must stay inside the declared route tree. Dot-segments such as `.` and `..` are rejected so SSG output cannot escape `outDir`.
 
 ## Deployment-Facing Environment Conventions
 

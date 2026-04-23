@@ -109,13 +109,20 @@ if [[ -z "${IDEMPOTENCY_KEY}" ]]; then
   fi
 fi
 
-PAYLOAD="$(python3 - <<PY
+PAYLOAD="$(
+  SOURCE_REVISION="${SOURCE_REVISION}" \
+  IDEMPOTENCY_KEY="${IDEMPOTENCY_KEY}" \
+  REASON="${REASON}" \
+  FORCE="${FORCE}" \
+  python3 - <<'PY'
 import json
+import os
+
 payload = {
-  'source_revision': ${SOURCE_REVISION@Q},
-  'idempotency_key': ${IDEMPOTENCY_KEY@Q},
-  'reason': ${REASON@Q},
-  'force': ${FORCE@Q}.lower() == 'true',
+  'source_revision': os.environ['SOURCE_REVISION'],
+  'idempotency_key': os.environ['IDEMPOTENCY_KEY'],
+  'reason': os.environ['REASON'],
+  'force': os.environ['FORCE'].lower() == 'true',
 }
 print(json.dumps(payload, separators=(',', ':')))
 PY

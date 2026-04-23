@@ -67,6 +67,7 @@ export const faces: FaceModule[] = [
 
 Why this is correct:
 - `ssg` is reserved for build-time output.
+- `generateStaticParams()` for SSG must resolve to normal path segments; dot-segments such as `.` and `..` are rejected rather than being written into the output tree.
 - `isr` is only used where regeneration is explicit and bounded.
 - `ssr` remains the fallback when freshness depends on request-time inputs.
 
@@ -272,6 +273,7 @@ Why this is correct:
 - FaceTheory fetches the next route as HTML and reuses the existing server contract instead of inventing a second route payload format.
 - `lang`, `htmlAttrs`, `bodyAttrs`, and non-executable head tags stay synchronized with the rendered document.
 - Exporting `hydrateFaceNavigation(...)` lets the client module update an existing app root instead of forcing a hard reload.
+- Same-origin boundaries stay intact: redirected cross-origin responses, remote bootstrap modules, and cross-origin programmatic navigations fail closed before the current document is mutated.
 
 Compatibility note:
 - If the bootstrap module does not export `hydrateFaceNavigation(...)`, FaceTheory can still reload that module as a fallback so existing side-effect-based entrypoints continue to work, but that fallback will not preserve long-lived client state.

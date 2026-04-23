@@ -24,6 +24,15 @@ function logJson(value: unknown): void {
   console.log(JSON.stringify(value));
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function hasHeader(headers: Headers | undefined, key: string): boolean {
   const values = headers?.[key.toLowerCase()];
   return Array.isArray(values) && values.length > 0;
@@ -117,18 +126,24 @@ const faceApp = createFaceApp({
     {
       route: '/{proxy+}',
       mode: 'ssr',
-      render: (ctx) => ({
-        status: 404,
-        headers: { 'cache-control': 'private, no-store' },
-        head: { title: 'Not Found' },
-        html: `
+      render: (ctx) => {
+        const escapedContext = escapeHtml(
+          JSON.stringify({ path: ctx.request.path, proxy: ctx.proxy }, null, 2),
+        );
+
+        return {
+          status: 404,
+          headers: { 'cache-control': 'private, no-store' },
+          head: { title: 'Not Found' },
+          html: `
 <main>
   <h1>Not Found</h1>
-  <pre>${JSON.stringify({ path: ctx.request.path, proxy: ctx.proxy }, null, 2)}</pre>
+  <pre>${escapedContext}</pre>
   <p><a href="/">Back</a></p>
 </main>
 `.trim(),
-      }),
+        };
+      },
     },
   ],
   isr: {

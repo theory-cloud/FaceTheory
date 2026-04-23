@@ -509,7 +509,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "e8a64f2e357e99fcbd6d6dcb4d21081463f2d6c23757d613f84fb7bbfa5ae343.zip"
+          "S3Key": "e61ba82fe336892415033159703dab446229375d09d1a0b5407f9bb44d659ce8.zip"
         },
         "Environment": {
           "Variables": {
@@ -968,8 +968,7 @@
             "HeaderBehavior": "whitelist",
             "Headers": [
               "x-request-id",
-              "x-facetheory-original-uri",
-              "x-facetheory-tenant"
+              "x-facetheory-original-uri"
             ]
           },
           "Name": "FaceTheoryAppTheorySsgIsrSiteOriginRequestPolicy4B63D3F3",

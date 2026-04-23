@@ -39,6 +39,10 @@ The reference stacks use AppTheory CDK and wire these runtime conventions:
 | `FACETHEORY_ISR_BUCKET` | ISR HTML bucket |
 | `FACETHEORY_ISR_PREFIX` | ISR HTML prefix |
 
+Reference-stack stance:
+- prefer a CloudFront-signed `AWS_IAM` Function URL origin for read-only SSR traffic
+- do not model viewer-supplied tenant-header passthrough as the default copy-paste shape
+
 ## CloudFront Behavior Options
 
 Choose between these patterns based on how many SSG routes you have and whether you want static misses to fail over to Lambda automatically.
@@ -57,6 +61,7 @@ Requirements:
 - preserve the original viewer path for Lambda failover routing
 - keep SSR cache headers explicit and conservative
 - when using `AppTheorySsrSite`, treat `staticPathPatterns` as HTML sections, `directS3PathPatterns` as raw data/object paths, and `ssrPathPatterns` as Lambda-only dynamic routes
+- if tenant identity matters, derive it from trusted context instead of forwarding raw viewer tenant headers by default
 
 ### Strategy B: Explicit Static Behaviors
 
@@ -66,6 +71,11 @@ Use:
 
 This is useful when:
 - the static route set is small and predictable
+
+Notes:
+- use Origin Access Control for S3
+- forward only headers/cookies/query actually required by app logic
+- avoid modeling viewer-supplied tenant headers as part of the default origin request contract
 
 ## Cache Policy By Rendering Mode
 
