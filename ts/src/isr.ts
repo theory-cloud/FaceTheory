@@ -5,6 +5,7 @@ import type {
   FaceModule,
   FaceResponse,
   Headers,
+  Query,
 } from './types.js';
 import {
   canonicalizeHeaders,
@@ -103,6 +104,7 @@ export interface IsrCacheKeyInput {
   tenant: string;
   routePattern: string;
   params: Record<string, string>;
+  query: Query;
 }
 
 export interface IsrCacheControlOptions {
@@ -380,6 +382,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         tenant,
         routePattern: normalizePath(input.routePattern),
         params: input.ctx.params,
+        query: input.ctx.request.query,
       });
       const currentNow = runtimeOptions.now();
       const existing = await runtimeOptions.metaStore.get(cacheKey);
@@ -484,7 +487,17 @@ export function defaultIsrCacheKey(input: IsrCacheKeyInput): string {
       (key) =>
         `${encodeURIComponent(key)}=${encodeURIComponent(String(input.params[key]))}`,
     );
-  return `${input.tenant}::${routePattern}?${paramParts.join('&')}`;
+  const queryParts = Object.keys(input.query)
+    .sort((left, right) => left.localeCompare(right))
+    .flatMap((key) =>
+      (input.query[key] ?? []).map(
+        (value) =>
+          `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
+      ),
+    );
+
+  const keyParts = [...paramParts, ...queryParts];
+  return `${input.tenant}::${routePattern}?${keyParts.join('&')}`;
 }
 
 export function blockingIsrCacheControl(
@@ -703,9 +716,11 @@ function resolveTenant(
 }
 
 function defaultTenantKey(ctx: FaceContext): string {
-  const values = ctx.request.headers['x-facetheory-tenant'] ?? [];
-  const first = values[0] ?? '';
-  return String(first).trim() || 'default';
+  const primary = firstHeaderValue(ctx.request.headers, 'x-tenant-id');
+  if (primary) return primary;
+
+  const legacy = firstHeaderValue(ctx.request.headers, 'x-facetheory-tenant');
+  return legacy ?? 'default';
 }
 
 function buildHtmlPointer(
@@ -762,6 +777,13 @@ function normalizeStatus(value: number): number {
   return int;
 }
 
+function firstHeaderValue(headers: Headers, key: string): string | null {
+  const values = headers[key] ?? headers[key.toLowerCase()] ?? [];
+  const first = values[0] ?? '';
+  const normalized = String(first).trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 function normalizeRevalidateSeconds(value: number | undefined): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return DEFAULT_REVALIDATE_SECONDS;
@@ -808,13 +830,6 @@ async function prepareFreshResponse(
     contentType,
     etag,
   };
-}
-
-function firstHeaderValue(headers: Headers, key: string): string | null {
-  const values = headers[key.toLowerCase()] ?? [];
-  if (!values.length) return null;
-  const first = values[0];
-  return first === undefined ? null : String(first);
 }
 
 async function collectBody(body: FaceResponse['body']): Promise<Uint8Array> {

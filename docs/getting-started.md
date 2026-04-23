@@ -197,6 +197,11 @@ Important default:
 
 - SSG disables real network `fetch()` calls unless `--allow-network` or a mocked `fetch` implementation is supplied.
 
+Important ISR default:
+
+- FaceTheory’s default ISR cache key now partitions by route params and query string, and the default tenant hint prefers `x-tenant-id` over legacy `x-facetheory-tenant`.
+- If cached HTML varies by auth/session/cookies/host-derived tenant, configure an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
+
 ## Reference Bundle
 
 The `v0.6.0` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->

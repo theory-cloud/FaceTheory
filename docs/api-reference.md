@@ -179,6 +179,12 @@ Relevant helpers:
 - `blockingIsrCacheControl(input)`
 - `isFresh(record, nowMs)`
 
+Default ISR partitioning:
+
+- `defaultIsrCacheKey(input)` now includes sorted route params **and** sorted query-string keys/values.
+- The default tenant resolver prefers `x-tenant-id` and falls back to legacy `x-facetheory-tenant`.
+- If HTML varies by request identity, cookies, auth, or other non-query inputs, supply an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
+
 Important deployment note:
 
 - `S3HtmlStore.keyPrefix` is a physical S3 prefix

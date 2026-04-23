@@ -122,6 +122,7 @@ test('isr: regeneration failure serves stale and keeps pointer intact', async ()
     tenant: 'default',
     routePattern: '/faces/{id}',
     params: { id: '42' },
+    query: {},
   });
   const beforeFailure = await metaStore.get(cacheKey);
   assert.ok(beforeFailure?.htmlPointer);
@@ -198,7 +199,46 @@ test('isr: expired lease does not deadlock regeneration', async () => {
   assert.equal(renderCount, 3);
 });
 
-test('isr: tenant partitioning keeps cache entries isolated', async () => {
+test('isr: default cache key partitions by query strings', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/search',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>search-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+    },
+  });
+
+  const first = await app.handle({ method: 'GET', path: '/search?view=table&sort=asc' });
+  const sameQueryDifferentOrder = await app.handle({
+    method: 'GET',
+    path: '/search?sort=asc&view=table',
+  });
+  const differentQuery = await app.handle({ method: 'GET', path: '/search?view=grid&sort=asc' });
+
+  assert.ok(decodeBody(first.body as Uint8Array).includes('search-1'));
+  assert.ok(decodeBody(sameQueryDifferentOrder.body as Uint8Array).includes('search-1'));
+  assert.ok(decodeBody(differentQuery.body as Uint8Array).includes('search-2'));
+  assert.equal(renderCount, 2);
+
+  const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
+  assert.equal(cacheKeys.length, 2);
+});
+
+test('isr: tenant partitioning prefers x-tenant-id with legacy fallback', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new InMemoryIsrMetaStore();
   let renderCount = 0;
@@ -224,12 +264,18 @@ test('isr: tenant partitioning keeps cache entries isolated', async () => {
   const tenantAFirst = await app.handle({
     method: 'GET',
     path: '/tenant/home',
-    headers: { 'x-facetheory-tenant': ['tenant-a'] },
+    headers: {
+      'x-tenant-id': ['tenant-a'],
+      'x-facetheory-tenant': ['spoofed-tenant'],
+    },
   });
   const tenantBFirst = await app.handle({
     method: 'GET',
     path: '/tenant/home',
-    headers: { 'x-facetheory-tenant': ['tenant-b'] },
+    headers: {
+      'x-tenant-id': ['tenant-b'],
+      'x-facetheory-tenant': ['tenant-a'],
+    },
   });
   const tenantASecond = await app.handle({
     method: 'GET',
