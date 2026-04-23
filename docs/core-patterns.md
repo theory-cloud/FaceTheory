@@ -210,6 +210,45 @@ Why this is incorrect:
 - It bypasses FaceTheory's document shell and can produce nested or invalid HTML.
 - It loses the shared escaping and merge rules that the runtime and tests enforce.
 
+## Pattern: Emit custom head styles through structured tags, not raw head HTML
+
+Problem:
+You need to inject a CSS-variable block or another custom `<style>` tag into the document head without bypassing FaceTheory's head/style emitters.
+
+**CORRECT**
+
+```ts
+import { stitchCssVarsToRootBlock, stitchToCssVars } from '@theory-cloud/facetheory/stitch-tokens';
+
+const vars = stitchToCssVars(tokens);
+
+render: async () => ({
+  styleTags: [{ cssText: stitchCssVarsToRootBlock(vars) }],
+  html: '<div id="root">...</div>',
+})
+```
+
+Why this is correct:
+- `stitchCssVarsToRootBlock()` returns raw CSS text, which matches `styleTags`.
+- FaceTheory still owns the `<style>` tag emission path, nonce injection, and head ordering.
+- The same contract works across buffered and streaming responses.
+
+**INCORRECT**
+
+```ts
+render: async () => ({
+  head: {
+    html: `<style>${stitchCssVarsToRootBlock(vars)}</style>`,
+  },
+  html: '<div id="root">...</div>',
+})
+```
+
+Why this is incorrect:
+- `head.html` is a raw HTML escape hatch inserted verbatim into `<head>`.
+- It bypasses FaceTheory's structured style-tag path and makes it easier to drift around escaping / nonce expectations.
+- `FaceHeadTag` with `type: 'raw'` has the same caveat and should stay a deliberate last resort.
+
 ## Pattern: Host packaged Svelte component libraries through the client entry
 
 Problem:

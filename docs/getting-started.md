@@ -168,6 +168,8 @@ FaceTheory provides a small set of brand-agnostic primitives that a consumer des
   });
   ```
 
+  If you need to serialize those vars into SSR `<style>` output, use `stitchCssVarsToRootBlock(vars)` as the `cssText` for a `styleTags` entry (or a `headTags` item with `type: "style"`). Do **not** wrap the returned string in `<style>...</style>` and pass it through `head.html`; `head.html` is a raw escape hatch, not the normal style-delivery path.
+
 Each adapter's `BrandHeader` composes cleanly as the `logo` value of its Topbar, or as a standalone header outside the Shell.
 
 ## Static Generation Quickstart

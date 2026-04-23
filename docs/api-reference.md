@@ -73,10 +73,16 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 | `FaceMode`         | Rendering mode                       | One of `ssr`, `ssg`, or `isr`.                                                                                                                      |
 | `FaceRequest`      | Normalized request input             | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`.                                                                     |
 | `FaceResponse`     | Runtime response                     | Includes normalized headers, cookies array, status, body, and `isBase64`.                                                                           |
-| `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. |
+| `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. `head.html` is a raw `<head>` escape hatch; prefer structured `headTags` / `styleTags` whenever possible. |
 | `FaceContext`      | Per-request context                  | Exposes normalized request, route params, and proxy match.                                                                                          |
 | `FaceAppOptions`   | App constructor options              | Accepts `faces`, optional ISR config, and optional observability hooks.                                                                             |
 | `FaceIsrOptions`   | ISR runtime tuning                   | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation.                        |
+
+Structured head/style emission is the supported default:
+
+- `headTags: [{ type: 'style', cssText, attrs? }]` and `styleTags` participate in FaceTheory's normal `<head>` serialization, escaping, and CSP nonce handling.
+- `FaceHeadTag` with `type: 'raw'` and `head.html` are raw HTML escape hatches inserted verbatim into `<head>`.
+- `stitchCssVarsToRootBlock()` returns raw CSS text, not a full `<style>` tag. Feed that string into `styleTags` or a `headTags` style entry rather than wrapping it and sending it through `head.html`.
 
 ## Core Usage
 
