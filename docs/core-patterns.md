@@ -153,6 +153,7 @@ createReactStreamFace({
 Why this is correct:
 - `all-ready` is the default and safest style extraction strategy.
 - The AntD token bridge runs before `createAntdIntegration()`, which matches the adapter contract.
+- Integrations can be declared once and reused because request-local mutable data should live in each integration's `createState()` hook rather than in module or closure state.
 
 **INCORRECT**
 

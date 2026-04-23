@@ -3,6 +3,7 @@ import { PassThrough } from 'node:stream';
 import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server';
 
+import { prepareUIIntegrations } from '../types.js';
 import type {
   FaceContext,
   FaceHead,
@@ -64,22 +65,25 @@ export async function renderReact(
   node: React.ReactNode,
   options: RenderReactOptions = {},
 ): Promise<FaceRenderResult> {
-  const integrations = options.integrations ?? [];
+  const integrations = await prepareUIIntegrations<
+    React.ReactElement,
+    UIIntegration<React.ReactElement>
+  >(options.integrations ?? [], ctx);
 
   let tree: React.ReactElement = React.createElement(React.Fragment, null, node);
 
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (integration.wrapTree) {
-      tree = integration.wrapTree(tree, ctx);
+      tree = integration.wrapTree(tree, ctx, state);
     }
   }
 
   const integrationHeadTags: FaceHeadTag[] = [];
   const integrationStyleTags: FaceStyleTag[] = [];
 
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (!integration.contribute) continue;
-    const contribution = await integration.contribute(ctx);
+    const contribution = await integration.contribute(ctx, state);
     if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
     if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
   }
@@ -97,9 +101,9 @@ export async function renderReact(
   if (styleTags.length) out.styleTags = styleTags;
   if (options.hydration !== undefined) out.hydration = options.hydration;
 
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (integration.finalize) {
-      out = await integration.finalize(out, ctx);
+      out = await integration.finalize(out, ctx, state);
     }
   }
 
@@ -111,22 +115,25 @@ export async function renderReactStream(
   node: React.ReactNode,
   options: RenderReactStreamOptions = {},
 ): Promise<FaceRenderResult> {
-  const integrations = options.integrations ?? [];
+  const integrations = await prepareUIIntegrations<
+    React.ReactElement,
+    UIIntegration<React.ReactElement>
+  >(options.integrations ?? [], ctx);
 
   let tree: React.ReactElement = React.createElement(React.Fragment, null, node);
 
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (integration.wrapTree) {
-      tree = integration.wrapTree(tree, ctx);
+      tree = integration.wrapTree(tree, ctx, state);
     }
   }
 
   const integrationHeadTags: FaceHeadTag[] = [];
   const integrationStyleTags: FaceStyleTag[] = [];
 
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (!integration.contribute) continue;
-    const contribution = await integration.contribute(ctx);
+    const contribution = await integration.contribute(ctx, state);
     if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
     if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
   }
@@ -248,9 +255,9 @@ export async function renderReactStream(
   if (styleTags.length) out.styleTags = styleTags;
   if (options.hydration !== undefined) out.hydration = options.hydration;
 
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (integration.finalize) {
-      out = await integration.finalize(out, ctx);
+      out = await integration.finalize(out, ctx, state);
     }
   }
 

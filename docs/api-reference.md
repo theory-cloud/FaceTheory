@@ -144,17 +144,19 @@ React:
 - `createReactFace()` for buffered SSR
 - `createReactStreamFace()` for streaming SSR
 - `renderReactStream(..., { styleStrategy: 'all-ready' | 'shell' })`
-- Integrations compose through `wrapTree`, `contribute`, and `finalize`
+- Integrations compose through `createState`, `wrapTree`, `contribute`, and `finalize`
+- Keep request-local mutable data inside `createState`; static integration instances can then be reused safely across renders
 
 Vue:
 
 - `createVueFace()` wraps a `VNode` render function into a `FaceModule`
-- `renderVue()` supports integration hooks plus `wrapApp`
+- `renderVue()` supports integration hooks plus `wrapApp`, and all of those hooks can share one request-local integration state object
 
 Svelte:
 
 - `createSvelteFace()` wraps a `SvelteRenderInput`
 - `renderSvelte()` supports legacy `Component.render()` and Svelte 5 server rendering
+- `renderSvelte()` passes the same request-local integration state through `wrapTree`, `contribute`, and `finalize`
 - Packaged Svelte libraries should import their CSS from the client entry and use `viteAssetsForEntry()` + `viteHydrationForEntry()` to keep SSR asset tags and hydration aligned
 
 ## ISR Storage And Cache APIs

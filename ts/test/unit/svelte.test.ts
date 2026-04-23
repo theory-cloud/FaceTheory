@@ -66,6 +66,7 @@ test('svelte adapter: renders component + extracts css', async () => {
 });
 
 test('svelte adapter: integration hooks provide deterministic head/style ordering and nonce coverage', async () => {
+  let nextStateId = 0;
   const source = `
     <script>
       export let name;
@@ -133,34 +134,41 @@ test('svelte adapter: integration hooks provide deterministic head/style orderin
             integrations: [
               {
                 name: 'svelte-wrap-contrib-finalize',
-                wrapTree: (input) => ({
+                createState: () => ({ id: ++nextStateId }),
+                wrapTree: (input, _ctx, state) => ({
                   ...input,
                   props: {
                     ...(input.props ?? {}),
-                    name: `${String((input.props as any)?.name ?? '')} + wrapped`,
+                    name: `${String((input.props as any)?.name ?? '')} + wrapped ${String((state as { id: number }).id)}`,
                   },
                 }),
-                contribute: () => ({
+                contribute: (_ctx, state) => ({
                   headTags: [
                     {
                       type: 'link',
-                      attrs: { rel: 'stylesheet', href: '/integration-a.css' },
+                      attrs: {
+                        rel: 'stylesheet',
+                        href: `/integration-a-${String((state as { id: number }).id)}.css`,
+                      },
                     },
                   ],
                   styleTags: [
                     {
-                      cssText: '.from-int{letter-spacing:1px;}',
-                      attrs: { id: 'style-int' },
+                      cssText: `.from-int{letter-spacing:1px;} .from-int-state-${String((state as { id: number }).id)}{display:block;}`,
+                      attrs: { id: `style-int-${String((state as { id: number }).id)}` },
                     },
                   ],
                 }),
-                finalize: (out) => ({
+                finalize: (out, _ctx, state) => ({
                   ...out,
                   headTags: [
                     ...(out.headTags ?? []),
                     {
                       type: 'link',
-                      attrs: { rel: 'stylesheet', href: '/integration-b.css' },
+                      attrs: {
+                        rel: 'stylesheet',
+                        href: `/integration-b-${String((state as { id: number }).id)}.css`,
+                      },
                     },
                   ],
                 }),
@@ -180,23 +188,30 @@ test('svelte adapter: integration hooks provide deterministic head/style orderin
     const body = new TextDecoder().decode(resp.body as Uint8Array);
 
     assert.ok(body.includes('<title>Svelte Integration Title</title>'));
-    assert.ok(body.includes('Hello Svelte Integration + wrapped'));
+    assert.ok(body.includes('Hello Svelte Integration + wrapped 1'));
     assert.ok(body.includes('name="svelte-head"'));
     assert.ok(body.includes('id="__FACETHEORY_DATA__"'));
 
-    const idxIntegrationA = body.indexOf('/integration-a.css');
+    const idxIntegrationA = body.indexOf('/integration-a-1.css');
     const idxOptions = body.indexOf('/options-svelte.css');
-    const idxIntegrationB = body.indexOf('/integration-b.css');
+    const idxIntegrationB = body.indexOf('/integration-b-1.css');
     assert.ok(idxIntegrationA >= 0 && idxOptions >= 0 && idxIntegrationB >= 0);
     assert.ok(idxIntegrationA < idxOptions);
     assert.ok(idxOptions < idxIntegrationB);
 
-    const idxStyleInt = body.indexOf('id="style-int"');
+    const idxStyleInt = body.indexOf('id="style-int-1"');
     const idxStyleOptions = body.indexOf('id="style-options"');
     assert.ok(idxStyleInt >= 0 && idxStyleOptions >= 0);
     assert.ok(idxStyleInt < idxStyleOptions);
 
     assertDocumentTagNonces(body, nonce, 3, 2);
+
+    const secondResp = await app.handle({ method: 'GET', path: '/' });
+    const secondBody = new TextDecoder().decode(secondResp.body as Uint8Array);
+    assert.ok(secondBody.includes('Hello Svelte Integration + wrapped 2'));
+    assert.ok(secondBody.includes('/integration-a-2.css'));
+    assert.ok(secondBody.includes('/integration-b-2.css'));
+    assert.ok(secondBody.includes('id="style-int-2"'));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

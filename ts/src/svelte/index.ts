@@ -1,3 +1,4 @@
+import { prepareUIIntegrations } from '../types.js';
 import type {
   FaceContext,
   FaceHead,
@@ -40,27 +41,32 @@ export interface SvelteRenderInput<Props = Record<string, unknown>> {
   cssText?: string;
 }
 
-export type SvelteUIIntegration<Props extends Record<string, unknown> = Record<string, unknown>> =
-  UIIntegration<SvelteRenderInput<Props>>;
+export type SvelteUIIntegration<
+  Props extends Record<string, unknown> = Record<string, unknown>,
+  TState = unknown,
+> = UIIntegration<SvelteRenderInput<Props>, TState>;
 
 export async function renderSvelte<Props extends Record<string, unknown>>(
   ctx: FaceContext,
   input: SvelteRenderInput<Props>,
   options: RenderSvelteOptions = {},
 ): Promise<FaceRenderResult> {
-  const integrations = (options.integrations ?? []) as Array<SvelteUIIntegration<Props>>;
+  const integrations = await prepareUIIntegrations<
+    SvelteRenderInput<Props>,
+    SvelteUIIntegration<Props>
+  >((options.integrations ?? []) as Array<SvelteUIIntegration<Props>>, ctx);
 
   let currentInput: SvelteRenderInput<Props> = input;
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (!integration.wrapTree) continue;
-    currentInput = integration.wrapTree(currentInput, ctx);
+    currentInput = integration.wrapTree(currentInput, ctx, state);
   }
 
   const integrationHeadTags: FaceHeadTag[] = [];
   const integrationStyleTags: FaceStyleTag[] = [];
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (!integration.contribute) continue;
-    const contribution = await integration.contribute(ctx);
+    const contribution = await integration.contribute(ctx, state);
     if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
     if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
   }
@@ -102,9 +108,9 @@ export async function renderSvelte<Props extends Record<string, unknown>>(
   if (styleTags.length) out.styleTags = styleTags;
   if (options.hydration !== undefined) out.hydration = options.hydration;
 
-  for (const integration of integrations) {
+  for (const { integration, state } of integrations) {
     if (!integration.finalize) continue;
-    out = await integration.finalize(out, ctx);
+    out = await integration.finalize(out, ctx, state);
   }
 
   return out;

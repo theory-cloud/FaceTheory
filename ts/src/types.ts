@@ -78,16 +78,46 @@ export interface UIIntegrationContribution {
   styleTags?: FaceStyleTag[];
 }
 
-export interface UIIntegration<TTree = unknown> {
+export interface UIIntegration<TTree = unknown, TState = unknown> {
   name: string;
-  wrapTree?: (tree: TTree, ctx: FaceContext) => TTree;
+  createState?: (ctx: FaceContext) => TState | Promise<TState>;
+  wrapTree?: (tree: TTree, ctx: FaceContext, state: TState) => TTree;
   contribute?: (
     ctx: FaceContext,
+    state: TState,
   ) => UIIntegrationContribution | Promise<UIIntegrationContribution>;
   finalize?: (
     out: FaceRenderResult,
     ctx: FaceContext,
+    state: TState,
   ) => FaceRenderResult | Promise<FaceRenderResult>;
+}
+
+export interface PreparedUIIntegration<
+  TTree = unknown,
+  TIntegration extends UIIntegration<TTree> = UIIntegration<TTree>,
+> {
+  integration: TIntegration;
+  state: unknown;
+}
+
+export async function prepareUIIntegrations<
+  TTree,
+  TIntegration extends UIIntegration<TTree>,
+>(
+  integrations: ReadonlyArray<TIntegration>,
+  ctx: FaceContext,
+): Promise<Array<PreparedUIIntegration<TTree, TIntegration>>> {
+  const prepared: Array<PreparedUIIntegration<TTree, TIntegration>> = [];
+  for (const integration of integrations) {
+    prepared.push({
+      integration,
+      state: integration.createState
+        ? await integration.createState(ctx)
+        : undefined,
+    });
+  }
+  return prepared;
 }
 
 export interface FaceModule {
