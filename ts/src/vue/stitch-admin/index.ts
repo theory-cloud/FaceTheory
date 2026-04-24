@@ -37,6 +37,13 @@ export {
 export { CopyableCode, type CopyableCodeProps } from './copyable-code.js';
 
 export {
+  HealthStatusPanel,
+  type HealthStatusPanelProps,
+  type OperatorHealthRow,
+  type OperatorHealthStatus,
+} from './health-status-panel.js';
+
+export {
   LogStream,
   type LogEntry,
   type LogLevel,

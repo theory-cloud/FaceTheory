@@ -10,6 +10,7 @@ import {
   DetailPanel,
   FilterChipGroup,
   GuardedOperatorShell,
+  HealthStatusPanel,
   FormRow,
   FormSection,
   InlineKeyValueList,
@@ -208,6 +209,89 @@ test('vue stitch-admin: GuardedOperatorShell accepts named fallback slots', asyn
   assert.ok(body.includes('Custom unauthorized slot'));
   assert.ok(!body.includes('Operator body'));
   assert.ok(!body.includes('Operator access required'));
+});
+
+test('vue stitch-admin: HealthStatusPanel renders degraded/stale health states', async () => {
+  const body = await renderSSR(
+    h(HealthStatusPanel, {
+      title: 'Release control plane health',
+      description: 'Stable health observations from Lambda checks.',
+      rows: [
+        {
+          key: 'checkout-api',
+          label: 'Checkout API',
+          status: 'healthy',
+          description: 'Lambda URL responded successfully.',
+          detail: 'p95 83ms',
+          checkedAt: '2026-04-24T22:00:00.000Z',
+          metadata: {
+            provenance: {
+              source: 'lambda-health-check',
+              sourceId: 'req_healthy_001',
+            },
+            staleness: {
+              state: 'fresh',
+              ageLabel: 'checked 1 minute ago',
+            },
+          },
+        },
+        {
+          key: 'release-worker',
+          label: 'Release worker',
+          status: 'degraded',
+          description: 'Queue depth exceeded warning threshold.',
+          detail: 'depth 42',
+          checkedAt: '2026-04-24T21:58:00.000Z',
+          metadata: {
+            provenance: { source: 'cloudwatch-snapshot' },
+            staleness: {
+              state: 'stale',
+              ageLabel: 'checked 9 minutes ago',
+              reason: 'Worker metrics are outside the freshness window.',
+            },
+          },
+        },
+        {
+          key: 'audit-stream',
+          label: 'Audit stream',
+          status: 'down',
+          detail: 'HTTP 503',
+        },
+        { key: 'partner-sync', label: 'Partner sync', status: 'unknown' },
+      ],
+    }),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-health-status-panel'));
+  assert.ok(body.includes('Release control plane health'));
+  assert.ok(body.includes('facetheory-stitch-health-status-healthy'));
+  assert.ok(body.includes('facetheory-stitch-health-status-degraded'));
+  assert.ok(body.includes('facetheory-stitch-health-status-down'));
+  assert.ok(body.includes('facetheory-stitch-health-status-unknown'));
+  assert.ok(body.includes('Healthy: 1'));
+  assert.ok(body.includes('Degraded: 1'));
+  assert.ok(body.includes('Down: 1'));
+  assert.ok(body.includes('Unknown: 1'));
+  assert.ok(body.includes('p95 83ms'));
+  assert.ok(body.includes('HTTP 503'));
+  assert.ok(body.includes('2026-04-24T22:00:00.000Z'));
+  assert.ok(body.includes('req_healthy_001'));
+  assert.ok(body.includes('lambda-health-check'));
+  assert.ok(body.includes('checked 9 minutes ago'));
+  assert.ok(body.includes('facetheory-stitch-health-row-stale'));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-danger'));
+});
+
+test('vue stitch-admin: HealthStatusPanel renders empty health observations', async () => {
+  const body = await renderSSR(
+    h(HealthStatusPanel, {
+      rows: [],
+      emptyLabel: 'No API health observations available yet.',
+    }),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-health-status-panel-empty'));
+  assert.ok(body.includes('No API health observations available yet.'));
 });
 
 test('vue stitch-admin: DataTable renders toolbar content, rows, and row actions', async () => {
