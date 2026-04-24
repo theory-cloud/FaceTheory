@@ -54,3 +54,59 @@ export interface LogEntry extends Omit<SharedLogEntry, 'message' | 'actor'> {
 
 export type LogLevel = SharedLogLevel;
 export type StatusVariant = SharedStatusVariant;
+
+export type {
+  AuthorityState,
+  ConfidenceLevel,
+  ConfidenceMetadata,
+  OperatorEmptyStateConfig,
+  OperatorEmptyStateIntent,
+  OperatorGuardState,
+  OperatorGuardStatus,
+  OperatorPlaceholderDataPolicy,
+  OperatorVisibilityMetadata,
+  ProvenanceMetadata,
+  StalenessMetadata,
+  StalenessState,
+} from '../../stitch-admin/operator-visibility-types.js';
+
+export type MetadataBadgeTone =
+  | 'neutral'
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'danger';
+
+export interface GuardedOperatorShellProps {
+  guard: import('../../stitch-admin/operator-visibility-types.js').OperatorGuardStatus;
+  authorized?: unknown;
+  unauthorized?: unknown;
+  loading?: unknown;
+  error?: unknown;
+  placeholderDataPolicy?: import('../../stitch-admin/operator-visibility-types.js').OperatorPlaceholderDataPolicy;
+}
+
+export interface MetadataBadgeProps {
+  label: unknown;
+  detail?: unknown;
+  tone?: MetadataBadgeTone;
+  href?: string;
+  title?: string;
+}
+
+export interface MetadataBadgeGroupProps {
+  metadata: import('../../stitch-admin/operator-visibility-types.js').OperatorVisibilityMetadata;
+  includeAuthority?: boolean;
+}
+
+export interface NonAuthoritativeBannerProps {
+  title?: unknown;
+  description?: unknown;
+  metadata?: import('../../stitch-admin/operator-visibility-types.js').OperatorVisibilityMetadata;
+  actions?: unknown;
+}
+
+export interface OperatorEmptyStateProps {
+  config: import('../../stitch-admin/operator-visibility-types.js').OperatorEmptyStateConfig;
+  action?: unknown;
+}

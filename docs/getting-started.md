@@ -109,7 +109,7 @@ FaceTheory's Stitch UI surface is split into shared contracts plus framework-spe
 The component names are intentionally parallel across frameworks, so the same conceptual surface exists everywhere:
 
 - Shell/layout: `Shell`, `PageFrame`, `Section`, `Panel`, `SummaryStrip`, `Callout`
-- Dense admin: `Tabs`, `FilterChip`, `FilterChipGroup`, `InlineKeyValueList`, `CopyableCode`, `LogStream`
+- Dense admin: `Tabs`, `FilterChip`, `FilterChipGroup`, `InlineKeyValueList`, `CopyableCode`, `LogStream`, `NonAuthoritativeBanner`, `MetadataBadgeGroup`, `OperatorEmptyState`, `GuardedOperatorShell`
 
 Example composition:
 
@@ -118,27 +118,32 @@ import type {
   FilterChipConfig,
   LogEntry,
   TabItem,
-} from '@theory-cloud/facetheory/stitch-admin';
-import { Callout } from '@theory-cloud/facetheory/react/stitch-shell';
+} from "@theory-cloud/facetheory/stitch-admin";
+import { Callout } from "@theory-cloud/facetheory/react/stitch-shell";
 import {
   FilterChipGroup,
   LogStream,
   Tabs,
-} from '@theory-cloud/facetheory/react/stitch-admin';
+} from "@theory-cloud/facetheory/react/stitch-admin";
 
 const tabs: TabItem[] = [
-  { key: 'policies', label: 'Policies', count: 8 },
-  { key: 'catalog', label: 'Catalog', count: 12 },
+  { key: "policies", label: "Policies", count: 8 },
+  { key: "catalog", label: "Catalog", count: 12 },
 ];
 
 const filters: FilterChipConfig[] = [
-  { key: 'status', label: 'status: active' },
-  { key: 'manifest', label: 'manifest: stale', count: 2 },
+  { key: "status", label: "status: active" },
+  { key: "manifest", label: "manifest: stale", count: 2 },
 ];
 
 const logs: LogEntry[] = [
-  { id: '1', timestamp: '14:02:11', level: 'debug', message: 'Repair started' },
-  { id: '2', timestamp: '14:02:12', level: 'success', message: 'Repair completed' },
+  { id: "1", timestamp: "14:02:11", level: "debug", message: "Repair started" },
+  {
+    id: "2",
+    timestamp: "14:02:12",
+    level: "success",
+    message: "Repair completed",
+  },
 ];
 
 // In React, render <Callout />, <Tabs />, <FilterChipGroup />, and <LogStream />
@@ -147,6 +152,8 @@ const logs: LogEntry[] = [
 ```
 
 Use the shared contract subpaths for data shape and semantic variants. Use the adapter-matched subpaths for actual components. That keeps the React, Vue, and Svelte surfaces in lockstep instead of letting one host drift into framework-local shapes.
+
+Operator visibility primitives use caller-supplied metadata and guard state only. Pass stable provenance, confidence, staleness labels, and `OperatorGuardStatus` values from `load()` or serialized hydration data; do not compute freshness or authorization from ambient browser/session globals during render. Empty states should use `OperatorEmptyStateConfig.placeholderDataPolicy = "no-production-like-data"` instead of production-looking placeholder tenants, partners, releases, or versions.
 
 For control-plane navigation, treat `path` as the SSR-safe baseline contract for nav items and breadcrumbs. Use `onNavigate` only as an optional client-side interception hook; if a host never hydrates, links with `path` must still work as normal anchors.
 
