@@ -13,6 +13,7 @@ export { default as Tabs } from './Tabs.svelte';
 export { default as FilterChip } from './FilterChip.svelte';
 export { default as FilterChipGroup } from './FilterChipGroup.svelte';
 export { default as GuardedOperatorShell } from './GuardedOperatorShell.svelte';
+export { default as HealthStatusPanel } from './HealthStatusPanel.svelte';
 export { default as InlineKeyValueList } from './InlineKeyValueList.svelte';
 export { default as CopyableCode } from './CopyableCode.svelte';
 export { default as LogStream } from './LogStream.svelte';
@@ -26,6 +27,7 @@ export type {
   DataTableColumn,
   FilterChipConfig,
   GuardedOperatorShellProps,
+  HealthStatusPanelProps,
   KeyValueEntry,
   LogEntry,
   LogLevel,
@@ -36,6 +38,8 @@ export type {
   OperatorEmptyStateProps,
   OperatorGuardState,
   OperatorGuardStatus,
+  OperatorHealthRow,
+  OperatorHealthStatus,
   PropertyItem,
   StatusVariant,
   TabItem,
