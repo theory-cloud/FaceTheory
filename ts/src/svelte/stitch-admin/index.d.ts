@@ -63,12 +63,23 @@ export type {
   ConfidenceMetadata,
   OperatorEmptyStateConfig,
   OperatorEmptyStateIntent,
+  OperatorGuardState,
+  OperatorGuardStatus,
   OperatorPlaceholderDataPolicy,
   OperatorVisibilityMetadata,
   ProvenanceMetadata,
   StalenessMetadata,
   StalenessState,
 } from '../../stitch-admin/operator-visibility-types.js';
+
+export interface GuardedOperatorShellProps {
+  guard: import('../../stitch-admin/operator-visibility-types.js').OperatorGuardStatus;
+  authorized?: unknown;
+  unauthorized?: unknown;
+  loading?: unknown;
+  error?: unknown;
+  placeholderDataPolicy?: import('../../stitch-admin/operator-visibility-types.js').OperatorPlaceholderDataPolicy;
+}
 
 export type MetadataBadgeTone =
   | 'neutral'
@@ -203,6 +214,7 @@ export declare const DestructiveConfirm: Component<DestructiveConfirmProps>;
 export declare const Tabs: Component<TabsProps>;
 export declare const FilterChip: Component<FilterChipProps>;
 export declare const FilterChipGroup: Component<FilterChipGroupProps>;
+export declare const GuardedOperatorShell: Component<GuardedOperatorShellProps>;
 export declare const InlineKeyValueList: Component<InlineKeyValueListProps>;
 export declare const CopyableCode: Component<CopyableCodeProps>;
 export declare const LogStream: Component<LogStreamProps>;

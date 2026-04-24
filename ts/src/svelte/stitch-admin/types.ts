@@ -61,6 +61,8 @@ export type {
   ConfidenceMetadata,
   OperatorEmptyStateConfig,
   OperatorEmptyStateIntent,
+  OperatorGuardState,
+  OperatorGuardStatus,
   OperatorPlaceholderDataPolicy,
   OperatorVisibilityMetadata,
   ProvenanceMetadata,
@@ -74,6 +76,15 @@ export type MetadataBadgeTone =
   | 'success'
   | 'warning'
   | 'danger';
+
+export interface GuardedOperatorShellProps {
+  guard: import('../../stitch-admin/operator-visibility-types.js').OperatorGuardStatus;
+  authorized?: unknown;
+  unauthorized?: unknown;
+  loading?: unknown;
+  error?: unknown;
+  placeholderDataPolicy?: import('../../stitch-admin/operator-visibility-types.js').OperatorPlaceholderDataPolicy;
+}
 
 export interface MetadataBadgeProps {
   label: unknown;

@@ -130,3 +130,82 @@ test('svelte stitch-admin: OperatorEmptyState renders explicit no-mock intent', 
   assert.ok(body.includes('Open import settings'));
   assert.ok(!body.includes('Acme'));
 });
+
+test('svelte stitch-admin: GuardedOperatorShell renders authorized content', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/GuardedOperatorShell.svelte'),
+    {
+      guard: { state: 'authorized', principalLabel: 'Release Ops' },
+      authorized: 'Release queue',
+    },
+  );
+
+  assert.ok(
+    body.includes('facetheory-stitch-guarded-operator-shell-authorized'),
+  );
+  assert.ok(body.includes('data-operator-guard-state="authorized"'));
+  assert.ok(body.includes('Release queue'));
+  assert.ok(!body.includes('Operator access required'));
+});
+
+test('svelte stitch-admin: GuardedOperatorShell renders unauthorized state', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/GuardedOperatorShell.svelte'),
+    {
+      guard: {
+        state: 'unauthorized',
+        principalLabel: 'readonly@example.com',
+        reason: 'Missing release:write permission.',
+        requestId: 'req_guard_123',
+      },
+      authorized: 'Sensitive release controls',
+    },
+  );
+
+  assert.ok(
+    body.includes('facetheory-stitch-guarded-operator-shell-unauthorized'),
+  );
+  assert.ok(body.includes('data-empty-intent="not-authorized"'));
+  assert.ok(body.includes('Operator access required'));
+  assert.ok(body.includes('Missing release:write permission.'));
+  assert.ok(body.includes('readonly@example.com'));
+  assert.ok(body.includes('req_guard_123'));
+  assert.ok(!body.includes('Sensitive release controls'));
+});
+
+test('svelte stitch-admin: GuardedOperatorShell renders loading state', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/GuardedOperatorShell.svelte'),
+    {
+      guard: { state: 'loading', requestId: 'req_guard_loading' },
+      authorized: 'Loaded dashboard',
+    },
+  );
+
+  assert.ok(body.includes('facetheory-stitch-guarded-operator-shell-loading'));
+  assert.ok(body.includes('data-empty-intent="loading"'));
+  assert.ok(body.includes('Checking operator access'));
+  assert.ok(body.includes('req_guard_loading'));
+  assert.ok(!body.includes('Loaded dashboard'));
+});
+
+test('svelte stitch-admin: GuardedOperatorShell renders error state', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/GuardedOperatorShell.svelte'),
+    {
+      guard: {
+        state: 'error',
+        reason: 'Autheory policy endpoint timed out.',
+        requestId: 'req_guard_error',
+      },
+      authorized: 'Policy editor',
+    },
+  );
+
+  assert.ok(body.includes('facetheory-stitch-guarded-operator-shell-error'));
+  assert.ok(body.includes('data-empty-intent="error"'));
+  assert.ok(body.includes('Operator access unavailable'));
+  assert.ok(body.includes('Autheory policy endpoint timed out.'));
+  assert.ok(body.includes('req_guard_error'));
+  assert.ok(!body.includes('Policy editor'));
+});

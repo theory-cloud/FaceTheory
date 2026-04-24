@@ -12,6 +12,7 @@ export { default as StatusTag } from './StatusTag.svelte';
 export { default as Tabs } from './Tabs.svelte';
 export { default as FilterChip } from './FilterChip.svelte';
 export { default as FilterChipGroup } from './FilterChipGroup.svelte';
+export { default as GuardedOperatorShell } from './GuardedOperatorShell.svelte';
 export { default as InlineKeyValueList } from './InlineKeyValueList.svelte';
 export { default as CopyableCode } from './CopyableCode.svelte';
 export { default as LogStream } from './LogStream.svelte';
@@ -24,6 +25,7 @@ export type {
   DataTableToolbarSlots,
   DataTableColumn,
   FilterChipConfig,
+  GuardedOperatorShellProps,
   KeyValueEntry,
   LogEntry,
   LogLevel,
@@ -32,6 +34,8 @@ export type {
   MetadataBadgeTone,
   NonAuthoritativeBannerProps,
   OperatorEmptyStateProps,
+  OperatorGuardState,
+  OperatorGuardStatus,
   PropertyItem,
   StatusVariant,
   TabItem,
