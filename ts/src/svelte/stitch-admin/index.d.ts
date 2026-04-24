@@ -65,12 +65,22 @@ export type {
   OperatorEmptyStateIntent,
   OperatorGuardState,
   OperatorGuardStatus,
+  OperatorHealthRow,
+  OperatorHealthStatus,
   OperatorPlaceholderDataPolicy,
   OperatorVisibilityMetadata,
   ProvenanceMetadata,
   StalenessMetadata,
   StalenessState,
 } from '../../stitch-admin/operator-visibility-types.js';
+
+export interface HealthStatusPanelProps {
+  title?: unknown;
+  description?: unknown;
+  rows: import('../../stitch-admin/operator-visibility-types.js').OperatorHealthRow[];
+  actions?: unknown;
+  emptyLabel?: unknown;
+}
 
 export interface GuardedOperatorShellProps {
   guard: import('../../stitch-admin/operator-visibility-types.js').OperatorGuardStatus;
@@ -215,6 +225,7 @@ export declare const Tabs: Component<TabsProps>;
 export declare const FilterChip: Component<FilterChipProps>;
 export declare const FilterChipGroup: Component<FilterChipGroupProps>;
 export declare const GuardedOperatorShell: Component<GuardedOperatorShellProps>;
+export declare const HealthStatusPanel: Component<HealthStatusPanelProps>;
 export declare const InlineKeyValueList: Component<InlineKeyValueListProps>;
 export declare const CopyableCode: Component<CopyableCodeProps>;
 export declare const LogStream: Component<LogStreamProps>;

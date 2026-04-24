@@ -109,7 +109,7 @@ FaceTheory's Stitch UI surface is split into shared contracts plus framework-spe
 The component names are intentionally parallel across frameworks, so the same conceptual surface exists everywhere:
 
 - Shell/layout: `Shell`, `PageFrame`, `Section`, `Panel`, `SummaryStrip`, `Callout`
-- Dense admin: `Tabs`, `FilterChip`, `FilterChipGroup`, `InlineKeyValueList`, `CopyableCode`, `LogStream`, `NonAuthoritativeBanner`, `MetadataBadgeGroup`, `OperatorEmptyState`, `GuardedOperatorShell`
+- Dense admin: `Tabs`, `FilterChip`, `FilterChipGroup`, `InlineKeyValueList`, `CopyableCode`, `LogStream`, `NonAuthoritativeBanner`, `MetadataBadgeGroup`, `OperatorEmptyState`, `GuardedOperatorShell`, `HealthStatusPanel`
 
 Example composition:
 
@@ -153,7 +153,7 @@ const logs: LogEntry[] = [
 
 Use the shared contract subpaths for data shape and semantic variants. Use the adapter-matched subpaths for actual components. That keeps the React, Vue, and Svelte surfaces in lockstep instead of letting one host drift into framework-local shapes.
 
-Operator visibility primitives use caller-supplied metadata and guard state only. Pass stable provenance, confidence, staleness labels, and `OperatorGuardStatus` values from `load()` or serialized hydration data; do not compute freshness or authorization from ambient browser/session globals during render. Empty states should use `OperatorEmptyStateConfig.placeholderDataPolicy = "no-production-like-data"` instead of production-looking placeholder tenants, partners, releases, or versions.
+Operator visibility primitives use caller-supplied metadata, guard state, and health observations only. Pass stable provenance, confidence, staleness labels, and `OperatorGuardStatus` values from `load()` or serialized hydration data; do not compute freshness or authorization from ambient browser/session globals during render. Empty states should use `OperatorEmptyStateConfig.placeholderDataPolicy = "no-production-like-data"` instead of production-looking placeholder tenants, partners, releases, or versions.
 
 For control-plane navigation, treat `path` as the SSR-safe baseline contract for nav items and breadcrumbs. Use `onNavigate` only as an optional client-side interception hook; if a host never hydrates, links with `path` must still work as normal anchors.
 

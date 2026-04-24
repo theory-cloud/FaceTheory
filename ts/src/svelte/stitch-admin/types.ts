@@ -63,6 +63,8 @@ export type {
   OperatorEmptyStateIntent,
   OperatorGuardState,
   OperatorGuardStatus,
+  OperatorHealthRow,
+  OperatorHealthStatus,
   OperatorPlaceholderDataPolicy,
   OperatorVisibilityMetadata,
   ProvenanceMetadata,
@@ -76,6 +78,14 @@ export type MetadataBadgeTone =
   | 'success'
   | 'warning'
   | 'danger';
+
+export interface HealthStatusPanelProps {
+  title?: unknown;
+  description?: unknown;
+  rows: import('../../stitch-admin/operator-visibility-types.js').OperatorHealthRow[];
+  actions?: unknown;
+  emptyLabel?: unknown;
+}
 
 export interface GuardedOperatorShellProps {
   guard: import('../../stitch-admin/operator-visibility-types.js').OperatorGuardStatus;
