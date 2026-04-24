@@ -14,6 +14,7 @@ import {
   FilterChip,
   FilterChipGroup,
   GuardedOperatorShell,
+  HealthStatusPanel,
   FormRow,
   FormSection,
   InlineKeyValueList,
@@ -210,6 +211,94 @@ test('GuardedOperatorShell renders deterministic error state', async () => {
   assert.ok(body.includes('Autheory policy endpoint timed out.'));
   assert.ok(body.includes('req_guard_error'));
   assert.ok(!body.includes('Policy editor'));
+});
+
+test('HealthStatusPanel renders health states, API metadata, and stale markers', async () => {
+  const body = await renderSSR(
+    h(HealthStatusPanel, {
+      title: 'Release control plane health',
+      description: 'Stable health observations from Lambda checks.',
+      rows: [
+        {
+          key: 'checkout-api',
+          label: 'Checkout API',
+          status: 'healthy',
+          description: 'Lambda URL responded successfully.',
+          detail: 'p95 83ms',
+          checkedAt: '2026-04-24T22:00:00.000Z',
+          metadata: {
+            provenance: {
+              source: 'lambda-health-check',
+              sourceId: 'req_healthy_001',
+            },
+            staleness: {
+              state: 'fresh',
+              ageLabel: 'checked 1 minute ago',
+            },
+          },
+        },
+        {
+          key: 'release-worker',
+          label: 'Release worker',
+          status: 'degraded',
+          description: 'Queue depth exceeded warning threshold.',
+          detail: 'depth 42',
+          checkedAt: '2026-04-24T21:58:00.000Z',
+          metadata: {
+            provenance: { source: 'cloudwatch-snapshot' },
+            staleness: {
+              state: 'stale',
+              ageLabel: 'checked 9 minutes ago',
+              reason: 'Worker metrics are outside the freshness window.',
+            },
+          },
+        },
+        {
+          key: 'audit-stream',
+          label: 'Audit stream',
+          status: 'down',
+          detail: 'HTTP 503',
+        },
+        {
+          key: 'partner-sync',
+          label: 'Partner sync',
+          status: 'unknown',
+        },
+      ],
+    }),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-health-status-panel'));
+  assert.ok(body.includes('Release control plane health'));
+  assert.ok(body.includes('Stable health observations from Lambda checks.'));
+  assert.ok(body.includes('facetheory-stitch-health-status-healthy'));
+  assert.ok(body.includes('facetheory-stitch-health-status-degraded'));
+  assert.ok(body.includes('facetheory-stitch-health-status-down'));
+  assert.ok(body.includes('facetheory-stitch-health-status-unknown'));
+  assert.ok(body.includes('Healthy: 1'));
+  assert.ok(body.includes('Degraded: 1'));
+  assert.ok(body.includes('Down: 1'));
+  assert.ok(body.includes('Unknown: 1'));
+  assert.ok(body.includes('p95 83ms'));
+  assert.ok(body.includes('HTTP 503'));
+  assert.ok(body.includes('2026-04-24T22:00:00.000Z'));
+  assert.ok(body.includes('req_healthy_001'));
+  assert.ok(body.includes('lambda-health-check'));
+  assert.ok(body.includes('checked 9 minutes ago'));
+  assert.ok(body.includes('facetheory-stitch-health-row-stale'));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-danger'));
+});
+
+test('HealthStatusPanel renders an explicit empty health state', async () => {
+  const body = await renderSSR(
+    h(HealthStatusPanel, {
+      rows: [],
+      emptyLabel: 'No API health observations available yet.',
+    }),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-health-status-panel-empty'));
+  assert.ok(body.includes('No API health observations available yet.'));
 });
 
 test('DataTable renders toolbar slots, rows, and the row-actions column', async () => {
