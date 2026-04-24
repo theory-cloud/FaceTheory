@@ -17,6 +17,9 @@ import {
   FormSection,
   InlineKeyValueList,
   LogStream,
+  MetadataBadgeGroup,
+  NonAuthoritativeBanner,
+  OperatorEmptyState,
   PropertyGrid,
   SplitForm,
   StatusTag,
@@ -52,6 +55,82 @@ const samplePartners: Partner[] = [
   { key: '1', name: 'Acme Corp', status: 'active' },
   { key: '2', name: 'Globex', status: 'pending' },
 ];
+
+test('NonAuthoritativeBanner renders authority, provenance, confidence, and staleness metadata', async () => {
+  const body = await renderSSR(
+    h(NonAuthoritativeBanner, {
+      metadata: {
+        authority: 'non-authoritative',
+        provenance: {
+          source: 'Factory import',
+          observedAt: '2026-04-24T18:30:00.000Z',
+        },
+        confidence: {
+          level: 'low',
+          label: 'Low confidence',
+          reason: 'Only one imported source agreed.',
+        },
+        staleness: {
+          state: 'stale',
+          ageLabel: 'refreshed 2 hours ago',
+          reason: 'Import has passed its freshness window.',
+        },
+      },
+    }),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-non-authoritative-banner'));
+  assert.ok(body.includes('Non-authoritative data'));
+  assert.ok(body.includes('Non-authoritative'));
+  assert.ok(body.includes('Factory import'));
+  assert.ok(body.includes('Low confidence'));
+  assert.ok(body.includes('refreshed 2 hours ago'));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-warning'));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-danger'));
+});
+
+test('MetadataBadgeGroup renders provenance links without computing freshness', async () => {
+  const body = await renderSSR(
+    h(MetadataBadgeGroup, {
+      metadata: {
+        provenance: {
+          source: 'Release manifest',
+          href: '/operator/sources/release-manifest',
+        },
+        staleness: {
+          state: 'fresh',
+          ageLabel: 'refreshed 4 minutes ago',
+        },
+      },
+    }),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
+  assert.ok(body.includes('href="/operator/sources/release-manifest"'));
+  assert.ok(body.includes('Release manifest'));
+  assert.ok(body.includes('refreshed 4 minutes ago'));
+});
+
+test('OperatorEmptyState renders explicit no-mock empty state intent', async () => {
+  const body = await renderSSR(
+    h(OperatorEmptyState, {
+      config: {
+        intent: 'no-data',
+        title: 'No imported visibility records',
+        description: 'Connect a source system before operator data appears.',
+        actionLabel: 'Open import settings',
+        placeholderDataPolicy: 'no-production-like-data',
+      },
+    }),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-operator-empty-state'));
+  assert.ok(body.includes('data-empty-intent="no-data"'));
+  assert.ok(body.includes('data-placeholder-policy="no-production-like-data"'));
+  assert.ok(body.includes('No imported visibility records'));
+  assert.ok(body.includes('Open import settings'));
+  assert.ok(!body.includes('Acme'));
+});
 
 test('DataTable renders toolbar slots, rows, and the row-actions column', async () => {
   const body = await renderSSR(
