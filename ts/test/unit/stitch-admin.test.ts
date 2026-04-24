@@ -13,6 +13,7 @@ import {
   DetailPanel,
   FilterChip,
   FilterChipGroup,
+  GuardedOperatorShell,
   FormRow,
   FormSection,
   InlineKeyValueList,
@@ -130,6 +131,85 @@ test('OperatorEmptyState renders explicit no-mock empty state intent', async () 
   assert.ok(body.includes('No imported visibility records'));
   assert.ok(body.includes('Open import settings'));
   assert.ok(!body.includes('Acme'));
+});
+
+test('GuardedOperatorShell renders authorized children only when authorized', async () => {
+  const body = await renderSSR(
+    h(GuardedOperatorShell, {
+      guard: { state: 'authorized', principalLabel: 'Release Ops' },
+      children: h(
+        'div',
+        { 'data-testid': 'release-dashboard' },
+        'Release queue',
+      ),
+    }),
+  );
+
+  assert.ok(
+    body.includes('facetheory-stitch-guarded-operator-shell-authorized'),
+  );
+  assert.ok(body.includes('data-operator-guard-state="authorized"'));
+  assert.ok(body.includes('Release queue'));
+  assert.ok(!body.includes('Operator access required'));
+});
+
+test('GuardedOperatorShell renders unauthorized state from caller-supplied guard status', async () => {
+  const body = await renderSSR(
+    h(GuardedOperatorShell, {
+      guard: {
+        state: 'unauthorized',
+        principalLabel: 'readonly@example.com',
+        reason: 'Missing release:write permission.',
+        requestId: 'req_guard_123',
+      },
+      children: h('div', null, 'Sensitive release controls'),
+    }),
+  );
+
+  assert.ok(
+    body.includes('facetheory-stitch-guarded-operator-shell-unauthorized'),
+  );
+  assert.ok(body.includes('data-empty-intent="not-authorized"'));
+  assert.ok(body.includes('Operator access required'));
+  assert.ok(body.includes('Missing release:write permission.'));
+  assert.ok(body.includes('readonly@example.com'));
+  assert.ok(body.includes('req_guard_123'));
+  assert.ok(!body.includes('Sensitive release controls'));
+});
+
+test('GuardedOperatorShell renders deterministic loading state', async () => {
+  const body = await renderSSR(
+    h(GuardedOperatorShell, {
+      guard: { state: 'loading', requestId: 'req_guard_loading' },
+      children: h('div', null, 'Loaded dashboard'),
+    }),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-guarded-operator-shell-loading'));
+  assert.ok(body.includes('data-empty-intent="loading"'));
+  assert.ok(body.includes('Checking operator access'));
+  assert.ok(body.includes('req_guard_loading'));
+  assert.ok(!body.includes('Loaded dashboard'));
+});
+
+test('GuardedOperatorShell renders deterministic error state', async () => {
+  const body = await renderSSR(
+    h(GuardedOperatorShell, {
+      guard: {
+        state: 'error',
+        reason: 'Autheory policy endpoint timed out.',
+        requestId: 'req_guard_error',
+      },
+      children: h('div', null, 'Policy editor'),
+    }),
+  );
+
+  assert.ok(body.includes('facetheory-stitch-guarded-operator-shell-error'));
+  assert.ok(body.includes('data-empty-intent="error"'));
+  assert.ok(body.includes('Operator access unavailable'));
+  assert.ok(body.includes('Autheory policy endpoint timed out.'));
+  assert.ok(body.includes('req_guard_error'));
+  assert.ok(!body.includes('Policy editor'));
 });
 
 test('DataTable renders toolbar slots, rows, and the row-actions column', async () => {
