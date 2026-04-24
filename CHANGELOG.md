@@ -1,5 +1,51 @@
 # Changelog
 
+## [1.0.0](https://github.com/theory-cloud/FaceTheory/compare/v0.6.1...v1.0.0) (2026-04-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** FaceTheory now aligns its AppTheory/TableTheory pins with AppTheory v1.0.0 and TableTheory v1.6.1, including the upstream tenant-header trust-enforcement contract addressed in AppTheory 1.0.0, and the next FaceTheory release is intended to promote to v1.0.0.
+
+### Bug Fixes
+
+* **antd:** isolate style cache per render ([1b15dff](https://github.com/theory-cloud/FaceTheory/commit/1b15dffe3686f15ffc4b0fde8845643fe5b3c319))
+* **deps:** align AppTheory v1.0.0 and TableTheory v1.6.1 ([0103b6e](https://github.com/theory-cloud/FaceTheory/commit/0103b6ebe4e4a12d3e2f5f71714db779fcedf26f))
+* **emotion:** isolate integration state per render ([a750e67](https://github.com/theory-cloud/FaceTheory/commit/a750e67814c811eac5f542f82f5462660c404e95))
+* **examples:** escape 404 context in ssg-isr handler ([f78a4a4](https://github.com/theory-cloud/FaceTheory/commit/f78a4a4f3fcc6b68e40822ccf6b884ba2fe00c6d))
+* **examples:** guard malformed URL decoding ([dfc0ed4](https://github.com/theory-cloud/FaceTheory/commit/dfc0ed4a191fe6f5edb698b02937d1da14a7e400))
+* **infra:** harden AppTheory reference stacks ([00866c9](https://github.com/theory-cloud/FaceTheory/commit/00866c949da75a5e5d086026490c38d686f3b2ec))
+* **integrations:** add per-render state plumbing ([4fea721](https://github.com/theory-cloud/FaceTheory/commit/4fea7218ff420eb25553cd4d65f85e28d7fe0a59))
+* **react:** drain shell readiness failures safely ([76493be](https://github.com/theory-cloud/FaceTheory/commit/76493be6322046bdd919f1e427276759e8be1175))
+* **rendering:** make integrations request-safe ([819b6f8](https://github.com/theory-cloud/FaceTheory/commit/819b6f8e77638d5898a174f36ebc55e41d85190e))
+* **scripts:** quote publish payload safely ([e09de58](https://github.com/theory-cloud/FaceTheory/commit/e09de58795861d49e7914197c84d35a4615aebf6))
+* **spa:** enforce same-origin navigation snapshots ([d1b47dd](https://github.com/theory-cloud/FaceTheory/commit/d1b47dd064da116cb7367cb5e452a2615a78230c))
+* **ssg:** block output path traversal ([d693b9e](https://github.com/theory-cloud/FaceTheory/commit/d693b9e0b56316750dfb6d0df4c52fd5bdcf8c3b))
+* **stitch-shell:** sanitize surfaceTone tokens ([daed20f](https://github.com/theory-cloud/FaceTheory/commit/daed20f3d91f48ddc419d7e4abef434b9599afa0))
+
+## [1.0.0-rc.2](https://github.com/theory-cloud/FaceTheory/compare/v0.6.0-rc.2...v1.0.0-rc.2) (2026-04-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** FaceTheory now aligns its AppTheory/TableTheory pins with AppTheory v1.0.0 and TableTheory v1.6.1, including the upstream tenant-header trust-enforcement contract addressed in AppTheory 1.0.0, and the next FaceTheory release is intended to promote to v1.0.0.
+
+### Bug Fixes
+
+* **antd:** isolate style cache per render ([1b15dff](https://github.com/theory-cloud/FaceTheory/commit/1b15dffe3686f15ffc4b0fde8845643fe5b3c319))
+* **deps:** align AppTheory v1.0.0 and TableTheory v1.6.1 ([0103b6e](https://github.com/theory-cloud/FaceTheory/commit/0103b6ebe4e4a12d3e2f5f71714db779fcedf26f))
+* **emotion:** isolate integration state per render ([a750e67](https://github.com/theory-cloud/FaceTheory/commit/a750e67814c811eac5f542f82f5462660c404e95))
+* **examples:** escape 404 context in ssg-isr handler ([f78a4a4](https://github.com/theory-cloud/FaceTheory/commit/f78a4a4f3fcc6b68e40822ccf6b884ba2fe00c6d))
+* **examples:** guard malformed URL decoding ([dfc0ed4](https://github.com/theory-cloud/FaceTheory/commit/dfc0ed4a191fe6f5edb698b02937d1da14a7e400))
+* **infra:** harden AppTheory reference stacks ([00866c9](https://github.com/theory-cloud/FaceTheory/commit/00866c949da75a5e5d086026490c38d686f3b2ec))
+* **integrations:** add per-render state plumbing ([4fea721](https://github.com/theory-cloud/FaceTheory/commit/4fea7218ff420eb25553cd4d65f85e28d7fe0a59))
+* **react:** drain shell readiness failures safely ([76493be](https://github.com/theory-cloud/FaceTheory/commit/76493be6322046bdd919f1e427276759e8be1175))
+* **rendering:** make integrations request-safe ([819b6f8](https://github.com/theory-cloud/FaceTheory/commit/819b6f8e77638d5898a174f36ebc55e41d85190e))
+* **scripts:** quote publish payload safely ([e09de58](https://github.com/theory-cloud/FaceTheory/commit/e09de58795861d49e7914197c84d35a4615aebf6))
+* **spa:** enforce same-origin navigation snapshots ([d1b47dd](https://github.com/theory-cloud/FaceTheory/commit/d1b47dd064da116cb7367cb5e452a2615a78230c))
+* **ssg:** block output path traversal ([d693b9e](https://github.com/theory-cloud/FaceTheory/commit/d693b9e0b56316750dfb6d0df4c52fd5bdcf8c3b))
+* **stitch-shell:** sanitize surfaceTone tokens ([daed20f](https://github.com/theory-cloud/FaceTheory/commit/daed20f3d91f48ddc419d7e4abef434b9599afa0))
+
 ## [0.6.1](https://github.com/theory-cloud/FaceTheory/compare/v0.6.0...v0.6.1) (2026-04-18)
 
 
