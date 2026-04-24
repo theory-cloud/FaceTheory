@@ -54,3 +54,10 @@ export {
   type NonAuthoritativeBannerProps,
   type OperatorEmptyStateProps,
 } from './operator-notices.js';
+
+export {
+  GuardedOperatorShell,
+  type GuardedOperatorShellProps,
+  type OperatorGuardState,
+  type OperatorGuardStatus,
+} from './operator-guard.js';

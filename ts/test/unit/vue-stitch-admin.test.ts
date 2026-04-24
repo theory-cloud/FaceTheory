@@ -9,6 +9,7 @@ import {
   DestructiveConfirm,
   DetailPanel,
   FilterChipGroup,
+  GuardedOperatorShell,
   FormRow,
   FormSection,
   InlineKeyValueList,
@@ -111,6 +112,102 @@ test('vue stitch-admin: OperatorEmptyState renders explicit no-mock intent', asy
   assert.ok(body.includes('No imported visibility records'));
   assert.ok(body.includes('Open import settings'));
   assert.ok(!body.includes('Acme'));
+});
+
+test('vue stitch-admin: GuardedOperatorShell renders authorized default slot', async () => {
+  const body = await renderSSR(
+    h(
+      GuardedOperatorShell,
+      { guard: { state: 'authorized', principalLabel: 'Release Ops' } },
+      {
+        default: () =>
+          h('div', { 'data-testid': 'release-dashboard' }, 'Release queue'),
+      },
+    ),
+  );
+
+  assert.ok(
+    body.includes('facetheory-stitch-guarded-operator-shell-authorized'),
+  );
+  assert.ok(body.includes('data-operator-guard-state="authorized"'));
+  assert.ok(body.includes('Release queue'));
+  assert.ok(!body.includes('Operator access required'));
+});
+
+test('vue stitch-admin: GuardedOperatorShell renders default unauthorized, loading, and error states', async () => {
+  const body = await renderSSR(
+    h('div', null, [
+      h(
+        GuardedOperatorShell,
+        {
+          guard: {
+            state: 'unauthorized',
+            principalLabel: 'readonly@example.com',
+            reason: 'Missing release:write permission.',
+            requestId: 'req_guard_123',
+          },
+        },
+        { default: () => h('div', null, 'Sensitive release controls') },
+      ),
+      h(
+        GuardedOperatorShell,
+        { guard: { state: 'loading', requestId: 'req_guard_loading' } },
+        { default: () => h('div', null, 'Loaded dashboard') },
+      ),
+      h(
+        GuardedOperatorShell,
+        {
+          guard: {
+            state: 'error',
+            reason: 'Autheory policy endpoint timed out.',
+            requestId: 'req_guard_error',
+          },
+        },
+        { default: () => h('div', null, 'Policy editor') },
+      ),
+    ]),
+  );
+
+  assert.ok(
+    body.includes('facetheory-stitch-guarded-operator-shell-unauthorized'),
+  );
+  assert.ok(body.includes('data-empty-intent="not-authorized"'));
+  assert.ok(body.includes('Operator access required'));
+  assert.ok(body.includes('Missing release:write permission.'));
+  assert.ok(body.includes('readonly@example.com'));
+  assert.ok(body.includes('req_guard_123'));
+  assert.ok(body.includes('facetheory-stitch-guarded-operator-shell-loading'));
+  assert.ok(body.includes('data-empty-intent="loading"'));
+  assert.ok(body.includes('Checking operator access'));
+  assert.ok(body.includes('req_guard_loading'));
+  assert.ok(body.includes('facetheory-stitch-guarded-operator-shell-error'));
+  assert.ok(body.includes('data-empty-intent="error"'));
+  assert.ok(body.includes('Operator access unavailable'));
+  assert.ok(body.includes('Autheory policy endpoint timed out.'));
+  assert.ok(body.includes('req_guard_error'));
+  assert.ok(!body.includes('Sensitive release controls'));
+  assert.ok(!body.includes('Loaded dashboard'));
+  assert.ok(!body.includes('Policy editor'));
+});
+
+test('vue stitch-admin: GuardedOperatorShell accepts named fallback slots', async () => {
+  const body = await renderSSR(
+    h(
+      GuardedOperatorShell,
+      { guard: { state: 'unauthorized' } },
+      {
+        default: () => h('div', null, 'Operator body'),
+        unauthorized: () => h('aside', null, 'Custom unauthorized slot'),
+      },
+    ),
+  );
+
+  assert.ok(
+    body.includes('facetheory-stitch-guarded-operator-shell-unauthorized'),
+  );
+  assert.ok(body.includes('Custom unauthorized slot'));
+  assert.ok(!body.includes('Operator body'));
+  assert.ok(!body.includes('Operator access required'));
 });
 
 test('vue stitch-admin: DataTable renders toolbar content, rows, and row actions', async () => {
