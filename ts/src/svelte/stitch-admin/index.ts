@@ -15,6 +15,10 @@ export { default as FilterChipGroup } from './FilterChipGroup.svelte';
 export { default as InlineKeyValueList } from './InlineKeyValueList.svelte';
 export { default as CopyableCode } from './CopyableCode.svelte';
 export { default as LogStream } from './LogStream.svelte';
+export { default as MetadataBadge } from './MetadataBadge.svelte';
+export { default as MetadataBadgeGroup } from './MetadataBadgeGroup.svelte';
+export { default as NonAuthoritativeBanner } from './NonAuthoritativeBanner.svelte';
+export { default as OperatorEmptyState } from './OperatorEmptyState.svelte';
 
 export type {
   DataTableToolbarSlots,
@@ -23,6 +27,11 @@ export type {
   KeyValueEntry,
   LogEntry,
   LogLevel,
+  MetadataBadgeGroupProps,
+  MetadataBadgeProps,
+  MetadataBadgeTone,
+  NonAuthoritativeBannerProps,
+  OperatorEmptyStateProps,
   PropertyItem,
   StatusVariant,
   TabItem,
