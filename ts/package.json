@@ -181,7 +181,9 @@
     "example:vite:svelte:build": "vite build --config examples/vite-ssr-svelte/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-svelte/vite.config.ts",
     "example:vite:svelte:serve": "tsx examples/vite-ssr-svelte/node-server.ts",
     "example:vite:svelte:library:build": "vite build --config examples/vite-ssr-svelte-library/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-svelte-library/vite.config.ts",
-    "example:vite:svelte:library:serve": "tsx examples/vite-ssr-svelte-library/node-server.ts"
+    "example:vite:svelte:library:serve": "tsx examples/vite-ssr-svelte-library/node-server.ts",
+    "example:operator-visibility:build": "tsx examples/operator-visibility-react/build.ts",
+    "example:operator-visibility:serve": "tsx examples/operator-visibility-react/node-server.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1005.0",
