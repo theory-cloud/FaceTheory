@@ -68,6 +68,11 @@ export type {
   OperatorPlaceholderDataPolicy,
   OperatorVisibilityMetadata,
   ProvenanceMetadata,
+  VisibilityMatrixCell,
+  VisibilityMatrixCellState,
+  VisibilityMatrixDimension,
+  VisibilityMatrixEntity,
+  VisibilityMatrixRow,
   StalenessMetadata,
   StalenessState,
 } from '../../stitch-admin/operator-visibility-types.js';
@@ -85,6 +90,16 @@ export interface HealthStatusPanelProps {
   rows: import('../../stitch-admin/operator-visibility-types.js').OperatorHealthRow[];
   actions?: unknown;
   emptyLabel?: unknown;
+}
+
+export interface VisibilityMatrixProps {
+  title?: unknown;
+  description?: unknown;
+  dimensions: import('../../stitch-admin/operator-visibility-types.js').VisibilityMatrixDimension[];
+  rows: import('../../stitch-admin/operator-visibility-types.js').VisibilityMatrixRow[];
+  actions?: unknown;
+  emptyLabel?: unknown;
+  emptyCellLabel?: unknown;
 }
 
 export interface GuardedOperatorShellProps {

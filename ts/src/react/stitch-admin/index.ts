@@ -55,6 +55,16 @@ export {
 } from './health-status-panel.js';
 
 export {
+  VisibilityMatrix,
+  type VisibilityMatrixProps,
+  type VisibilityMatrixCell,
+  type VisibilityMatrixCellState,
+  type VisibilityMatrixDimension,
+  type VisibilityMatrixEntity,
+  type VisibilityMatrixRow,
+} from './visibility-matrix.js';
+
+export {
   LogStream,
   type LogEntry,
   type LogLevel,

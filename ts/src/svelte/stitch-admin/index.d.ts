@@ -70,6 +70,11 @@ export type {
   OperatorPlaceholderDataPolicy,
   OperatorVisibilityMetadata,
   ProvenanceMetadata,
+  VisibilityMatrixCell,
+  VisibilityMatrixCellState,
+  VisibilityMatrixDimension,
+  VisibilityMatrixEntity,
+  VisibilityMatrixRow,
   StalenessMetadata,
   StalenessState,
 } from '../../stitch-admin/operator-visibility-types.js';
@@ -80,6 +85,16 @@ export interface HealthStatusPanelProps {
   rows: import('../../stitch-admin/operator-visibility-types.js').OperatorHealthRow[];
   actions?: unknown;
   emptyLabel?: unknown;
+}
+
+export interface VisibilityMatrixProps {
+  title?: unknown;
+  description?: unknown;
+  dimensions: import('../../stitch-admin/operator-visibility-types.js').VisibilityMatrixDimension[];
+  rows: import('../../stitch-admin/operator-visibility-types.js').VisibilityMatrixRow[];
+  actions?: unknown;
+  emptyLabel?: unknown;
+  emptyCellLabel?: unknown;
 }
 
 export interface GuardedOperatorShellProps {
@@ -226,6 +241,7 @@ export declare const FilterChip: Component<FilterChipProps>;
 export declare const FilterChipGroup: Component<FilterChipGroupProps>;
 export declare const GuardedOperatorShell: Component<GuardedOperatorShellProps>;
 export declare const HealthStatusPanel: Component<HealthStatusPanelProps>;
+export declare const VisibilityMatrix: Component<VisibilityMatrixProps>;
 export declare const InlineKeyValueList: Component<InlineKeyValueListProps>;
 export declare const CopyableCode: Component<CopyableCodeProps>;
 export declare const LogStream: Component<LogStreamProps>;

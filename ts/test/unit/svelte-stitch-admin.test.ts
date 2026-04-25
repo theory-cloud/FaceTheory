@@ -294,3 +294,139 @@ test('svelte stitch-admin: HealthStatusPanel renders empty observations', async 
   assert.ok(body.includes('facetheory-stitch-health-status-panel-empty'));
   assert.ok(body.includes('No API health observations available yet.'));
 });
+
+test('svelte stitch-admin: VisibilityMatrix renders cell metadata and states', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/VisibilityMatrix.svelte'),
+    {
+      title: 'Partner service visibility',
+      description: 'Caller-supplied visibility by service environment.',
+      dimensions: [
+        { key: 'checkout-prod', label: 'Checkout production' },
+        { key: 'checkout-sandbox', label: 'Checkout sandbox' },
+        { key: 'payouts-prod', label: 'Payouts production' },
+      ],
+      rows: [
+        {
+          entity: {
+            key: 'partner-alpha',
+            label: 'Partner Alpha',
+            description: 'Enterprise partner imported from Factory.',
+          },
+          cells: [
+            {
+              entityKey: 'partner-alpha',
+              dimensionKey: 'checkout-prod',
+              state: 'visible',
+              label: 'Live',
+              detail: 'Release gate passed.',
+              metadata: {
+                authority: 'authoritative',
+                provenance: {
+                  source: 'visibility-import',
+                  sourceId: 'vis_001',
+                },
+                confidence: { level: 'high', label: 'High confidence' },
+                staleness: {
+                  state: 'fresh',
+                  ageLabel: 'refreshed 3 minutes ago',
+                },
+              },
+            },
+            {
+              entityKey: 'partner-alpha',
+              dimensionKey: 'checkout-sandbox',
+              state: 'partial',
+              detail: 'Sandbox merchant mapping is pending review.',
+              metadata: {
+                authority: 'non-authoritative',
+                confidence: { level: 'medium', label: 'Medium confidence' },
+                staleness: {
+                  state: 'stale',
+                  ageLabel: 'refreshed 2 hours ago',
+                  reason: 'Import has passed its freshness window.',
+                },
+              },
+            },
+            {
+              entityKey: 'partner-alpha',
+              dimensionKey: 'payouts-prod',
+              state: 'blocked',
+              detail: 'Missing payout capability.',
+              metadata: {
+                confidence: { level: 'low', label: 'Low confidence' },
+              },
+            },
+          ],
+        },
+        {
+          entity: { key: 'partner-beta', label: 'Partner Beta' },
+          cells: [
+            {
+              entityKey: 'partner-beta',
+              dimensionKey: 'checkout-prod',
+              state: 'not-visible',
+              detail: 'No active rollout for production.',
+            },
+            {
+              entityKey: 'partner-beta',
+              dimensionKey: 'checkout-sandbox',
+              state: 'unknown',
+            },
+          ],
+        },
+      ],
+    },
+  );
+
+  assert.ok(body.includes('facetheory-stitch-visibility-matrix'));
+  assert.ok(body.includes('Partner service visibility'));
+  assert.ok(body.includes('Checkout production'));
+  assert.ok(body.includes('Partner Alpha'));
+  assert.ok(body.includes('facetheory-stitch-visibility-matrix-cell-visible'));
+  assert.ok(body.includes('facetheory-stitch-visibility-matrix-cell-partial'));
+  assert.ok(body.includes('facetheory-stitch-visibility-matrix-cell-blocked'));
+  assert.ok(
+    body.includes('facetheory-stitch-visibility-matrix-cell-not-visible'),
+  );
+  assert.ok(body.includes('facetheory-stitch-visibility-matrix-cell-unknown'));
+  assert.ok(body.includes('data-cell-state="partial"'));
+  assert.ok(body.includes('data-authority-state="non-authoritative"'));
+  assert.ok(body.includes('data-confidence-level="medium"'));
+  assert.ok(body.includes('data-staleness-state="stale"'));
+  assert.ok(body.includes('visibility-import'));
+  assert.ok(body.includes('High confidence'));
+  assert.ok(body.includes('refreshed 2 hours ago'));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-warning'));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-danger'));
+});
+
+test('svelte stitch-admin: VisibilityMatrix renders explicit empty matrix cells', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/VisibilityMatrix.svelte'),
+    {
+      dimensions: [
+        { key: 'checkout-prod', label: 'Checkout production' },
+        { key: 'payouts-prod', label: 'Payouts production' },
+      ],
+      rows: [
+        {
+          entity: { key: 'partner-gamma', label: 'Partner Gamma' },
+          cells: [
+            {
+              entityKey: 'partner-gamma',
+              dimensionKey: 'checkout-prod',
+              state: 'visible',
+            },
+          ],
+        },
+      ],
+      emptyCellLabel: 'No imported visibility record',
+    },
+  );
+
+  assert.ok(body.includes('facetheory-stitch-visibility-matrix-cell-empty'));
+  assert.ok(body.includes('data-empty-cell="true"'));
+  assert.ok(body.includes('No imported visibility record'));
+  assert.ok(body.includes('data-cell-state="unknown"'));
+});
