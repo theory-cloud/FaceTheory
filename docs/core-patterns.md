@@ -437,7 +437,7 @@ export const face = createReactFace<OperatorDashboardData>({
 
 Why this is correct:
 - AppTheory or Autheory-derived authorization is resolved before FaceTheory renders; FaceTheory receives `OperatorGuardStatus` as data and does not embed the auth provider.
-- Health, staleness, confidence, provenance, and visibility cells are loaded once and serialized as stable render data.
+- Health, staleness, confidence, provenance, correlation, and visibility cells are loaded once and serialized as stable render data.
 - SSR is used because the HTML can vary by request identity, role, tenant, and visibility source.
 - The same shared contracts can feed Vue or Svelte by switching only the adapter import path.
 

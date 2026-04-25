@@ -9,6 +9,7 @@ export type {
   ConfidenceMetadata,
   OperatorEmptyStateConfig,
   OperatorEmptyStateIntent,
+  OperatorCorrelationMetadata,
   OperatorGuardState,
   OperatorGuardStatus,
   OperatorHealthRow,

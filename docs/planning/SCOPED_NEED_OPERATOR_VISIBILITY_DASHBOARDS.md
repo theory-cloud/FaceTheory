@@ -2,7 +2,7 @@
 
 ## Background
 
-Pay Theory's `release-control-plane` needs Phase 1 operator visibility panels that show real imported release and partner visibility while making safety boundaries obvious. The UI must distinguish real data from placeholders, mark data as non-authoritative until a later gate transition, expose provenance/confidence/staleness metadata, and keep authorization integration outside FaceTheory's business logic. These patterns are reusable for Theory Cloud operator dashboards beyond `release-control-plane`.
+Pay Theory's `release-control-plane` needs Phase 1 operator visibility panels that show real imported release and partner visibility while making safety boundaries obvious. The UI must distinguish real data from placeholders, mark data as non-authoritative until a later gate transition, expose provenance/confidence/staleness/correlation metadata, and keep authorization integration outside FaceTheory's business logic. These patterns are reusable for Theory Cloud operator dashboards beyond `release-control-plane`.
 
 ## Driver
 
@@ -10,7 +10,7 @@ Pay Theory `release-control-plane` Phase 1, with likely reuse by future Theory C
 
 ## Problem
 
-FaceTheory's current Stitch shell/admin primitives provide generic layout, callouts, tables, status tags, logs, filters, and hosted-auth state cards, but they do not provide domain-neutral operator-visibility semantics. Downstream dashboards must currently hand-roll the same safety cues: non-authoritative data banners, provenance/confidence/staleness badges, guarded shell states, health/API panels, entity-by-dimension visibility matrices, and explicit empty states that cannot be mistaken for mock partner/version data.
+FaceTheory's current Stitch shell/admin primitives provide generic layout, callouts, tables, status tags, logs, filters, and hosted-auth state cards, but they do not provide domain-neutral operator-visibility semantics. Downstream dashboards must currently hand-roll the same safety cues: non-authoritative data banners, provenance/confidence/staleness/correlation badges, guarded shell states, health/API panels, entity-by-dimension visibility matrices, and explicit empty states that cannot be mistaken for mock partner/version data.
 
 ## Render modes affected
 
@@ -31,7 +31,7 @@ Fits inside the existing FaceTheory shape as an additive Stitch capability. It d
 
 ## Determinism impact
 
-Preserves determinism if the primitives receive already-resolved display values and serialized metadata rather than reading time/random/browser state during render. Staleness display must be deterministic at the server/client boundary: examples should pass ISO timestamps, stable labels, or server-computed age text through `load()`/hydration data instead of recomputing `Date.now()` during render. Empty/loading/unauthorized states must render explicit stable markup.
+Preserves determinism if the primitives receive already-resolved display values and serialized metadata rather than reading time/random/browser state during render. Staleness and correlation display must be deterministic at the server/client boundary: examples should pass ISO timestamps, stable labels, server-computed age text, and normalized correlation IDs through `load()`/hydration data instead of recomputing `Date.now()` or looking up request/session state during render. Empty/loading/unauthorized states must render explicit stable markup.
 
 ## AWS-first posture
 
@@ -41,7 +41,7 @@ Preserves the AWS-first posture. Health/status examples should assume a Lambda/A
 
 - Shared operator-visibility contracts exist for:
   - authority/non-authoritative state,
-  - provenance/confidence/staleness metadata,
+  - provenance/confidence/staleness/correlation metadata,
   - guarded operator access states,
   - health/status panel rows,
   - entity × dimension visibility matrix rows/cells,

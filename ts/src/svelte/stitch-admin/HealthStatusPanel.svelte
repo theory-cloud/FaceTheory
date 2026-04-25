@@ -112,6 +112,17 @@
       out.push(badge);
     }
 
+    if (metadata.correlation !== undefined) {
+      const badge: HealthBadge = {
+        label: 'Correlation',
+        detail: metadata.correlation.correlationId,
+        tone: 'info',
+      };
+      const title = correlationTitle(metadata.correlation);
+      if (title !== undefined) badge.title = title;
+      out.push(badge);
+    }
+
     if (metadata.confidence !== undefined) {
       const badge: HealthBadge = {
         label: 'Confidence',
@@ -133,6 +144,22 @@
     }
 
     return out;
+  }
+
+  function correlationTitle(
+    correlation: NonNullable<OperatorVisibilityMetadata['correlation']>,
+  ): string | undefined {
+    const parts: string[] = [];
+    if (correlation.correlationSource !== undefined) {
+      parts.push(`Source: ${correlation.correlationSource}`);
+    }
+    if (correlation.trigger !== undefined) {
+      parts.push(`Trigger: ${correlation.trigger}`);
+    }
+    if (correlation.requestId !== undefined) {
+      parts.push(`Request ID: ${correlation.requestId}`);
+    }
+    return parts.length > 0 ? parts.join(' · ') : undefined;
   }
 
   function healthStatusStyle(status: OperatorHealthStatus): string {
