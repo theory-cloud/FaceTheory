@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0-rc.4](https://github.com/theory-cloud/FaceTheory/compare/v1.0.0-rc.3...v1.0.0-rc.4) (2026-04-25)
+
+
+### Features
+
+* **stitch-admin:** add operator correlation metadata ([1a9d13f](https://github.com/theory-cloud/FaceTheory/commit/1a9d13f44b7d6dbd1341e6e15f4dbe0502eeb158))
+* **stitch-admin:** add operator correlation metadata ([aaad242](https://github.com/theory-cloud/FaceTheory/commit/aaad2425456913a5f18858986b6a26f998f814be))
+
+
+### Bug Fixes
+
+* **deps:** update PostCSS for advisory GHSA-qx2v-qp2m-jg93 ([f464ad4](https://github.com/theory-cloud/FaceTheory/commit/f464ad4749bd37fd7fd4e68ce57bb1e7b34f74fd))
+
 ## [1.0.0-rc.3](https://github.com/theory-cloud/FaceTheory/compare/v1.0.0-rc.2...v1.0.0-rc.3) (2026-04-25)
 
 
