@@ -82,6 +82,12 @@ Use this when changing:
 
 The example intentionally passes stable age labels, guard status, health observations, and matrix cells through Face `load()` data. Do not compute freshness from `Date.now()`, browser globals, auth/session state, or network calls during render.
 
+For operator dashboard documentation or integration reviews, also confirm:
+
+- AppTheory/Autheory-derived auth state is passed into FaceTheory as `OperatorGuardStatus`; FaceTheory docs and examples do not embed Autheory validation or product-specific authorization logic.
+- Live auth-varying dashboards use SSR or a deterministic SPA shell. SSG is limited to static snapshots, and ISR examples call out explicit cache/tenant partitioning for every request-varying dimension.
+- Empty, loading, unauthorized, and filtered states do not use production-like mock partner, tenant, release, account, or version values.
+
 ### Vite SSR Adapters
 
 ```bash

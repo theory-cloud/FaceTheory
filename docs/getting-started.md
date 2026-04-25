@@ -165,6 +165,15 @@ The example renders `NonAuthoritativeBanner`, `GuardedOperatorShell`, `HealthSta
 
 Operator visibility primitives use caller-supplied metadata, guard state, health observations, and visibility matrix rows/cells only. Pass stable provenance, confidence, staleness labels, matrix cell labels, and `OperatorGuardStatus` values from `load()` or serialized hydration data; do not compute freshness or authorization from ambient browser/session globals during render. Empty states should use `OperatorEmptyStateConfig.placeholderDataPolicy = "no-production-like-data"` instead of production-looking placeholder tenants, partners, releases, or versions.
 
+### Operator dashboard integration boundaries
+
+Keep the dashboard boundary explicit:
+
+- **Auth state is upstream.** AppTheory middleware, an Autheory-hosted auth surface, or another host-owned service can validate the request before FaceTheory runs. FaceTheory should receive the derived `OperatorGuardStatus` and display it; it should not import Autheory validators, read provider sessions in a component, or encode Pay Theory release-control-plane rules.
+- **Render mode follows request variance.** Use SSR for request-authorized operator pages and a deterministic SPA shell when client refreshes happen after the initial render. Do not use SSG for live authorized visibility data. Use ISR only for non-personalized or safely partitioned snapshots where `cacheKey` and `tenantKey` include every authorization, tenant, role, locale, and visibility variant that can change the HTML.
+- **Freshness is data, not a render side effect.** Age labels, observed timestamps, health summaries, and visibility cells come from `load()` or serialized hydration data. Components should display those values exactly instead of recomputing them from `Date.now()`, browser globals, auth/session state, or network calls during render.
+- **No production-like placeholders.** Loading, unauthorized, filtered-empty, and missing-data states should be explicit about what is unavailable. Do not fill empty dashboards with realistic partner, tenant, release, version, or account-looking mock values.
+
 For control-plane navigation, treat `path` as the SSR-safe baseline contract for nav items and breadcrumbs. Use `onNavigate` only as an optional client-side interception hook; if a host never hydrates, links with `path` must still work as normal anchors.
 
 ### Brand-agnostic surface primitives

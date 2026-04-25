@@ -65,6 +65,23 @@ The shared Stitch foundation lives under the framework-neutral `stitch-tokens`, 
 
 Operator visibility contracts in `@theory-cloud/facetheory/stitch-admin` are framework-neutral data shapes for guarded operator dashboards. They describe caller-supplied authorization state, authority/provenance/confidence/staleness metadata, health rows, entity × dimension visibility matrix rows/cells, and explicit empty states. Keep timestamps, age labels, confidence labels, and staleness copy stable in `load()` or serialized hydration data; do not compute freshness from ambient time during render.
 
+## Operator Visibility Dashboard Boundary
+
+The operator visibility surface is presentational. It renders stable state supplied by the host; it is not an auth provider, cache-invalidation service, or release-control-plane business-logic package.
+
+Host-owned inputs:
+
+- `OperatorGuardStatus` values derived before render by AppTheory middleware, an Autheory integration, or another request-authorized service. FaceTheory components display the resulting authorized, unauthorized, loading, or error state without importing Autheory validators or reading provider sessions.
+- `OperatorVisibilityMetadata`, `OperatorHealthRow`, `VisibilityMatrixRow`, and `VisibilityMatrixCell` values loaded through `FaceModule.load()` or serialized hydration data. Provenance, confidence, staleness, health, and visibility labels are caller-supplied strings and timestamps.
+- `OperatorEmptyStateConfig` values that use `placeholderDataPolicy: "no-production-like-data"` when a screen would otherwise be empty, filtered, unauthorized, or waiting on upstream evidence.
+
+Render-mode guidance:
+
+- SSR is the default for request-authorized operator dashboards because each request can derive fresh guard, role, tenant, and visibility state.
+- A deterministic SPA shell is acceptable when the first paint is stable and any client refresh starts from serialized hydration data.
+- SSG is only for static documentation, training, or non-authorized snapshots; do not use it for live auth-varying operator visibility.
+- ISR requires safe partitioning. If HTML varies by user, role, tenant, cookie, locale, environment, or visibility source, encode that variance in explicit `cacheKey` / `tenantKey` functions or keep the route on SSR.
+
 ## Core Runtime Contracts
 
 These contracts shape every adapter and delivery mode. If you change one of these interfaces, update the canonical docs in the same change.
