@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.0-rc.4](https://github.com/theory-cloud/FaceTheory/compare/v1.0.0-rc.3...v1.0.0-rc.4) (2026-04-25)
+## [1.1.0](https://github.com/theory-cloud/FaceTheory/compare/v1.0.0...v1.1.0) (2026-04-25)
 
 
 ### Features
