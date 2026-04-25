@@ -153,6 +153,16 @@ const logs: LogEntry[] = [
 
 Use the shared contract subpaths for data shape and semantic variants. Use the adapter-matched subpaths for actual components. That keeps the React, Vue, and Svelte surfaces in lockstep instead of letting one host drift into framework-local shapes.
 
+The React operator visibility SSR example shows those primitives wired together from a Face `load()` function:
+
+```bash
+cd ts
+npm run example:operator-visibility:build
+npm run example:operator-visibility:serve
+```
+
+The example renders `NonAuthoritativeBanner`, `GuardedOperatorShell`, `HealthStatusPanel`, `VisibilityMatrix`, and `OperatorEmptyState` from injected data. Treat it as the reference shape for deterministic operator dashboards: load stable labels and metadata first, then render them without reading browser/session globals.
+
 Operator visibility primitives use caller-supplied metadata, guard state, health observations, and visibility matrix rows/cells only. Pass stable provenance, confidence, staleness labels, matrix cell labels, and `OperatorGuardStatus` values from `load()` or serialized hydration data; do not compute freshness or authorization from ambient browser/session globals during render. Empty states should use `OperatorEmptyStateConfig.placeholderDataPolicy = "no-production-like-data"` instead of production-looking placeholder tenants, partners, releases, or versions.
 
 For control-plane navigation, treat `path` as the SSR-safe baseline contract for nav items and breadcrumbs. Use `onNavigate` only as an optional client-side interception hook; if a host never hydrates, links with `path` must still work as normal anchors.
