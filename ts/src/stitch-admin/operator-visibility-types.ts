@@ -54,15 +54,32 @@ export interface StalenessMetadata {
 }
 
 /**
- * Shared metadata envelope for authority, provenance, confidence, and
- * staleness. Adapter primitives can render this consistently across React,
- * Vue, and Svelte without each adapter inventing its own data shape.
+ * Caller-provided correlation identifiers for operator support workflows.
+ * Values are normalized before render so badge output is deterministic across
+ * SSR and client hydration.
+ */
+export interface OperatorCorrelationMetadata {
+  /** Normalized correlation identifier shown/copied by operators. */
+  correlationId: string;
+  /** Where the selected correlation ID came from. */
+  correlationSource?: string;
+  /** Workload/trigger surface, e.g. "http", "eventbridge", or "dynamodb_stream". */
+  trigger?: string;
+  /** Invocation/request ID when distinct from correlationId. */
+  requestId?: string;
+}
+
+/**
+ * Shared metadata envelope for authority, provenance, confidence, staleness,
+ * and correlation. Adapter primitives can render this consistently across
+ * React, Vue, and Svelte without each adapter inventing its own data shape.
  */
 export interface OperatorVisibilityMetadata {
   authority?: AuthorityState;
   provenance?: ProvenanceMetadata;
   confidence?: ConfidenceMetadata;
   staleness?: StalenessMetadata;
+  correlation?: OperatorCorrelationMetadata;
 }
 
 /** Guard states for caller-supplied operator authorization. */

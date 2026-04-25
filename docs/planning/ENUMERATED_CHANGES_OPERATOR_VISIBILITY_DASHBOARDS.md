@@ -10,7 +10,7 @@ This list keeps issue #93 inside the existing FaceTheory shape: no render-mode c
 - **Layer**: stitch / docs
 - **Render mode impact**: none
 - **Determinism-sensitive**: no — this is type-only shared contract surface.
-- **Acceptance**: `@theory-cloud/facetheory/stitch-admin` exports framework-neutral contracts for `AuthorityState`, `OperatorGuardState`, provenance/confidence/staleness metadata, health rows, visibility matrix rows/cells, and explicit empty-state intent.
+- **Acceptance**: `@theory-cloud/facetheory/stitch-admin` exports framework-neutral contracts for `AuthorityState`, `OperatorGuardState`, provenance/confidence/staleness/correlation metadata, health rows, visibility matrix rows/cells, and explicit empty-state intent.
 - **Validation**: `cd ts && npm run typecheck`; `cd ts && npm run check`
 - **Conventional Commit subject**: `feat(stitch-admin): add operator visibility contracts`
 
@@ -20,7 +20,7 @@ This list keeps issue #93 inside the existing FaceTheory shape: no render-mode c
 - **Layer**: react adapter / stitch / docs
 - **Render mode impact**: all render modes can render the primitives; no mode semantics change.
 - **Determinism-sensitive**: no — components render caller-supplied stable labels and metadata only.
-- **Acceptance**: React exports `NonAuthoritativeBanner`, metadata badge/group primitives, and `OperatorEmptyState`; SSR tests cover non-authoritative, stale, low-confidence, provenance, and no-mock empty states.
+- **Acceptance**: React exports `NonAuthoritativeBanner`, metadata badge/group primitives, and `OperatorEmptyState`; SSR tests cover non-authoritative, stale, low-confidence, provenance, correlation, and no-mock empty states.
 - **Validation**: `cd ts && npx tsx test/unit/stitch-admin.test.ts`; `cd ts && npm run check`
 - **Conventional Commit subject**: `feat(react): add operator visibility notice primitives`
 
@@ -139,7 +139,7 @@ This list keeps issue #93 inside the existing FaceTheory shape: no render-mode c
 - **Paths**: `ts/examples/operator-visibility-react/`, `ts/package.json`, `ts/test/unit/operator-visibility-example.test.ts`, `ts/test/run-unit.ts`, `docs/getting-started.md`, `docs/testing-guide.md`
 - **Layer**: example / react adapter / docs
 - **Render mode impact**: ssr / spa
-- **Determinism-sensitive**: yes — the example demonstrates the deterministic SSR boundary for authority/staleness metadata and must not compute freshness labels from `Date.now()` during render.
+- **Determinism-sensitive**: yes — the example demonstrates the deterministic SSR boundary for authority/staleness/correlation metadata and must not compute freshness labels or derive correlation IDs from ambient request/session state during render.
 - **Acceptance**: A runnable React SSR example renders a guarded operator dashboard from injected `load()` data, includes non-authoritative/stale/low-confidence states, contains no mock production-like partner/version values in placeholders, and has a unit test asserting deterministic output markers.
 - **Validation**: `cd ts && npm run example:operator-visibility:build`; `cd ts && npx tsx test/unit/operator-visibility-example.test.ts`; `cd ts && npm run check`
 - **Conventional Commit subject**: `feat(examples): add operator visibility SSR example`
@@ -159,7 +159,7 @@ This list keeps issue #93 inside the existing FaceTheory shape: no render-mode c
 - [x] Core runtime/render-mode primitives are not changed because the need fits inside Stitch/admin.
 - [x] Shared contracts land before adapter implementations.
 - [x] React, Vue, and Svelte implementations are enumerated for every shared visual primitive family.
-- [x] Determinism-sensitive work is limited to the SSR example that demonstrates stable staleness metadata at the hydration boundary.
+- [x] Determinism-sensitive work is limited to the SSR example that demonstrates stable staleness and correlation metadata at the hydration boundary.
 - [x] Examples and docs are included because this is consumer-facing UI surface.
 - [x] No release manifests, version markers, dependencies, AWS-S3 code, ISR storage, or infrastructure stacks are part of the feature commits.
 - [x] The full list satisfies issue #93's acceptance criteria without adding release-control-plane business logic to FaceTheory.

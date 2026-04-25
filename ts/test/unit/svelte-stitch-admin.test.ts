@@ -8,6 +8,14 @@ import { pathToFileURL } from 'node:url';
 
 import { createFaceApp } from '../../src/app.js';
 import { createSvelteFace } from '../../src/svelte/index.js';
+import type { OperatorCorrelationMetadata } from '../../src/stitch-admin/index.js';
+
+const sampleCorrelation = {
+  correlationId: 'corr_release_20260424_001',
+  correlationSource: 'eventbridge.envelope',
+  trigger: 'eventbridge',
+  requestId: 'lambda_req_123',
+} satisfies OperatorCorrelationMetadata;
 
 async function renderComponent(
   componentPath: string,
@@ -86,7 +94,7 @@ test('svelte stitch-admin: NonAuthoritativeBanner renders metadata parity marker
   assert.ok(body.includes('facetheory-stitch-metadata-badge-danger'));
 });
 
-test('svelte stitch-admin: MetadataBadgeGroup renders provenance links and stable freshness', async () => {
+test('svelte stitch-admin: MetadataBadgeGroup renders provenance, correlation, and stable freshness', async () => {
   const body = await renderComponent(
     path.resolve('src/svelte/stitch-admin/MetadataBadgeGroup.svelte'),
     {
@@ -95,6 +103,7 @@ test('svelte stitch-admin: MetadataBadgeGroup renders provenance links and stabl
           source: 'Release manifest',
           href: '/operator/sources/release-manifest',
         },
+        correlation: sampleCorrelation,
         staleness: {
           state: 'fresh',
           ageLabel: 'refreshed 4 minutes ago',
@@ -106,6 +115,11 @@ test('svelte stitch-admin: MetadataBadgeGroup renders provenance links and stabl
   assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
   assert.ok(body.includes('href="/operator/sources/release-manifest"'));
   assert.ok(body.includes('Release manifest'));
+  assert.ok(body.includes('Correlation'));
+  assert.ok(body.includes('corr_release_20260424_001'));
+  assert.ok(body.includes('Source: eventbridge.envelope'));
+  assert.ok(body.includes('Trigger: eventbridge'));
+  assert.ok(body.includes('Request ID: lambda_req_123'));
   assert.ok(body.includes('refreshed 4 minutes ago'));
 });
 

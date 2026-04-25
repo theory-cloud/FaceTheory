@@ -44,6 +44,10 @@ test('operator visibility example renders deterministic SSR markers from load da
   assert.ok(firstBody.includes('data-operator-guard-state="authorized"'));
   assert.ok(firstBody.includes('facetheory-stitch-non-authoritative-banner'));
   assert.ok(firstBody.includes('Non-authoritative'));
+  assert.ok(firstBody.includes('Correlation'));
+  assert.ok(firstBody.includes('corr_example_visibility_001'));
+  assert.ok(firstBody.includes('Source: example.envelope.correlation_id'));
+  assert.ok(firstBody.includes('Trigger: eventbridge'));
   assert.ok(firstBody.includes('Low confidence'));
   assert.ok(firstBody.includes('refreshed 2 hours before snapshot'));
   assert.ok(firstBody.includes('facetheory-stitch-metadata-badge-danger'));

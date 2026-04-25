@@ -42,6 +42,7 @@ export type {
   MetadataBadgeProps,
   MetadataBadgeTone,
   NonAuthoritativeBannerProps,
+  OperatorCorrelationMetadata,
   OperatorEmptyStateProps,
   OperatorGuardState,
   OperatorGuardStatus,

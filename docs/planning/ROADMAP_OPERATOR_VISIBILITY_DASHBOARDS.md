@@ -2,7 +2,7 @@
 
 ## Goal
 
-Deliver issue #93 as an additive Stitch admin capability: shared operator-visibility contracts plus React, Vue, and Svelte visual primitives for guarded operator dashboards, non-authoritative data, provenance/confidence/staleness metadata, health/status panels, entity × dimension visibility matrices, and explicit no-mock empty states. The roadmap keeps FaceTheory inside its existing SSR/SSG/ISR/SPA and React/Vue/Svelte shape while giving Pay Theory `release-control-plane` reusable Phase 1 dashboard building blocks.
+Deliver issue #93 as an additive Stitch admin capability: shared operator-visibility contracts plus React, Vue, and Svelte visual primitives for guarded operator dashboards, non-authoritative data, provenance/confidence/staleness/correlation metadata, health/status panels, entity × dimension visibility matrices, and explicit no-mock empty states. The roadmap keeps FaceTheory inside its existing SSR/SSG/ISR/SPA and React/Vue/Svelte shape while giving Pay Theory `release-control-plane` reusable Phase 1 dashboard building blocks.
 
 ## Render modes and adapters affected
 
@@ -18,7 +18,7 @@ SSG and ISR can render static or safely partitioned visibility snapshots, but au
 
 ## Determinism impact
 
-The primitive work preserves determinism because components render caller-supplied state and metadata. The new determinism surface is the example and documentation for staleness/freshness: freshness labels must be server-computed or passed as stable serialized values rather than recomputed from `Date.now()` during render or hydration.
+The primitive work preserves determinism because components render caller-supplied state and metadata. The new determinism surface is the example and documentation for staleness/freshness and correlation: freshness labels and correlation IDs must be server-computed or passed as stable serialized values rather than recomputed or looked up from `Date.now()`, request/session globals, or network state during render or hydration.
 
 ## Phases
 
@@ -63,7 +63,7 @@ The primitive work preserves determinism because components render caller-suppli
 
 **Milestone candidates:**
 
-- **Operator visibility SSR example** — Add a runnable React SSR example using injected real-shaped data and deterministic metadata.
+- **Operator visibility SSR example** — Add a runnable React SSR example using injected real-shaped data and deterministic metadata, including normalized correlation IDs.
   - Items: 14
   - Dependencies: Phases 1 and 2
   - Determinism-sensitive: yes
