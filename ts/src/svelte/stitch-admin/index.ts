@@ -14,6 +14,7 @@ export { default as FilterChip } from './FilterChip.svelte';
 export { default as FilterChipGroup } from './FilterChipGroup.svelte';
 export { default as GuardedOperatorShell } from './GuardedOperatorShell.svelte';
 export { default as HealthStatusPanel } from './HealthStatusPanel.svelte';
+export { default as VisibilityMatrix } from './VisibilityMatrix.svelte';
 export { default as InlineKeyValueList } from './InlineKeyValueList.svelte';
 export { default as CopyableCode } from './CopyableCode.svelte';
 export { default as LogStream } from './LogStream.svelte';
@@ -28,6 +29,12 @@ export type {
   FilterChipConfig,
   GuardedOperatorShellProps,
   HealthStatusPanelProps,
+  VisibilityMatrixProps,
+  VisibilityMatrixCell,
+  VisibilityMatrixCellState,
+  VisibilityMatrixDimension,
+  VisibilityMatrixEntity,
+  VisibilityMatrixRow,
   KeyValueEntry,
   LogEntry,
   LogLevel,
