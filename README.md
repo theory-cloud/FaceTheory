@@ -90,7 +90,16 @@ High-signal examples:
 - Vue Vite SSR: `npm run example:vite:vue:build && npm run example:vite:vue:serve`
 - Svelte Vite SSR: `npm run example:vite:svelte:build && npm run example:vite:svelte:serve`
 - Svelte external library host: `npm run example:vite:svelte:library:build && npm run example:vite:svelte:library:serve`
+- Operator visibility SSR example: `npm run example:operator-visibility:build && npm run example:operator-visibility:serve`
 - SSG: `npm run example:ssg:build && npm run example:ssg:serve`
+
+## Operator Visibility Dashboards
+
+Stitch admin includes operator visibility contracts and React, Vue, and Svelte primitives for guarded operator dashboards. Hosts pass AppTheory/Autheory-derived auth state into FaceTheory as caller-supplied `OperatorGuardStatus`; FaceTheory renders that state but does not validate sessions or embed Autheory business logic.
+
+For auth-varying dashboards, prefer SSR or a deterministic SPA shell. Avoid SSG for live authorized visibility data, and use ISR only when the cache key and tenant partitioning fully separate every request-varying dimension. Empty and placeholder states must use explicit no-data copy instead of production-like partner, tenant, release, or version mock values.
+
+See [Getting Started](./docs/getting-started.md#add-stitch-control-plane-primitives), [API Reference](./docs/api-reference.md#operator-visibility-dashboard-boundary), and [Core Patterns](./docs/core-patterns.md#pattern-build-operator-dashboards-from-caller-supplied-state) for the integration boundary.
 
 ## Repository Layout
 
