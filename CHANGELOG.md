@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.0.0-rc.3](https://github.com/theory-cloud/FaceTheory/compare/v1.0.0-rc.2...v1.0.0-rc.3) (2026-04-25)
+
+
+### Features
+
+* **examples:** add operator visibility SSR example ([8dfac0a](https://github.com/theory-cloud/FaceTheory/commit/8dfac0ab0833f03632b08b42f4090e6777b1886e))
+* **examples:** add operator visibility SSR example ([e1fb440](https://github.com/theory-cloud/FaceTheory/commit/e1fb4407d8755abc940680cc7b5a1ff1ac0eeef0))
+* **react:** add guarded operator shell states ([debb04c](https://github.com/theory-cloud/FaceTheory/commit/debb04c4a5126c8f6de648c81958736df53d6754))
+* **react:** add operator health status panel ([12e2661](https://github.com/theory-cloud/FaceTheory/commit/12e26610277192610cdd9406a65981649b5295b0))
+* **react:** add operator visibility matrix ([f189f19](https://github.com/theory-cloud/FaceTheory/commit/f189f19b472c3d227f6b017adb1fa0d5e05d776c))
+* **react:** add operator visibility notice primitives ([b42766a](https://github.com/theory-cloud/FaceTheory/commit/b42766a825914156aef46b3fc499bcd441afb594))
+* **stitch-admin:** add operator health panels ([2ee075f](https://github.com/theory-cloud/FaceTheory/commit/2ee075f4afeab8dd4f063f44bf9c60e29cb70d66))
+* **stitch-admin:** add operator safety states ([3950efd](https://github.com/theory-cloud/FaceTheory/commit/3950efdb5f4cf49731fd7846f955ce84477a0346))
+* **stitch-admin:** add operator visibility contracts ([4cfbec1](https://github.com/theory-cloud/FaceTheory/commit/4cfbec16b45e567a18fe9e07942084cd7688c208))
+* **stitch-admin:** add operator visibility contracts ([19ac1a0](https://github.com/theory-cloud/FaceTheory/commit/19ac1a0a545adc2dae76c23088b3613dce206cce))
+* **stitch-admin:** add operator visibility matrices ([c904ef0](https://github.com/theory-cloud/FaceTheory/commit/c904ef01abed6f9a56fdf0f59b977d230f19cc17))
+* **svelte:** add guarded operator shell states ([01898d6](https://github.com/theory-cloud/FaceTheory/commit/01898d660eaf3cde373f9b16612baf3b7201637a))
+* **svelte:** add operator health status panel ([6031d41](https://github.com/theory-cloud/FaceTheory/commit/6031d41f843d2d8304f4ec6aa92526cf089971db))
+* **svelte:** add operator visibility matrix ([1b4e04d](https://github.com/theory-cloud/FaceTheory/commit/1b4e04de7d4729226711497bf7b652d804c3a806))
+* **svelte:** add operator visibility notice primitives ([8606f4a](https://github.com/theory-cloud/FaceTheory/commit/8606f4a8e4acd38906e29ef4bbc38f9a18e10fb8))
+* **vue:** add guarded operator shell states ([bf26bd5](https://github.com/theory-cloud/FaceTheory/commit/bf26bd57482162c346c867fe20d39600ed005ed4))
+* **vue:** add operator health status panel ([dcf9e35](https://github.com/theory-cloud/FaceTheory/commit/dcf9e353eaf2693fc804e2c8efe4901e0c38ab9d))
+* **vue:** add operator visibility matrix ([f51b8e2](https://github.com/theory-cloud/FaceTheory/commit/f51b8e2144aaf238b5041e6d9218019a9412af3f))
+* **vue:** add operator visibility notice primitives ([587f7a1](https://github.com/theory-cloud/FaceTheory/commit/587f7a134c02ca6c2967b37957f520c1c8203136))
+
+
+### Bug Fixes
+
+* **deps:** align AppTheory v1.1.0 and TableTheory v1.7.0 ([7f696f0](https://github.com/theory-cloud/FaceTheory/commit/7f696f06bf9bcc899b3e1d7ef2a24900231a66b1))
+* **deps:** align AppTheory v1.1.0 and TableTheory v1.7.0 ([82ed194](https://github.com/theory-cloud/FaceTheory/commit/82ed1947219d8dff3dd7bdafbf3440faa8f058b9))
+* **security:** address dependency and redos alerts ([9edd688](https://github.com/theory-cloud/FaceTheory/commit/9edd6881e7bdc8170afd8d850ad04dec38e972a3))
+* **security:** address dependency and redos alerts ([44c265a](https://github.com/theory-cloud/FaceTheory/commit/44c265a4f58b26711ffa6dfff6875e5c022c2154))
+
 ## [1.0.0](https://github.com/theory-cloud/FaceTheory/compare/v0.6.1...v1.0.0) (2026-04-23)
 
 
