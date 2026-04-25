@@ -37,8 +37,44 @@ export {
 export { CopyableCode, type CopyableCodeProps } from './copyable-code.js';
 
 export {
+  HealthStatusPanel,
+  type HealthStatusPanelProps,
+  type OperatorHealthRow,
+  type OperatorHealthStatus,
+} from './health-status-panel.js';
+
+export {
+  VisibilityMatrix,
+  type VisibilityMatrixProps,
+  type VisibilityMatrixCell,
+  type VisibilityMatrixCellState,
+  type VisibilityMatrixDimension,
+  type VisibilityMatrixEntity,
+  type VisibilityMatrixRow,
+} from './visibility-matrix.js';
+
+export {
   LogStream,
   type LogEntry,
   type LogLevel,
   type LogStreamProps,
 } from './log-stream.js';
+
+export {
+  MetadataBadge,
+  MetadataBadgeGroup,
+  NonAuthoritativeBanner,
+  OperatorEmptyState,
+  type MetadataBadgeGroupProps,
+  type MetadataBadgeProps,
+  type MetadataBadgeTone,
+  type NonAuthoritativeBannerProps,
+  type OperatorEmptyStateProps,
+} from './operator-notices.js';
+
+export {
+  GuardedOperatorShell,
+  type GuardedOperatorShellProps,
+  type OperatorGuardState,
+  type OperatorGuardStatus,
+} from './operator-guard.js';

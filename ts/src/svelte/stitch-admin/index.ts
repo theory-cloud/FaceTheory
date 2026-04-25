@@ -12,17 +12,41 @@ export { default as StatusTag } from './StatusTag.svelte';
 export { default as Tabs } from './Tabs.svelte';
 export { default as FilterChip } from './FilterChip.svelte';
 export { default as FilterChipGroup } from './FilterChipGroup.svelte';
+export { default as GuardedOperatorShell } from './GuardedOperatorShell.svelte';
+export { default as HealthStatusPanel } from './HealthStatusPanel.svelte';
+export { default as VisibilityMatrix } from './VisibilityMatrix.svelte';
 export { default as InlineKeyValueList } from './InlineKeyValueList.svelte';
 export { default as CopyableCode } from './CopyableCode.svelte';
 export { default as LogStream } from './LogStream.svelte';
+export { default as MetadataBadge } from './MetadataBadge.svelte';
+export { default as MetadataBadgeGroup } from './MetadataBadgeGroup.svelte';
+export { default as NonAuthoritativeBanner } from './NonAuthoritativeBanner.svelte';
+export { default as OperatorEmptyState } from './OperatorEmptyState.svelte';
 
 export type {
   DataTableToolbarSlots,
   DataTableColumn,
   FilterChipConfig,
+  GuardedOperatorShellProps,
+  HealthStatusPanelProps,
+  VisibilityMatrixProps,
+  VisibilityMatrixCell,
+  VisibilityMatrixCellState,
+  VisibilityMatrixDimension,
+  VisibilityMatrixEntity,
+  VisibilityMatrixRow,
   KeyValueEntry,
   LogEntry,
   LogLevel,
+  MetadataBadgeGroupProps,
+  MetadataBadgeProps,
+  MetadataBadgeTone,
+  NonAuthoritativeBannerProps,
+  OperatorEmptyStateProps,
+  OperatorGuardState,
+  OperatorGuardStatus,
+  OperatorHealthRow,
+  OperatorHealthStatus,
   PropertyItem,
   StatusVariant,
   TabItem,

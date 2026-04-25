@@ -27,6 +27,8 @@ await import('./unit/vue-stitch-shell.test.js');
 await import('./unit/vue-stitch-hosted-auth.test.js');
 await import('./unit/vue-stitch-admin.test.js');
 await import('./unit/svelte.test.js');
+await import('./unit/svelte-stitch-admin.test.js');
+await import('./unit/operator-visibility-example.test.js');
 await import('./unit/vite-ssr-example.test.js');
 await import('./unit/vite-ssr-vue-example.test.js');
 await import('./unit/vite-ssr-svelte-example.test.js');

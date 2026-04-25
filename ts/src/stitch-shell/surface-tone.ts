@@ -4,19 +4,41 @@ export interface ResolvedSurfaceTone {
   chipColor: string;
 }
 
-export function normalizeSurfaceTone(surfaceTone: string | undefined): string | undefined {
+function isAsciiAlphaNumeric(charCode: number): boolean {
+  return (
+    (charCode >= 48 && charCode <= 57) || (charCode >= 97 && charCode <= 122)
+  );
+}
+
+export function normalizeSurfaceTone(
+  surfaceTone: string | undefined,
+): string | undefined {
   if (surfaceTone === undefined) return undefined;
 
-  const normalized = surfaceTone
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  const lower = surfaceTone.trim().toLowerCase();
+  let normalized = '';
+  let pendingSeparator = false;
+
+  for (let index = 0; index < lower.length; index += 1) {
+    const char = lower[index]!;
+
+    if (isAsciiAlphaNumeric(char.charCodeAt(0))) {
+      if (pendingSeparator && normalized.length > 0) {
+        normalized += '-';
+      }
+      normalized += char;
+      pendingSeparator = false;
+    } else if (normalized.length > 0) {
+      pendingSeparator = true;
+    }
+  }
 
   return normalized ? normalized : undefined;
 }
 
-export function resolveSurfaceTone(surfaceTone: string | undefined): ResolvedSurfaceTone {
+export function resolveSurfaceTone(
+  surfaceTone: string | undefined,
+): ResolvedSurfaceTone {
   const normalizedTone = normalizeSurfaceTone(surfaceTone);
 
   return normalizedTone !== undefined

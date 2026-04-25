@@ -504,9 +504,26 @@ test('BrandHeader surfaceTone normalizes to safe stitch CSS variable suffixes', 
     }),
   );
   assert.ok(body.includes('--stitch-color-secondary-accent-prod-2-container'));
-  assert.ok(body.includes('--stitch-color-on-secondary-accent-prod-2-container'));
+  assert.ok(
+    body.includes('--stitch-color-on-secondary-accent-prod-2-container'),
+  );
   assert.ok(body.includes('data-surface-tone="secondary-accent-prod-2"'));
   assert.ok(!body.includes('Secondary Accent / Prod 2'));
+});
+
+test('BrandHeader surfaceTone handles long separator runs safely', async () => {
+  const separators = '-'.repeat(10_000);
+  const body = await renderSSR(
+    h(BrandHeader, {
+      logo: h('span', null, '◆'),
+      wordmark: 'Theory Cloud',
+      surfaceLabel: '[Core]',
+      surfaceTone: `${separators}Admin${separators}Ops${separators}`,
+    }),
+  );
+  assert.ok(body.includes('--stitch-color-admin-ops-container'));
+  assert.ok(body.includes('--stitch-color-on-admin-ops-container'));
+  assert.ok(body.includes('data-surface-tone="admin-ops"'));
 });
 
 test('BrandHeader falls back to neutral tokens when surfaceTone normalizes empty', async () => {

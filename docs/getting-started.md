@@ -21,7 +21,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=1.0.0 # x-release-please-version
+export FACETHEORY_VERSION=1.0.0-rc.3 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -39,10 +39,10 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.0.0/theory-cloud-apptheory-1.0.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.1.0/theory-cloud-apptheory-1.1.0.tgz
 
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.6.1/theory-cloud-tabletheory-ts-1.6.1.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.7.0/theory-cloud-tabletheory-ts-1.7.0.tgz
 ```
 
 Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoint. Use TableTheory when you want the documented production ISR metadata store adapter.
@@ -109,7 +109,7 @@ FaceTheory's Stitch UI surface is split into shared contracts plus framework-spe
 The component names are intentionally parallel across frameworks, so the same conceptual surface exists everywhere:
 
 - Shell/layout: `Shell`, `PageFrame`, `Section`, `Panel`, `SummaryStrip`, `Callout`
-- Dense admin: `Tabs`, `FilterChip`, `FilterChipGroup`, `InlineKeyValueList`, `CopyableCode`, `LogStream`
+- Dense admin: `Tabs`, `FilterChip`, `FilterChipGroup`, `InlineKeyValueList`, `CopyableCode`, `LogStream`, `NonAuthoritativeBanner`, `MetadataBadgeGroup`, `OperatorEmptyState`, `GuardedOperatorShell`, `HealthStatusPanel`, `VisibilityMatrix`
 
 Example composition:
 
@@ -118,27 +118,32 @@ import type {
   FilterChipConfig,
   LogEntry,
   TabItem,
-} from '@theory-cloud/facetheory/stitch-admin';
-import { Callout } from '@theory-cloud/facetheory/react/stitch-shell';
+} from "@theory-cloud/facetheory/stitch-admin";
+import { Callout } from "@theory-cloud/facetheory/react/stitch-shell";
 import {
   FilterChipGroup,
   LogStream,
   Tabs,
-} from '@theory-cloud/facetheory/react/stitch-admin';
+} from "@theory-cloud/facetheory/react/stitch-admin";
 
 const tabs: TabItem[] = [
-  { key: 'policies', label: 'Policies', count: 8 },
-  { key: 'catalog', label: 'Catalog', count: 12 },
+  { key: "policies", label: "Policies", count: 8 },
+  { key: "catalog", label: "Catalog", count: 12 },
 ];
 
 const filters: FilterChipConfig[] = [
-  { key: 'status', label: 'status: active' },
-  { key: 'manifest', label: 'manifest: stale', count: 2 },
+  { key: "status", label: "status: active" },
+  { key: "manifest", label: "manifest: stale", count: 2 },
 ];
 
 const logs: LogEntry[] = [
-  { id: '1', timestamp: '14:02:11', level: 'debug', message: 'Repair started' },
-  { id: '2', timestamp: '14:02:12', level: 'success', message: 'Repair completed' },
+  { id: "1", timestamp: "14:02:11", level: "debug", message: "Repair started" },
+  {
+    id: "2",
+    timestamp: "14:02:12",
+    level: "success",
+    message: "Repair completed",
+  },
 ];
 
 // In React, render <Callout />, <Tabs />, <FilterChipGroup />, and <LogStream />
@@ -147,6 +152,27 @@ const logs: LogEntry[] = [
 ```
 
 Use the shared contract subpaths for data shape and semantic variants. Use the adapter-matched subpaths for actual components. That keeps the React, Vue, and Svelte surfaces in lockstep instead of letting one host drift into framework-local shapes.
+
+The React operator visibility SSR example shows those primitives wired together from a Face `load()` function:
+
+```bash
+cd ts
+npm run example:operator-visibility:build
+npm run example:operator-visibility:serve
+```
+
+The example renders `NonAuthoritativeBanner`, `GuardedOperatorShell`, `HealthStatusPanel`, `VisibilityMatrix`, and `OperatorEmptyState` from injected data. Treat it as the reference shape for deterministic operator dashboards: load stable labels and metadata first, then render them without reading browser/session globals.
+
+Operator visibility primitives use caller-supplied metadata, guard state, health observations, and visibility matrix rows/cells only. Pass stable provenance, confidence, staleness labels, matrix cell labels, and `OperatorGuardStatus` values from `load()` or serialized hydration data; do not compute freshness or authorization from ambient browser/session globals during render. Empty states should use `OperatorEmptyStateConfig.placeholderDataPolicy = "no-production-like-data"` instead of production-looking placeholder tenants, partners, releases, or versions.
+
+### Operator dashboard integration boundaries
+
+Keep the dashboard boundary explicit:
+
+- **Auth state is upstream.** AppTheory middleware, an Autheory-hosted auth surface, or another host-owned service can validate the request before FaceTheory runs. FaceTheory should receive the derived `OperatorGuardStatus` and display it; it should not import Autheory validators, read provider sessions in a component, or encode Pay Theory release-control-plane rules.
+- **Render mode follows request variance.** Use SSR for request-authorized operator pages and a deterministic SPA shell when client refreshes happen after the initial render. Do not use SSG for live authorized visibility data. Use ISR only for non-personalized or safely partitioned snapshots where `cacheKey` and `tenantKey` include every authorization, tenant, role, locale, and visibility variant that can change the HTML.
+- **Freshness is data, not a render side effect.** Age labels, observed timestamps, health summaries, and visibility cells come from `load()` or serialized hydration data. Components should display those values exactly instead of recomputing them from `Date.now()`, browser globals, auth/session state, or network calls during render.
+- **No production-like placeholders.** Loading, unauthorized, filtered-empty, and missing-data states should be explicit about what is unavailable. Do not fill empty dashboards with realistic partner, tenant, release, version, or account-looking mock values.
 
 For control-plane navigation, treat `path` as the SSR-safe baseline contract for nav items and breadcrumbs. Use `onNavigate` only as an optional client-side interception hook; if a host never hydrates, links with `path` must still work as normal anchors.
 
@@ -206,7 +232,7 @@ Important ISR default:
 
 ## Reference Bundle
 
-The `v1.0.0` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v1.0.0-rc.3` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples

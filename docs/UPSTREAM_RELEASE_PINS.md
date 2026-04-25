@@ -7,24 +7,24 @@ This file records the currently pinned versions and the exact install strings we
 
 ## Pins
 
-- AppTheory (TypeScript): `v1.0.0`
-- AppTheory (CDK): `v1.0.0`
-- TableTheory (TypeScript): `v1.6.1`
+- AppTheory (TypeScript): `v1.1.0`
+- AppTheory (CDK): `v1.1.0`
+- TableTheory (TypeScript): `v1.7.0`
 
 ## Install (npm)
 
 ```bash
   # AppTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.0.0/theory-cloud-apptheory-1.0.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.1.0/theory-cloud-apptheory-1.1.0.tgz
 
   # TableTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.6.1/theory-cloud-tabletheory-ts-1.6.1.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.7.0/theory-cloud-tabletheory-ts-1.7.0.tgz
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.0.0/theory-cloud-apptheory-cdk-1.0.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.1.0/theory-cloud-apptheory-cdk-1.1.0.tgz
 ```
 
 ## package.json Snippet (Pinned)
@@ -35,12 +35,12 @@ registry installs:
 ```json
 {
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.0.0/theory-cloud-apptheory-1.0.0.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.6.1/theory-cloud-tabletheory-ts-1.6.1.tgz"
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.1.0/theory-cloud-apptheory-1.1.0.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.7.0/theory-cloud-tabletheory-ts-1.7.0.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.6.1/theory-cloud-tabletheory-ts-1.6.1.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.7.0/theory-cloud-tabletheory-ts-1.7.0.tgz"
     }
   }
 }
