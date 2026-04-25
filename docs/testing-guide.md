@@ -77,10 +77,10 @@ npx tsx test/unit/operator-visibility-example.test.ts
 Use this when changing:
 
 - Stitch admin operator visibility primitives
-- deterministic guard/authority/confidence/staleness rendering
+- deterministic guard/authority/confidence/staleness/correlation rendering
 - health panels or visibility matrices used by operator dashboards
 
-The example intentionally passes stable age labels, guard status, health observations, and matrix cells through Face `load()` data. Do not compute freshness from `Date.now()`, browser globals, auth/session state, or network calls during render.
+The example intentionally passes stable age labels, normalized correlation IDs, guard status, health observations, and matrix cells through Face `load()` data. Do not compute freshness or correlation from `Date.now()`, browser globals, auth/session state, or network calls during render.
 
 For operator dashboard documentation or integration reviews, also confirm:
 

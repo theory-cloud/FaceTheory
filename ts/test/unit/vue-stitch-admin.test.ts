@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
+import type { OperatorCorrelationMetadata } from '../../src/stitch-admin/index.js';
 import { createVueFace, h } from '../../src/vue/index.js';
 import {
   CopyableCode,
@@ -24,6 +25,13 @@ import {
   StatusTag,
   Tabs,
 } from '../../src/vue/stitch-admin/index.js';
+
+const sampleCorrelation = {
+  correlationId: 'corr_release_20260424_001',
+  correlationSource: 'eventbridge.envelope',
+  trigger: 'eventbridge',
+  requestId: 'lambda_req_123',
+} satisfies OperatorCorrelationMetadata;
 
 async function renderSSR(vnode: ReturnType<typeof h>): Promise<string> {
   const app = createFaceApp({
@@ -73,7 +81,7 @@ test('vue stitch-admin: operator visibility notices render parity metadata', asy
   assert.ok(body.includes('facetheory-stitch-metadata-badge-danger'));
 });
 
-test('vue stitch-admin: MetadataBadgeGroup renders provenance links and stable freshness', async () => {
+test('vue stitch-admin: MetadataBadgeGroup renders provenance, correlation, and stable freshness', async () => {
   const body = await renderSSR(
     h(MetadataBadgeGroup, {
       metadata: {
@@ -81,6 +89,7 @@ test('vue stitch-admin: MetadataBadgeGroup renders provenance links and stable f
           source: 'Release manifest',
           href: '/operator/sources/release-manifest',
         },
+        correlation: sampleCorrelation,
         staleness: {
           state: 'fresh',
           ageLabel: 'refreshed 4 minutes ago',
@@ -92,6 +101,11 @@ test('vue stitch-admin: MetadataBadgeGroup renders provenance links and stable f
   assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
   assert.ok(body.includes('href="/operator/sources/release-manifest"'));
   assert.ok(body.includes('Release manifest'));
+  assert.ok(body.includes('Correlation'));
+  assert.ok(body.includes('corr_release_20260424_001'));
+  assert.ok(body.includes('Source: eventbridge.envelope'));
+  assert.ok(body.includes('Trigger: eventbridge'));
+  assert.ok(body.includes('Request ID: lambda_req_123'));
   assert.ok(body.includes('refreshed 4 minutes ago'));
 });
 

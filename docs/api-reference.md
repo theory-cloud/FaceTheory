@@ -42,7 +42,7 @@ Use this table as the public entrypoint map for package consumers. It reflects t
 | `@theory-cloud/facetheory/aws-s3`                    | AWS SDK S3 adapter                   | `createAwsSdkS3HtmlStoreClient`                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `@theory-cloud/facetheory/stitch-tokens`             | Shared Stitch token utilities        | `StitchTokenSet` (with optional `surface` classification), `StitchCssVarOptions` (supports `prefix` and `additionalPrefixes`), `stitchToCssVars`, `stitchCssVarsToRootBlock`                                                                                                                                                                                                                                                                                                                |
 | `@theory-cloud/facetheory/stitch-shell`              | Shared Stitch navigation helpers     | `NavItem`, `BreadcrumbNode`, `ResolvedNav`, `CalloutVariant`, `resolveActiveNav`                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `@theory-cloud/facetheory/stitch-admin`              | Shared Stitch admin contracts        | `TabItem`, `FilterChipConfig`, `LogEntry`, `LogLevel`, `StatusVariant`, `AuthorityState`, `OperatorGuardState`, `OperatorVisibilityMetadata`, `OperatorHealthRow`, `VisibilityMatrixRow`, `VisibilityMatrixCell`, `OperatorEmptyStateConfig`                                                                                                                                                                                                                                                |
+| `@theory-cloud/facetheory/stitch-admin`              | Shared Stitch admin contracts        | `TabItem`, `FilterChipConfig`, `LogEntry`, `LogLevel`, `StatusVariant`, `AuthorityState`, `OperatorGuardState`, `OperatorCorrelationMetadata`, `OperatorVisibilityMetadata`, `OperatorHealthRow`, `VisibilityMatrixRow`, `VisibilityMatrixCell`, `OperatorEmptyStateConfig`                                                                                                                                                                                                                 |
 | `@theory-cloud/facetheory/react`                     | React adapter                        | `renderReact`, `renderReactStream`, `createReactFace`, `createReactStreamFace`                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `@theory-cloud/facetheory/react/antd`                | React Ant Design integration         | `createAntdIntegration`                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `@theory-cloud/facetheory/react/emotion`             | React Emotion integration            | `createEmotionIntegration`                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -63,7 +63,7 @@ Use this table as the public entrypoint map for package consumers. It reflects t
 
 The shared Stitch foundation lives under the framework-neutral `stitch-tokens`, `stitch-shell`, and `stitch-admin` subpaths so React, Vue, and Svelte applications can consume the same token, navigation, and dense-admin contracts. The visual primitives now ship with parallel React, Vue, and Svelte adapter subpaths so each framework consumes the same conceptual surface without falling back to React-only wrappers.
 
-Operator visibility contracts in `@theory-cloud/facetheory/stitch-admin` are framework-neutral data shapes for guarded operator dashboards. They describe caller-supplied authorization state, authority/provenance/confidence/staleness metadata, health rows, entity × dimension visibility matrix rows/cells, and explicit empty states. Keep timestamps, age labels, confidence labels, and staleness copy stable in `load()` or serialized hydration data; do not compute freshness from ambient time during render.
+Operator visibility contracts in `@theory-cloud/facetheory/stitch-admin` are framework-neutral data shapes for guarded operator dashboards. They describe caller-supplied authorization state, authority/provenance/confidence/staleness/correlation metadata, health rows, entity × dimension visibility matrix rows/cells, and explicit empty states. Keep timestamps, age labels, confidence labels, staleness copy, and correlation IDs stable in `load()` or serialized hydration data; do not compute freshness or derive correlation from ambient time, browser/session state, or lookups during render.
 
 ## Operator Visibility Dashboard Boundary
 
@@ -72,8 +72,31 @@ The operator visibility surface is presentational. It renders stable state suppl
 Host-owned inputs:
 
 - `OperatorGuardStatus` values derived before render by AppTheory middleware, an Autheory integration, or another request-authorized service. FaceTheory components display the resulting authorized, unauthorized, loading, or error state without importing Autheory validators or reading provider sessions.
-- `OperatorVisibilityMetadata`, `OperatorHealthRow`, `VisibilityMatrixRow`, and `VisibilityMatrixCell` values loaded through `FaceModule.load()` or serialized hydration data. Provenance, confidence, staleness, health, and visibility labels are caller-supplied strings and timestamps.
+- `OperatorVisibilityMetadata`, `OperatorHealthRow`, `VisibilityMatrixRow`, and `VisibilityMatrixCell` values loaded through `FaceModule.load()` or serialized hydration data. Provenance, confidence, staleness, correlation, health, and visibility labels are caller-supplied strings and timestamps.
+- `OperatorCorrelationMetadata` values when operators need a normalized support/debug identifier. Set `correlationId` to the ID operators should see/copy, and optionally include `correlationSource`, `trigger`, and distinct `requestId` values from AppTheory envelopes, EventBridge payloads, DynamoDB Streams records, or other upstream workload metadata.
 - `OperatorEmptyStateConfig` values that use `placeholderDataPolicy: "no-production-like-data"` when a screen would otherwise be empty, filtered, unauthorized, or waiting on upstream evidence.
+
+Example correlation mappings:
+
+```ts
+const eventBridgeMetadata = {
+  correlation: {
+    correlationId: envelope.correlation_id,
+    correlationSource: envelope.correlation_source,
+    trigger: "eventbridge",
+    requestId: envelope.request_id,
+  },
+};
+
+const dynamoStreamMetadata = {
+  correlation: {
+    correlationId: streamRecord.eventID,
+    correlationSource: "dynamodb.event_id",
+    trigger: "dynamodb_stream",
+    requestId: lambdaRequestId,
+  },
+};
+```
 
 Render-mode guidance:
 

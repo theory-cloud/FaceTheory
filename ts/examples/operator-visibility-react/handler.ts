@@ -1,8 +1,9 @@
 // Deterministic React SSR operator visibility example.
 //
 // The Face `load()` function injects every authority, confidence, freshness,
-// guard, health, and matrix value. The React render path only displays those
-// caller-supplied values; it never computes freshness from ambient time.
+// correlation, guard, health, and matrix value. The React render path only
+// displays those caller-supplied values; it never computes freshness from
+// ambient time.
 
 import * as React from 'react';
 
@@ -59,6 +60,12 @@ export async function loadOperatorVisibilityDashboard(
         sourceId: 'example-import-2026-04-24T18:00Z',
         observedAt: SNAPSHOT_AT,
       },
+      correlation: {
+        correlationId: 'corr_example_visibility_001',
+        correlationSource: 'example.envelope.correlation_id',
+        trigger: 'eventbridge',
+        requestId: 'req_example_visibility_001',
+      },
       confidence: {
         level: 'low',
         label: 'Low confidence',
@@ -83,6 +90,12 @@ export async function loadOperatorVisibilityDashboard(
           provenance: {
             source: 'operator-health-fixture',
             sourceId: 'health_example_001',
+          },
+          correlation: {
+            correlationId: 'health_example_001',
+            correlationSource: 'fixture.health_id',
+            trigger: 'scheduled',
+            requestId: 'req_example_visibility_001',
           },
           staleness: {
             state: 'stale',
@@ -146,6 +159,11 @@ export async function loadOperatorVisibilityDashboard(
             metadata: {
               authority: 'non-authoritative',
               provenance: { source: 'Example import manifest' },
+              correlation: {
+                correlationId: 'corr_example_visibility_001',
+                correlationSource: 'example.envelope.correlation_id',
+                trigger: 'eventbridge',
+              },
               confidence: { level: 'low', label: 'Low confidence' },
               staleness: {
                 state: 'stale',
@@ -264,7 +282,7 @@ export function OperatorVisibilityDashboard(
             color: 'var(--stitch-color-on-surface-variant, #464553)',
           },
         },
-        'All authority, confidence, freshness, guard, health, and matrix values are injected by the Face load() function before render.',
+        'All authority, confidence, freshness, correlation, guard, health, and matrix values are injected by the Face load() function before render.',
       ),
     ),
     h(

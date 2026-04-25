@@ -61,6 +61,7 @@ export type {
   AuthorityState,
   ConfidenceLevel,
   ConfidenceMetadata,
+  OperatorCorrelationMetadata,
   OperatorEmptyStateConfig,
   OperatorEmptyStateIntent,
   OperatorGuardState,
