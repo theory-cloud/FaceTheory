@@ -23,14 +23,18 @@ export interface PropertyItem {
   span?: 'half' | 'full';
 }
 
-export interface TabItem
-  extends Omit<import('../../stitch-admin/tabs-types.js').TabItem, 'label' | 'icon'> {
+export interface TabItem extends Omit<
+  import('../../stitch-admin/tabs-types.js').TabItem,
+  'label' | 'icon'
+> {
   label: unknown;
   icon?: unknown;
 }
 
-export interface FilterChipConfig
-  extends Omit<import('../../stitch-admin/filter-types.js').FilterChipConfig, 'label'> {
+export interface FilterChipConfig extends Omit<
+  import('../../stitch-admin/filter-types.js').FilterChipConfig,
+  'label'
+> {
   label: unknown;
 }
 
@@ -42,13 +46,97 @@ export interface KeyValueEntry {
 
 export type LogLevel = import('../../stitch-admin/log-types.js').LogLevel;
 
-export interface LogEntry
-  extends Omit<import('../../stitch-admin/log-types.js').LogEntry, 'message' | 'actor'> {
+export interface LogEntry extends Omit<
+  import('../../stitch-admin/log-types.js').LogEntry,
+  'message' | 'actor'
+> {
   message: unknown;
   actor?: unknown;
 }
 
-export type StatusVariant = import('../../stitch-admin/status-types.js').StatusVariant;
+export type StatusVariant =
+  import('../../stitch-admin/status-types.js').StatusVariant;
+
+export type {
+  AuthorityState,
+  ConfidenceLevel,
+  ConfidenceMetadata,
+  OperatorEmptyStateConfig,
+  OperatorEmptyStateIntent,
+  OperatorGuardState,
+  OperatorGuardStatus,
+  OperatorHealthRow,
+  OperatorHealthStatus,
+  OperatorPlaceholderDataPolicy,
+  OperatorVisibilityMetadata,
+  ProvenanceMetadata,
+  VisibilityMatrixCell,
+  VisibilityMatrixCellState,
+  VisibilityMatrixDimension,
+  VisibilityMatrixEntity,
+  VisibilityMatrixRow,
+  StalenessMetadata,
+  StalenessState,
+} from '../../stitch-admin/operator-visibility-types.js';
+
+export interface HealthStatusPanelProps {
+  title?: unknown;
+  description?: unknown;
+  rows: import('../../stitch-admin/operator-visibility-types.js').OperatorHealthRow[];
+  actions?: unknown;
+  emptyLabel?: unknown;
+}
+
+export interface VisibilityMatrixProps {
+  title?: unknown;
+  description?: unknown;
+  dimensions: import('../../stitch-admin/operator-visibility-types.js').VisibilityMatrixDimension[];
+  rows: import('../../stitch-admin/operator-visibility-types.js').VisibilityMatrixRow[];
+  actions?: unknown;
+  emptyLabel?: unknown;
+  emptyCellLabel?: unknown;
+}
+
+export interface GuardedOperatorShellProps {
+  guard: import('../../stitch-admin/operator-visibility-types.js').OperatorGuardStatus;
+  authorized?: unknown;
+  unauthorized?: unknown;
+  loading?: unknown;
+  error?: unknown;
+  placeholderDataPolicy?: import('../../stitch-admin/operator-visibility-types.js').OperatorPlaceholderDataPolicy;
+}
+
+export type MetadataBadgeTone =
+  | 'neutral'
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'danger';
+
+export interface MetadataBadgeProps {
+  label: unknown;
+  detail?: unknown;
+  tone?: MetadataBadgeTone;
+  href?: string;
+  title?: string;
+}
+
+export interface MetadataBadgeGroupProps {
+  metadata: import('../../stitch-admin/operator-visibility-types.js').OperatorVisibilityMetadata;
+  includeAuthority?: boolean;
+}
+
+export interface NonAuthoritativeBannerProps {
+  title?: unknown;
+  description?: unknown;
+  metadata?: import('../../stitch-admin/operator-visibility-types.js').OperatorVisibilityMetadata;
+  actions?: unknown;
+}
+
+export interface OperatorEmptyStateProps {
+  config: import('../../stitch-admin/operator-visibility-types.js').OperatorEmptyStateConfig;
+  action?: unknown;
+}
 
 export interface DataTableProps {
   rowKey: string | ((record: Record<string, unknown>) => string);
@@ -151,6 +239,13 @@ export declare const DestructiveConfirm: Component<DestructiveConfirmProps>;
 export declare const Tabs: Component<TabsProps>;
 export declare const FilterChip: Component<FilterChipProps>;
 export declare const FilterChipGroup: Component<FilterChipGroupProps>;
+export declare const GuardedOperatorShell: Component<GuardedOperatorShellProps>;
+export declare const HealthStatusPanel: Component<HealthStatusPanelProps>;
+export declare const VisibilityMatrix: Component<VisibilityMatrixProps>;
 export declare const InlineKeyValueList: Component<InlineKeyValueListProps>;
 export declare const CopyableCode: Component<CopyableCodeProps>;
 export declare const LogStream: Component<LogStreamProps>;
+export declare const MetadataBadge: Component<MetadataBadgeProps>;
+export declare const MetadataBadgeGroup: Component<MetadataBadgeGroupProps>;
+export declare const NonAuthoritativeBanner: Component<NonAuthoritativeBannerProps>;
+export declare const OperatorEmptyState: Component<OperatorEmptyStateProps>;

@@ -379,6 +379,91 @@ Why this is incorrect:
 - Re-declaring local tab/filter/log/status variants lets one application drift away from the shared Stitch surface.
 - Ad hoc contracts make it harder to keep docs, tests, and framework adapters aligned in future changes.
 
+## Pattern: Build operator dashboards from caller-supplied state
+
+Problem:
+You need an operator visibility dashboard that shows guarded access, non-authoritative evidence, health rows, and entity × dimension visibility without embedding auth-provider or product-specific rules in FaceTheory.
+
+**CORRECT**
+
+```tsx
+import type { FaceContext } from '@theory-cloud/facetheory';
+import { createReactFace } from '@theory-cloud/facetheory/react';
+import type {
+  OperatorGuardStatus,
+  OperatorHealthRow,
+  VisibilityMatrixDimension,
+  VisibilityMatrixRow,
+} from '@theory-cloud/facetheory/stitch-admin';
+import {
+  GuardedOperatorShell,
+  HealthStatusPanel,
+  VisibilityMatrix,
+} from '@theory-cloud/facetheory/react/stitch-admin';
+
+interface OperatorDashboardData {
+  guard: OperatorGuardStatus;
+  healthRows: OperatorHealthRow[];
+  visibilityDimensions: VisibilityMatrixDimension[];
+  visibilityRows: VisibilityMatrixRow[];
+  freshnessLabel: string;
+}
+
+async function loadDashboard(ctx: FaceContext): Promise<OperatorDashboardData> {
+  const guard = await deriveGuardInHostRuntime(ctx); // AppTheory / Autheory-owned boundary
+  const snapshot = await loadVisibilitySnapshot(ctx, guard); // host-owned data source
+
+  return {
+    guard,
+    healthRows: snapshot.healthRows,
+    visibilityDimensions: snapshot.visibilityDimensions,
+    visibilityRows: snapshot.visibilityRows,
+    freshnessLabel: snapshot.freshnessLabel,
+  };
+}
+
+export const face = createReactFace<OperatorDashboardData>({
+  route: '/operators/visibility',
+  mode: 'ssr',
+  load: loadDashboard,
+  render: (_ctx, data) => (
+    <GuardedOperatorShell guard={data.guard}>
+      <HealthStatusPanel rows={data.healthRows} />
+      <VisibilityMatrix rows={data.visibilityRows} dimensions={data.visibilityDimensions} />
+    </GuardedOperatorShell>
+  ),
+});
+```
+
+Why this is correct:
+- AppTheory or Autheory-derived authorization is resolved before FaceTheory renders; FaceTheory receives `OperatorGuardStatus` as data and does not embed the auth provider.
+- Health, staleness, confidence, provenance, and visibility cells are loaded once and serialized as stable render data.
+- SSR is used because the HTML can vary by request identity, role, tenant, and visibility source.
+- The same shared contracts can feed Vue or Svelte by switching only the adapter import path.
+
+**INCORRECT**
+
+```tsx
+export const face = createReactFace({
+  route: '/operators/visibility',
+  mode: 'ssg',
+  render: async () => (
+    <GuardedOperatorShell guard={readBrowserSession()}>
+      <p>{Math.round((Date.now() - lastChecked) / 1000)} seconds old</p>
+      <p>Placeholder partner release 1.2.3</p>
+    </GuardedOperatorShell>
+  ),
+});
+```
+
+Why this is incorrect:
+- A live auth-varying dashboard is being rendered as SSG output.
+- Authorization and freshness are read during render from ambient browser/time state, which can drift from the server-rendered HTML.
+- Production-like mock partner, tenant, release, or version values make empty states look like real operational data.
+
+ISR note:
+- Use ISR for operator visibility only when the rendered HTML is non-personalized or fully partitioned. If the output varies by identity, role, tenant, cookie, locale, environment, or data-source variant, include those dimensions in explicit `cacheKey` and `tenantKey` functions or keep the route on SSR.
+
 ## Pattern Selection Notes
 
 - Prefer published package exports over private source imports.
