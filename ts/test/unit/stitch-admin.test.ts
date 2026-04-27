@@ -21,6 +21,7 @@ import {
   FormSection,
   InlineKeyValueList,
   LogStream,
+  MetadataBadge,
   MetadataBadgeGroup,
   NonAuthoritativeBanner,
   OperatorEmptyState,
@@ -126,6 +127,19 @@ test('MetadataBadgeGroup renders provenance and correlation without computing fr
   assert.ok(body.includes('Trigger: eventbridge'));
   assert.ok(body.includes('Request ID: lambda_req_123'));
   assert.ok(body.includes('refreshed 4 minutes ago'));
+});
+
+test('MetadataBadge blocks executable href protocols', async () => {
+  const body = await renderSSR(
+    h(MetadataBadge, {
+      label: 'Unsafe source',
+      href: 'javascript:alert(1)',
+    }),
+  );
+
+  assert.ok(body.includes('Unsafe source'));
+  assert.equal(body.includes('<a'), false);
+  assert.equal(body.includes('javascript:alert(1)'), false);
 });
 
 test('OperatorEmptyState renders explicit no-mock empty state intent', async () => {

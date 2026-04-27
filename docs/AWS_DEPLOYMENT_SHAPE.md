@@ -150,8 +150,8 @@ Notes:
 5. On regeneration failure, previous pointer stays valid; stale serve policy applies.
 
 Default tenant note:
-- FaceTheory prefers `x-tenant-id` for the default tenant partition and falls back to legacy `x-facetheory-tenant`.
-- If tenant identity comes from auth/session/host mapping rather than a trusted header, provide an explicit `tenantKey` or keep that route on SSR.
+- FaceTheory uses the `default` tenant unless `tenantKey` is configured.
+- If tenant identity comes from auth/session/host mapping or a trusted header, provide an explicit `tenantKey` or keep that route on SSR.
 
 ## Operational Checklist
 

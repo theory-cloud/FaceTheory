@@ -10,6 +10,7 @@ import {
   type IsrMetaRecord,
   type IsrMetaStore,
   type ReleaseIsrLeaseInput,
+  tenantKeyFromTrustedHeader,
   type TryAcquireIsrLeaseInput,
   type TryAcquireIsrLeaseResult,
 } from '../../src/isr.js';
@@ -22,9 +23,15 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function withTimeout<T>(input: Promise<T>, timeoutMs: number): Promise<T> {
+async function withTimeout<T>(
+  input: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs);
+    const timer = setTimeout(
+      () => reject(new Error(`timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
     input.then(
       (value) => {
         clearTimeout(timer);
@@ -74,14 +81,20 @@ test('isr: stale burst triggers one regeneration and waiters share result', asyn
 
   nowMs = 2_000;
   const responses = await Promise.all(
-    Array.from({ length: 8 }, () => app.handle({ method: 'GET', path: '/posts/a' })),
+    Array.from({ length: 8 }, () =>
+      app.handle({ method: 'GET', path: '/posts/a' }),
+    ),
   );
 
   assert.equal(renderCount, 2);
   for (const response of responses) {
     const html = decodeBody(response.body as Uint8Array);
     assert.ok(html.includes('render-2'));
-    assert.ok(['miss', 'wait-hit'].includes(response.headers['x-facetheory-isr']?.[0] ?? ''));
+    assert.ok(
+      ['miss', 'wait-hit'].includes(
+        response.headers['x-facetheory-isr']?.[0] ?? '',
+      ),
+    );
   }
 });
 
@@ -123,13 +136,18 @@ test('isr: regeneration failure serves stale and keeps pointer intact', async ()
     routePattern: '/faces/{id}',
     params: { id: '42' },
     query: {},
+    headers: {},
+    cookies: {},
   });
   const beforeFailure = await metaStore.get(cacheKey);
   assert.ok(beforeFailure?.htmlPointer);
 
   nowMs = 11_000;
   failNextRegeneration = true;
-  const staleAfterFailure = await app.handle({ method: 'GET', path: '/faces/42' });
+  const staleAfterFailure = await app.handle({
+    method: 'GET',
+    path: '/faces/42',
+  });
   assert.ok(decodeBody(staleAfterFailure.body as Uint8Array).includes('v1'));
 
   const afterFailure = await metaStore.get(cacheKey);
@@ -186,13 +204,21 @@ test('isr: expired lease does not deadlock regeneration', async () => {
   await app.handle({ method: 'GET', path: '/lock' });
   offsetMs = 31_000;
 
-  const first = withTimeout(app.handle({ method: 'GET', path: '/lock' }), 2_000);
-  const second = withTimeout(app.handle({ method: 'GET', path: '/lock' }), 2_000);
+  const first = withTimeout(
+    app.handle({ method: 'GET', path: '/lock' }),
+    2_000,
+  );
+  const second = withTimeout(
+    app.handle({ method: 'GET', path: '/lock' }),
+    2_000,
+  );
   const [left, right] = await Promise.all([first, second]);
 
   const leftHtml = decodeBody(left.body as Uint8Array);
   const rightHtml = decodeBody(right.body as Uint8Array);
-  assert.ok(leftHtml.includes('fast-regen') || rightHtml.includes('fast-regen'));
+  assert.ok(
+    leftHtml.includes('fast-regen') || rightHtml.includes('fast-regen'),
+  );
 
   const followup = await app.handle({ method: 'GET', path: '/lock' });
   assert.ok(decodeBody(followup.body as Uint8Array).includes('fast-regen'));
@@ -222,15 +248,23 @@ test('isr: default cache key partitions by query strings', async () => {
     },
   });
 
-  const first = await app.handle({ method: 'GET', path: '/search?view=table&sort=asc' });
+  const first = await app.handle({
+    method: 'GET',
+    path: '/search?view=table&sort=asc',
+  });
   const sameQueryDifferentOrder = await app.handle({
     method: 'GET',
     path: '/search?sort=asc&view=table',
   });
-  const differentQuery = await app.handle({ method: 'GET', path: '/search?view=grid&sort=asc' });
+  const differentQuery = await app.handle({
+    method: 'GET',
+    path: '/search?view=grid&sort=asc',
+  });
 
   assert.ok(decodeBody(first.body as Uint8Array).includes('search-1'));
-  assert.ok(decodeBody(sameQueryDifferentOrder.body as Uint8Array).includes('search-1'));
+  assert.ok(
+    decodeBody(sameQueryDifferentOrder.body as Uint8Array).includes('search-1'),
+  );
   assert.ok(decodeBody(differentQuery.body as Uint8Array).includes('search-2'));
   assert.equal(renderCount, 2);
 
@@ -238,7 +272,7 @@ test('isr: default cache key partitions by query strings', async () => {
   assert.equal(cacheKeys.length, 2);
 });
 
-test('isr: tenant partitioning prefers x-tenant-id with legacy fallback', async () => {
+test('isr: default tenant partition ignores spoofable request headers', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new InMemoryIsrMetaStore();
   let renderCount = 0;
@@ -261,7 +295,7 @@ test('isr: tenant partitioning prefers x-tenant-id with legacy fallback', async 
     },
   });
 
-  const tenantAFirst = await app.handle({
+  const tenantAHeader = await app.handle({
     method: 'GET',
     path: '/tenant/home',
     headers: {
@@ -269,7 +303,7 @@ test('isr: tenant partitioning prefers x-tenant-id with legacy fallback', async 
       'x-facetheory-tenant': ['spoofed-tenant'],
     },
   });
-  const tenantBFirst = await app.handle({
+  const tenantBHeader = await app.handle({
     method: 'GET',
     path: '/tenant/home',
     headers: {
@@ -277,10 +311,54 @@ test('isr: tenant partitioning prefers x-tenant-id with legacy fallback', async 
       'x-facetheory-tenant': ['tenant-a'],
     },
   });
+
+  assert.ok(decodeBody(tenantAHeader.body as Uint8Array).includes('tenant-1'));
+  assert.ok(decodeBody(tenantBHeader.body as Uint8Array).includes('tenant-1'));
+  assert.equal(renderCount, 1);
+
+  const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
+  assert.equal(cacheKeys.length, 1);
+  assert.ok(cacheKeys.every((key) => key.startsWith('default::')));
+});
+
+test('isr: tenantKey option partitions by a trusted header boundary', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/tenant/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>tenant-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+    },
+  });
+
+  const tenantAFirst = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['tenant-a'] },
+  });
+  const tenantBFirst = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['tenant-b'] },
+  });
   const tenantASecond = await app.handle({
     method: 'GET',
     path: '/tenant/home',
-    headers: { 'x-facetheory-tenant': ['tenant-a'] },
+    headers: { 'x-tenant-id': ['tenant-a'] },
   });
 
   assert.ok(decodeBody(tenantAFirst.body as Uint8Array).includes('tenant-1'));
@@ -290,6 +368,73 @@ test('isr: tenant partitioning prefers x-tenant-id with legacy fallback', async 
 
   const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
   assert.equal(cacheKeys.length, 2);
+});
+
+test('isr: default cache key partitions by auth headers and cookies without raw secrets', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/account',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>account-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+    },
+  });
+
+  const anonymous = await app.handle({ method: 'GET', path: '/account' });
+  const anonymousAgain = await app.handle({ method: 'GET', path: '/account' });
+  const authA = await app.handle({
+    method: 'GET',
+    path: '/account',
+    headers: { authorization: ['Bearer SECRET_TOKEN_A'] },
+  });
+  const authB = await app.handle({
+    method: 'GET',
+    path: '/account',
+    headers: { authorization: ['Bearer SECRET_TOKEN_B'] },
+  });
+  const cookieA = await app.handle({
+    method: 'GET',
+    path: '/account',
+    headers: { cookie: ['session=COOKIE_SECRET_A; theme=light'] },
+  });
+  const cookieAAgain = await app.handle({
+    method: 'GET',
+    path: '/account',
+    headers: { cookie: ['theme=light; session=COOKIE_SECRET_A'] },
+  });
+
+  assert.ok(decodeBody(anonymous.body as Uint8Array).includes('account-1'));
+  assert.ok(
+    decodeBody(anonymousAgain.body as Uint8Array).includes('account-1'),
+  );
+  assert.ok(decodeBody(authA.body as Uint8Array).includes('account-2'));
+  assert.ok(decodeBody(authB.body as Uint8Array).includes('account-3'));
+  assert.ok(decodeBody(cookieA.body as Uint8Array).includes('account-4'));
+  assert.ok(decodeBody(cookieAAgain.body as Uint8Array).includes('account-4'));
+  assert.equal(renderCount, 4);
+
+  const serializedKeys = metaStore
+    .debugSnapshot()
+    .map((record) => record.cacheKey)
+    .join('\n');
+  assert.equal(serializedKeys.includes('SECRET_TOKEN_A'), false);
+  assert.equal(serializedKeys.includes('SECRET_TOKEN_B'), false);
+  assert.equal(serializedKeys.includes('COOKIE_SECRET_A'), false);
+  assert.equal(serializedKeys.includes('authorization'), false);
+  assert.equal(serializedKeys.includes('session'), false);
 });
 
 class RecordingMetaStore implements IsrMetaStore {
@@ -304,7 +449,9 @@ class RecordingMetaStore implements IsrMetaStore {
     return await this.inner.get(cacheKey);
   }
 
-  async tryAcquireLease(input: TryAcquireIsrLeaseInput): Promise<TryAcquireIsrLeaseResult> {
+  async tryAcquireLease(
+    input: TryAcquireIsrLeaseInput,
+  ): Promise<TryAcquireIsrLeaseResult> {
     return await this.inner.tryAcquireLease(input);
   }
 
@@ -351,5 +498,10 @@ test('isr: metadata commits never include HTML body text', async () => {
     assert.equal(Object.prototype.hasOwnProperty.call(commit, 'body'), false);
   }
 
-  assert.ok(recording.commits.some((commit) => typeof commit.htmlPointer === 'string' && commit.htmlPointer.length > 0));
+  assert.ok(
+    recording.commits.some(
+      (commit) =>
+        typeof commit.htmlPointer === 'string' && commit.htmlPointer.length > 0,
+    ),
+  );
 });

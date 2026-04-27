@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import type {
+  CookieMap,
   FaceContext,
   FaceModule,
   FaceResponse,
@@ -19,6 +20,12 @@ const DEFAULT_REVALIDATE_SECONDS = 60;
 const DEFAULT_LEASE_DURATION_MS = 5_000;
 const DEFAULT_REGEN_WAIT_TIMEOUT_MS = 7_000;
 const DEFAULT_REGEN_POLL_INTERVAL_MS = 25;
+const DEFAULT_AUTH_VARY_HEADERS = [
+  'authorization',
+  'proxy-authorization',
+  'x-api-key',
+  'x-amz-security-token',
+] as const;
 
 export type IsrFailurePolicy = 'serve-stale' | 'error';
 export type IsrLockContentionPolicy = 'wait' | 'serve-stale';
@@ -105,6 +112,8 @@ export interface IsrCacheKeyInput {
   routePattern: string;
   params: Record<string, string>;
   query: Query;
+  headers?: Headers;
+  cookies?: CookieMap;
 }
 
 export interface IsrCacheControlOptions {
@@ -383,6 +392,8 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         routePattern: normalizePath(input.routePattern),
         params: input.ctx.params,
         query: input.ctx.request.query,
+        headers: input.ctx.request.headers,
+        cookies: input.ctx.request.cookies,
       });
       const currentNow = runtimeOptions.now();
       const existing = await runtimeOptions.metaStore.get(cacheKey);
@@ -497,7 +508,73 @@ export function defaultIsrCacheKey(input: IsrCacheKeyInput): string {
     );
 
   const keyParts = [...paramParts, ...queryParts];
-  return `${input.tenant}::${routePattern}?${keyParts.join('&')}`;
+  const requestVariantParts = requestVariantKeyParts(input);
+  const requestVariant =
+    requestVariantParts.length > 0 ? `#${requestVariantParts.join('&')}` : '';
+  return `${input.tenant}::${routePattern}?${keyParts.join('&')}${requestVariant}`;
+}
+
+function requestVariantKeyParts(input: IsrCacheKeyInput): string[] {
+  const parts: string[] = [];
+  const authHeadersDigest = digestSelectedHeaders(
+    input.headers,
+    DEFAULT_AUTH_VARY_HEADERS,
+  );
+  if (authHeadersDigest) parts.push(`auth=${authHeadersDigest}`);
+
+  const cookiesDigest = digestCookies(input.cookies);
+  if (cookiesDigest) parts.push(`cookies=${cookiesDigest}`);
+  return parts;
+}
+
+function digestSelectedHeaders(
+  headers: Headers | undefined,
+  headerNames: readonly string[],
+): string | null {
+  const canonical = canonicalizeHeaders(headers);
+  const lines: string[] = [];
+
+  for (const name of [...headerNames].sort((left, right) =>
+    left.localeCompare(right),
+  )) {
+    const values = canonical[name] ?? [];
+    if (values.length === 0) continue;
+    lines.push(
+      `${name}=${values.map((value) => String(value)).join('\u0000')}`,
+    );
+  }
+
+  return digestVariantLines(lines);
+}
+
+function digestCookies(cookies: CookieMap | undefined): string | null {
+  if (!cookies) return null;
+  const lines = Object.keys(cookies)
+    .sort((left, right) => left.localeCompare(right))
+    .map((name) => `${name}=${String(cookies[name])}`);
+  return digestVariantLines(lines);
+}
+
+function digestVariantLines(lines: string[]): string | null {
+  if (lines.length === 0) return null;
+  return createHash('sha256')
+    .update(lines.join('\n'))
+    .digest('hex')
+    .slice(0, 24);
+}
+
+/**
+ * Returns a tenant resolver backed by a request header. Only use this when an
+ * upstream trusted boundary (for example AppTheory middleware or CloudFront)
+ * strips client-supplied copies and writes the header after authentication.
+ * The default ISR tenant resolver intentionally ignores request headers.
+ */
+export function tenantKeyFromTrustedHeader(
+  headerName = 'x-tenant-id',
+): (ctx: FaceContext) => string | null {
+  const normalized = String(headerName).trim().toLowerCase();
+  return (ctx) =>
+    normalized ? firstHeaderValue(ctx.request.headers, normalized) : null;
 }
 
 export function blockingIsrCacheControl(
@@ -716,11 +793,8 @@ function resolveTenant(
 }
 
 function defaultTenantKey(ctx: FaceContext): string {
-  const primary = firstHeaderValue(ctx.request.headers, 'x-tenant-id');
-  if (primary) return primary;
-
-  const legacy = firstHeaderValue(ctx.request.headers, 'x-facetheory-tenant');
-  return legacy ?? 'default';
+  void ctx;
+  return 'default';
 }
 
 function buildHtmlPointer(

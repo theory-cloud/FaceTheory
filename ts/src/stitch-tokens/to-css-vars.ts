@@ -4,6 +4,10 @@ function kebab(value: string): string {
   return value.replace(/([A-Z])/g, '-$1').toLowerCase();
 }
 
+function escapeStyleElementText(value: string): string {
+  return value.replaceAll(/<\/style/gi, '<\\/style');
+}
+
 export interface StitchCssVarOptions {
   /** CSS variable prefix. Defaults to `--stitch`. */
   prefix?: string;
@@ -85,13 +89,17 @@ export function stitchToCssVars(
 /**
  * Serializes a CSS variable record as a `:root { ... }` block. Use this for
  * SSR style injection when spreading onto a framework `style` prop is not an
- * option. The returned string is raw CSS text, so emit it through FaceTheory's
- * `styleTags` / `headTags: [{ type: 'style', ... }]` paths rather than wrapping
- * it in `<style>...</style>` and passing it through `head.html`.
+ * option. The returned string is CSS text with `</style>` terminators escaped,
+ * so emit it through FaceTheory's `styleTags` /
+ * `headTags: [{ type: 'style', ... }]` paths rather than wrapping it in
+ * `<style>...</style>` and passing it through `head.html`.
  */
 export function stitchCssVarsToRootBlock(vars: Record<string, string>): string {
   const lines = Object.entries(vars)
-    .map(([k, v]) => `  ${k}: ${v};`)
+    .map(
+      ([k, v]) =>
+        `  ${escapeStyleElementText(k)}: ${escapeStyleElementText(v)};`,
+    )
     .join('\n');
   return `:root {\n${lines}\n}`;
 }

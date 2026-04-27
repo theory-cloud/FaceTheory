@@ -10,6 +10,7 @@
   export let metadata: OperatorVisibilityMetadata;
   export let includeAuthority = true;
 
+  const safeHrefBase = 'https://facetheory.invalid';
   const palette: Record<MetadataBadgeTone, { background: string; color: string }> = {
     neutral: {
       background: 'var(--stitch-color-surface-container-high, #e2e7ff)',
@@ -59,7 +60,8 @@
         detail: source.provenance.source,
         tone: 'info',
       };
-      if (source.provenance.href !== undefined) badge.href = source.provenance.href;
+      const href = sanitizeHref(source.provenance.href);
+      if (href !== undefined) badge.href = href;
       if (source.provenance.observedAt !== undefined) badge.title = source.provenance.observedAt;
       out.push(badge);
     }
@@ -117,6 +119,20 @@
   function badgeStyle(tone: MetadataBadgeTone): string {
     const current = palette[tone];
     return `display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 10px;border-radius:9999px;font-size:12px;font-weight:500;line-height:1.4;background:${current.background};color:${current.color};`;
+  }
+
+  function sanitizeHref(value: string | undefined): string | undefined {
+    const normalized = String(value ?? '').trim();
+    if (normalized.length === 0) return undefined;
+
+    try {
+      const parsed = new URL(normalized, safeHrefBase);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+        ? normalized
+        : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   function authorityLabel(authority: OperatorVisibilityMetadata['authority']): string {
