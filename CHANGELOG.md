@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.1](https://github.com/theory-cloud/FaceTheory/compare/v1.2.0...v1.2.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* **release:** enforce prerelease manifest alignment ([779d03f](https://github.com/theory-cloud/FaceTheory/commit/779d03f43d4456000a8d68dcdfe6cfeac03164fb))
+* **release:** enforce prerelease manifest alignment ([17f0ad7](https://github.com/theory-cloud/FaceTheory/commit/17f0ad71a7d915b317af00e4d3f1893810e05e79))
+* **security:** harden ISR cache and HTML inputs ([c84258c](https://github.com/theory-cloud/FaceTheory/commit/c84258c25cc1475c81e702498070795953954a8d))
+* **security:** harden ISR cache and HTML inputs ([c9aeb70](https://github.com/theory-cloud/FaceTheory/commit/c9aeb701e02e402d6ee9e558140159e42aaacd80))
+
+## [1.2.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v1.2.0...v1.2.1-rc) (2026-04-27)
+
+
+### Bug Fixes
+
+* **release:** enforce prerelease manifest alignment ([779d03f](https://github.com/theory-cloud/FaceTheory/commit/779d03f43d4456000a8d68dcdfe6cfeac03164fb))
+* **release:** enforce prerelease manifest alignment ([17f0ad7](https://github.com/theory-cloud/FaceTheory/commit/17f0ad71a7d915b317af00e4d3f1893810e05e79))
+* **security:** harden ISR cache and HTML inputs ([c84258c](https://github.com/theory-cloud/FaceTheory/commit/c84258c25cc1475c81e702498070795953954a8d))
+* **security:** harden ISR cache and HTML inputs ([c9aeb70](https://github.com/theory-cloud/FaceTheory/commit/c9aeb701e02e402d6ee9e558140159e42aaacd80))
+
 ## [1.2.0](https://github.com/theory-cloud/FaceTheory/compare/v1.1.0...v1.2.0) (2026-04-25)
 
 
