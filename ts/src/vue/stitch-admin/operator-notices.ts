@@ -8,6 +8,7 @@ import type {
   OperatorVisibilityMetadata,
   StalenessState,
 } from '../../stitch-admin/operator-visibility-types.js';
+import { safeMetadataHref } from '../../stitch-admin/safe-url.js';
 import { renderPropContent, vnodeChildProp } from '../stitch-common.js';
 
 export type MetadataBadgeTone =
@@ -94,6 +95,7 @@ export const MetadataBadge = defineComponent({
   setup(props) {
     return () => {
       const tone = props.tone;
+      const safeHref = safeMetadataHref(props.href);
       const palette = badgePalette[tone];
       const commonProps = {
         class: `facetheory-stitch-metadata-badge facetheory-stitch-metadata-badge-${tone}`,
@@ -126,12 +128,12 @@ export const MetadataBadge = defineComponent({
           : null,
       ];
 
-      return props.href !== undefined
+      return safeHref !== undefined
         ? h(
             'a',
             {
               ...commonProps,
-              href: props.href,
+              href: safeHref,
               style: { ...commonProps.style, textDecoration: 'none' },
             },
             children,
@@ -372,8 +374,9 @@ function metadataToBadges(
       detail: metadata.provenance.source,
       tone: 'info',
     };
-    if (metadata.provenance.href !== undefined) {
-      provenanceBadge.href = metadata.provenance.href;
+    const href = safeMetadataHref(metadata.provenance.href);
+    if (href !== undefined) {
+      provenanceBadge.href = href;
     }
     if (metadata.provenance.observedAt !== undefined) {
       provenanceBadge.title = metadata.provenance.observedAt;

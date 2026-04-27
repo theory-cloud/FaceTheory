@@ -19,7 +19,7 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
 ```bash
-export FACETHEORY_VERSION=1.1.0 # x-release-please-version
+export FACETHEORY_VERSION=1.2.0 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -115,7 +115,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 | `FaceMode`         | Rendering mode                       | One of `ssr`, `ssg`, or `isr`.                                                                                                                                                                                                                                |
 | `FaceRequest`      | Normalized request input             | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`.                                                                                                                                                                               |
 | `FaceResponse`     | Runtime response                     | Includes normalized headers, cookies array, status, body, and `isBase64`.                                                                                                                                                                                     |
-| `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. `head.html` is a raw `<head>` escape hatch; prefer structured `headTags` / `styleTags` whenever possible. |
+| `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. `head.html` is legacy escaped head text; prefer structured `headTags` / `styleTags` for actual tags. |
 | `FaceContext`      | Per-request context                  | Exposes normalized request, route params, and proxy match.                                                                                                                                                                                                    |
 | `FaceAppOptions`   | App constructor options              | Accepts `faces`, optional ISR config, and optional observability hooks.                                                                                                                                                                                       |
 | `FaceIsrOptions`   | ISR runtime tuning                   | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation.                                                                                                                                  |
@@ -123,8 +123,8 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 Structured head/style emission is the supported default:
 
 - `headTags: [{ type: 'style', cssText, attrs? }]` and `styleTags` participate in FaceTheory's normal `<head>` serialization, escaping, and CSP nonce handling.
-- `FaceHeadTag` with `type: 'raw'` and `head.html` are raw HTML escape hatches inserted verbatim into `<head>`.
-- `stitchCssVarsToRootBlock()` returns raw CSS text, not a full `<style>` tag. Feed that string into `styleTags` or a `headTags` style entry rather than wrapping it and sending it through `head.html`.
+- `FaceHeadTag` with `type: 'raw'` is the explicit raw HTML escape hatch inserted verbatim into `<head>`; reserve it for caller-owned HTML.
+- `stitchCssVarsToRootBlock()` returns CSS text, not a full `<style>` tag, and escapes `</style>` terminators as defense-in-depth. Feed that string into `styleTags` or a `headTags` style entry rather than wrapping it and sending it through `head.html`.
 
 ## Core Usage
 
@@ -226,14 +226,15 @@ Metadata and lease storage:
 Relevant helpers:
 
 - `defaultIsrCacheKey(input)`
-- `blockingIsrCacheControl(input)`
+- `tenantKeyFromTrustedHeader(headerName?)`
+- `blockingIsrCacheControl(input)
 - `isFresh(record, nowMs)`
 
 Default ISR partitioning:
 
-- `defaultIsrCacheKey(input)` now includes sorted route params **and** sorted query-string keys/values.
-- The default tenant resolver prefers `x-tenant-id` and falls back to legacy `x-facetheory-tenant`.
-- If HTML varies by request identity, cookies, auth, or other non-query inputs, supply an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
+- `defaultIsrCacheKey(input)` includes sorted route params, sorted query-string keys/values, and hashed request-identity partitions for cookies and common auth headers (`Authorization`, `Proxy-Authorization`, `X-API-Key`, `X-Amz-Security-Token`). Raw cookie and auth values are not written to cache keys.
+- The default tenant resolver intentionally ignores request tenant headers and uses `default`. For authenticated tenant boundaries, supply `tenantKey` explicitly (for example `tenantKeyFromTrustedHeader('x-tenant-id')` after trusted middleware strips client-supplied copies).
+- If HTML varies by other request headers or identity inputs, supply an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
 
 Important deployment note:
 

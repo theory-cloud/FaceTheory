@@ -15,7 +15,8 @@ export type FaceHeadTag =
   | { type: 'style'; cssText: string; attrs?: FaceAttributes }
   /**
    * Raw HTML escape hatch. FaceTheory inserts this verbatim into `<head>`
-   * without escaping or nonce augmentation.
+   * without escaping or nonce augmentation. Prefer structured tags unless the
+   * caller fully owns the HTML.
    */
   | { type: 'raw'; html: string };
 
@@ -60,9 +61,10 @@ export interface FaceContext {
 export interface FaceHead {
   title?: string;
   /**
-   * Raw HTML inserted verbatim into `<head>`. This bypasses FaceTheory's
-   * escaped `headTags` / `styleTags` emission and should be treated as an
-   * explicit unsafe escape hatch.
+   * Legacy head text inserted into `<head>` after HTML escaping. Use
+   * structured `headTags` / `styleTags` for actual tags. The explicit
+   * `headTags: [{ type: 'raw', html }]` escape hatch remains available only
+   * for caller-owned HTML.
    */
   html?: string;
 }

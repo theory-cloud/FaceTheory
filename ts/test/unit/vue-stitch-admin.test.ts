@@ -17,6 +17,7 @@ import {
   FormSection,
   InlineKeyValueList,
   LogStream,
+  MetadataBadge,
   MetadataBadgeGroup,
   NonAuthoritativeBanner,
   OperatorEmptyState,
@@ -107,6 +108,19 @@ test('vue stitch-admin: MetadataBadgeGroup renders provenance, correlation, and 
   assert.ok(body.includes('Trigger: eventbridge'));
   assert.ok(body.includes('Request ID: lambda_req_123'));
   assert.ok(body.includes('refreshed 4 minutes ago'));
+});
+
+test('vue stitch-admin: MetadataBadge blocks executable href protocols', async () => {
+  const body = await renderSSR(
+    h(MetadataBadge, {
+      label: 'Unsafe source',
+      href: 'data:text/html,<script>alert(1)</script>',
+    }),
+  );
+
+  assert.ok(body.includes('Unsafe source'));
+  assert.equal(body.includes('<a'), false);
+  assert.equal(body.includes('data:text/html'), false);
 });
 
 test('vue stitch-admin: OperatorEmptyState renders explicit no-mock intent', async () => {
