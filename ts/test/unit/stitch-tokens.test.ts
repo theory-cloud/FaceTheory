@@ -170,6 +170,18 @@ test('stitch-tokens: stitchCssVarsToRootBlock renders a valid :root block', () =
   assert.match(block, /}\n?$/);
 });
 
+test('stitch-tokens: stitchCssVarsToRootBlock escapes style terminators', () => {
+  const block = stitchCssVarsToRootBlock({
+    '--stitch-color-primary': 'red;</style><script>alert(1)</script>',
+    '--stitch-surface': '</STYLE><script>alert(2)</script>',
+  });
+
+  assert.equal(block.includes('</style>'), false);
+  assert.equal(block.includes('</STYLE>'), false);
+  assert.ok(block.includes('<\\/style><script>alert(1)</script>'));
+  assert.ok(block.includes('<\\/style><script>alert(2)</script>'));
+});
+
 test('stitch-tokens: React subpath re-exports the shared token helpers', () => {
   const vars = stitchToCssVars(m3aFixture);
   assert.deepEqual(reactStitchToCssVars(m3aFixture), vars);

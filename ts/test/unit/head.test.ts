@@ -52,3 +52,30 @@ test('head: applies CSP nonce to inline styles and hydration scripts', () => {
   );
 });
 
+test('head: escapes legacy head fields and blocks unsafe hydration module URLs', () => {
+  const head = renderFaceHead({
+    html: '<div>ok</div>',
+    head: {
+      title: '</title><script>alert("title")</script>',
+      html: '<meta name="unsafe" content="</head><script>alert(1)</script>">',
+    },
+    hydration: {
+      data: { safe: true },
+      bootstrapModule: 'javascript:alert(1)',
+    },
+  });
+
+  assert.ok(
+    head.includes(
+      '<title>&lt;/title&gt;&lt;script&gt;alert(&quot;title&quot;)&lt;/script&gt;</title>',
+    ),
+  );
+  assert.ok(
+    head.includes(
+      '&lt;meta name=&quot;unsafe&quot; content=&quot;&lt;/head&gt;&lt;script&gt;alert(1)&lt;/script&gt;&quot;&gt;',
+    ),
+  );
+  assert.equal(head.includes('<script>alert("title")</script>'), false);
+  assert.equal(head.includes('<script>alert(1)</script>'), false);
+  assert.equal(head.includes('javascript:alert(1)'), false);
+});

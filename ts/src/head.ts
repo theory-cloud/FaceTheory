@@ -17,6 +17,20 @@ function escapeStyleText(value: string): string {
   return value.replaceAll(/<\/style/gi, '<\\/style');
 }
 
+function safeHttpUrl(value: string): string | null {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) return null;
+
+  try {
+    const parsed = new URL(trimmed, 'https://facetheory.invalid');
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      ? trimmed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function renderAttributes(attrs: FaceAttributes | undefined): string {
   if (!attrs) return '';
   const keys = Object.keys(attrs).sort();
@@ -37,7 +51,11 @@ function renderAttributes(attrs: FaceAttributes | undefined): string {
 }
 
 function isCharsetMeta(tag: FaceHeadTag): boolean {
-  return tag.type === 'meta' && tag.attrs.charset !== undefined && tag.attrs.charset !== null;
+  return (
+    tag.type === 'meta' &&
+    tag.attrs.charset !== undefined &&
+    tag.attrs.charset !== null
+  );
 }
 
 function dedupeKey(tag: FaceHeadTag): string | null {
@@ -46,7 +64,8 @@ function dedupeKey(tag: FaceHeadTag): string | null {
       return 'title';
     case 'meta': {
       const { attrs } = tag;
-      if (attrs.charset !== undefined && attrs.charset !== null) return 'meta:charset';
+      if (attrs.charset !== undefined && attrs.charset !== null)
+        return 'meta:charset';
       const name = attrs.name;
       if (typeof name === 'string') return `meta:name:${name.toLowerCase()}`;
       const property = attrs.property;
@@ -80,7 +99,8 @@ function dedupeKey(tag: FaceHeadTag): string | null {
       const id = tag.attrs?.id;
       if (typeof id === 'string') return `style:id:${id}`;
       const dataEmotion = tag.attrs?.['data-emotion'];
-      if (typeof dataEmotion === 'string') return `style:data-emotion:${dataEmotion}`;
+      if (typeof dataEmotion === 'string')
+        return `style:data-emotion:${dataEmotion}`;
       return null;
     }
     case 'raw':
@@ -93,7 +113,8 @@ function applyCspNonce(tag: FaceHeadTag, nonce: string | null): FaceHeadTag {
   if (tag.type !== 'script' && tag.type !== 'style') return tag;
 
   const attrs = tag.type === 'script' ? tag.attrs : (tag.attrs ?? {});
-  if (attrs.nonce !== undefined && attrs.nonce !== null && attrs.nonce !== '') return tag;
+  if (attrs.nonce !== undefined && attrs.nonce !== null && attrs.nonce !== '')
+    return tag;
 
   const withNonce: FaceAttributes = { ...attrs, nonce };
   return tag.type === 'script'
@@ -193,7 +214,7 @@ export function renderFaceHead(
     tags.push({ type: 'title', text: out.head.title });
   }
   if (out.head?.html) {
-    tags.push({ type: 'raw', html: out.head.html });
+    tags.push({ type: 'raw', html: escapeHTML(out.head.html) });
   }
 
   if (out.hydration) {
@@ -202,10 +223,13 @@ export function renderFaceHead(
       attrs: { id: '__FACETHEORY_DATA__', type: 'application/json' },
       body: safeJson(out.hydration.data),
     });
-    tags.push({
-      type: 'script',
-      attrs: { type: 'module', src: out.hydration.bootstrapModule },
-    });
+    const bootstrapModule = safeHttpUrl(out.hydration.bootstrapModule);
+    if (bootstrapModule) {
+      tags.push({
+        type: 'script',
+        attrs: { type: 'module', src: bootstrapModule },
+      });
+    }
   }
 
   return normalizeHeadTags(tags, { cspNonce: options.cspNonce ?? null })

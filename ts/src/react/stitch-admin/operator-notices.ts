@@ -7,6 +7,7 @@ import type {
   OperatorVisibilityMetadata,
   StalenessState,
 } from '../../stitch-admin/operator-visibility-types.js';
+import { safeMetadataHref } from '../../stitch-admin/safe-url.js';
 
 const h = React.createElement;
 
@@ -85,6 +86,7 @@ const INTENT_LABELS: Record<OperatorEmptyStateIntent, string> = {
  */
 export function MetadataBadge(props: MetadataBadgeProps): React.ReactElement {
   const { label, detail, tone = 'neutral', href, title } = props;
+  const safeHref = safeMetadataHref(href);
   const palette = BADGE_PALETTE[tone];
   const content = [
     h('span', { key: 'label' }, label),
@@ -119,12 +121,12 @@ export function MetadataBadge(props: MetadataBadgeProps): React.ReactElement {
     },
   };
 
-  return href !== undefined
+  return safeHref !== undefined
     ? h(
         'a',
         {
           ...commonProps,
-          href,
+          href: safeHref,
           style: { ...commonProps.style, textDecoration: 'none' },
         },
         content,
@@ -312,8 +314,9 @@ function metadataToBadges(
       detail: metadata.provenance.source,
       tone: 'info',
     };
-    if (metadata.provenance.href !== undefined) {
-      provenanceBadge.href = metadata.provenance.href;
+    const href = safeMetadataHref(metadata.provenance.href);
+    if (href !== undefined) {
+      provenanceBadge.href = href;
     }
     if (metadata.provenance.observedAt !== undefined) {
       provenanceBadge.title = metadata.provenance.observedAt;

@@ -123,6 +123,20 @@ test('svelte stitch-admin: MetadataBadgeGroup renders provenance, correlation, a
   assert.ok(body.includes('refreshed 4 minutes ago'));
 });
 
+test('svelte stitch-admin: MetadataBadge blocks executable href protocols', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/MetadataBadge.svelte'),
+    {
+      label: 'Unsafe source',
+      href: 'javascript:alert(1)',
+    },
+  );
+
+  assert.ok(body.includes('Unsafe source'));
+  assert.equal(body.includes('<a'), false);
+  assert.equal(body.includes('javascript:alert(1)'), false);
+});
+
 test('svelte stitch-admin: OperatorEmptyState renders explicit no-mock intent', async () => {
   const body = await renderComponent(
     path.resolve('src/svelte/stitch-admin/OperatorEmptyState.svelte'),
