@@ -44,6 +44,81 @@ if [[ "${ts_version}" != "${expected_version}" ]]; then
   exit 1
 fi
 
+manifest_check_output="$(
+  EXPECTED_VERSION="${expected_version}" python3 - <<'PY'
+import json
+import os
+import re
+from pathlib import Path
+
+expected = os.environ["EXPECTED_VERSION"]
+semver = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-rc(?:\.\d+)?)?$")
+
+
+def base(value: str) -> str:
+    value = value.strip()
+    if value.startswith("v"):
+        value = value[1:]
+    value = value.split("+", 1)[0]
+    return value.split("-", 1)[0]
+
+
+def base_tuple(value: str) -> tuple[int, int, int]:
+    return tuple(int(part) for part in base(value).split("."))
+
+
+def is_rc(value: str) -> bool:
+    return "-rc" in value.split("+", 1)[0]
+
+
+def load_manifest(path: str) -> str:
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise SystemExit(f"missing {path}")
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"invalid {path}: {exc}")
+
+    value = str(data.get(".", "")).strip()
+    if not value:
+        raise SystemExit(f"{path} missing package version for '.'")
+    if not semver.match(value):
+        raise SystemExit(
+            f"{path} version {value!r} is not X.Y.Z, X.Y.Z-rc, or X.Y.Z-rc.N"
+        )
+    return value
+
+
+stable = load_manifest(".release-please-manifest.json")
+premain = load_manifest(".release-please-manifest.premain.json")
+
+if not semver.match(expected):
+    raise SystemExit(f"VERSION {expected!r} is not X.Y.Z, X.Y.Z-rc, or X.Y.Z-rc.N")
+
+if is_rc(expected):
+    if premain != expected:
+        raise SystemExit(
+            f".release-please-manifest.premain.json {premain} != prerelease VERSION {expected}"
+        )
+    if base_tuple(stable) > base_tuple(expected):
+        raise SystemExit(
+            f".release-please-manifest.json {stable} is ahead of prerelease VERSION {expected}"
+        )
+else:
+    if stable != expected:
+        raise SystemExit(
+            f".release-please-manifest.json {stable} != stable VERSION {expected}"
+        )
+    if base(premain) != expected:
+        raise SystemExit(
+            f".release-please-manifest.premain.json {premain} must align to release-candidate base {expected}"
+        )
+PY
+)" || {
+  echo "version-alignment: FAIL (${manifest_check_output})"
+  exit 1
+}
+
 if [[ -f "ts/package-lock.json" ]]; then
   lock_version="$(
     python3 - <<'PY'
