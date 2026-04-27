@@ -21,7 +21,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=1.2.0 # x-release-please-version
+export FACETHEORY_VERSION=1.2.1-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -39,10 +39,10 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.1.0/theory-cloud-apptheory-1.1.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.1.1/theory-cloud-apptheory-1.1.1.tgz
 
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.7.0/theory-cloud-tabletheory-ts-1.7.0.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.7.1/theory-cloud-tabletheory-ts-1.7.1.tgz
 ```
 
 Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoint. Use TableTheory when you want the documented production ISR metadata store adapter.
@@ -194,7 +194,7 @@ FaceTheory provides a small set of brand-agnostic primitives that a consumer des
   });
   ```
 
-  If you need to serialize those vars into SSR `<style>` output, use `stitchCssVarsToRootBlock(vars)` as the `cssText` for a `styleTags` entry (or a `headTags` item with `type: "style"`). Do **not** wrap the returned string in `<style>...</style>` and pass it through `head.html`; `head.html` is a raw escape hatch, not the normal style-delivery path.
+  If you need to serialize those vars into SSR `<style>` output, use `stitchCssVarsToRootBlock(vars)` as the `cssText` for a `styleTags` entry (or a `headTags` item with `type: "style"`). Do **not** wrap the returned string in `<style>...</style>` and pass it through `head.html`; `head.html` is escaped legacy head text, not the normal style-delivery path.
 
 Each adapter's `BrandHeader` composes cleanly as the `logo` value of its Topbar, or as a standalone header outside the Shell.
 
@@ -227,12 +227,13 @@ Important default:
 
 Important ISR default:
 
-- FaceTheory’s default ISR cache key now partitions by route params and query string, and the default tenant hint prefers `x-tenant-id` over legacy `x-facetheory-tenant`.
-- If cached HTML varies by auth/session/cookies/host-derived tenant, configure an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
+- FaceTheory’s default ISR cache key partitions by route params, query string, and hashed request-identity inputs for cookies and common auth headers without storing raw secrets.
+- FaceTheory’s default ISR tenant is `default`; configure `tenantKey` explicitly for authenticated tenant boundaries.
+- If cached HTML varies by other headers or host-derived tenant, configure an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
 
 ## Reference Bundle
 
-The `v1.2.0` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v1.2.1-rc` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples

@@ -87,9 +87,9 @@ The SSG/ISR example stack provisions these via `cloudfront.ResponseHeadersPolicy
 
 ### Tenant partitioning guidance
 
-- FaceTheory’s default ISR tenant resolver now prefers `x-tenant-id` and falls back to legacy `x-facetheory-tenant`.
-- Treat both as partition hints, not proof of identity.
-- If tenant identity is derived from a session, auth token, host mapping, or another trusted source, override `tenantKey` so cached HTML keys follow that trusted source instead of raw headers.
+- FaceTheory’s default ISR tenant resolver ignores request tenant headers and uses the `default` tenant.
+- Treat request headers as untrusted until AppTheory middleware, CloudFront, or another authenticated boundary strips client-supplied copies and writes trusted values.
+- If tenant identity is derived from a session, auth token, host mapping, or trusted header, override `tenantKey` so cached HTML keys follow that trusted source instead of raw client input.
 
 ## Limits and Timeouts
 

@@ -229,7 +229,7 @@ render: async () => ({
 ```
 
 Why this is correct:
-- `stitchCssVarsToRootBlock()` returns raw CSS text, which matches `styleTags`.
+- `stitchCssVarsToRootBlock()` returns CSS text with style terminators escaped, which matches `styleTags`.
 - FaceTheory still owns the `<style>` tag emission path, nonce injection, and head ordering.
 - The same contract works across buffered and streaming responses.
 
@@ -245,7 +245,7 @@ render: async () => ({
 ```
 
 Why this is incorrect:
-- `head.html` is a raw HTML escape hatch inserted verbatim into `<head>`.
+- `head.html` is escaped legacy head text rather than a tag-emission path.
 - It bypasses FaceTheory's structured style-tag path and makes it easier to drift around escaping / nonce expectations.
 - `FaceHeadTag` with `type: 'raw'` has the same caveat and should stay a deliberate last resort.
 
