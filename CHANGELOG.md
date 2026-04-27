@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0-rc.5](https://github.com/theory-cloud/FaceTheory/compare/v1.0.0-rc.4...v1.0.0-rc.5) (2026-04-27)
+
+
+### Bug Fixes
+
+* **security:** harden ISR cache and HTML inputs ([c84258c](https://github.com/theory-cloud/FaceTheory/commit/c84258c25cc1475c81e702498070795953954a8d))
+* **security:** harden ISR cache and HTML inputs ([c9aeb70](https://github.com/theory-cloud/FaceTheory/commit/c9aeb701e02e402d6ee9e558140159e42aaacd80))
+
 ## [1.2.0](https://github.com/theory-cloud/FaceTheory/compare/v1.1.0...v1.2.0) (2026-04-25)
 
 
