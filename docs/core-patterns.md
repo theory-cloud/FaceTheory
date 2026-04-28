@@ -68,7 +68,7 @@ export const faces: FaceModule[] = [
 Why this is correct:
 - `ssg` is reserved for build-time output.
 - `generateStaticParams()` for SSG must resolve to normal path segments; dot-segments such as `.` and `..` are rejected rather than being written into the output tree.
-- `isr` is only used where regeneration is explicit and bounded.
+- `isr` is only used where regeneration is explicit, bounded, and tenant-invariant or explicitly partitioned.
 - `ssr` remains the fallback when freshness depends on request-time inputs.
 
 **INCORRECT**
@@ -81,6 +81,7 @@ const app = createFaceApp({
 
 Why this is incorrect:
 - It omits the coordinated HTML and metadata stores that blocking ISR expects in production.
+- If the page renders tenant-specific HTML, it also omits the explicit `tenantKey` or custom `cacheKey` required to partition that cache. FaceTheory fails closed when known tenant boundary headers reach ISR without such a partition.
 
 ## Pattern: Keep ISR storage prefixes intentional
 
@@ -463,6 +464,7 @@ Why this is incorrect:
 
 ISR note:
 - Use ISR for operator visibility only when the rendered HTML is non-personalized or fully partitioned. If the output varies by identity, role, tenant, cookie, locale, environment, or data-source variant, include those dimensions in explicit `cacheKey` and `tenantKey` functions or keep the route on SSR.
+- Tenant-invariant ISR routes should not receive tenant-like headers such as `x-tenant-id` or `x-facetheory-tenant`; those headers trigger FaceTheory's fail-closed partition guard unless `tenantKey` or a custom `cacheKey` is configured.
 
 ## Pattern Selection Notes
 

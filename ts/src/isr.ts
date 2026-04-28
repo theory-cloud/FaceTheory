@@ -26,6 +26,10 @@ const DEFAULT_AUTH_VARY_HEADERS = [
   'x-api-key',
   'x-amz-security-token',
 ] as const;
+const DEFAULT_TENANT_BOUNDARY_HEADERS = [
+  'x-tenant-id',
+  'x-facetheory-tenant',
+] as const;
 
 export type IsrFailurePolicy = 'serve-stale' | 'error';
 export type IsrLockContentionPolicy = 'wait' | 'serve-stale';
@@ -166,7 +170,10 @@ interface CreateIsrRuntimeOptions {
   failurePolicy: IsrFailurePolicy;
   lockContentionPolicy: IsrLockContentionPolicy;
   tenantKey: (ctx: FaceContext) => string | null | undefined;
+  hasExplicitTenantKey: boolean;
   cacheKey: (input: IsrCacheKeyInput) => string;
+  hasExplicitCacheKey: boolean;
+  tenantBoundaryHeaders: readonly string[];
   htmlPointerPrefix: string;
   cacheControl: (input: IsrCacheHeaderInput) => string;
 }
@@ -386,6 +393,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
       const revalidateSeconds = normalizeRevalidateSeconds(
         input.face.revalidateSeconds,
       );
+      assertPartitionedTenantBoundary(runtimeOptions, input.ctx);
       const tenant = resolveTenant(runtimeOptions, input.ctx);
       const cacheKey = runtimeOptions.cacheKey({
         tenant,
@@ -751,6 +759,12 @@ function normalizeRuntimeOptions(
 ): CreateIsrRuntimeOptions {
   const htmlStore = input.htmlStore ?? new InMemoryHtmlStore();
   const metaStore = input.metaStore ?? new InMemoryIsrMetaStore();
+  const tenantKey =
+    typeof input.tenantKey === 'function' ? input.tenantKey : defaultTenantKey;
+  const hasExplicitTenantKey = typeof input.tenantKey === 'function';
+  const cacheKey =
+    typeof input.cacheKey === 'function' ? input.cacheKey : defaultIsrCacheKey;
+  const hasExplicitCacheKey = typeof input.cacheKey === 'function';
 
   return {
     htmlStore,
@@ -774,13 +788,47 @@ function normalizeRuntimeOptions(
     ),
     failurePolicy: input.failurePolicy ?? 'serve-stale',
     lockContentionPolicy: input.lockContentionPolicy ?? 'wait',
-    tenantKey: input.tenantKey ?? defaultTenantKey,
-    cacheKey: input.cacheKey ?? defaultIsrCacheKey,
+    tenantKey,
+    hasExplicitTenantKey,
+    cacheKey,
+    hasExplicitCacheKey,
+    tenantBoundaryHeaders: DEFAULT_TENANT_BOUNDARY_HEADERS,
     htmlPointerPrefix: normalizeObjectPrefix(input.htmlPointerPrefix ?? 'isr'),
     cacheControl:
       input.cacheControl ??
       ((options) => blockingIsrCacheControl(options.revalidateSeconds)),
   };
+}
+
+function assertPartitionedTenantBoundary(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  ctx: FaceContext,
+): void {
+  if (runtimeOptions.hasExplicitTenantKey || runtimeOptions.hasExplicitCacheKey)
+    return;
+  if (
+    !hasNonEmptyHeader(
+      ctx.request.headers,
+      runtimeOptions.tenantBoundaryHeaders,
+    )
+  )
+    return;
+
+  throw new Error(
+    'ISR tenant boundary header requires explicit tenantKey or cacheKey configuration',
+  );
+}
+
+function hasNonEmptyHeader(
+  headers: Headers | undefined,
+  headerNames: readonly string[],
+): boolean {
+  const canonical = canonicalizeHeaders(headers);
+  for (const name of headerNames) {
+    const values = canonical[name] ?? [];
+    if (values.some((value) => String(value).trim().length > 0)) return true;
+  }
+  return false;
 }
 
 function resolveTenant(

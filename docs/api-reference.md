@@ -19,7 +19,7 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
 ```bash
-export FACETHEORY_VERSION=1.2.1-rc # x-release-please-version
+export FACETHEORY_VERSION=1.2.1 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -103,7 +103,7 @@ Render-mode guidance:
 - SSR is the default for request-authorized operator dashboards because each request can derive fresh guard, role, tenant, and visibility state.
 - A deterministic SPA shell is acceptable when the first paint is stable and any client refresh starts from serialized hydration data.
 - SSG is only for static documentation, training, or non-authorized snapshots; do not use it for live auth-varying operator visibility.
-- ISR requires safe partitioning. If HTML varies by user, role, tenant, cookie, locale, environment, or visibility source, encode that variance in explicit `cacheKey` / `tenantKey` functions or keep the route on SSR.
+- ISR requires safe partitioning. If HTML varies by user, role, tenant, cookie, locale, environment, or visibility source, encode that variance in explicit `cacheKey` / `tenantKey` functions or keep the route on SSR. Requests carrying known tenant boundary headers without an explicit ISR partition fail closed instead of sharing the implicit `default` tenant cache entry.
 
 ## Core Runtime Contracts
 
@@ -227,13 +227,14 @@ Relevant helpers:
 
 - `defaultIsrCacheKey(input)`
 - `tenantKeyFromTrustedHeader(headerName?)`
-- `blockingIsrCacheControl(input)
+- `blockingIsrCacheControl(input)`
 - `isFresh(record, nowMs)`
 
 Default ISR partitioning:
 
 - `defaultIsrCacheKey(input)` includes sorted route params, sorted query-string keys/values, and hashed request-identity partitions for cookies and common auth headers (`Authorization`, `Proxy-Authorization`, `X-API-Key`, `X-Amz-Security-Token`). Raw cookie and auth values are not written to cache keys.
 - The default tenant resolver intentionally ignores request tenant headers and uses `default`. For authenticated tenant boundaries, supply `tenantKey` explicitly (for example `tenantKeyFromTrustedHeader('x-tenant-id')` after trusted middleware strips client-supplied copies).
+- If a request includes a known tenant boundary header (`x-tenant-id` or `x-facetheory-tenant`) and the app has not configured an explicit `tenantKey` or custom `cacheKey`, ISR fails closed before cache lookup or HTML writes. Remove tenant-like headers for tenant-invariant ISR, provide a trusted `tenantKey`, provide a custom `cacheKey`, or keep the route on SSR.
 - If HTML varies by other request headers or identity inputs, supply an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
 
 Important deployment note:
