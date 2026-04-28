@@ -170,7 +170,7 @@ Operator visibility primitives use caller-supplied metadata, guard state, health
 Keep the dashboard boundary explicit:
 
 - **Auth state is upstream.** AppTheory middleware, an Autheory-hosted auth surface, or another host-owned service can validate the request before FaceTheory runs. FaceTheory should receive the derived `OperatorGuardStatus` and display it; it should not import Autheory validators, read provider sessions in a component, or encode Pay Theory release-control-plane rules.
-- **Render mode follows request variance.** Use SSR for request-authorized operator pages and a deterministic SPA shell when client refreshes happen after the initial render. Do not use SSG for live authorized visibility data. Use ISR only for non-personalized or safely partitioned snapshots where `cacheKey` and `tenantKey` include every authorization, tenant, role, locale, and visibility variant that can change the HTML.
+- **Render mode follows request variance.** Use SSR for request-authorized operator pages and a deterministic SPA shell when client refreshes happen after the initial render. Do not use SSG for live authorized visibility data. Use ISR only for non-personalized or safely partitioned snapshots where `cacheKey` and `tenantKey` include every authorization, tenant, role, locale, and visibility variant that can change the HTML. ISR fails closed when known tenant boundary headers are present without an explicit cache partition.
 - **Freshness and correlation are data, not render side effects.** Age labels, observed timestamps, normalized correlation IDs, health summaries, and visibility cells come from `load()` or serialized hydration data. Components should display those values exactly instead of recomputing or looking them up from `Date.now()`, browser globals, auth/session state, or network calls during render.
 - **No production-like placeholders.** Loading, unauthorized, filtered-empty, and missing-data states should be explicit about what is unavailable. Do not fill empty dashboards with realistic partner, tenant, release, version, or account-looking mock values.
 
@@ -229,6 +229,7 @@ Important ISR default:
 
 - FaceTheory’s default ISR cache key partitions by route params, query string, and hashed request-identity inputs for cookies and common auth headers without storing raw secrets.
 - FaceTheory’s default ISR tenant is `default`; configure `tenantKey` explicitly for authenticated tenant boundaries.
+- If a request carries `x-tenant-id` or `x-facetheory-tenant` and no explicit `tenantKey` or custom `cacheKey` is configured, ISR fails closed before cache lookup/write.
 - If cached HTML varies by other headers or host-derived tenant, configure an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
 
 ## Reference Bundle

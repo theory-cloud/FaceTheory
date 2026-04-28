@@ -4,6 +4,7 @@ import test from 'node:test';
 import { createFaceApp } from '../../src/app.js';
 import {
   type CommitIsrGenerationInput,
+  createIsrRuntime,
   defaultIsrCacheKey,
   InMemoryHtmlStore,
   InMemoryIsrMetaStore,
@@ -272,7 +273,7 @@ test('isr: default cache key partitions by query strings', async () => {
   assert.equal(cacheKeys.length, 2);
 });
 
-test('isr: default tenant partition ignores spoofable request headers', async () => {
+test('isr: default tenant partition fails closed on tenant boundary headers', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new InMemoryIsrMetaStore();
   let renderCount = 0;
@@ -283,9 +284,10 @@ test('isr: default tenant partition ignores spoofable request headers', async ()
         route: '/tenant/{slug}',
         mode: 'isr',
         revalidateSeconds: 60,
-        render: async () => {
+        render: async (ctx) => {
           const seq = ++renderCount;
-          return { html: `<main>tenant-${seq}</main>` };
+          const tenant = ctx.request.headers['x-tenant-id']?.[0] ?? 'missing';
+          return { html: `<main>${tenant}-${seq}</main>` };
         },
       },
     ],
@@ -299,7 +301,7 @@ test('isr: default tenant partition ignores spoofable request headers', async ()
     method: 'GET',
     path: '/tenant/home',
     headers: {
-      'x-tenant-id': ['tenant-a'],
+      'x-tenant-id': ['TENANT_SECRET_A'],
       'x-facetheory-tenant': ['spoofed-tenant'],
     },
   });
@@ -307,18 +309,55 @@ test('isr: default tenant partition ignores spoofable request headers', async ()
     method: 'GET',
     path: '/tenant/home',
     headers: {
-      'x-tenant-id': ['tenant-b'],
-      'x-facetheory-tenant': ['tenant-a'],
+      'x-tenant-id': ['TENANT_SECRET_B'],
+      'x-facetheory-tenant': ['TENANT_SECRET_A'],
     },
   });
 
-  assert.ok(decodeBody(tenantAHeader.body as Uint8Array).includes('tenant-1'));
-  assert.ok(decodeBody(tenantBHeader.body as Uint8Array).includes('tenant-1'));
-  assert.equal(renderCount, 1);
+  assert.equal(tenantAHeader.status, 500);
+  assert.equal(tenantBHeader.status, 500);
+  const tenantAHtml = decodeBody(tenantAHeader.body as Uint8Array);
+  const tenantBHtml = decodeBody(tenantBHeader.body as Uint8Array);
+  assert.equal(tenantAHtml.includes('TENANT_SECRET_A'), false);
+  assert.equal(tenantBHtml.includes('TENANT_SECRET_B'), false);
+  assert.equal(renderCount, 0);
 
   const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
-  assert.equal(cacheKeys.length, 1);
-  assert.ok(cacheKeys.every((key) => key.startsWith('default::')));
+  assert.deepEqual(cacheKeys, []);
+
+  const runtime = createIsrRuntime({ htmlStore, metaStore });
+  await assert.rejects(
+    runtime.handleFace({
+      face: {
+        route: '/tenant/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => ({ html: '<main>should not render</main>' }),
+      },
+      ctx: {
+        request: {
+          method: 'GET',
+          path: '/tenant/home',
+          query: {},
+          headers: { 'x-tenant-id': ['TENANT_SECRET_C'] },
+          cookies: {},
+          body: new Uint8Array(),
+          isBase64: false,
+          cspNonce: null,
+        },
+        params: { slug: 'home' },
+        proxy: null,
+      },
+      routePattern: '/tenant/{slug}',
+      renderFresh: async () => {
+        throw new Error('should not render');
+      },
+    }),
+    (err) =>
+      err instanceof Error &&
+      err.message.includes('tenantKey or cacheKey') &&
+      !err.message.includes('TENANT_SECRET_C'),
+  );
 });
 
 test('isr: tenantKey option partitions by a trusted header boundary', async () => {
@@ -368,6 +407,74 @@ test('isr: tenantKey option partitions by a trusted header boundary', async () =
 
   const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
   assert.equal(cacheKeys.length, 2);
+});
+
+test('isr: custom cacheKey is an explicit tenant boundary partition contract', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/tenant/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async (ctx) => {
+          const seq = ++renderCount;
+          const tenant = ctx.request.headers['x-tenant-id']?.[0] ?? 'missing';
+          return { html: `<main>${tenant}-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      cacheKey: (input) => {
+        const tenant = input.headers?.['x-tenant-id']?.[0];
+        const tenantPartition = tenant === 'TENANT_SECRET_A' ? 'a' : 'b';
+        return `custom::${input.routePattern}#tenant=${tenantPartition}`;
+      },
+    },
+  });
+
+  const tenantAFirst = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['TENANT_SECRET_A'] },
+  });
+  const tenantBFirst = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['TENANT_SECRET_B'] },
+  });
+  const tenantASecond = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['TENANT_SECRET_A'] },
+  });
+
+  assert.equal(tenantAFirst.status, 200);
+  assert.equal(tenantBFirst.status, 200);
+  assert.equal(tenantASecond.status, 200);
+  assert.ok(
+    decodeBody(tenantAFirst.body as Uint8Array).includes('TENANT_SECRET_A-1'),
+  );
+  assert.ok(
+    decodeBody(tenantBFirst.body as Uint8Array).includes('TENANT_SECRET_B-2'),
+  );
+  assert.ok(
+    decodeBody(tenantASecond.body as Uint8Array).includes('TENANT_SECRET_A-1'),
+  );
+  assert.equal(renderCount, 2);
+
+  const serializedKeys = metaStore
+    .debugSnapshot()
+    .map((record) => record.cacheKey)
+    .join('\n');
+  assert.equal(serializedKeys.includes('TENANT_SECRET_A'), false);
+  assert.equal(serializedKeys.includes('TENANT_SECRET_B'), false);
+  assert.equal(metaStore.debugSnapshot().length, 2);
 });
 
 test('isr: default cache key partitions by auth headers and cookies without raw secrets', async () => {
