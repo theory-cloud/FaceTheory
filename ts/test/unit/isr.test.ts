@@ -6,6 +6,7 @@ import {
   type CommitIsrGenerationInput,
   createIsrRuntime,
   defaultIsrCacheKey,
+  type FaceIsrOptions,
   InMemoryHtmlStore,
   InMemoryIsrMetaStore,
   type IsrMetaRecord,
@@ -359,6 +360,76 @@ test('isr: default tenant partition fails closed on tenant boundary headers', as
       !err.message.includes('TENANT_SECRET_C'),
   );
 });
+
+for (const variant of [
+  {
+    label: 'null tenantKey',
+    isr: { tenantKey: null },
+  },
+  {
+    label: 'null cacheKey',
+    isr: { cacheKey: null },
+  },
+  {
+    label: 'null tenantKey and cacheKey',
+    isr: { tenantKey: null, cacheKey: null },
+  },
+]) {
+  test(`isr: ${variant.label} does not count as an explicit tenant partition`, async () => {
+    const htmlStore = new InMemoryHtmlStore();
+    const metaStore = new InMemoryIsrMetaStore();
+    let renderCount = 0;
+
+    const app = createFaceApp({
+      faces: [
+        {
+          route: '/tenant-null/{slug}',
+          mode: 'isr',
+          revalidateSeconds: 60,
+          render: async (ctx) => {
+            const seq = ++renderCount;
+            const tenant =
+              ctx.request.headers['x-tenant-id']?.[0] ?? 'missing';
+            return { html: `<main>${tenant}-${seq}</main>` };
+          },
+        },
+      ],
+      isr: {
+        htmlStore,
+        metaStore,
+        ...variant.isr,
+      } as unknown as FaceIsrOptions,
+    });
+
+    const tenantAHeader = await app.handle({
+      method: 'GET',
+      path: '/tenant-null/home',
+      headers: { 'x-tenant-id': ['TENANT_SECRET_A'] },
+    });
+    const tenantBHeader = await app.handle({
+      method: 'GET',
+      path: '/tenant-null/home',
+      headers: { 'x-tenant-id': ['TENANT_SECRET_B'] },
+    });
+
+    assert.equal(tenantAHeader.status, 500);
+    assert.equal(tenantBHeader.status, 500);
+    assert.equal(renderCount, 0);
+    assert.deepEqual(metaStore.debugSnapshot(), []);
+    assert.equal(
+      decodeBody(tenantAHeader.body as Uint8Array).includes(
+        'TENANT_SECRET_A',
+      ),
+      false,
+    );
+    assert.equal(
+      decodeBody(tenantBHeader.body as Uint8Array).includes(
+        'TENANT_SECRET_B',
+      ),
+      false,
+    );
+  });
+}
 
 test('isr: tenantKey option partitions by a trusted header boundary', async () => {
   const htmlStore = new InMemoryHtmlStore();
