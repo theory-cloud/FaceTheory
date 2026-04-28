@@ -78,7 +78,7 @@ Suggested RC soak duration: short but explicit, at least one downstream validati
 
 ## Version-bump implication
 
-Minor bump under pre-1.0 semver, driven by a breaking `fix!` commit with a `BREAKING CHANGE:` footer. Although the package is currently versioned above `1.0`, the repository instructions still treat FaceTheory as pre-1.0; release-please will determine the exact resulting version from Conventional Commits.
+Minor bump under pre-1.0 semver, driven by a breaking `fix(isr)!:` commit with a `BREAKING CHANGE:` footer. Although the package is currently versioned above `1.0`, the repository instructions still treat FaceTheory as pre-1.0; release-please will determine the exact resulting version from Conventional Commits.
 
 ## Cross-phase risks
 

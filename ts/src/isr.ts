@@ -759,6 +759,12 @@ function normalizeRuntimeOptions(
 ): CreateIsrRuntimeOptions {
   const htmlStore = input.htmlStore ?? new InMemoryHtmlStore();
   const metaStore = input.metaStore ?? new InMemoryIsrMetaStore();
+  const tenantKey =
+    typeof input.tenantKey === 'function' ? input.tenantKey : defaultTenantKey;
+  const hasExplicitTenantKey = typeof input.tenantKey === 'function';
+  const cacheKey =
+    typeof input.cacheKey === 'function' ? input.cacheKey : defaultIsrCacheKey;
+  const hasExplicitCacheKey = typeof input.cacheKey === 'function';
 
   return {
     htmlStore,
@@ -782,10 +788,10 @@ function normalizeRuntimeOptions(
     ),
     failurePolicy: input.failurePolicy ?? 'serve-stale',
     lockContentionPolicy: input.lockContentionPolicy ?? 'wait',
-    tenantKey: input.tenantKey ?? defaultTenantKey,
-    hasExplicitTenantKey: input.tenantKey !== undefined,
-    cacheKey: input.cacheKey ?? defaultIsrCacheKey,
-    hasExplicitCacheKey: input.cacheKey !== undefined,
+    tenantKey,
+    hasExplicitTenantKey,
+    cacheKey,
+    hasExplicitCacheKey,
     tenantBoundaryHeaders: DEFAULT_TENANT_BOUNDARY_HEADERS,
     htmlPointerPrefix: normalizeObjectPrefix(input.htmlPointerPrefix ?? 'isr'),
     cacheControl:
