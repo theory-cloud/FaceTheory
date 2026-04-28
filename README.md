@@ -75,6 +75,17 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 The `v1.2.1` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
 
+## ISR Tenant Partition Safety
+
+Blocking ISR is fail-closed when known tenant boundary headers such as `x-tenant-id` or `x-facetheory-tenant` reach
+FaceTheory without an explicit `tenantKey` or custom `cacheKey`. Tenant-invariant ISR deployments should strip
+viewer-supplied tenant-like headers at the CloudFront/AppTheory boundary; tenant-varying pages should use SSR or an
+explicit trusted partition that includes every request-varying dimension that affects the cached HTML.
+
+See [Migration Guide](./docs/migration-guide.md#migration-4-adopt-isr-tenant-fail-closed-defaults) and
+[Troubleshooting](./docs/troubleshooting.md#issue-isr-fails-closed-when-tenant-headers-are-present) for upgrade
+steps and verification.
+
 ## Repository Development
 
 ```bash
