@@ -21,12 +21,12 @@ The single-path philosophy extends to client delivery: one way to render, one wa
 FaceTheory's ISR implementation uses TableTheory for cache metadata and regeneration leases, ensuring the same
 deterministic patterns that govern the backend also govern the frontend.
 
-## Install v1.2.1 <!-- x-release-please-version -->
+## Install v2.0.0-rc <!-- x-release-please-version -->
 
 Install the exact GitHub release tarball:
 
 ```bash
-export FACETHEORY_VERSION=1.2.1 # x-release-please-version
+export FACETHEORY_VERSION=2.0.0-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -73,7 +73,18 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
-The `v1.2.1` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+The `v2.0.0-rc` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+
+## ISR Tenant Partition Safety
+
+Blocking ISR is fail-closed when known tenant boundary headers such as `x-tenant-id` or `x-facetheory-tenant` reach
+FaceTheory without an explicit `tenantKey` or custom `cacheKey`. Tenant-invariant ISR deployments should strip
+viewer-supplied tenant-like headers at the CloudFront/AppTheory boundary; tenant-varying pages should use SSR or an
+explicit trusted partition that includes every request-varying dimension that affects the cached HTML.
+
+See [Migration Guide](./docs/migration-guide.md#migration-4-adopt-isr-tenant-fail-closed-defaults) and
+[Troubleshooting](./docs/troubleshooting.md#issue-isr-fails-closed-when-tenant-headers-are-present) for upgrade
+steps and verification.
 
 ## Repository Development
 
