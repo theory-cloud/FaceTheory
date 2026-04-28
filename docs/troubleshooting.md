@@ -10,6 +10,7 @@ Use this guide for recurring setup, build, and runtime failures that already hav
 | `npm run ssg` exits with usage errors | Missing or invalid CLI flags | `docs/api-reference.md` and `ts/src/ssg-cli.ts` |
 | SSG build fails during page generation | Network access was attempted without opting in | `buildSsgSite()` and SSG fetch guard behavior |
 | SSG build fails with dot-segment output errors | `generateStaticParams()` returned `.` / `..` path segments | `ts/src/ssg.ts` path validation and route params |
+| ISR route returns a deterministic 500 when tenant headers are present | Known tenant boundary headers reached ISR without an explicit tenant/cache partition | `docs/migration-guide.md` and `ts/src/isr.ts` tenant guard behavior |
 | ISR object keys look duplicated | `S3HtmlStore.keyPrefix` and `htmlPointerPrefix` repeat the same prefix | `docs/core-patterns.md` and `docs/cdk/aws-deployment.md` |
 | React streaming misses late styles | `styleStrategy: shell` was used where `all-ready` was needed | `docs/core-patterns.md` |
 
@@ -95,6 +96,33 @@ Solution:
 Verification:
 - rerun the SSG build
 - confirm the build succeeds and output files remain under the configured `outDir`
+
+## Issue: ISR Fails Closed When Tenant Headers Are Present
+
+Symptoms:
+- an ISR route that previously rendered now returns a deterministic server error
+- the request includes a tenant-like header such as `x-tenant-id` or `x-facetheory-tenant`
+- the response does not include normal `x-facetheory-isr: miss|hit|wait-hit|stale` transitions
+- expected ISR metadata or HTML objects are not written for that request
+
+Cause:
+- FaceTheory detected a tenant boundary signal on an ISR route that has neither an explicit `tenantKey` nor a custom
+  `cacheKey`. The runtime fails closed before cache lookup, regeneration lease acquisition, metadata writes, or HTML
+  writes so tenant-specific HTML cannot fall into the shared default cache partition.
+
+Solution:
+- If the route is actually tenant-invariant, strip viewer-supplied tenant-like headers at the CloudFront/AppTheory
+  boundary before FaceTheory handles the request.
+- If the route renders tenant-varying or personalized HTML, keep it as `mode: 'ssr'` unless the HTML is safe to cache
+  independently for each partition.
+- If tenant-varying ISR is intentional, configure `tenantKey: tenantKeyFromTrustedHeader('x-tenant-id')` only after a
+  trusted boundary strips viewer-supplied values and injects trusted tenant context, or provide a custom `cacheKey`
+  that includes every request-varying dimension that changes the rendered HTML.
+
+Verification:
+- tenant-invariant ISR reaches normal `x-facetheory-isr` states once tenant-like headers are removed
+- an unpartitioned ISR request with tenant-like headers still fails closed and leaves no ISR cache writes behind
+- explicitly partitioned tenant ISR returns separate cache entries for tenant A and tenant B
 
 ## Issue: ISR HTML Keys Are Duplicated
 

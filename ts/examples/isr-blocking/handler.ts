@@ -2,6 +2,11 @@
 //
 // Replace the in-memory stores with `S3HtmlStore` + a TableTheory-backed `IsrMetaStore`
 // (for DynamoDB use TableTheory `FaceTheoryIsrMetaStore`) in production.
+//
+// This example is intentionally tenant-invariant: it does not read tenant headers,
+// auth headers, or cookies while rendering cached HTML. Tenant-varying ISR must
+// configure an explicit `tenantKey` or custom `cacheKey`; otherwise FaceTheory
+// fails closed when known tenant boundary headers reach the ISR runtime.
 
 import { createFaceApp } from '../../src/app.js';
 import { InMemoryHtmlStore, InMemoryIsrMetaStore } from '../../src/isr.js';
