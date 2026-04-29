@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.0.0](https://github.com/theory-cloud/FaceTheory/compare/v1.2.1...v2.0.0) (2026-04-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **isr:** ISR requests carrying known tenant boundary headers fail closed when tenantKey or cacheKey is null; configure a function partition or use SSR for tenant-varying HTML.
+
+### Bug Fixes
+
+* **isr:** fail closed on null tenant partitions ([588b61d](https://github.com/theory-cloud/FaceTheory/commit/588b61db04776916c2643357e23998a87d52fa93)), closes [#124](https://github.com/theory-cloud/FaceTheory/issues/124)
+
+## [2.0.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v1.2.1-rc...v2.0.0-rc) (2026-04-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **isr:** ISR requests carrying known tenant boundary headers fail closed when tenantKey or cacheKey is null; configure a function partition or use SSR for tenant-varying HTML.
+
+### Bug Fixes
+
+* **isr:** fail closed on null tenant partitions ([588b61d](https://github.com/theory-cloud/FaceTheory/commit/588b61db04776916c2643357e23998a87d52fa93)), closes [#124](https://github.com/theory-cloud/FaceTheory/issues/124)
+
 ## [1.2.1](https://github.com/theory-cloud/FaceTheory/compare/v1.2.0...v1.2.1) (2026-04-27)
 
 
