@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.1](https://github.com/theory-cloud/FaceTheory/compare/v2.0.0...v2.0.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **deps:** align AppTheory v1.2.0 pins ([8fcb3d0](https://github.com/theory-cloud/FaceTheory/commit/8fcb3d0855a67d9a9df19460d3adc7502b1ca82d))
+
+## [2.0.0-rc.1](https://github.com/theory-cloud/FaceTheory/compare/v2.0.0-rc...v2.0.0-rc.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **deps:** align AppTheory v1.2.0 pins ([8fcb3d0](https://github.com/theory-cloud/FaceTheory/commit/8fcb3d0855a67d9a9df19460d3adc7502b1ca82d))
+
 ## [2.0.0](https://github.com/theory-cloud/FaceTheory/compare/v1.2.1...v2.0.0) (2026-04-28)
 
 
