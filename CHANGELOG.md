@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/theory-cloud/FaceTheory/compare/v3.0.0...v3.0.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* **deps:** align upstream pins and audit rubric ([0a9c2a1](https://github.com/theory-cloud/FaceTheory/commit/0a9c2a11f6ef4259eeb4498dacb90e5b204972f2))
+
 ## [3.0.0-rc.1](https://github.com/theory-cloud/FaceTheory/compare/v3.0.0-rc...v3.0.0-rc.1) (2026-05-10)
 
 
