@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack build-release-assets ensure-release-branches test-ensure-release-branches stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin build-release-assets ensure-release-branches test-ensure-release-branches stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
 
 ts-build:
 	cd ts && npm run build
@@ -23,6 +23,12 @@ verify-version-alignment:
 
 verify-ts-pack:
 	./scripts/verify-ts-pack.sh
+
+verify-npm-audit:
+	./scripts/verify-npm-audit.sh
+
+verify-go-version-pin:
+	./scripts/verify-go-version-pin.sh
 
 build-release-assets:
 	./scripts/build-release-assets.sh "$$(./scripts/read-version.sh)" dist
@@ -51,4 +57,4 @@ test-theorycloud-targets:
 test-trigger-theorycloud-publish-awscurl:
 	./scripts/test-trigger-theorycloud-publish-awscurl.sh
 
-rubric: ts-typecheck ts-lint ts-test verify-version-alignment verify-ts-pack
+rubric: ts-typecheck ts-lint ts-test verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin
