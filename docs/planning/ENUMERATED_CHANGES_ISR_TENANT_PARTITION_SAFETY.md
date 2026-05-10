@@ -12,7 +12,7 @@ Decision locked for this enumeration: **fail closed by default**. If a request c
 - **Determinism-sensitive**: no — this changes deterministic ISR cache identity and failure behavior, not server/client DOM or hydration equivalence.
 - **Acceptance**: ISR requests containing known tenant boundary headers, initially `x-tenant-id` and `x-facetheory-tenant`, fail closed before cache lookup/write when neither `tenantKey` nor a custom `cacheKey` is explicitly configured; tenant-invariant ISR without those headers still works; explicit `tenantKey` and explicit `cacheKey` paths continue to work; thrown/configuration errors do not include raw tenant/header secret values.
 - **Validation**: `make rubric`; targeted ISR validation such as `cd ts && npx tsx --test test/unit/isr.test.ts`; verify docs mention the breaking fail-closed default and the explicit `tenantKey` / `cacheKey` escape path.
-- **Conventional Commit subject**: `fix(isr)!: fail closed on unpartitioned tenant headers`
+- **Conventional Commit subject**: `fix!(isr): fail closed on unpartitioned tenant headers`
 
 Commit body must include a `BREAKING CHANGE:` footer because tenant-like headers that previously collapsed into the implicit `default` ISR tenant now fail closed unless the app configures an explicit tenant/cache partition.
 
