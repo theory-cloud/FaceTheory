@@ -10,7 +10,8 @@ export type AwsOacFormTransportMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type AwsOacFormEncoding =
   | typeof AWS_OAC_URL_ENCODED_FORM_ENCODING
   | 'multipart/form-data'
-  | 'text/plain';
+  | 'text/plain'
+  | (string & {});
 export type AwsOacSha256Digest = (
   body: AwsOacRequestBody,
 ) => Promise<ArrayBuffer | ArrayBufferView>;
@@ -538,7 +539,10 @@ function resolveFormEncoding(
     return normalizeFormEncoding(submitterEncoding);
   }
 
-  return normalizeFormEncoding(form.getAttribute('enctype') ?? form.enctype);
+  const formEncoding = form.getAttribute('enctype');
+  if (formEncoding !== null) return normalizeFormEncoding(formEncoding);
+
+  return AWS_OAC_URL_ENCODED_FORM_ENCODING;
 }
 
 function normalizeFormEncoding(
@@ -547,10 +551,15 @@ function normalizeFormEncoding(
   const normalized = String(value ?? '')
     .trim()
     .toLowerCase();
-  if (normalized === 'multipart/form-data' || normalized === 'text/plain') {
+  if (!normalized) return AWS_OAC_URL_ENCODED_FORM_ENCODING;
+  if (
+    normalized === AWS_OAC_URL_ENCODED_FORM_ENCODING ||
+    normalized === 'multipart/form-data' ||
+    normalized === 'text/plain'
+  ) {
     return normalized;
   }
-  return AWS_OAC_URL_ENCODED_FORM_ENCODING;
+  return normalized as AwsOacFormEncoding;
 }
 
 function isKnownMutatingMethod(

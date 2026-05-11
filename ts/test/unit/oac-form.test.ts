@@ -118,6 +118,7 @@ test('oac form helpers: compute lowercase SHA256 hex with Web Crypto', async () 
 async function flushEventLoop(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
   await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 test('oac form transport: intercepts marked same-origin POST forms with OAC headers', async () => {
@@ -504,6 +505,49 @@ test('oac form transport: fails closed for form-level text plain encoding', asyn
   }
 });
 
+test('oac form transport: fails closed for unknown form-level encoding', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/save" method="post" enctype="application/json" data-facetheory-oac-form>
+        <input name="title" value="Draft">
+      </form>`,
+    { url: 'https://example.test/' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    const errors: unknown[] = [];
+    let fetchCount = 0;
+    startAwsOacFormTransport({
+      document: dom.window.document,
+      fetcher: async () => {
+        fetchCount += 1;
+        return new Response(null, { status: 204 });
+      },
+      onError: (error) => {
+        errors.push(error);
+      },
+      window: dom.window as unknown as Window,
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(fetchCount, 0);
+    assert.equal(errors.length, 1);
+    assert.match(String(errors[0]), /received application\/json/);
+  } finally {
+    dom.window.close();
+  }
+});
+
 test('oac form transport: submitter formenctype can opt back into URL encoding', async () => {
   const dom = new JSDOM(
     `<!doctype html>
@@ -545,6 +589,53 @@ test('oac form transport: submitter formenctype can opt back into URL encoding',
 
     assert.equal(event.defaultPrevented, true);
     assert.deepEqual(bodies, ['title=Draft&intent=save']);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: unknown submitter formenctype fails closed over form encoding', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/save" method="post" enctype="application/x-www-form-urlencoded" data-facetheory-oac-form>
+        <input name="title" value="Draft">
+        <button name="intent" value="save" formenctype="application/json">Save</button>
+      </form>`,
+    { url: 'https://example.test/' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    const submitter = dom.window.document.querySelector('button');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+    assert.ok(submitter instanceof dom.window.HTMLElement);
+
+    const errors: unknown[] = [];
+    let fetchCount = 0;
+    startAwsOacFormTransport({
+      document: dom.window.document,
+      fetcher: async () => {
+        fetchCount += 1;
+        return new Response(null, { status: 204 });
+      },
+      onError: (error) => {
+        errors.push(error);
+      },
+      window: dom.window as unknown as Window,
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+      submitter,
+    });
+    form.dispatchEvent(event);
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(fetchCount, 0);
+    assert.equal(errors.length, 1);
+    assert.match(String(errors[0]), /received application\/json/);
   } finally {
     dom.window.close();
   }
