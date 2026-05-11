@@ -28,8 +28,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Check current release baseline
+        id: baseline
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: scripts/check-release-baseline-ready.sh .release-please-manifest.json
+
       - name: Compute release-as (align to premain RC)
         id: version
+        if: steps.baseline.outputs.ready == 'true'
         run: |
           set -euo pipefail
 
@@ -68,7 +75,7 @@ jobs:
           echo "release-as: ${release_as:-}"
 
       - name: Release Please (PR only) (aligned)
-        if: steps.version.outputs.release_as != ''
+        if: steps.baseline.outputs.ready == 'true' && steps.version.outputs.release_as != ''
         id: release_aligned
         env:
           RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
@@ -85,7 +92,7 @@ jobs:
             --release-as "${RELEASE_AS}"
 
       - name: Release Please (PR only)
-        if: steps.version.outputs.release_as == ''
+        if: steps.baseline.outputs.ready == 'true' && steps.version.outputs.release_as == ''
         id: release_default
         env:
           RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
