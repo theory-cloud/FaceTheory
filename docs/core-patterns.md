@@ -10,21 +10,25 @@ You need a supported production entrypoint that preserves streaming behavior, re
 **CORRECT**
 
 ```ts
-import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
-import { createFaceApp } from '@theory-cloud/facetheory';
-import { createAppTheoryFaceHandler } from '@theory-cloud/facetheory/apptheory';
+import {
+  createApp,
+  createLambdaFunctionURLStreamingHandler,
+} from "@theory-cloud/apptheory";
+import { createFaceApp } from "@theory-cloud/facetheory";
+import { createAppTheoryFaceHandler } from "@theory-cloud/facetheory/apptheory";
 
 const faceApp = createFaceApp({ faces });
 const app = createApp();
 const faceHandler = createAppTheoryFaceHandler({ app: faceApp });
 
-app.get('/', faceHandler);
-app.get('/{proxy+}', faceHandler);
+app.get("/", faceHandler);
+app.get("/{proxy+}", faceHandler);
 
 export const handler = createLambdaFunctionURLStreamingHandler(app);
 ```
 
 Why this is correct:
+
 - Uses the documented adapter surface.
 - Preserves `x-request-id` correlation across AppTheory and FaceTheory.
 - Keeps cookie and `set-cookie` behavior aligned with the tested runtime path.
@@ -34,12 +38,13 @@ Why this is correct:
 ```ts
 export const handler = async () => ({
   statusCode: 200,
-  headers: { 'cache-control': 'public, max-age=31536000, immutable' },
-  body: '<html>...</html>',
+  headers: { "cache-control": "public, max-age=31536000, immutable" },
+  body: "<html>...</html>",
 });
 ```
 
 Why this is incorrect:
+
 - It bypasses FaceTheory and AppTheory request and response translation.
 - It applies an immutable cache policy to request-dependent HTML.
 
@@ -51,21 +56,26 @@ You need to map each route to `ssr`, `ssg`, or `isr`.
 **CORRECT**
 
 ```ts
-import type { FaceModule } from '@theory-cloud/facetheory';
+import type { FaceModule } from "@theory-cloud/facetheory";
 
 export const faces: FaceModule[] = [
-  { route: '/', mode: 'ssr', render: async () => ({ html: '<h1>Home</h1>' }) },
-  { route: '/docs', mode: 'ssg', render: async () => ({ html: '<h1>Docs</h1>' }) },
+  { route: "/", mode: "ssr", render: async () => ({ html: "<h1>Home</h1>" }) },
   {
-    route: '/news/{id}',
-    mode: 'isr',
+    route: "/docs",
+    mode: "ssg",
+    render: async () => ({ html: "<h1>Docs</h1>" }),
+  },
+  {
+    route: "/news/{id}",
+    mode: "isr",
     revalidateSeconds: 60,
-    render: async () => ({ html: '<h1>News</h1>' }),
+    render: async () => ({ html: "<h1>News</h1>" }),
   },
 ];
 ```
 
 Why this is correct:
+
 - `ssg` is reserved for build-time output.
 - `generateStaticParams()` for SSG must resolve to normal path segments; dot-segments such as `.` and `..` are rejected rather than being written into the output tree.
 - `isr` is only used where regeneration is explicit, bounded, and tenant-invariant or explicitly partitioned.
@@ -75,11 +85,14 @@ Why this is correct:
 
 ```ts
 const app = createFaceApp({
-  faces: [{ route: '/blog/{id}', mode: 'isr', render: async () => ({ html: '...' }) }],
+  faces: [
+    { route: "/blog/{id}", mode: "isr", render: async () => ({ html: "..." }) },
+  ],
 });
 ```
 
 Why this is incorrect:
+
 - It omits the coordinated HTML and metadata stores that blocking ISR expects in production.
 - If the page renders tenant-specific HTML, it also omits the explicit `tenantKey` or custom `cacheKey` required to partition that cache. FaceTheory fails closed when known tenant boundary headers reach ISR without such a partition.
 
@@ -91,12 +104,12 @@ ISR HTML pointers and S3 object keys need predictable shapes.
 **CORRECT**
 
 ```ts
-import { S3HtmlStore, createFaceApp } from '@theory-cloud/facetheory';
+import { S3HtmlStore, createFaceApp } from "@theory-cloud/facetheory";
 
 const htmlStore = new S3HtmlStore({
   client,
-  bucket: 'example-bucket',
-  keyPrefix: 'isr-html',
+  bucket: "example-bucket",
+  keyPrefix: "isr-html",
 });
 
 const app = createFaceApp({
@@ -104,23 +117,25 @@ const app = createFaceApp({
   isr: {
     htmlStore,
     metaStore,
-    htmlPointerPrefix: 'pages',
+    htmlPointerPrefix: "pages",
   },
 });
 ```
 
 Why this is correct:
+
 - The physical S3 prefix and logical pointer prefix are distinct.
 - Generated keys stay understandable during verification and incident response.
 
 **INCORRECT**
 
 ```ts
-keyPrefix: 'isr'
-htmlPointerPrefix: 'isr'
+keyPrefix: "isr";
+htmlPointerPrefix: "isr";
 ```
 
 Why this is incorrect:
+
 - It can produce duplicated key segments such as `isr/isr/...`.
 
 ## Pattern: Default React streaming to `all-ready`
@@ -152,6 +167,7 @@ createReactStreamFace({
 ```
 
 Why this is correct:
+
 - `all-ready` is the default and safest style extraction strategy.
 - The AntD token bridge runs before `createAntdIntegration()`, which matches the adapter contract.
 - Integrations can be declared once and reused because request-local mutable data should live in each integration's `createState()` hook rather than in module or closure state.
@@ -170,6 +186,7 @@ createReactStreamFace({
 ```
 
 Why this can be incorrect:
+
 - `shell` may emit before late styles from Suspense or async boundaries are available.
 - FaceTheory drains late `all-ready` failures so shell mode does not leak unhandled readiness rejections, but it still intentionally trades away late-style capture.
 - It is only appropriate when you have explicitly accepted that tradeoff.
@@ -195,6 +212,7 @@ The host needs root-level document semantics such as `lang`, `dir`, theme, or bo
 ```
 
 Why this is correct:
+
 - It uses the public render contract instead of raw string surgery around `<html>` or `<body>`.
 - The same attrs flow through buffered and streaming responses.
 - Attr output stays escaped and deterministic.
@@ -204,10 +222,11 @@ Why this is correct:
 ```ts
 render: async () => ({
   html: '<html dir="rtl"><body class="dashboard-shell">...</body></html>',
-})
+});
 ```
 
 Why this is incorrect:
+
 - It bypasses FaceTheory's document shell and can produce nested or invalid HTML.
 - It loses the shared escaping and merge rules that the runtime and tests enforce.
 
@@ -219,17 +238,21 @@ You need to inject a CSS-variable block or another custom `<style>` tag into the
 **CORRECT**
 
 ```ts
-import { stitchCssVarsToRootBlock, stitchToCssVars } from '@theory-cloud/facetheory/stitch-tokens';
+import {
+  stitchCssVarsToRootBlock,
+  stitchToCssVars,
+} from "@theory-cloud/facetheory/stitch-tokens";
 
 const vars = stitchToCssVars(tokens);
 
 render: async () => ({
   styleTags: [{ cssText: stitchCssVarsToRootBlock(vars) }],
   html: '<div id="root">...</div>',
-})
+});
 ```
 
 Why this is correct:
+
 - `stitchCssVarsToRootBlock()` returns CSS text with style terminators escaped, which matches `styleTags`.
 - FaceTheory still owns the `<style>` tag emission path, nonce injection, and head ordering.
 - The same contract works across buffered and streaming responses.
@@ -242,10 +265,11 @@ render: async () => ({
     html: `<style>${stitchCssVarsToRootBlock(vars)}</style>`,
   },
   html: '<div id="root">...</div>',
-})
+});
 ```
 
 Why this is incorrect:
+
 - `head.html` is escaped legacy head text rather than a tag-emission path.
 - It bypasses FaceTheory's structured style-tag path and makes it easier to drift around escaping / nonce expectations.
 - `FaceHeadTag` with `type: 'raw'` has the same caveat and should stay a deliberate last resort.
@@ -259,38 +283,89 @@ You need FaceTheory's Svelte adapter to SSR and hydrate components that come fro
 
 ```ts
 // src/entry-client.ts
-import '@theory-cloud/facetheory-svelte-library-example/styles.css';
+import "@theory-cloud/facetheory-svelte-library-example/styles.css";
 
 // src/entry-server.ts
-const { headTags } = viteAssetsForEntry(manifest, 'src/entry-client.ts', {
+const { headTags } = viteAssetsForEntry(manifest, "src/entry-client.ts", {
   includeAssets: true,
 });
 
 return {
   headTags,
-  hydration: viteHydrationForEntry(manifest, 'src/entry-client.ts', data),
+  hydration: viteHydrationForEntry(manifest, "src/entry-client.ts", data),
 };
 ```
 
 Why this is correct:
+
 - The packaged library is imported like a normal dependency instead of being copied into the host app.
 - Package CSS stays in the Vite client graph, so FaceTheory can emit deterministic stylesheet and asset tags from the manifest.
 - The hydration bootstrap module matches the same client entry that pulled in the library code and CSS.
 
 Reference example:
+
 - `ts/examples/vite-ssr-svelte-library/`
 
 **INCORRECT**
 
 ```ts
 return {
-  html: '<style>/* pasted library css */</style><div>...</div>',
-}
+  html: "<style>/* pasted library css */</style><div>...</div>",
+};
 ```
 
 Why this is incorrect:
+
 - It bypasses the package asset graph and makes stylesheet delivery drift from the hydrated client bundle.
 - It creates a second, undocumented integration path that tests will not cover.
+
+## Pattern: Mark same-origin mutating forms for OAC transport
+
+Problem:
+Your FaceTheory page is delivered behind an AppTheorySsrSite CloudFront distribution with Lambda Function URL OAC enabled, and a browser form needs to submit a same-origin mutation route.
+
+**CORRECT**
+
+```html
+<form action="/agents/new" method="post" data-facetheory-oac-form>
+  <input name="agentName" required />
+  <button name="intent" value="create">Create agent</button>
+</form>
+```
+
+```ts
+import { startAwsOacFormTransport } from "@theory-cloud/facetheory";
+
+startAwsOacFormTransport();
+```
+
+Why this is correct:
+
+- The form opts in explicitly with `data-facetheory-oac-form`; unmarked forms keep native browser behavior.
+- FaceTheory computes the SHA256 hash over the exact URL-encoded bytes it sends and sets `x-amz-content-sha256` for CloudFront's Lambda URL OAC signing path.
+- The action must stay same-origin, so the browser never posts directly to the Lambda Function URL or another origin.
+- Cookies and same-origin credentials remain on the CloudFront/AppTheory path, while AppTheory's `AWS_IAM` Lambda URL hardening stays intact.
+
+**INCORRECT**
+
+```html
+<form
+  action="https://abc123.lambda-url.us-east-1.on.aws/agents/new"
+  method="post"
+>
+  <input name="agentName" />
+</form>
+```
+
+Why this is incorrect:
+
+- It bypasses the CloudFront distribution and AppTheorySsrSite origin contract.
+- Native browser form POSTs cannot add the `x-amz-content-sha256` header required by Lambda Function URL OAC for mutating payloads.
+- It invites a second unauthenticated or differently authenticated mutation path, which breaks the single AWS-first delivery route.
+
+Multipart note:
+
+- `startAwsOacFormTransport()` is intentionally URL-encoded. File uploads and browser-generated multipart bodies are not silently transformed; they fail closed until a separate, explicitly scoped multipart transport exists.
 
 ## Pattern: Use `startFaceNavigation()` with a stable view container
 
@@ -300,35 +375,38 @@ You want SPA-style navigation between FaceTheory routes without a full browser r
 **CORRECT**
 
 ```ts
-import { startFaceNavigation } from '@theory-cloud/facetheory';
+import { startFaceNavigation } from "@theory-cloud/facetheory";
 
 export async function hydrateFaceNavigation({ data, view }) {
   renderIntoExistingClientRoot(view, data);
 }
 
 startFaceNavigation({
-  viewSelector: '[data-facetheory-view]',
+  viewSelector: "[data-facetheory-view]",
 });
 ```
 
 Why this is correct:
+
 - FaceTheory fetches the next route as HTML and reuses the existing server contract instead of inventing a second route payload format.
 - `lang`, `htmlAttrs`, `bodyAttrs`, and non-executable head tags stay synchronized with the rendered document.
 - Exporting `hydrateFaceNavigation(...)` lets the client module update an existing app root instead of forcing a hard reload.
 - Same-origin boundaries stay intact: redirected cross-origin responses, remote bootstrap modules, and cross-origin programmatic navigations fail closed before the current document is mutated.
 
 Compatibility note:
+
 - If the bootstrap module does not export `hydrateFaceNavigation(...)`, FaceTheory can still reload that module as a fallback so existing side-effect-based entrypoints continue to work, but that fallback will not preserve long-lived client state.
 
 **INCORRECT**
 
 ```ts
-document.addEventListener('click', async (event) => {
+document.addEventListener("click", async (event) => {
   // fetch('/next') and manually patch random DOM nodes
 });
 ```
 
 Why this is incorrect:
+
 - It bypasses the tested FaceTheory navigation helpers and leaves head tags, hydration payloads, and document attrs unsynchronized.
 - It creates an ad hoc client router contract that other hosts and adapters cannot share.
 
@@ -345,23 +423,33 @@ import type {
   LogEntry,
   StatusVariant,
   TabItem,
-} from '@theory-cloud/facetheory/stitch-admin';
-import { Callout } from '@theory-cloud/facetheory/vue/stitch-shell';
+} from "@theory-cloud/facetheory/stitch-admin";
+import { Callout } from "@theory-cloud/facetheory/vue/stitch-shell";
 import {
   CopyableCode,
   FilterChipGroup,
   InlineKeyValueList,
   LogStream,
   Tabs,
-} from '@theory-cloud/facetheory/vue/stitch-admin';
+} from "@theory-cloud/facetheory/vue/stitch-admin";
 
-const tabs: TabItem[] = [{ key: 'catalog', label: 'Catalog', count: 12 }];
-const filters: FilterChipConfig[] = [{ key: 'status', label: 'status: active' }];
-const logs: LogEntry[] = [{ id: '1', timestamp: '09:42:12', level: 'info', message: 'Created demo-sandbox-01' }];
-const status: StatusVariant = 'allow';
+const tabs: TabItem[] = [{ key: "catalog", label: "Catalog", count: 12 }];
+const filters: FilterChipConfig[] = [
+  { key: "status", label: "status: active" },
+];
+const logs: LogEntry[] = [
+  {
+    id: "1",
+    timestamp: "09:42:12",
+    level: "info",
+    message: "Created demo-sandbox-01",
+  },
+];
+const status: StatusVariant = "allow";
 ```
 
 Why this is correct:
+
 - Shared data contracts and semantic variants come from the framework-neutral `stitch-admin` and `stitch-shell` subpaths.
 - Visual primitives come from the matching framework adapter path.
 - The same conceptual primitives now exist across React, Vue, and Svelte, so porting a control-plane screen does not require redesigning the UI contract.
@@ -370,12 +458,13 @@ Why this is correct:
 **INCORRECT**
 
 ```ts
-import { Tabs, LogStream } from '@theory-cloud/facetheory/react/stitch-admin';
+import { Tabs, LogStream } from "@theory-cloud/facetheory/react/stitch-admin";
 
-type StatusVariant = 'active' | 'paused' | 'mystery';
+type StatusVariant = "active" | "paused" | "mystery";
 ```
 
 Why this is incorrect:
+
 - Pulling React primitives into a Vue or Svelte host bypasses the adapter contract and breaks cross-framework parity.
 - Re-declaring local tab/filter/log/status variants lets one application drift away from the shared Stitch surface.
 - Ad hoc contracts make it harder to keep docs, tests, and framework adapters aligned in future changes.
@@ -388,19 +477,19 @@ You need an operator visibility dashboard that shows guarded access, non-authori
 **CORRECT**
 
 ```tsx
-import type { FaceContext } from '@theory-cloud/facetheory';
-import { createReactFace } from '@theory-cloud/facetheory/react';
+import type { FaceContext } from "@theory-cloud/facetheory";
+import { createReactFace } from "@theory-cloud/facetheory/react";
 import type {
   OperatorGuardStatus,
   OperatorHealthRow,
   VisibilityMatrixDimension,
   VisibilityMatrixRow,
-} from '@theory-cloud/facetheory/stitch-admin';
+} from "@theory-cloud/facetheory/stitch-admin";
 import {
   GuardedOperatorShell,
   HealthStatusPanel,
   VisibilityMatrix,
-} from '@theory-cloud/facetheory/react/stitch-admin';
+} from "@theory-cloud/facetheory/react/stitch-admin";
 
 interface OperatorDashboardData {
   guard: OperatorGuardStatus;
@@ -424,19 +513,23 @@ async function loadDashboard(ctx: FaceContext): Promise<OperatorDashboardData> {
 }
 
 export const face = createReactFace<OperatorDashboardData>({
-  route: '/operators/visibility',
-  mode: 'ssr',
+  route: "/operators/visibility",
+  mode: "ssr",
   load: loadDashboard,
   render: (_ctx, data) => (
     <GuardedOperatorShell guard={data.guard}>
       <HealthStatusPanel rows={data.healthRows} />
-      <VisibilityMatrix rows={data.visibilityRows} dimensions={data.visibilityDimensions} />
+      <VisibilityMatrix
+        rows={data.visibilityRows}
+        dimensions={data.visibilityDimensions}
+      />
     </GuardedOperatorShell>
   ),
 });
 ```
 
 Why this is correct:
+
 - AppTheory or Autheory-derived authorization is resolved before FaceTheory renders; FaceTheory receives `OperatorGuardStatus` as data and does not embed the auth provider.
 - Health, staleness, confidence, provenance, correlation, and visibility cells are loaded once and serialized as stable render data.
 - SSR is used because the HTML can vary by request identity, role, tenant, and visibility source.
@@ -446,8 +539,8 @@ Why this is correct:
 
 ```tsx
 export const face = createReactFace({
-  route: '/operators/visibility',
-  mode: 'ssg',
+  route: "/operators/visibility",
+  mode: "ssg",
   render: async () => (
     <GuardedOperatorShell guard={readBrowserSession()}>
       <p>{Math.round((Date.now() - lastChecked) / 1000)} seconds old</p>
@@ -458,11 +551,13 @@ export const face = createReactFace({
 ```
 
 Why this is incorrect:
+
 - A live auth-varying dashboard is being rendered as SSG output.
 - Authorization and freshness are read during render from ambient browser/time state, which can drift from the server-rendered HTML.
 - Production-like mock partner, tenant, release, or version values make empty states look like real operational data.
 
 ISR note:
+
 - Use ISR for operator visibility only when the rendered HTML is non-personalized or fully partitioned. If the output varies by identity, role, tenant, cookie, locale, environment, or data-source variant, include those dimensions in explicit `cacheKey` and `tenantKey` functions or keep the route on SSR.
 - Tenant-invariant ISR routes should not receive tenant-like headers such as `x-tenant-id` or `x-facetheory-tenant`; those headers trigger FaceTheory's fail-closed partition guard unless `tenantKey` or a custom `cacheKey` is configured.
 
