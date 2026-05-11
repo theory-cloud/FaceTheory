@@ -39,6 +39,14 @@ export interface AwsOacFormTransportResponseContext {
   submitter: HTMLElement | null;
 }
 
+export type AwsOacFormNavigationKind = 'redirect' | 'replace-document';
+
+export interface AwsOacFormTransportNavigationContext extends AwsOacFormTransportResponseContext {
+  finalUrl: URL;
+  html: string | null;
+  navigation: AwsOacFormNavigationKind;
+}
+
 export interface AwsOacFormTransportErrorContext {
   action: URL | null;
   event: SubmitEvent;
@@ -58,6 +66,9 @@ export interface StartAwsOacFormTransportOptions {
     error: unknown,
     context: AwsOacFormTransportErrorContext,
   ) => void | Promise<void>;
+  onNavigate?: (
+    context: AwsOacFormTransportNavigationContext,
+  ) => boolean | void | Promise<boolean | void>;
   onResponse?: (
     response: Response,
     context: AwsOacFormTransportResponseContext,
@@ -236,12 +247,14 @@ export function startAwsOacFormTransport(
 
     void submitForm({
       action,
+      allowedOrigin,
       event: submitEvent,
       fetcher,
       form,
       method,
       options,
       submitter,
+      window: win,
     }).catch((error) => {
       void reportError(error, context);
     });
@@ -281,12 +294,14 @@ function createFormData(
 
 interface SubmitAwsOacFormInput {
   action: URL;
+  allowedOrigin: string;
   event: SubmitEvent;
   fetcher: typeof fetch;
   form: HTMLFormElement;
   method: AwsOacFormTransportMethod;
   options: StartAwsOacFormTransportOptions;
   submitter: HTMLElement | null;
+  window: Window;
 }
 
 async function submitForm(input: SubmitAwsOacFormInput): Promise<void> {
@@ -329,10 +344,87 @@ async function submitForm(input: SubmitAwsOacFormInput): Promise<void> {
     return;
   }
 
-  if (!response.ok) {
+  await applyDefaultNavigationPolicy(input, context);
+}
+
+async function applyDefaultNavigationPolicy(
+  input: SubmitAwsOacFormInput,
+  context: AwsOacFormTransportResponseContext,
+): Promise<void> {
+  const finalUrl = resolveResponseUrl(context.response, input.action);
+  if (finalUrl.origin !== input.allowedOrigin) {
     throw new Error(
-      `FaceTheory OAC form transport failed (${response.status}) for ${input.action.toString()}`,
+      `FaceTheory OAC form transport rejected cross-origin response URL: expected ${input.allowedOrigin}, received ${finalUrl.origin}`,
     );
+  }
+
+  if (
+    context.response.redirected ||
+    finalUrl.toString() !== input.action.toString()
+  ) {
+    const navigationContext: AwsOacFormTransportNavigationContext = {
+      ...context,
+      finalUrl,
+      html: null,
+      navigation: 'redirect',
+    };
+    if (await customNavigationHandled(input.options, navigationContext)) return;
+    input.window.location.assign(finalUrl.toString());
+    return;
+  }
+
+  if (isHtmlResponse(context.response)) {
+    const html = await context.response.text();
+    const navigationContext: AwsOacFormTransportNavigationContext = {
+      ...context,
+      finalUrl,
+      html,
+      navigation: 'replace-document',
+    };
+    if (await customNavigationHandled(input.options, navigationContext)) return;
+    replaceDocument(input.form.ownerDocument, input.window, html, finalUrl);
+    return;
+  }
+
+  if (!context.response.ok) {
+    throw new Error(
+      `FaceTheory OAC form transport failed (${context.response.status}) for ${input.action.toString()}`,
+    );
+  }
+}
+
+async function customNavigationHandled(
+  options: StartAwsOacFormTransportOptions,
+  context: AwsOacFormTransportNavigationContext,
+): Promise<boolean> {
+  if (!options.onNavigate) return false;
+  return (await options.onNavigate(context)) !== false;
+}
+
+function resolveResponseUrl(response: Response, fallback: URL): URL {
+  return new URL(response.url || fallback.toString(), fallback);
+}
+
+function isHtmlResponse(response: Response): boolean {
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+  return (
+    contentType.startsWith('text/html') ||
+    contentType.startsWith('application/xhtml+xml')
+  );
+}
+
+function replaceDocument(
+  doc: Document,
+  win: Window,
+  html: string,
+  finalUrl: URL,
+): void {
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  if (finalUrl.toString() !== win.location.href) {
+    win.history.replaceState({}, '', finalUrl);
   }
 }
 

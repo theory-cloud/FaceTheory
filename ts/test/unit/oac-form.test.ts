@@ -384,17 +384,106 @@ test('oac form transport: requires opt-in for non-native mutating methods', asyn
 
     const methods: string[] = [];
     const errors: unknown[] = [];
+    const submitted = new Promise<void>((resolve) => {
+      startAwsOacFormTransport({
+        allowedMethods: ['POST', 'PATCH'],
+        document: dom.window.document,
+        fetcher: async (_input, init) => {
+          methods.push(String(init?.method));
+          return new Response(null, { status: 204 });
+        },
+        onError: (error) => {
+          errors.push(error);
+          resolve();
+        },
+        onResponse: () => {
+          resolve();
+        },
+        window: dom.window as unknown as Window,
+      });
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await submitted;
+
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(methods, ['PATCH']);
+    assert.deepEqual(errors, []);
+  } finally {
+    dom.window.close();
+  }
+});
+
+function responseWithUrl(
+  response: Response,
+  url: string,
+  redirected = false,
+): Response {
+  Object.defineProperty(response, 'url', { configurable: true, value: url });
+  Object.defineProperty(response, 'redirected', {
+    configurable: true,
+    value: redirected,
+  });
+  return response;
+}
+
+function fakeNavigationWindow(
+  dom: JSDOM,
+  assigned: string[],
+  replaced: string[] = [],
+): Window {
+  const location = {
+    href: dom.window.location.href,
+    origin: dom.window.location.origin,
+    assign: (url: string) => {
+      assigned.push(url);
+      location.href = new URL(url, location.href).toString();
+    },
+  };
+  return {
+    history: {
+      replaceState: (
+        _state: unknown,
+        _title: string,
+        url?: string | URL | null,
+      ) => {
+        if (url === undefined || url === null) return;
+        const resolved = new URL(String(url), location.href).toString();
+        replaced.push(resolved);
+        location.href = resolved;
+      },
+    },
+    location,
+  } as unknown as Window;
+}
+
+test('oac form transport: navigates same-origin redirects through the browser', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/save" method="post" data-facetheory-oac-form>
+        <input name="title" value="Draft">
+      </form>`,
+    { url: 'https://example.test/edit' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    const assigned: string[] = [];
     startAwsOacFormTransport({
-      allowedMethods: ['POST', 'PATCH'],
       document: dom.window.document,
-      fetcher: async (_input, init) => {
-        methods.push(String(init?.method));
-        return new Response(null, { status: 204 });
-      },
-      onError: (error) => {
-        errors.push(error);
-      },
-      window: dom.window as unknown as Window,
+      fetcher: async () =>
+        responseWithUrl(
+          new Response(null, { status: 200 }),
+          'https://example.test/done',
+          true,
+        ),
+      window: fakeNavigationWindow(dom, assigned),
     });
 
     const event = new dom.window.SubmitEvent('submit', {
@@ -405,8 +494,168 @@ test('oac form transport: requires opt-in for non-native mutating methods', asyn
     await flushEventLoop();
 
     assert.equal(event.defaultPrevented, true);
-    assert.deepEqual(methods, ['PATCH']);
-    assert.deepEqual(errors, []);
+    assert.deepEqual(assigned, ['https://example.test/done']);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: rejects cross-origin redirect targets', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/save" method="post" data-facetheory-oac-form>
+        <input name="title" value="Draft">
+      </form>`,
+    { url: 'https://example.test/edit' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    const assigned: string[] = [];
+    const errors: unknown[] = [];
+    startAwsOacFormTransport({
+      document: dom.window.document,
+      fetcher: async () =>
+        responseWithUrl(
+          new Response(null, { status: 200 }),
+          'https://evil.test/done',
+          true,
+        ),
+      onError: (error) => {
+        errors.push(error);
+      },
+      window: fakeNavigationWindow(dom, assigned),
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(assigned, []);
+    assert.equal(errors.length, 1);
+    assert.match(String(errors[0]), /rejected cross-origin response URL/);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: replaces the document for same-origin HTML responses', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html>
+        <head><title>Edit</title></head>
+        <body>
+          <form action="/save" method="post" data-facetheory-oac-form>
+            <input name="title" value="">
+          </form>
+        </body>
+      </html>`,
+    { url: 'https://example.test/edit' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    const replaced: string[] = [];
+    startAwsOacFormTransport({
+      document: dom.window.document,
+      fetcher: async () =>
+        responseWithUrl(
+          new Response(
+            '<!doctype html><html><head><title>Invalid</title></head><body><main>Title is required</main></body></html>',
+            {
+              headers: { 'content-type': 'text/html; charset=utf-8' },
+              status: 422,
+            },
+          ),
+          'https://example.test/save',
+        ),
+      window: fakeNavigationWindow(dom, [], replaced),
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(dom.window.document.title, 'Invalid');
+    assert.equal(
+      dom.window.document.body.textContent?.trim(),
+      'Title is required',
+    );
+    assert.deepEqual(replaced, ['https://example.test/save']);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: lets hosts override navigation outcomes', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html>
+        <head><title>Edit</title></head>
+        <body>
+          <form action="/save" method="post" data-facetheory-oac-form>
+            <input name="title" value="Draft">
+          </form>
+        </body>
+      </html>`,
+    { url: 'https://example.test/edit' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    const navigations: Array<{
+      html: string | null;
+      navigation: string;
+      url: string;
+    }> = [];
+    startAwsOacFormTransport({
+      document: dom.window.document,
+      fetcher: async () =>
+        responseWithUrl(
+          new Response('<!doctype html><title>Saved</title><p>Saved</p>', {
+            headers: { 'content-type': 'text/html' },
+            status: 200,
+          }),
+          'https://example.test/save',
+        ),
+      onNavigate: (context) => {
+        navigations.push({
+          html: context.html,
+          navigation: context.navigation,
+          url: context.finalUrl.toString(),
+        });
+        return true;
+      },
+      window: fakeNavigationWindow(dom, []),
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(dom.window.document.title, 'Edit');
+    assert.equal(navigations.length, 1);
+    assert.equal(navigations[0]?.navigation, 'replace-document');
+    assert.equal(navigations[0]?.url, 'https://example.test/save');
+    assert.match(navigations[0]?.html ?? '', /Saved/);
   } finally {
     dom.window.close();
   }

@@ -345,6 +345,7 @@ Why this is correct:
 - FaceTheory computes the SHA256 hash over the exact URL-encoded bytes it sends and sets `x-amz-content-sha256` for CloudFront's Lambda URL OAC signing path.
 - The action must stay same-origin, so the browser never posts directly to the Lambda Function URL or another origin.
 - Cookies and same-origin credentials remain on the CloudFront/AppTheory path, while AppTheory's `AWS_IAM` Lambda URL hardening stays intact.
+- Same-origin redirects use normal browser navigation to the final URL, and same-origin HTML validation/error responses replace the whole document instead of inventing a partial DOM patching contract.
 
 **INCORRECT**
 
