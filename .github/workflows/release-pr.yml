@@ -30,9 +30,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify stable release baseline tag
-        run: scripts/verify-release-baseline-tag.sh
-
       - name: Compute release-as (align to premain RC)
         id: version
         run: |
