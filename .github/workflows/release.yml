@@ -60,11 +60,34 @@ jobs:
           git fetch origin main --force
           git fetch origin premain --force || true
 
-          # Existing draft tags may predate a synchronized VERSION file.
+          # Existing draft tags may predate synchronized version manifests.
           # Normalize the workspace copy so verification/build scripts use the requested tag version.
           if [[ -f VERSION ]]; then
             printf '%s # x-release-please-version\n' "${TAG_NAME#v}" > VERSION
           fi
+
+          RELEASE_VERSION="${TAG_NAME#v}" python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"]
+          is_prerelease = "-rc" in version.split("+", 1)[0]
+
+
+          def update_manifest(path: str) -> None:
+              manifest = Path(path)
+              if not manifest.exists():
+                  return
+              data = json.loads(manifest.read_text(encoding="utf-8"))
+              data["."] = version
+              manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+          if not is_prerelease:
+              update_manifest(".release-please-manifest.json")
+          update_manifest(".release-please-manifest.premain.json")
+          PY
 
           scripts/verify-release-branch.sh "${TAG_NAME}"
 
@@ -102,9 +125,19 @@ jobs:
 
           gh release edit "${TAG_NAME}" --draft=false ${prerelease_flag} --notes-file dist/RELEASE_NOTES.md
 
+      - name: Checkout (stable release preflight)
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.tag_name == '')
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Verify version alignment before release creation
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.tag_name == '')
+        run: scripts/verify-version-alignment.sh
+
       - name: Release Please (Stable)
         id: release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.tag_name == '')
         uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
@@ -218,3 +251,24 @@ jobs:
           fi
 
           gh release edit "${TAG_NAME}" --draft=false --notes-file dist/RELEASE_NOTES.md
+
+      - name: Cleanup failed draft stable release (no remnants)
+        if: failure() && steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+        run: |
+          if [[ -z "${TAG_NAME}" ]]; then
+            echo "release-cleanup: SKIP (missing tag_name output)"
+            exit 0
+          fi
+
+          is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft' 2>/dev/null || true)"
+          if [[ "${is_draft}" != "true" ]]; then
+            echo "release-cleanup: SKIP (release not draft or not found)"
+            exit 0
+          fi
+
+          echo "release-cleanup: deleting draft release and tag ${TAG_NAME}"
+          gh release delete "${TAG_NAME}" --yes || true
+          git push origin ":refs/tags/${TAG_NAME}" || true
