@@ -200,12 +200,14 @@ Navigation behavior:
 - same-origin redirects navigate the browser to the final response URL
 - cross-origin redirect targets fail closed and call `onError`
 - server-rendered HTML validation/error responses replace the whole document
+- marked forms that resolve to `multipart/form-data`, `text/plain`, or another unsupported encoding fail closed through `onError` before sending
 - use `onNavigate(context)` only when a host intentionally coordinates the outcome with `startFaceNavigation()` or another caller-owned navigation layer
 
 Verification:
 
 - the request reaches the AppTheory/FaceTheory handler instead of failing at CloudFront/Lambda URL auth
 - request headers include `x-amz-content-sha256` and `content-type: application/x-www-form-urlencoded;charset=UTF-8`
+- marked multipart or text/plain forms do not send a request and surface through `onError`
 - redirect and validation responses stay same-origin and produce full-document outcomes
 
 ## Issue: Streaming HTML Ships Without Expected Late Styles

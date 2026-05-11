@@ -342,7 +342,7 @@ startAwsOacFormTransport();
 Why this is correct:
 
 - The form opts in explicitly with `data-facetheory-oac-form`; unmarked forms keep native browser behavior.
-- FaceTheory computes the SHA256 hash over the exact URL-encoded bytes it sends and sets `x-amz-content-sha256` for CloudFront's Lambda URL OAC signing path.
+- FaceTheory proceeds only when the resolved form encoding is `application/x-www-form-urlencoded`, computes the SHA256 hash over the exact URL-encoded bytes it sends, and sets `x-amz-content-sha256` for CloudFront's Lambda URL OAC signing path.
 - The action must stay same-origin, so the browser never posts directly to the Lambda Function URL or another origin.
 - Cookies and same-origin credentials remain on the CloudFront/AppTheory path, while AppTheory's `AWS_IAM` Lambda URL hardening stays intact.
 - Same-origin redirects use normal browser navigation to the final URL, and same-origin HTML validation/error responses replace the whole document instead of inventing a partial DOM patching contract.
@@ -364,9 +364,9 @@ Why this is incorrect:
 - Native browser form POSTs cannot add the `x-amz-content-sha256` header required by Lambda Function URL OAC for mutating payloads.
 - It invites a second unauthenticated or differently authenticated mutation path, which breaks the single AWS-first delivery route.
 
-Multipart note:
+Encoding note:
 
-- `startAwsOacFormTransport()` is intentionally URL-encoded. File uploads and browser-generated multipart bodies are not silently transformed; they fail closed until a separate, explicitly scoped multipart transport exists.
+- `startAwsOacFormTransport()` is intentionally URL-encoded. Submitter `formenctype` overrides form `enctype`, matching browser form resolution. Marked forms that resolve to `multipart/form-data`, `text/plain`, or another unsupported encoding are not silently transformed and do not fall back to native POST; they fail closed through `onError` until a separate, explicitly scoped transport exists.
 
 ## Pattern: Use `startFaceNavigation()` with a stable view container
 

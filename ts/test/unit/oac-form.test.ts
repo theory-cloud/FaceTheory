@@ -418,6 +418,185 @@ test('oac form transport: requires opt-in for non-native mutating methods', asyn
   }
 });
 
+test('oac form transport: fails closed for form-level multipart encoding', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/save" method="post" enctype="multipart/form-data" data-facetheory-oac-form>
+        <input name="title" value="Draft">
+      </form>`,
+    { url: 'https://example.test/' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    const errors: unknown[] = [];
+    let fetchCount = 0;
+    startAwsOacFormTransport({
+      document: dom.window.document,
+      fetcher: async () => {
+        fetchCount += 1;
+        return new Response(null, { status: 204 });
+      },
+      onError: (error) => {
+        errors.push(error);
+      },
+      window: dom.window as unknown as Window,
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(fetchCount, 0);
+    assert.equal(errors.length, 1);
+    assert.match(String(errors[0]), /received multipart\/form-data/);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: fails closed for form-level text plain encoding', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/save" method="post" enctype="text/plain" data-facetheory-oac-form>
+        <input name="title" value="Draft">
+      </form>`,
+    { url: 'https://example.test/' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    const errors: unknown[] = [];
+    let fetchCount = 0;
+    startAwsOacFormTransport({
+      document: dom.window.document,
+      fetcher: async () => {
+        fetchCount += 1;
+        return new Response(null, { status: 204 });
+      },
+      onError: (error) => {
+        errors.push(error);
+      },
+      window: dom.window as unknown as Window,
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(fetchCount, 0);
+    assert.equal(errors.length, 1);
+    assert.match(String(errors[0]), /received text\/plain/);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: submitter formenctype can opt back into URL encoding', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/save" method="post" enctype="multipart/form-data" data-facetheory-oac-form>
+        <input name="title" value="Draft">
+        <button name="intent" value="save" formenctype="application/x-www-form-urlencoded">Save</button>
+      </form>`,
+    { url: 'https://example.test/' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    const submitter = dom.window.document.querySelector('button');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+    assert.ok(submitter instanceof dom.window.HTMLElement);
+
+    const bodies: string[] = [];
+    const submitted = new Promise<void>((resolve) => {
+      startAwsOacFormTransport({
+        document: dom.window.document,
+        fetcher: async (_input, init) => {
+          bodies.push(new TextDecoder().decode(init?.body as Uint8Array));
+          return new Response(null, { status: 204 });
+        },
+        onResponse: () => {
+          resolve();
+        },
+        window: dom.window as unknown as Window,
+      });
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+      submitter,
+    });
+    form.dispatchEvent(event);
+    await submitted;
+
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(bodies, ['title=Draft&intent=save']);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: submitter formenctype can fail closed over form encoding', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/save" method="post" enctype="application/x-www-form-urlencoded" data-facetheory-oac-form>
+        <input name="title" value="Draft">
+        <button name="intent" value="save" formenctype="text/plain">Save</button>
+      </form>`,
+    { url: 'https://example.test/' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    const submitter = dom.window.document.querySelector('button');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+    assert.ok(submitter instanceof dom.window.HTMLElement);
+
+    const errors: unknown[] = [];
+    let fetchCount = 0;
+    startAwsOacFormTransport({
+      document: dom.window.document,
+      fetcher: async () => {
+        fetchCount += 1;
+        return new Response(null, { status: 204 });
+      },
+      onError: (error) => {
+        errors.push(error);
+      },
+      window: dom.window as unknown as Window,
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+      submitter,
+    });
+    form.dispatchEvent(event);
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(fetchCount, 0);
+    assert.equal(errors.length, 1);
+    assert.match(String(errors[0]), /received text\/plain/);
+  } finally {
+    dom.window.close();
+  }
+});
+
 function responseWithUrl(
   response: Response,
   url: string,
@@ -515,18 +694,21 @@ test('oac form transport: rejects cross-origin redirect targets', async () => {
 
     const assigned: string[] = [];
     const errors: unknown[] = [];
-    startAwsOacFormTransport({
-      document: dom.window.document,
-      fetcher: async () =>
-        responseWithUrl(
-          new Response(null, { status: 200 }),
-          'https://evil.test/done',
-          true,
-        ),
-      onError: (error) => {
-        errors.push(error);
-      },
-      window: fakeNavigationWindow(dom, assigned),
+    const errored = new Promise<void>((resolve) => {
+      startAwsOacFormTransport({
+        document: dom.window.document,
+        fetcher: async () =>
+          responseWithUrl(
+            new Response(null, { status: 200 }),
+            'https://evil.test/done',
+            true,
+          ),
+        onError: (error) => {
+          errors.push(error);
+          resolve();
+        },
+        window: fakeNavigationWindow(dom, assigned),
+      });
     });
 
     const event = new dom.window.SubmitEvent('submit', {
@@ -534,7 +716,7 @@ test('oac form transport: rejects cross-origin redirect targets', async () => {
       cancelable: true,
     });
     form.dispatchEvent(event);
-    await flushEventLoop();
+    await errored;
 
     assert.equal(event.defaultPrevented, true);
     assert.deepEqual(assigned, []);
@@ -622,25 +804,28 @@ test('oac form transport: lets hosts override navigation outcomes', async () => 
       navigation: string;
       url: string;
     }> = [];
-    startAwsOacFormTransport({
-      document: dom.window.document,
-      fetcher: async () =>
-        responseWithUrl(
-          new Response('<!doctype html><title>Saved</title><p>Saved</p>', {
-            headers: { 'content-type': 'text/html' },
-            status: 200,
-          }),
-          'https://example.test/save',
-        ),
-      onNavigate: (context) => {
-        navigations.push({
-          html: context.html,
-          navigation: context.navigation,
-          url: context.finalUrl.toString(),
-        });
-        return true;
-      },
-      window: fakeNavigationWindow(dom, []),
+    const navigated = new Promise<void>((resolve) => {
+      startAwsOacFormTransport({
+        document: dom.window.document,
+        fetcher: async () =>
+          responseWithUrl(
+            new Response('<!doctype html><title>Saved</title><p>Saved</p>', {
+              headers: { 'content-type': 'text/html' },
+              status: 200,
+            }),
+            'https://example.test/save',
+          ),
+        onNavigate: (context) => {
+          navigations.push({
+            html: context.html,
+            navigation: context.navigation,
+            url: context.finalUrl.toString(),
+          });
+          resolve();
+          return true;
+        },
+        window: fakeNavigationWindow(dom, []),
+      });
     });
 
     const event = new dom.window.SubmitEvent('submit', {
@@ -648,7 +833,7 @@ test('oac form transport: lets hosts override navigation outcomes', async () => 
       cancelable: true,
     });
     form.dispatchEvent(event);
-    await flushEventLoop();
+    await navigated;
 
     assert.equal(event.defaultPrevented, true);
     assert.equal(dom.window.document.title, 'Edit');

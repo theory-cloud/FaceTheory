@@ -270,7 +270,7 @@ Core exports:
 - `createAwsOacUrlEncodedFormBody(fields)` creates the exact UTF-8 `application/x-www-form-urlencoded` body bytes.
 - `createAwsOacUrlEncodedFormPayload(form, options)` returns the encoded body, content type, fields, and lowercase SHA256 hex digest over those bytes.
 - `sha256HexForAwsOacPayload(body, digest?)` exposes the Web Crypto digest path with a test-injectable digest.
-- `startAwsOacFormTransport(options)` intercepts only forms carrying the marker, resolves action/method from the form and submitter, enforces same-origin actions, preserves constraint validation, and sends the encoded body through `fetch` with `credentials: "same-origin"`, `content-type`, and `x-amz-content-sha256`.
+- `startAwsOacFormTransport(options)` intercepts only forms carrying the marker, resolves action/method/encoding from the form and submitter, enforces same-origin actions, preserves constraint validation, and sends the encoded body through `fetch` with `credentials: "same-origin"`, `content-type`, and `x-amz-content-sha256`.
 - `onNavigate(context)` lets a host coordinate successful form outcomes with `startFaceNavigation()` or another caller-owned navigation layer. If the hook returns anything other than `false`, FaceTheory treats the outcome as handled.
 
 Example client bootstrap:
@@ -293,7 +293,7 @@ Form markup stays explicit:
 </form>
 ```
 
-The helper intentionally leaves unmarked, `GET`, and `dialog` forms on native browser behavior. `PUT`, `PATCH`, and `DELETE` require explicit `allowedMethods` opt-in so the helper, not the browser, owns the actual fetch method and body bytes. Browser-generated multipart file uploads are out of scope for this URL-encoded transport and fail closed as non-string `FormData` entries.
+The helper intentionally leaves unmarked, `GET`, and `dialog` forms on native browser behavior. `PUT`, `PATCH`, and `DELETE` require explicit `allowedMethods` opt-in so the helper, not the browser, owns the actual fetch method and body bytes. Marked mutating forms must resolve to `application/x-www-form-urlencoded`: submitter `formenctype` overrides form `enctype`, and `multipart/form-data`, `text/plain`, or any other unsupported marked encoding fails closed through `onError` before a request is sent. Browser-generated multipart file uploads are out of scope for this URL-encoded transport.
 
 Default navigation policy after a successful fetch is deliberately full-document instead of partial DOM patching:
 

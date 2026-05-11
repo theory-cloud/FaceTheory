@@ -1,11 +1,16 @@
 export const AWS_OAC_CONTENT_SHA256_HEADER = 'x-amz-content-sha256';
 export const AWS_OAC_FORM_MARKER_ATTRIBUTE = 'data-facetheory-oac-form';
-export const AWS_OAC_URL_ENCODED_FORM_CONTENT_TYPE =
-  'application/x-www-form-urlencoded;charset=UTF-8';
+export const AWS_OAC_URL_ENCODED_FORM_ENCODING =
+  'application/x-www-form-urlencoded';
+export const AWS_OAC_URL_ENCODED_FORM_CONTENT_TYPE = `${AWS_OAC_URL_ENCODED_FORM_ENCODING};charset=UTF-8`;
 
 export type AwsOacFormField = readonly [name: string, value: string];
 export type AwsOacRequestBody = Uint8Array<ArrayBuffer>;
 export type AwsOacFormTransportMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+export type AwsOacFormEncoding =
+  | typeof AWS_OAC_URL_ENCODED_FORM_ENCODING
+  | 'multipart/form-data'
+  | 'text/plain';
 export type AwsOacSha256Digest = (
   body: AwsOacRequestBody,
 ) => Promise<ArrayBuffer | ArrayBufferView>;
@@ -229,6 +234,18 @@ export function startAwsOacFormTransport(
 
     const action = resolveFormAction(form, submitter, win);
     const context = { ...baseContext, action, method };
+    const encoding = resolveFormEncoding(form, submitter);
+
+    if (encoding !== AWS_OAC_URL_ENCODED_FORM_ENCODING) {
+      event.preventDefault();
+      void reportError(
+        new Error(
+          `FaceTheory OAC form transport only supports application/x-www-form-urlencoded forms; received ${encoding}`,
+        ),
+        context,
+      );
+      return;
+    }
 
     if (action.origin !== allowedOrigin) {
       event.preventDefault();
@@ -510,6 +527,30 @@ function resolveFormMethod(
     form.getAttribute('method') ??
     'GET';
   return rawMethod.trim().toUpperCase() || 'GET';
+}
+
+function resolveFormEncoding(
+  form: HTMLFormElement,
+  submitter: HTMLElement | null,
+): AwsOacFormEncoding {
+  const submitterEncoding = submitter?.getAttribute('formenctype');
+  if (submitterEncoding !== null && submitterEncoding !== undefined) {
+    return normalizeFormEncoding(submitterEncoding);
+  }
+
+  return normalizeFormEncoding(form.getAttribute('enctype') ?? form.enctype);
+}
+
+function normalizeFormEncoding(
+  value: string | null | undefined,
+): AwsOacFormEncoding {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  if (normalized === 'multipart/form-data' || normalized === 'text/plain') {
+    return normalized;
+  }
+  return AWS_OAC_URL_ENCODED_FORM_ENCODING;
 }
 
 function isKnownMutatingMethod(
