@@ -38,6 +38,7 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
       | docs/api-reference.md \
       | docs/getting-started.md \
       | scripts/build-release-assets.sh \
+      | scripts/check-release-baseline-ready.sh \
       | scripts/generate-checksums.sh \
       | scripts/read-version.sh \
       | scripts/render-release-notes.sh \
