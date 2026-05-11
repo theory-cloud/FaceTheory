@@ -5,6 +5,7 @@ export * from './html.js';
 export * from './isr.js';
 export * from './lambda-url.js';
 export * from './ops.js';
+export * from './oac-form.js';
 export * from './router.js';
 export * from './security.js';
 export * from './spa.js';
