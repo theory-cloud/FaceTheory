@@ -45,7 +45,7 @@ if [[ "${ts_version}" != "${expected_version}" ]]; then
 fi
 
 manifest_check_output="$(
-  EXPECTED_VERSION="${expected_version}" python3 - <<'PY'
+  EXPECTED_VERSION="${expected_version}" python3 - <<'PY' 2>&1
 import json
 import os
 import re
@@ -153,7 +153,7 @@ PY
   fi
 fi
 
-EXPECTED_VERSION="${expected_version}" python3 - <<'PY'
+EXPECTED_VERSION="${expected_version}" python3 - <<'PY' 2>&1
 import os
 from pathlib import Path
 
