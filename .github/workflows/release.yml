@@ -60,11 +60,34 @@ jobs:
           git fetch origin main --force
           git fetch origin premain --force || true
 
-          # Existing draft tags may predate a synchronized VERSION file.
+          # Existing draft tags may predate synchronized version manifests.
           # Normalize the workspace copy so verification/build scripts use the requested tag version.
           if [[ -f VERSION ]]; then
             printf '%s # x-release-please-version\n' "${TAG_NAME#v}" > VERSION
           fi
+
+          RELEASE_VERSION="${TAG_NAME#v}" python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"]
+          is_prerelease = "-rc" in version.split("+", 1)[0]
+
+
+          def update_manifest(path: str) -> None:
+              manifest = Path(path)
+              if not manifest.exists():
+                  return
+              data = json.loads(manifest.read_text(encoding="utf-8"))
+              data["."] = version
+              manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+          if not is_prerelease:
+              update_manifest(".release-please-manifest.json")
+          update_manifest(".release-please-manifest.premain.json")
+          PY
 
           scripts/verify-release-branch.sh "${TAG_NAME}"
 
