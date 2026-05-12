@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.1.0](https://github.com/theory-cloud/FaceTheory/compare/v3.0.1...v3.1.0) (2026-05-11)
+
+
+### Features
+
+* **oac:** add OAC form core transport ([45c7dfb](https://github.com/theory-cloud/FaceTheory/commit/45c7dfb0c8da2a616fda34496d20d26124b021c8))
+* **oac:** add same-origin mutating form transport ([8a2e5f2](https://github.com/theory-cloud/FaceTheory/commit/8a2e5f2672796186c6c69ea92d06b2e9b3b9a7e4))
+* **oac:** add URL-encoded form payload hashing ([4470c65](https://github.com/theory-cloud/FaceTheory/commit/4470c65ff9d5ccc92e24bf78198856c73937ccf9))
+* **oac:** preserve form navigation outcomes ([d5803c2](https://github.com/theory-cloud/FaceTheory/commit/d5803c2a771a84a9269a87474af1824f88ba8eea))
+
+
+### Bug Fixes
+
+* **oac:** preserve unsupported form encodings ([a8ca178](https://github.com/theory-cloud/FaceTheory/commit/a8ca17861de4aa557b682ad068ff4d6cd0357204))
+* **oac:** reject unsupported form encodings ([800fe4a](https://github.com/theory-cloud/FaceTheory/commit/800fe4aaab82adcfa27f6d9fdf7afbaa6b9a27f7))
+* **release:** align premain manifest with v3.0.1 ([e5e3e01](https://github.com/theory-cloud/FaceTheory/commit/e5e3e012f5cff047cee041df82d83d0b80198b9f))
+* **release:** guard release baseline versioning ([187fd3a](https://github.com/theory-cloud/FaceTheory/commit/187fd3a58f801d39548c21875e30305f08c40a17))
+* **release:** guard release baseline versioning ([1de103c](https://github.com/theory-cloud/FaceTheory/commit/1de103cfb61d9659b08068cf6e61974ba7ee0225))
+* **release:** restore automatic tag creation ([b485f1c](https://github.com/theory-cloud/FaceTheory/commit/b485f1c5864eaca6619dd6d5dae43002b92eed5d))
+* **release:** restore automatic tag creation ([b70182b](https://github.com/theory-cloud/FaceTheory/commit/b70182b6a09902e7007ee95c68f669861f229a13))
+
 ## [3.0.1](https://github.com/theory-cloud/FaceTheory/compare/v3.0.0...v3.0.1) (2026-05-10)
 
 

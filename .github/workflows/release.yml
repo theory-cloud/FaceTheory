@@ -135,6 +135,72 @@ jobs:
         if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.tag_name == '')
         run: scripts/verify-version-alignment.sh
 
+      - name: Recover missing current stable Release Please state
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.tag_name == '')
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          version="$(
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path(".release-please-manifest.json").read_text(encoding="utf-8"))
+          version = str(data.get(".", "")).strip()
+          if not version:
+              raise SystemExit("missing stable release-please manifest version")
+          print(version)
+          PY
+          )"
+          tag="v${version}"
+
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            echo "release-recovery: ${tag} release already exists"
+            exit 0
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "release-recovery: ${tag} tag already exists"
+            exit 0
+          fi
+
+          expected_title="chore(main): release ${version}"
+          pending_number="$(
+            EXPECTED_TITLE="${expected_title}" gh pr list \
+              --state merged \
+              --base main \
+              --label "autorelease: pending" \
+              --limit 50 \
+              --json number,title \
+              --jq 'map(select(.title == env.EXPECTED_TITLE)) | .[0].number // ""'
+          )"
+          if [[ -n "${pending_number}" ]]; then
+            echo "release-recovery: ${tag} already pending on PR #${pending_number}"
+            exit 0
+          fi
+
+          tagged_number="$(
+            EXPECTED_TITLE="${expected_title}" gh pr list \
+              --state merged \
+              --base main \
+              --label "autorelease: tagged" \
+              --limit 50 \
+              --json number,title \
+              --jq 'map(select(.title == env.EXPECTED_TITLE)) | .[0].number // ""'
+          )"
+
+          if [[ -z "${tagged_number}" ]]; then
+            echo "release-recovery: FAIL (${tag} is missing and no merged ${expected_title} PR is pending/tagged)"
+            exit 1
+          fi
+
+          echo "release-recovery: resetting PR #${tagged_number} from tagged to pending for ${tag}"
+          gh pr edit "${tagged_number}" \
+            --remove-label "autorelease: tagged" \
+            --add-label "autorelease: pending"
+
       - name: Release Please (Stable)
         id: release
         if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.tag_name == '')
