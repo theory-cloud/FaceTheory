@@ -172,7 +172,7 @@ export function startAwsOacFormTransport(
     options.markerAttribute ?? AWS_OAC_FORM_MARKER_ATTRIBUTE;
   const allowedOrigin = resolveAllowedOrigin(options.allowedOrigin, win);
   const allowedMethods = resolveAllowedMethods(options.allowedMethods);
-  const fetcher = options.fetcher ?? globalThis.fetch;
+  const fetcher = resolveFetch(options.fetcher, win);
 
   if (typeof fetcher !== 'function') {
     throw new Error(
@@ -495,6 +495,27 @@ function resolveAllowedMethods(
     allowed.add(method.toUpperCase() as AwsOacFormTransportMethod);
   }
   return allowed;
+}
+
+function resolveFetch(
+  explicitFetcher: typeof fetch | undefined,
+  win: Window,
+): typeof fetch | undefined {
+  if (explicitFetcher !== undefined) return explicitFetcher;
+
+  const windowFetch = win.fetch;
+  if (typeof windowFetch === 'function') {
+    return ((input, init) =>
+      windowFetch.call(win, input, init)) as typeof fetch;
+  }
+
+  const globalFetch = globalThis.fetch;
+  if (typeof globalFetch === 'function') {
+    return ((input, init) =>
+      globalFetch.call(globalThis, input, init)) as typeof fetch;
+  }
+
+  return undefined;
 }
 
 function readSubmitForm(event: SubmitEvent): HTMLFormElement | null {
