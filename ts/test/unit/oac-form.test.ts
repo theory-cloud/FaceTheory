@@ -194,6 +194,68 @@ test('oac form transport: intercepts marked same-origin POST forms with OAC head
   }
 });
 
+test('oac form transport: binds the default browser fetch to window', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/agents/new" method="post" data-facetheory-oac-form>
+        <input name="agent" value="demo">
+        <button name="intent" value="create">Create</button>
+      </form>`,
+    { url: 'https://control.lab.theorymcp.ai/agents/new' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    const submitter = dom.window.document.querySelector('button');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+    assert.ok(submitter instanceof dom.window.HTMLElement);
+
+    const win = dom.window as unknown as Window & { fetch: typeof fetch };
+    const calls: Array<{
+      input: string | URL | Request;
+      init: RequestInit | undefined;
+    }> = [];
+    const errors: unknown[] = [];
+    win.fetch = function receiverSensitiveFetch(
+      this: Window,
+      input: Parameters<typeof fetch>[0],
+      init?: Parameters<typeof fetch>[1],
+    ): ReturnType<typeof fetch> {
+      assert.equal(this, win);
+      calls.push({ input, init });
+      return Promise.resolve(new Response(null, { status: 204 }));
+    } as typeof fetch;
+
+    startAwsOacFormTransport({
+      document: dom.window.document,
+      onError: (error) => {
+        errors.push(error);
+      },
+      window: win,
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+      submitter,
+    });
+    form.dispatchEvent(event);
+
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(errors, []);
+    assert.equal(calls.length, 1);
+    assert.equal(
+      calls[0]?.input,
+      'https://control.lab.theorymcp.ai/agents/new',
+    );
+    assert.equal(calls[0]?.init?.method, 'POST');
+  } finally {
+    dom.window.close();
+  }
+});
+
 test('oac form transport: leaves unmarked and GET forms to native behavior', () => {
   const dom = new JSDOM(
     `<!doctype html>
