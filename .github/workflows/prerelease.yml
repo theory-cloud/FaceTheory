@@ -18,11 +18,11 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'premain' || github.sha }}
 
       - name: Check stable release baseline
         id: baseline
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.json
 
       - name: Release Please (Prerelease)
@@ -41,6 +41,8 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ steps.release.outputs.tag_name }}
 
       - name: Fetch main + premain (release branch verification)
         if: steps.release.outputs.release_created == 'true'
@@ -159,4 +161,4 @@ jobs:
 
           echo "release-cleanup: deleting draft release and tag ${TAG_NAME}"
           gh release delete "${TAG_NAME}" --yes || true
-          git push origin ":refs/tags/${TAG_NAME}" || true
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG_NAME}" || true
