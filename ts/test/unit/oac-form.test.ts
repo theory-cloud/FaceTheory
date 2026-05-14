@@ -171,6 +171,7 @@ test('oac form transport: intercepts marked same-origin POST forms with OAC head
     );
     assert.equal(calls[0]?.init?.method, 'POST');
     assert.equal(calls[0]?.init?.credentials, 'same-origin');
+    assert.equal(calls[0]?.init?.redirect, 'error');
     assert.equal(
       new TextDecoder().decode(calls[0]?.init?.body as Uint8Array),
       'agent=demo&intent=create',
@@ -189,6 +190,52 @@ test('oac form transport: intercepts marked same-origin POST forms with OAC head
         new TextEncoder().encode('agent=demo&intent=create'),
       ),
     );
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: forces redirect errors for mutating fetches', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/agents/new" method="post" data-facetheory-oac-form>
+        <input name="agent" value="demo">
+        <button>Create</button>
+      </form>`,
+    { url: 'https://control.lab.theorymcp.ai/agents/new' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    const redirects: Array<RequestInit['redirect']> = [];
+    const responseSeen = new Promise<void>((resolve) => {
+      startAwsOacFormTransport({
+        document: dom.window.document,
+        fetcher: async (_input, init) => {
+          redirects.push(init?.redirect);
+          return new Response(null, { status: 204 });
+        },
+        onResponse: () => {
+          resolve();
+        },
+        requestInit: {
+          redirect: 'follow',
+        },
+        window: dom.window as unknown as Window,
+      });
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+
+    await responseSeen;
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(redirects, ['error']);
   } finally {
     dom.window.close();
   }
@@ -793,7 +840,7 @@ function fakeNavigationWindow(
   } as unknown as Window;
 }
 
-test('oac form transport: navigates same-origin redirects through the browser', async () => {
+test('oac form transport: navigates same-origin redirected responses through the browser', async () => {
   const dom = new JSDOM(
     `<!doctype html>
       <form action="/save" method="post" data-facetheory-oac-form>
@@ -929,6 +976,72 @@ test('oac form transport: replaces the document for same-origin HTML responses',
       'Title is required',
     );
     assert.deepEqual(replaced, ['https://example.test/save']);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: refuses default document replacement when response CSP is present', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html>
+        <head><title>Edit</title></head>
+        <body>
+          <form action="/save" method="post" data-facetheory-oac-form>
+            <input name="title" value="">
+          </form>
+        </body>
+      </html>`,
+    { url: 'https://example.test/edit' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    const errors: unknown[] = [];
+    const replaced: string[] = [];
+    const errored = new Promise<void>((resolve) => {
+      startAwsOacFormTransport({
+        document: dom.window.document,
+        fetcher: async () =>
+          responseWithUrl(
+            new Response(
+              '<!doctype html><html><head><title>Invalid</title></head><body><script>document.body.dataset.executed = "yes"</script><main>Title is required</main></body></html>',
+              {
+                headers: {
+                  'content-security-policy': "script-src 'none'",
+                  'content-type': 'text/html; charset=utf-8',
+                },
+                status: 422,
+              },
+            ),
+            'https://example.test/save',
+          ),
+        onError: (error) => {
+          errors.push(error);
+          resolve();
+        },
+        window: fakeNavigationWindow(dom, [], replaced),
+      });
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await errored;
+
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(dom.window.document.title, 'Edit');
+    assert.equal(dom.window.document.body.dataset.executed, undefined);
+    assert.deepEqual(replaced, []);
+    assert.equal(errors.length, 1);
+    assert.match(
+      String(errors[0]),
+      /refused to replace.*Content-Security-Policy/,
+    );
   } finally {
     dom.window.close();
   }

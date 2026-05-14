@@ -19,7 +19,7 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
 ```bash
-export FACETHEORY_VERSION=3.1.0 # x-release-please-version
+export FACETHEORY_VERSION=3.1.1 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -270,7 +270,7 @@ Core exports:
 - `createAwsOacUrlEncodedFormBody(fields)` creates the exact UTF-8 `application/x-www-form-urlencoded` body bytes.
 - `createAwsOacUrlEncodedFormPayload(form, options)` returns the encoded body, content type, fields, and lowercase SHA256 hex digest over those bytes.
 - `sha256HexForAwsOacPayload(body, digest?)` exposes the Web Crypto digest path with a test-injectable digest.
-- `startAwsOacFormTransport(options)` intercepts only forms carrying the marker, resolves action/method/encoding from the form and submitter, enforces same-origin actions, preserves constraint validation, and sends the encoded body through `fetch` with `credentials: "same-origin"`, `content-type`, and `x-amz-content-sha256`.
+- `startAwsOacFormTransport(options)` intercepts only forms carrying the marker, resolves action/method/encoding from the form and submitter, enforces same-origin actions, preserves constraint validation, and sends the encoded body through `fetch` with `credentials: "same-origin"`, `redirect: "error"`, `content-type`, and `x-amz-content-sha256`.
 - `onNavigate(context)` lets a host coordinate successful form outcomes with `startFaceNavigation()` or another caller-owned navigation layer. If the hook returns anything other than `false`, FaceTheory treats the outcome as handled.
 
 Example client bootstrap:
@@ -297,8 +297,9 @@ The helper intentionally leaves unmarked, `GET`, and `dialog` forms on native br
 
 Default navigation policy after a successful fetch is deliberately full-document instead of partial DOM patching:
 
-- same-origin redirects navigate the browser to the final response URL; cross-origin redirect targets fail closed before navigation
-- non-redirect HTML responses, including server-rendered validation/error pages, replace the current document through `document.open()` / `document.write()` / `document.close()` and update history to the response URL when needed
+- HTTP redirects fail closed at the fetch boundary so a preserving 307/308 cannot replay the signed body to another origin; hosts that want post-submit navigation should return a direct response and then choose a safe same-origin browser navigation in `onResponse` or `onNavigate`
+- non-redirect HTML responses, including server-rendered validation/error pages, replace the current document through `document.open()` / `document.write()` / `document.close()` and update history to the response URL when needed, unless the response carries `Content-Security-Policy` or `Content-Security-Policy-Report-Only`
+- CSP-protected HTML responses fail closed by default because fetch cannot install response CSP headers as the active document policy during `document.write()` replacement
 - non-HTML non-OK responses throw to `onError`
 - `onResponse` remains a full override for hosts that want to own response handling themselves
 
