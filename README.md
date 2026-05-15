@@ -75,6 +75,24 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 The `v3.1.1` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
 
+## OAC Mutating Forms
+
+AppTheorySsrSite deployments keep the Lambda Function URL origin protected with `AWS_IAM` and CloudFront OAC. Native
+browser forms cannot add the `x-amz-content-sha256` payload hash required for mutating Lambda URL requests, so
+FaceTheory exposes `startAwsOacFormTransport()` for explicitly marked same-origin URL-encoded forms:
+
+```html
+<form action="/control/items/new" method="post" data-facetheory-oac-form>
+  <input name="name" required />
+  <button>Create</button>
+</form>
+```
+
+Route the action path to Lambda/AppTheory, keep OAC enabled, and install the helper from a client bootstrap module. The
+payload hash is AWS signing plumbing only; app authentication, CSRF, idempotency, and business validation remain
+application responsibilities. See [Getting Started](./docs/getting-started.md#add-an-oac-safe-mutating-ssr-form) and
+[Core Patterns](./docs/core-patterns.md#pattern-mark-same-origin-mutating-forms-for-oac-transport).
+
 ## ISR Tenant Partition Safety
 
 Blocking ISR is fail-closed when known tenant boundary headers such as `x-tenant-id` or `x-facetheory-tenant` reach
