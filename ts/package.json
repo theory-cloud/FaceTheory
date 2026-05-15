@@ -135,7 +135,7 @@
     "antd": ">=5",
     "react": ">=18",
     "react-dom": ">=18",
-    "svelte": ">=4",
+    "svelte": ">=4 <5.46.0 || >=5.55.7",
     "vue": ">=3"
   },
   "peerDependenciesMeta": {

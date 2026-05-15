@@ -31,7 +31,7 @@ npm install --save-exact \
 - React: `npm install react react-dom`
 - React + AntD/Emotion: `npm install antd @emotion/react @emotion/cache @emotion/server`
 - Vue: `npm install vue @vue/server-renderer`
-- Svelte: `npm install svelte`
+- Svelte: `npm install svelte@^5.55.7`
 
 ### Step 3: Install optional companion packages
 

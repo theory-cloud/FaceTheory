@@ -29,7 +29,7 @@ Adapter peers:
 - React routes require `react` and `react-dom`
 - React + AntD/Emotion integrations additionally require `antd`, `@emotion/react`, `@emotion/cache`, and `@emotion/server`
 - Vue routes require `vue` and `@vue/server-renderer`
-- Svelte routes require `svelte`
+- Svelte routes require `svelte` satisfying `>=4 <5.46.0 || >=5.55.7`
 
 ## Package Export Map
 
