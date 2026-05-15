@@ -42,6 +42,27 @@ The reference stacks use AppTheory CDK and wire these runtime conventions:
 Reference-stack stance:
 - prefer a CloudFront-signed `AWS_IAM` Function URL origin for read-only SSR traffic
 - do not model viewer-supplied tenant-header passthrough as the default copy-paste shape
+- keep same-origin mutating form action paths on Lambda/AppTheory behaviors, usually through `ssrPathPatterns`
+- use FaceTheory's marked URL-encoded OAC form helper for browser forms that submit through Lambda Function URL OAC
+
+### Mutating Forms Behind Lambda Function URL OAC
+
+`AppTheorySsrSite` keeps the Lambda Function URL origin protected by `AWS_IAM` and CloudFront Lambda URL OAC. Browser
+forms that submit mutating methods cannot attach the `x-amz-content-sha256` header that CloudFront must sign for the
+exact payload bytes, so native form POSTs can fail before the request reaches AppTheory or FaceTheory.
+
+Supported contract:
+
+- render the form action as a same-origin CloudFront path, never a direct Lambda Function URL
+- route the action path to Lambda through `ssrPathPatterns` even when the page containing the form is SSG or ISR
+- mark URL-encoded forms with `data-facetheory-oac-form`
+- install `startAwsOacFormTransport()` from a client bootstrap module
+- keep app authentication, authorization, CSRF, idempotency, and business validation in application-owned code
+
+The helper hashes the exact `application/x-www-form-urlencoded` bytes it sends and adds `x-amz-content-sha256` for AWS
+signing. It fails closed for marked multipart, text/plain, unknown encodings, cross-origin actions, unsafe redirect
+handling, and default document replacement of CSP-protected HTML responses. Do not turn `ssrUrlAuthType` to `NONE` as a
+durable solution; use it only as an explicitly authorized temporary rollback with an owner and removal date.
 
 ## CloudFront Behavior Options
 

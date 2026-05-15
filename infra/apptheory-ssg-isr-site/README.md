@@ -37,6 +37,10 @@ npm run synth
 ## Deployment Notes
 
 - Use the canonical AWS deployment and operations docs for routing, cache, and smoke-test expectations.
+- SSG or ISR pages may render forms, but same-origin mutating form action paths must route to Lambda/AppTheory through
+  `ssrPathPatterns`; do not let those paths resolve to S3 static objects or direct Function URLs.
+- Keep `AWS_IAM` + CloudFront OAC enabled for the Lambda Function URL and use FaceTheory's
+  `data-facetheory-oac-form` / `startAwsOacFormTransport()` path for URL-encoded browser submissions.
 - This reference stack intentionally avoids forwarding viewer-supplied tenant headers by default; derive tenant identity from trusted request context if a deployment needs it.
 - The bundled ISR demo is tenant-invariant. Tenant-varying ISR deployments must configure FaceTheory `tenantKey` or a custom `cacheKey` after AppTheory/CloudFront has stripped viewer-supplied tenant headers and injected trusted tenant context.
 - If tenant-like headers such as `x-tenant-id` or `x-facetheory-tenant` reach FaceTheory without that explicit partition, the ISR runtime fails closed before metadata lookup or HTML writes.
