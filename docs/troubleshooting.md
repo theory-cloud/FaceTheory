@@ -210,6 +210,18 @@ Verification:
 - marked multipart or text/plain forms do not send a request and surface through `onError`
 - redirects fail before body replay, and validation responses either stay same-origin with full-document outcomes or fail closed when response CSP cannot be preserved
 
+Release handoff:
+
+- validate the FaceTheory RC from its GitHub Release tarball in the consuming app rather than from a workspace link
+- verify the same-origin action path is routed through AppTheory/CloudFront to Lambda, not S3 or a direct Function URL
+- confirm Lambda receives the request with `AWS_IAM` + CloudFront OAC still enabled
+- confirm any app-local workaround or disabled-form path is removed only after the helper succeeds in the deployed
+  CloudFront flow
+- for the original theory-mcp-server lab driver, validate `POST /agents/new` through CloudFront OAC before stable
+  promotion
+- if emergency rollback is needed, pin the previous FaceTheory tarball or remove the opt-in marker/bootstrap; do not
+  keep `ssrUrlAuthType: NONE` as a durable solution
+
 ## Issue: Streaming HTML Ships Without Expected Late Styles
 
 Symptoms:
