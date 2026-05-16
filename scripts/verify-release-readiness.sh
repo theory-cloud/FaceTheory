@@ -43,7 +43,9 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
       | scripts/read-version.sh \
       | scripts/render-release-notes.sh \
       | scripts/verify-release-branch.sh \
+      | scripts/verify-release-draft-target.sh \
       | scripts/verify-release-readiness.sh \
+      | scripts/test-verify-release-draft-target.sh \
       | scripts/verify-ts-pack.sh \
       | scripts/verify-version-alignment.sh \
       | ts/README.md \

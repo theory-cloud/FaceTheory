@@ -19,12 +19,77 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Resolve release source ref
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${TAG_NAME}" ]]; then
+            release_json="$(gh release view "${TAG_NAME}" --json tagName,targetCommitish,isDraft,isPrerelease,url 2>/dev/null || true)"
+            if [[ -z "${release_json}" ]]; then
+              echo "source_ref=${TAG_NAME}" >> "${GITHUB_OUTPUT}"
+              echo "release_is_draft=false" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+
+            mapfile -t release_fields < <(
+              RELEASE_JSON="${release_json}" python3 - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["RELEASE_JSON"])
+          print(data.get("tagName", ""))
+          print(data.get("targetCommitish", ""))
+          print("true" if data.get("isDraft") is True else "false")
+          print("true" if data.get("isPrerelease") is True else "false")
+          print(data.get("url", ""))
+          PY
+            )
+
+            release_tag="${release_fields[0]:-}"
+            target_commitish="${release_fields[1]:-}"
+            is_draft="${release_fields[2]:-false}"
+            is_prerelease="${release_fields[3]:-false}"
+            release_url="${release_fields[4]:-}"
+
+            if [[ "${release_tag}" != "${TAG_NAME}" ]]; then
+              echo "release-assets: FAIL (release tag ${release_tag:-<empty>} != ${TAG_NAME})"
+              exit 1
+            fi
+            if [[ -z "${target_commitish}" ]]; then
+              echo "release-assets: FAIL (${TAG_NAME} missing targetCommitish)"
+              exit 1
+            fi
+            if [[ "${is_draft}" == "true" ]]; then
+              if [[ "${TAG_NAME}" =~ -rc(\.|$) && "${is_prerelease}" != "true" ]]; then
+                echo "release-assets: FAIL (${TAG_NAME} draft must be marked prerelease)"
+                exit 1
+              fi
+              if [[ ! "${TAG_NAME}" =~ -rc(\.|$) && "${is_prerelease}" == "true" ]]; then
+                echo "release-assets: FAIL (${TAG_NAME} stable draft must not be marked prerelease)"
+                exit 1
+              fi
+              echo "release-assets: draft ${TAG_NAME} targets ${target_commitish} (${release_url})"
+            fi
+
+            echo "source_ref=${target_commitish}" >> "${GITHUB_OUTPUT}"
+            echo "release_is_draft=${is_draft}" >> "${GITHUB_OUTPUT}"
+            echo "release_target=${target_commitish}" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          echo "source_ref=${GITHUB_REF}" >> "${GITHUB_OUTPUT}"
+          echo "release_is_draft=false" >> "${GITHUB_OUTPUT}"
+
       - name: Checkout (for tag-triggered assets)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ inputs.tag_name || github.ref }}
+          ref: ${{ steps.source.outputs.source_ref }}
 
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
@@ -37,7 +102,10 @@ jobs:
 
       - name: Build assets for existing tag release
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
+          RELEASE_IS_DRAFT: ${{ steps.source.outputs.release_is_draft }}
+          RELEASE_TARGET: ${{ steps.source.outputs.release_target }}
         run: |
           set -euo pipefail
 
@@ -77,6 +145,14 @@ jobs:
               update_manifest(".release-please-manifest.json")
           update_manifest(".release-please-manifest.premain.json")
           PY
+
+          if [[ "${RELEASE_IS_DRAFT}" == "true" && "${RELEASE_TARGET}" =~ ^[0-9a-f]{40}$ ]]; then
+            actual_commit="$(git rev-parse HEAD)"
+            if [[ "${actual_commit}" != "${RELEASE_TARGET}" ]]; then
+              echo "release-assets: FAIL (${TAG_NAME} draft targets ${RELEASE_TARGET}, checked out ${actual_commit})"
+              exit 1
+            fi
+          fi
 
           scripts/verify-release-branch.sh "${TAG_NAME}"
 
@@ -289,14 +365,22 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          # Draft GitHub Releases do not guarantee a git tag exists until the
+          # release is published. Build from the release commit and verify the
+          # draft's target before uploading immutable assets.
+          ref: ${{ github.sha }}
 
       - name: Fetch main + premain (release branch verification)
         run: |
           git fetch origin main --force
           git fetch origin premain --force || true
 
-      - name: Verify tag was cut from the correct branch
+      - name: Verify draft release targets this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
+
+      - name: Verify release source branch
         run: scripts/verify-release-branch.sh "${{ needs.release-please.outputs.tag_name }}"
 
       - name: Set SOURCE_DATE_EPOCH (deterministic artifacts)
@@ -435,12 +519,22 @@ jobs:
             exit 0
           fi
 
-          is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft' 2>/dev/null || true)"
-          if [[ "${is_draft}" != "true" ]]; then
-            echo "release-cleanup: SKIP (release not draft or not found)"
+          release_id=""
+          for attempt in 1 2 3 4 5 6; do
+            release_id="$(
+              TAG_NAME="${TAG_NAME}" gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+                --jq 'map(select(.tag_name == env.TAG_NAME and .draft == true)) | .[0].id // ""' \
+                2>/dev/null || true
+            )"
+            [[ -n "${release_id}" ]] && break
+            sleep 5
+          done
+
+          if [[ -z "${release_id}" ]]; then
+            echo "release-cleanup: SKIP (draft release not found)"
             exit 0
           fi
 
-          echo "release-cleanup: deleting draft release and tag ${TAG_NAME}"
-          gh release delete "${TAG_NAME}" --yes || true
+          echo "release-cleanup: deleting draft release ${release_id} and tag ${TAG_NAME}"
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}" || true
           gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG_NAME}" || true
