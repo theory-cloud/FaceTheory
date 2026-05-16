@@ -27,6 +27,20 @@ When using `AppTheorySsrSite` in `ssg-isr` mode:
 - prefer an `AWS_IAM` Function URL origin for read-only SSR traffic rather than a public direct URL
 - do not forward viewer-supplied tenant headers by default; derive tenancy from trusted request context when possible
 
+Mutating form routes behind Lambda Function URL OAC are dynamic routes. If an SSR, SSG, ISR, or SPA page renders a
+same-origin form that performs `POST`, `PUT`, `PATCH`, or `DELETE`, route the form action path through `ssrPathPatterns`
+so CloudFront sends it to Lambda/AppTheory instead of S3 or an origin group static hit. Keep the Lambda Function URL on
+`AWS_IAM` + OAC and install FaceTheory's `startAwsOacFormTransport()` helper on forms marked with
+`data-facetheory-oac-form`; native browser form posts cannot add the `x-amz-content-sha256` payload hash header that
+CloudFront signs for mutating Lambda URL requests.
+
+Treat `x-amz-content-sha256` as AWS signing plumbing only. It is not application authentication, authorization, CSRF
+protection, or idempotency. Browser-generated `multipart/form-data` is intentionally out of scope for the URL-encoded
+helper; marked multipart/text/plain forms fail closed until a separately scoped transport constructs and hashes the
+exact body bytes itself. Setting `ssrUrlAuthType: NONE` is only an explicitly authorized, time-boxed rollback while a
+broken deployment is repaired, and the rollback plan must restore `AWS_IAM` + OAC rather than making unauthenticated
+Function URLs durable.
+
 Reference example (FaceTheory repo):
 - `infra/apptheory-ssr-site/`
 - `infra/apptheory-ssg-isr-site/` (SSG origin-group + ISR example)

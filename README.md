@@ -21,12 +21,12 @@ The single-path philosophy extends to client delivery: one way to render, one wa
 FaceTheory's ISR implementation uses TableTheory for cache metadata and regeneration leases, ensuring the same
 deterministic patterns that govern the backend also govern the frontend.
 
-## Install v3.1.0 <!-- x-release-please-version -->
+## Install v3.1.1 <!-- x-release-please-version -->
 
 Install the exact GitHub release tarball:
 
 ```bash
-export FACETHEORY_VERSION=3.1.0 # x-release-please-version
+export FACETHEORY_VERSION=3.1.1 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -36,13 +36,13 @@ Add the framework peers that match your adapter surface:
 - React: `npm install react react-dom`
 - React + AntD/Emotion: `npm install antd @emotion/react @emotion/cache @emotion/server`
 - Vue: `npm install vue @vue/server-renderer`
-- Svelte: `npm install svelte`
+- Svelte: `npm install svelte@^5.55.7`
 
 Optional companion packages from pinned GitHub releases:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.5.0/theory-cloud-apptheory-1.5.0.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v1.5.0/theory-cloud-apptheory-cdk-1.5.0.tgz`
-- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.8.2/theory-cloud-tabletheory-ts-1.8.2.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.6.0/theory-cloud-apptheory-1.6.0.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v1.6.0/theory-cloud-apptheory-cdk-1.6.0.tgz`
+- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz`
 
 ## Quickstart
 
@@ -73,7 +73,25 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
-The `v3.1.0` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+The `v3.1.1` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+
+## OAC Mutating Forms
+
+AppTheorySsrSite deployments keep the Lambda Function URL origin protected with `AWS_IAM` and CloudFront OAC. Native
+browser forms cannot add the `x-amz-content-sha256` payload hash required for mutating Lambda URL requests, so
+FaceTheory exposes `startAwsOacFormTransport()` for explicitly marked same-origin URL-encoded forms:
+
+```html
+<form action="/control/items/new" method="post" data-facetheory-oac-form>
+  <input name="name" required />
+  <button>Create</button>
+</form>
+```
+
+Route the action path to Lambda/AppTheory, keep OAC enabled, and install the helper from a client bootstrap module. The
+payload hash is AWS signing plumbing only; app authentication, CSRF, idempotency, and business validation remain
+application responsibilities. See [Getting Started](./docs/getting-started.md#add-an-oac-safe-mutating-ssr-form) and
+[Core Patterns](./docs/core-patterns.md#pattern-mark-same-origin-mutating-forms-for-oac-transport).
 
 ## ISR Tenant Partition Safety
 

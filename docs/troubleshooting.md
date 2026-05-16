@@ -197,18 +197,30 @@ Keep the action same-origin. The helper computes the SHA256 digest over the exac
 
 Navigation behavior:
 
-- same-origin redirects navigate the browser to the final response URL
-- cross-origin redirect targets fail closed and call `onError`
-- server-rendered HTML validation/error responses replace the whole document
+- the mutating fetch forces `redirect: "error"`, so HTTP redirects fail closed before a 307/308 can replay the URL-encoded body to another origin
+- server-rendered HTML validation/error responses may replace the whole document when they are not protected by response CSP headers
+- HTML responses with `Content-Security-Policy` headers fail closed by default because fetched response headers cannot become the active document policy for `document.write()` replacement
 - marked forms that resolve to `multipart/form-data`, `text/plain`, or another unsupported encoding fail closed through `onError` before sending
-- use `onNavigate(context)` only when a host intentionally coordinates the outcome with `startFaceNavigation()` or another caller-owned navigation layer
+- use `onNavigate(context)` or `onResponse(response, context)` when a host intentionally coordinates CSP-protected responses, post-submit redirects to safe GET URLs, `startFaceNavigation()`, or another caller-owned navigation layer
 
 Verification:
 
 - the request reaches the AppTheory/FaceTheory handler instead of failing at CloudFront/Lambda URL auth
 - request headers include `x-amz-content-sha256` and `content-type: application/x-www-form-urlencoded;charset=UTF-8`
 - marked multipart or text/plain forms do not send a request and surface through `onError`
-- redirect and validation responses stay same-origin and produce full-document outcomes
+- redirects fail before body replay, and validation responses either stay same-origin with full-document outcomes or fail closed when response CSP cannot be preserved
+
+Release handoff:
+
+- validate the FaceTheory RC from its GitHub Release tarball in the consuming app rather than from a workspace link
+- verify the same-origin action path is routed through AppTheory/CloudFront to Lambda, not S3 or a direct Function URL
+- confirm Lambda receives the request with `AWS_IAM` + CloudFront OAC still enabled
+- confirm any app-local workaround or disabled-form path is removed only after the helper succeeds in the deployed
+  CloudFront flow
+- for the original theory-mcp-server lab driver, validate `POST /agents/new` through CloudFront OAC before stable
+  promotion
+- if emergency rollback is needed, pin the previous FaceTheory tarball or remove the opt-in marker/bootstrap; do not
+  keep `ssrUrlAuthType: NONE` as a durable solution
 
 ## Issue: Streaming HTML Ships Without Expected Late Styles
 

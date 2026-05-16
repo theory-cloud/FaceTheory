@@ -343,9 +343,9 @@ Why this is correct:
 
 - The form opts in explicitly with `data-facetheory-oac-form`; unmarked forms keep native browser behavior.
 - FaceTheory proceeds only when the resolved form encoding is `application/x-www-form-urlencoded`, computes the SHA256 hash over the exact URL-encoded bytes it sends, and sets `x-amz-content-sha256` for CloudFront's Lambda URL OAC signing path.
-- The action must stay same-origin, so the browser never posts directly to the Lambda Function URL or another origin.
+- The action must stay same-origin, and FaceTheory forces `redirect: "error"` on the mutating fetch so a 307/308 open redirect cannot replay the signed form body to another origin.
 - Cookies and same-origin credentials remain on the CloudFront/AppTheory path, while AppTheory's `AWS_IAM` Lambda URL hardening stays intact.
-- Same-origin redirects use normal browser navigation to the final URL, and same-origin HTML validation/error responses replace the whole document instead of inventing a partial DOM patching contract.
+- Same-origin HTML validation/error responses may replace the whole document instead of inventing a partial DOM patching contract, but the default replacement fails closed when the response carries a `Content-Security-Policy` header because fetch cannot install response CSP headers into a `document.write()` navigation. Use `onNavigate` or `onResponse` for CSP-protected HTML responses and for intentional post-submit redirects to safe GET URLs.
 
 **INCORRECT**
 
@@ -367,6 +367,7 @@ Why this is incorrect:
 Encoding note:
 
 - `startAwsOacFormTransport()` is intentionally URL-encoded. Submitter `formenctype` overrides form `enctype`, matching browser form resolution. Marked forms that resolve to `multipart/form-data`, `text/plain`, or another unsupported encoding are not silently transformed and do not fall back to native POST; they fail closed through `onError` until a separate, explicitly scoped transport exists.
+- Marked forms do not follow HTTP redirects in the fetch transport. Return a direct response for the mutation result, or handle the response with `onResponse` / `onNavigate` and explicitly choose a safe same-origin browser navigation after the mutating request completes.
 
 ## Pattern: Use `startFaceNavigation()` with a stable view container
 

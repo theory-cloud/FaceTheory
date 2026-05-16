@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.1.1](https://github.com/theory-cloud/FaceTheory/compare/v3.1.0...v3.1.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* **deps:** align AppTheory v1.5.0 pins ([e52bf11](https://github.com/theory-cloud/FaceTheory/commit/e52bf11f645f0e4be904743905af8306128ca69f))
+* **oac:** bind default form fetcher to window ([ea0a6f1](https://github.com/theory-cloud/FaceTheory/commit/ea0a6f1d5cdacaa0a210bee10763fa6dfd29f05a))
+* **oac:** bind default form fetcher to window ([0cb4034](https://github.com/theory-cloud/FaceTheory/commit/0cb4034df0e481a8784d3a8d3e52e3f67ffbd00d))
+
 ## [3.1.0](https://github.com/theory-cloud/FaceTheory/compare/v3.0.1...v3.1.0) (2026-05-11)
 
 

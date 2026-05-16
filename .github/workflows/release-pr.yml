@@ -17,23 +17,26 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  release-please:
+  check-baseline:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      ready: ${{ steps.baseline.outputs.ready }}
+      release_as: ${{ steps.version.outputs.release_as }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.sha }}
 
       - name: Check current release baseline
         id: baseline
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.json
 
       - name: Compute release-as (align to premain RC)
@@ -76,34 +79,34 @@ jobs:
           echo "release_as=${release_as}" >> "${GITHUB_OUTPUT}"
           echo "release-as: ${release_as:-}"
 
+  release-please:
+    needs: check-baseline
+    if: needs.check-baseline.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
       - name: Release Please (PR only) (aligned)
-        if: steps.baseline.outputs.ready == 'true' && steps.version.outputs.release_as != ''
+        if: needs.check-baseline.outputs.release_as != ''
         id: release_aligned
-        env:
-          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          RELEASE_AS: ${{ steps.version.outputs.release_as }}
-        run: |
-          set -euo pipefail
-
-          npx -y release-please@17.1.3 release-pr \
-            --token "${RELEASE_PLEASE_TOKEN}" \
-            --repo-url "${GITHUB_REPOSITORY}" \
-            --target-branch main \
-            --config-file release-please-config.json \
-            --manifest-file .release-please-manifest.json \
-            --release-as "${RELEASE_AS}"
+        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          target-branch: main
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          release-as: ${{ needs.check-baseline.outputs.release_as }}
+          skip-github-release: true
 
       - name: Release Please (PR only)
-        if: steps.baseline.outputs.ready == 'true' && steps.version.outputs.release_as == ''
+        if: needs.check-baseline.outputs.release_as == ''
         id: release_default
-        env:
-          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          npx -y release-please@17.1.3 release-pr \
-            --token "${RELEASE_PLEASE_TOKEN}" \
-            --repo-url "${GITHUB_REPOSITORY}" \
-            --target-branch main \
-            --config-file release-please-config.json \
-            --manifest-file .release-please-manifest.json
+        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          target-branch: main
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-release: true

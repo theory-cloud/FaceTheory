@@ -132,6 +132,52 @@ npm run typecheck
 npm test
 ```
 
+## Migration 6: Replace App-Local OAC Form Workarounds
+
+Use this path when an SSR control-plane page behind AppTheorySsrSite Lambda Function URL OAC has an app-local fetch
+shim, disabled form, direct Lambda Function URL action, or temporary Function URL auth rollback because native browser
+forms could not provide `x-amz-content-sha256`.
+
+1. Keep the public form action on the same-origin CloudFront URL.
+2. Route the mutating action path to Lambda/AppTheory with `ssrPathPatterns` when the deployment has an S3 or SSG/ISR
+   origin path that could otherwise intercept the request.
+3. Mark only supported URL-encoded forms with `data-facetheory-oac-form`.
+4. Install `startAwsOacFormTransport()` from the Face's client bootstrap module.
+5. Remove any direct Function URL form action or app-local transport workaround after the FaceTheory helper is verified.
+6. Keep authentication, authorization, CSRF, idempotency, and business validation in the application layer; the
+   `x-amz-content-sha256` value is only AWS signing plumbing.
+7. Leave browser-generated multipart uploads out of this migration unless a separately scoped transport constructs and
+   hashes the exact multipart bytes.
+
+Validation:
+
+```bash
+cd ts
+npx tsx test/unit/oac-form.test.ts
+```
+
+Deployed verification:
+
+```bash
+curl -I https://<cloudfront-domain>/control/items/new
+```
+
+Then submit the marked form in a browser through the CloudFront URL and confirm:
+
+- the request reaches the AppTheory/FaceTheory Lambda instead of failing with `InvalidSignatureException`
+- the request includes `x-amz-content-sha256` and `content-type: application/x-www-form-urlencoded;charset=UTF-8`
+- unsupported marked encodings fail closed before sending
+- Lambda Function URL auth remains `AWS_IAM` behind CloudFront OAC
+
+Rollback:
+
+- remove the `data-facetheory-oac-form` marker or the bootstrap call to return to native browser behavior while the app
+  remains pinned to the previous known-good FaceTheory release tarball, or
+- temporarily disable the affected mutating form in the consuming app.
+
+Do not make `ssrUrlAuthType: NONE` a durable rollback. If an operator explicitly authorizes it to recover a broken
+deployment, record an owner, expiration date, and restoration plan back to `AWS_IAM` + OAC.
+
 ## Rollback Notes
 
 - Keep the prior handler or deployable artifact available until the new path is verified.
