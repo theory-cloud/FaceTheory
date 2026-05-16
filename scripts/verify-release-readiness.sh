@@ -39,7 +39,12 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
       | docs/getting-started.md \
       | scripts/build-release-assets.sh \
       | scripts/check-release-baseline-ready.sh \
+      | scripts/release-json-by-tag.sh \
+      | scripts/resolve-release-source-ref.sh \
+      | scripts/publish-draft-release-assets.sh \
       | scripts/test-check-release-baseline-ready.sh \
+      | scripts/test-resolve-release-source-ref.sh \
+      | scripts/test-publish-draft-release-assets.sh \
       | scripts/generate-checksums.sh \
       | scripts/read-version.sh \
       | scripts/render-release-notes.sh \

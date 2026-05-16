@@ -39,13 +39,13 @@ jobs:
       - name: Check stable release baseline
         id: stable
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.json
 
       - name: Check premain prerelease baseline
         id: prerelease
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.premain.json
 
       - name: Mark prerelease PR baseline readiness
@@ -70,7 +70,7 @@ jobs:
         id: release
         uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           target-branch: premain
           config-file: release-please-config.premain.json
           manifest-file: .release-please-manifest.premain.json
