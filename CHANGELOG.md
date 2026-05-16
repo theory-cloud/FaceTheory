@@ -1,5 +1,34 @@
 # Changelog
 
+## [3.1.2](https://github.com/theory-cloud/FaceTheory/compare/v3.1.1...v3.1.2) (2026-05-16)
+
+
+### Bug Fixes
+
+* **deps:** align upstream release pins ([7f80417](https://github.com/theory-cloud/FaceTheory/commit/7f80417c97c200c0b057d226cc3eb969039972e0))
+* **deps:** exclude vulnerable Svelte peer range ([ba12782](https://github.com/theory-cloud/FaceTheory/commit/ba12782b12786265c1c13c2b5ba8c364b3c420d2))
+* **deps:** update Svelte audit baseline ([6249afe](https://github.com/theory-cloud/FaceTheory/commit/6249afe4b00e230ca00d6655aeefa248577f4628))
+* **oac:** fail closed for unsafe form navigation ([9b9a396](https://github.com/theory-cloud/FaceTheory/commit/9b9a396bba4a8e81746a2cc2f6dcd1919612b92d))
+* **release:** allow baseline draft visibility ([c5c4499](https://github.com/theory-cloud/FaceTheory/commit/c5c449990da3b126171380297a5714cbb985d9d6))
+* **release:** authenticate baseline checks ([10fdf80](https://github.com/theory-cloud/FaceTheory/commit/10fdf80fb57f193f217047688ac852d52744f0c6))
+* **release:** avoid blob churn in readiness harness ([392791c](https://github.com/theory-cloud/FaceTheory/commit/392791c5461d5177fdd7fc2e4576ce661bad7b9b))
+* **release:** avoid blob churn in readiness harness ([c3e87c7](https://github.com/theory-cloud/FaceTheory/commit/c3e87c7b9e6c94820e0bc3c0913e8182cca5ba29))
+* **release:** avoid token exposure in baseline checks ([a6c2d05](https://github.com/theory-cloud/FaceTheory/commit/a6c2d05273be1b872c6470abd750e8f556c2ac13))
+* **release:** build draft assets from release commit ([0c12d8b](https://github.com/theory-cloud/FaceTheory/commit/0c12d8b6312bcec07234ab79e2bb9793e6d06248))
+* **release:** gate stable rc promotion ([10ffbf0](https://github.com/theory-cloud/FaceTheory/commit/10ffbf083927e38b34596adc851e13dbe934b294))
+* **release:** harden readiness test harness ([24a00c7](https://github.com/theory-cloud/FaceTheory/commit/24a00c761aff3ec8be3c78a449df17906bfb0770))
+* **release:** harden readiness test harness ([11dfe45](https://github.com/theory-cloud/FaceTheory/commit/11dfe450119e8d723efd6ee2eeaf68ffb57bb423))
+* **release:** isolate token jobs from repo scripts ([3b7b1c8](https://github.com/theory-cloud/FaceTheory/commit/3b7b1c838b8be8c657bcbd7be3422ff0978662de))
+* **release:** keep readiness harness lightweight ([cf20d50](https://github.com/theory-cloud/FaceTheory/commit/cf20d50148805ade61ec326bba82189b40896988))
+* **release:** preserve changelog baselines ([f2d4bd9](https://github.com/theory-cloud/FaceTheory/commit/f2d4bd9c6110f5c01031ca8f6d8a553b53216f97))
+* **release:** preserve changelog baselines ([0f3becd](https://github.com/theory-cloud/FaceTheory/commit/0f3becd42a6cec3da89b4ed7133beebbd3f8bb15))
+* **release:** recover untagged draft releases ([3047010](https://github.com/theory-cloud/FaceTheory/commit/304701094aedda0e40d6300185dedd6311cc34d3))
+* **release:** recover untagged draft releases ([575af59](https://github.com/theory-cloud/FaceTheory/commit/575af5903b369cfd696a1141794e70558058d381))
+* **release:** resolve existing draft sources ([5611f53](https://github.com/theory-cloud/FaceTheory/commit/5611f5379e3dbaae384d997823db314c60efd70b))
+* **release:** scan readiness commits without pipefail ([961d103](https://github.com/theory-cloud/FaceTheory/commit/961d10399c739fcec33769f801784e921cba6387))
+* **release:** scan readiness commits without pipefail ([28798cd](https://github.com/theory-cloud/FaceTheory/commit/28798cde425e51cc89a876390248b468610ab9c1))
+* **release:** support existing untagged drafts ([16bd638](https://github.com/theory-cloud/FaceTheory/commit/16bd6382c9fad0f0ddfee21775449729358bcb12))
+
 ## [3.1.2-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.1.1...v3.1.2-rc) (2026-05-16)
 
 
