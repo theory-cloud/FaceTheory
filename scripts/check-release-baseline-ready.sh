@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${REPO_ROOT:-$(cd "${script_dir}/.." && pwd)}"
 cd "${repo_root}"
 
 manifest_path="${1:-.release-please-manifest.json}"
@@ -65,11 +66,7 @@ fi
 
 release_json=""
 if command -v "${gh_bin}" >/dev/null 2>&1; then
-  if [[ -n "${repo}" ]]; then
-    release_json="$("${gh_bin}" release view "${tag}" --repo "${repo}" --json tagName,isDraft,url 2>/dev/null || true)"
-  else
-    release_json="$("${gh_bin}" release view "${tag}" --json tagName,isDraft,url 2>/dev/null || true)"
-  fi
+  release_json="$(GH_BIN="${gh_bin}" GITHUB_REPOSITORY="${repo}" "${script_dir}/release-json-by-tag.sh" "${tag}" 2>/dev/null || true)"
 fi
 
 if [[ -z "${release_json}" && -n "${repo}" ]] && command -v "${curl_bin}" >/dev/null 2>&1; then

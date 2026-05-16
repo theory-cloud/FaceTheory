@@ -26,7 +26,7 @@ jobs:
       - name: Check stable release baseline
         id: baseline
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.json
 
   release-please:
@@ -46,7 +46,7 @@ jobs:
         id: release
         uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           target-branch: premain
           config-file: release-please-config.premain.json
           manifest-file: .release-please-manifest.premain.json
@@ -74,7 +74,7 @@ jobs:
 
       - name: Verify draft release targets this commit
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
         run: scripts/verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
 
       - name: Verify release source branch
@@ -124,64 +124,24 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout release workflow scripts
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
       - name: Download release asset bundle
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: facetheory-prerelease-assets
           path: dist
 
-      - name: Upload release assets
+      - name: Upload and publish draft prerelease assets
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-        run: |
-          if [[ -z "${TAG_NAME}" ]]; then
-            echo "release-assets: FAIL (missing tag_name output)"
-            exit 1
-          fi
-
-          is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft')"
-          if [[ "${is_draft}" != "true" ]]; then
-            echo "release-assets: FAIL (release is already published; cannot upload assets/notes under immutable releases)"
-            exit 1
-          fi
-
-          mapfile -t existing_assets < <(gh release view "${TAG_NAME}" --json assets --jq '.assets[].name' 2>/dev/null || true)
-
-          assets=(
-            dist/theory-cloud-facetheory*.tgz
-            dist/facetheory-reference-*.tar.gz
-            dist/SHA256SUMS.txt
-          )
-
-          for asset_glob in "${assets[@]}"; do
-            for asset_path in ${asset_glob}; do
-              asset_name="$(basename "${asset_path}")"
-              if printf '%s\n' "${existing_assets[@]}" | grep -Fxq "${asset_name}"; then
-                echo "release-assets: skip existing ${asset_name}"
-                continue
-              fi
-              gh release upload "${TAG_NAME}" "${asset_path}"
-            done
-          done
-
-      - name: Publish prerelease (immutable)
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-        run: |
-          if [[ -z "${TAG_NAME}" ]]; then
-            echo "release-assets: FAIL (missing tag_name output)"
-            exit 1
-          fi
-
-          is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft')"
-          if [[ "${is_draft}" != "true" ]]; then
-            echo "release-assets: skip publish (already published)"
-            exit 0
-          fi
-
-          gh release edit "${TAG_NAME}" --draft=false --prerelease
+        run: scripts/publish-draft-release-assets.sh "${TAG_NAME}" dist
 
   cleanup-failed-draft:
     needs:
@@ -205,7 +165,7 @@ jobs:
     steps:
       - name: Cleanup failed draft prerelease (no remnants)
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
         run: |
           if [[ -z "${TAG_NAME}" ]]; then

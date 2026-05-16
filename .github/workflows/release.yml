@@ -18,71 +18,22 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      release_id: ${{ steps.source.outputs.release_id }}
     steps:
+      - name: Checkout release workflow scripts
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
       - name: Resolve release source ref
         id: source
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ inputs.tag_name }}
-        run: |
-          set -euo pipefail
-
-          if [[ -n "${TAG_NAME}" ]]; then
-            release_json="$(gh release view "${TAG_NAME}" --json tagName,targetCommitish,isDraft,isPrerelease,url 2>/dev/null || true)"
-            if [[ -z "${release_json}" ]]; then
-              echo "source_ref=${TAG_NAME}" >> "${GITHUB_OUTPUT}"
-              echo "release_is_draft=false" >> "${GITHUB_OUTPUT}"
-              exit 0
-            fi
-
-            mapfile -t release_fields < <(
-              RELEASE_JSON="${release_json}" python3 - <<'PY'
-          import json
-          import os
-
-          data = json.loads(os.environ["RELEASE_JSON"])
-          print(data.get("tagName", ""))
-          print(data.get("targetCommitish", ""))
-          print("true" if data.get("isDraft") is True else "false")
-          print("true" if data.get("isPrerelease") is True else "false")
-          print(data.get("url", ""))
-          PY
-            )
-
-            release_tag="${release_fields[0]:-}"
-            target_commitish="${release_fields[1]:-}"
-            is_draft="${release_fields[2]:-false}"
-            is_prerelease="${release_fields[3]:-false}"
-            release_url="${release_fields[4]:-}"
-
-            if [[ "${release_tag}" != "${TAG_NAME}" ]]; then
-              echo "release-assets: FAIL (release tag ${release_tag:-<empty>} != ${TAG_NAME})"
-              exit 1
-            fi
-            if [[ -z "${target_commitish}" ]]; then
-              echo "release-assets: FAIL (${TAG_NAME} missing targetCommitish)"
-              exit 1
-            fi
-            if [[ "${is_draft}" == "true" ]]; then
-              if [[ "${TAG_NAME}" =~ -rc(\.|$) && "${is_prerelease}" != "true" ]]; then
-                echo "release-assets: FAIL (${TAG_NAME} draft must be marked prerelease)"
-                exit 1
-              fi
-              if [[ ! "${TAG_NAME}" =~ -rc(\.|$) && "${is_prerelease}" == "true" ]]; then
-                echo "release-assets: FAIL (${TAG_NAME} stable draft must not be marked prerelease)"
-                exit 1
-              fi
-              echo "release-assets: draft ${TAG_NAME} targets ${target_commitish} (${release_url})"
-            fi
-
-            echo "source_ref=${target_commitish}" >> "${GITHUB_OUTPUT}"
-            echo "release_is_draft=${is_draft}" >> "${GITHUB_OUTPUT}"
-            echo "release_target=${target_commitish}" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
-
-          echo "source_ref=${GITHUB_REF}" >> "${GITHUB_OUTPUT}"
-          echo "release_is_draft=false" >> "${GITHUB_OUTPUT}"
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
+        run: scripts/resolve-release-source-ref.sh "${TAG_NAME}" >> "${GITHUB_OUTPUT}"
 
       - name: Checkout (for tag-triggered assets)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -102,7 +53,7 @@ jobs:
 
       - name: Build assets for existing tag release
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
           RELEASE_IS_DRAFT: ${{ steps.source.outputs.release_is_draft }}
           RELEASE_TARGET: ${{ steps.source.outputs.release_target }}
@@ -180,59 +131,24 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout release workflow scripts
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
       - name: Download existing tag asset bundle
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: facetheory-existing-tag-assets
           path: dist
 
-      - name: Upload assets for existing tag release
+      - name: Upload and publish existing tag draft release
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
-        run: |
-          set -euo pipefail
-
-          if [[ -z "${TAG_NAME}" ]]; then
-            echo "release-assets: FAIL (missing tag ref_name)"
-            exit 1
-          fi
-
-          if ! gh release view "${TAG_NAME}" >/dev/null 2>&1; then
-            gh release create "${TAG_NAME}" --generate-notes --draft
-          fi
-
-          is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft')"
-          if [[ "${is_draft}" != "true" ]]; then
-            echo "release-assets: FAIL (release is already published; immutable releases prevent adding assets/notes)"
-            exit 1
-          fi
-
-          mapfile -t existing_assets < <(gh release view "${TAG_NAME}" --json assets --jq '.assets[].name' 2>/dev/null || true)
-
-          assets=(
-            dist/theory-cloud-facetheory*.tgz
-            dist/facetheory-reference-*.tar.gz
-            dist/SHA256SUMS.txt
-          )
-
-          for asset_glob in "${assets[@]}"; do
-            for asset_path in ${asset_glob}; do
-              asset_name="$(basename "${asset_path}")"
-              if printf '%s\n' "${existing_assets[@]}" | grep -Fxq "${asset_name}"; then
-                echo "release-assets: skip existing ${asset_name}"
-                continue
-              fi
-              gh release upload "${TAG_NAME}" "${asset_path}"
-            done
-          done
-
-          prerelease_flag=""
-          if [[ "${TAG_NAME}" =~ -rc(\.|$) ]]; then
-            prerelease_flag="--prerelease"
-          fi
-
-          gh release edit "${TAG_NAME}" --draft=false ${prerelease_flag}
+        run: scripts/publish-draft-release-assets.sh "${TAG_NAME}" dist
 
   stable-preflight:
     if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.tag_name == '')
@@ -278,7 +194,7 @@ jobs:
 
       - name: Recover missing current stable Release Please state
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
         run: |
           set -euo pipefail
 
@@ -345,7 +261,7 @@ jobs:
         id: release
         uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           target-branch: main
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
@@ -375,7 +291,7 @@ jobs:
 
       - name: Verify draft release targets this commit
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
         run: scripts/verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
 
       - name: Verify release source branch
@@ -425,64 +341,24 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout release workflow scripts
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
       - name: Download release asset bundle
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: facetheory-stable-assets
           path: dist
 
-      - name: Upload release assets
+      - name: Upload and publish draft release assets
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-        run: |
-          if [[ -z "${TAG_NAME}" ]]; then
-            echo "release-assets: FAIL (missing tag_name output)"
-            exit 1
-          fi
-
-          is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft')"
-          if [[ "${is_draft}" != "true" ]]; then
-            echo "release-assets: FAIL (release is already published; cannot upload assets/notes under immutable releases)"
-            exit 1
-          fi
-
-          mapfile -t existing_assets < <(gh release view "${TAG_NAME}" --json assets --jq '.assets[].name' 2>/dev/null || true)
-
-          assets=(
-            dist/theory-cloud-facetheory*.tgz
-            dist/facetheory-reference-*.tar.gz
-            dist/SHA256SUMS.txt
-          )
-
-          for asset_glob in "${assets[@]}"; do
-            for asset_path in ${asset_glob}; do
-              asset_name="$(basename "${asset_path}")"
-              if printf '%s\n' "${existing_assets[@]}" | grep -Fxq "${asset_name}"; then
-                echo "release-assets: skip existing ${asset_name}"
-                continue
-              fi
-              gh release upload "${TAG_NAME}" "${asset_path}"
-            done
-          done
-
-      - name: Publish release (immutable)
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-        run: |
-          if [[ -z "${TAG_NAME}" ]]; then
-            echo "release-assets: FAIL (missing tag_name output)"
-            exit 1
-          fi
-
-          is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft')"
-          if [[ "${is_draft}" != "true" ]]; then
-            echo "release-assets: skip publish (already published)"
-            exit 0
-          fi
-
-          gh release edit "${TAG_NAME}" --draft=false
+        run: scripts/publish-draft-release-assets.sh "${TAG_NAME}" dist
 
   cleanup-failed-draft:
     needs:
@@ -506,7 +382,7 @@ jobs:
     steps:
       - name: Cleanup failed draft stable release (no remnants)
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
         run: |
           if [[ -z "${TAG_NAME}" ]]; then

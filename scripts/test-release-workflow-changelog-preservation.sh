@@ -21,6 +21,26 @@ for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; 
   fi
 done
 
+if grep -R -Fq 'secrets.GITHUB_TOKEN' .github/workflows; then
+  fail "workflows must fall back to github.token, not a non-existent secrets.GITHUB_TOKEN"
+fi
+
+if grep -R -F 'gh release create' .github/workflows scripts | grep -v 'scripts/test-release-workflow-changelog-preservation.sh'; then
+  fail "release recovery must not create GitHub Releases outside Release Please"
+fi
+
+grep -Fq 'scripts/resolve-release-source-ref.sh "${TAG_NAME}"' .github/workflows/release.yml ||
+  fail "release.yml must resolve existing draft source refs before checkout"
+
+grep -Fq 'Checkout release workflow scripts' .github/workflows/release.yml ||
+  fail "release.yml must checkout current workflow scripts before resolving an existing draft source"
+
+grep -Fq 'scripts/publish-draft-release-assets.sh "${TAG_NAME}" dist' .github/workflows/release.yml ||
+  fail "release.yml must publish draft assets through the release-id aware publisher"
+
+grep -Fq 'scripts/publish-draft-release-assets.sh "${TAG_NAME}" dist' .github/workflows/prerelease.yml ||
+  fail "prerelease.yml must publish draft assets through the release-id aware publisher"
+
 grep -Fq 'scripts/check-release-baseline-ready.sh .release-please-manifest.premain.json' .github/workflows/prerelease-pr.yml ||
   fail "prerelease-pr.yml must verify the current premain prerelease baseline before generating the next RC PR"
 

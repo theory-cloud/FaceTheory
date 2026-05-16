@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${REPO_ROOT:-$(cd "${script_dir}/.." && pwd)}"
 cd "${repo_root}"
 
 tag="${1:-${GITHUB_REF_NAME:-}}"
@@ -32,7 +33,7 @@ if ! command -v "${gh_bin}" >/dev/null 2>&1; then
   exit 1
 fi
 
-release_json="$("${gh_bin}" release view "${tag}" --json tagName,targetCommitish,isDraft,isPrerelease,url 2>/dev/null || true)"
+release_json="$(GH_BIN="${gh_bin}" "${script_dir}/release-json-by-tag.sh" "${tag}" 2>/dev/null || true)"
 if [[ -z "${release_json}" ]]; then
   echo "release-draft-target: FAIL (draft release ${tag} not found)"
   exit 1
@@ -45,11 +46,11 @@ import json
 import os
 
 data = json.loads(os.environ["RELEASE_JSON"])
-print(data.get("tagName", ""))
-print(data.get("targetCommitish", ""))
-print("true" if data.get("isDraft") is True else "false")
-print("true" if data.get("isPrerelease") is True else "false")
-print(data.get("url", ""))
+print(data.get("tagName") or data.get("tag_name") or "")
+print(data.get("targetCommitish") or data.get("target_commitish") or "")
+print("true" if data.get("isDraft", data.get("draft")) is True else "false")
+print("true" if data.get("isPrerelease", data.get("prerelease")) is True else "false")
+print(data.get("url") or data.get("html_url") or "")
 PY
 )
 

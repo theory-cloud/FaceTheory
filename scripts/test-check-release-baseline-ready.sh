@@ -46,18 +46,53 @@ write_fake_gh() {
   local bin_dir="$1"
   local tag="$2"
   local draft="$3"
+  local mode="${4:-api}"
 
   mkdir -p "${bin_dir}"
   cat > "${bin_dir}/gh" <<SH
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ "\$1 \$2 \$3" != "release view ${tag}" ]]; then
-  echo "unexpected gh invocation: \$*" >&2
-  exit 1
+if [[ "\$1" == "api" ]]; then
+  endpoint="\$2"
+  case "\${endpoint}" in
+    repos/theory-cloud/FaceTheory/releases\\?per_page=100\\&page=1)
+      case "${mode}" in
+        api)
+          cat <<'JSON'
+[{"tag_name":"${tag}","draft":${draft},"html_url":"https://github.test/releases/${tag}","target_commitish":"1111111111111111111111111111111111111111","prerelease":false,"id":99}]
+JSON
+          ;;
+        empty|view)
+          printf '[]\\n'
+          ;;
+        *)
+          echo "unknown mode ${mode}" >&2
+          exit 1
+          ;;
+      esac
+      ;;
+    *)
+      echo "unexpected gh api invocation: \$*" >&2
+      exit 1
+      ;;
+  esac
+  exit 0
 fi
-cat <<'JSON'
+if [[ "\$1 \$2 \$3" == "release view ${tag}" ]]; then
+  case "${mode}" in
+    view)
+      cat <<'JSON'
 {"tagName":"${tag}","isDraft":${draft},"url":"https://github.test/releases/${tag}"}
 JSON
+      ;;
+    api|empty)
+      exit 1
+      ;;
+  esac
+  exit 0
+fi
+echo "unexpected gh invocation: \$*" >&2
+exit 1
 SH
   chmod +x "${bin_dir}/gh"
 }
@@ -69,7 +104,7 @@ remote_dir="$(setup_remote_with_tag "${tmpdir}")"
 
 published_work="$(setup_work "${tmpdir}" "1.2.3")"
 published_bin="${tmpdir}/published-bin"
-write_fake_gh "${published_bin}" "v1.2.3" "false"
+write_fake_gh "${published_bin}" "v1.2.3" "false" "api"
 published_out="$(
   REPO_ROOT="${published_work}" \
   GIT_REMOTE="${remote_dir}" \
@@ -82,7 +117,7 @@ printf '%s\n' "${published_out}" | grep -Fq 'release-baseline-ready: PASS' ||
 
 draft_work="$(setup_work "${tmpdir}" "1.2.3")"
 draft_bin="${tmpdir}/draft-bin"
-write_fake_gh "${draft_bin}" "v1.2.3" "true"
+write_fake_gh "${draft_bin}" "v1.2.3" "true" "api"
 draft_out="$(
   REPO_ROOT="${draft_work}" \
   GIT_REMOTE="${remote_dir}" \
@@ -96,9 +131,35 @@ if printf '%s\n' "${draft_out}" | grep -Fq 'release-baseline-ready: PASS'; then
   fail "draft release baseline unexpectedly passed"
 fi
 
+untagged_draft_work="$(setup_work "${tmpdir}" "1.2.3")"
+untagged_draft_bin="${tmpdir}/untagged-draft-bin"
+write_fake_gh "${untagged_draft_bin}" "v1.2.3" "true" "api"
+untagged_draft_out="$(
+  REPO_ROOT="${untagged_draft_work}" \
+  GIT_REMOTE="${remote_dir}" \
+  GH_BIN="${untagged_draft_bin}/gh" \
+  GITHUB_REPOSITORY="theory-cloud/FaceTheory" \
+  bash "${script_path}"
+)"
+printf '%s\n' "${untagged_draft_out}" | grep -Fq 'release=draft' ||
+  fail "untagged draft discovered only through releases list was not rejected as draft"
+
+fallback_work="$(setup_work "${tmpdir}" "1.2.3")"
+fallback_bin="${tmpdir}/fallback-bin"
+write_fake_gh "${fallback_bin}" "v1.2.3" "false" "view"
+fallback_out="$(
+  REPO_ROOT="${fallback_work}" \
+  GIT_REMOTE="${remote_dir}" \
+  GH_BIN="${fallback_bin}/gh" \
+  GITHUB_REPOSITORY="theory-cloud/FaceTheory" \
+  bash "${script_path}"
+)"
+printf '%s\n' "${fallback_out}" | grep -Fq 'release-baseline-ready: PASS' ||
+  fail "release view fallback baseline did not pass"
+
 missing_tag_work="$(setup_work "${tmpdir}" "1.2.4")"
 missing_bin="${tmpdir}/missing-bin"
-write_fake_gh "${missing_bin}" "v1.2.4" "false"
+write_fake_gh "${missing_bin}" "v1.2.4" "false" "api"
 missing_out="$(
   REPO_ROOT="${missing_tag_work}" \
   GIT_REMOTE="${remote_dir}" \
