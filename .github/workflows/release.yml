@@ -289,14 +289,22 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          # Draft GitHub Releases do not guarantee a git tag exists until the
+          # release is published. Build from the release commit and verify the
+          # draft's target before uploading immutable assets.
+          ref: ${{ github.sha }}
 
       - name: Fetch main + premain (release branch verification)
         run: |
           git fetch origin main --force
           git fetch origin premain --force || true
 
-      - name: Verify tag was cut from the correct branch
+      - name: Verify draft release targets this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
+
+      - name: Verify release source branch
         run: scripts/verify-release-branch.sh "${{ needs.release-please.outputs.tag_name }}"
 
       - name: Set SOURCE_DATE_EPOCH (deterministic artifacts)
@@ -435,12 +443,22 @@ jobs:
             exit 0
           fi
 
-          is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft' 2>/dev/null || true)"
-          if [[ "${is_draft}" != "true" ]]; then
-            echo "release-cleanup: SKIP (release not draft or not found)"
+          release_id=""
+          for attempt in 1 2 3 4 5 6; do
+            release_id="$(
+              TAG_NAME="${TAG_NAME}" gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+                --jq 'map(select(.tag_name == env.TAG_NAME and .draft == true)) | .[0].id // ""' \
+                2>/dev/null || true
+            )"
+            [[ -n "${release_id}" ]] && break
+            sleep 5
+          done
+
+          if [[ -z "${release_id}" ]]; then
+            echo "release-cleanup: SKIP (draft release not found)"
             exit 0
           fi
 
-          echo "release-cleanup: deleting draft release and tag ${TAG_NAME}"
-          gh release delete "${TAG_NAME}" --yes || true
+          echo "release-cleanup: deleting draft release ${release_id} and tag ${TAG_NAME}"
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}" || true
           gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG_NAME}" || true
