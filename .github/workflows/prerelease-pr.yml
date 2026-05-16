@@ -38,10 +38,14 @@ jobs:
 
       - name: Check stable release baseline
         id: stable
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.json
 
       - name: Check premain prerelease baseline
         id: prerelease
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.premain.json
 
       - name: Mark prerelease PR baseline readiness
