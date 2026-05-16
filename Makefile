@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin build-release-assets ensure-release-branches test-ensure-release-branches test-verify-release-draft-target stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin build-release-assets ensure-release-branches test-ensure-release-branches test-verify-release-draft-target test-check-release-baseline-ready test-release-workflow-changelog-preservation stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
 
 ts-build:
 	cd ts && npm run build
@@ -42,6 +42,12 @@ test-ensure-release-branches:
 test-verify-release-draft-target:
 	./scripts/test-verify-release-draft-target.sh
 
+test-check-release-baseline-ready:
+	./scripts/test-check-release-baseline-ready.sh
+
+test-release-workflow-changelog-preservation:
+	./scripts/test-release-workflow-changelog-preservation.sh
+
 stage-theorycloud-facetheory-subtree:
 	./scripts/stage_theorycloud_facetheory_subtree.sh --output "$${THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR:-/tmp/facetheory-theorycloud}"
 
@@ -60,4 +66,4 @@ test-theorycloud-targets:
 test-trigger-theorycloud-publish-awscurl:
 	./scripts/test-trigger-theorycloud-publish-awscurl.sh
 
-rubric: ts-typecheck ts-lint ts-test verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin test-verify-release-draft-target
+rubric: ts-typecheck ts-lint ts-test verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin test-verify-release-draft-target test-check-release-baseline-ready test-release-workflow-changelog-preservation
