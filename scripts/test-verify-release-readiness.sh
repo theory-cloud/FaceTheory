@@ -58,13 +58,15 @@ trap 'rm -rf "${tmpdir}"' EXIT
 
 # Regression for a pipefail/SIGPIPE bug: the old implementation piped
 # `git log` into `grep -q`; with `pipefail`, a conventional commit near the
-# beginning of a long range could make grep exit before git log finished and
-# incorrectly fail release readiness.
+# beginning of a multi-commit range could make grep exit before git log
+# finished and incorrectly fail release readiness. Keep this range large
+# enough to exercise non-trivial scanning but small enough to avoid GitHub
+# runner temp-repo object flakiness.
 work_dir="${tmpdir}/with-fix"
 current_case="setup with conventional fix"
 setup_repo "${work_dir}"
 work_script="$(copy_script "${work_dir}")"
-for i in $(seq 1 180); do
+for i in $(seq 1 24); do
   printf 'doc %s\n' "${i}" > "${work_dir}/docs-${i}.md"
   commit_file "${work_dir}" "docs: filler ${i}" "docs-${i}.md"
 done
