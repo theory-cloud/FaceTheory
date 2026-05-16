@@ -19,12 +19,32 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Resolve release source ref
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${TAG_NAME}" ]]; then
+            target_commitish="$(gh release view "${TAG_NAME}" --json targetCommitish --jq '.targetCommitish')"
+            if [[ -z "${target_commitish}" ]]; then
+              echo "release-assets: FAIL (${TAG_NAME} missing targetCommitish)"
+              exit 1
+            fi
+            echo "source_ref=${target_commitish}" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          echo "source_ref=${GITHUB_REF}" >> "${GITHUB_OUTPUT}"
+
       - name: Checkout (for tag-triggered assets)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ inputs.tag_name || github.ref }}
+          ref: ${{ steps.source.outputs.source_ref }}
 
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
@@ -37,6 +57,7 @@ jobs:
 
       - name: Build assets for existing tag release
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
         run: |
           set -euo pipefail
@@ -79,6 +100,12 @@ jobs:
           PY
 
           scripts/verify-release-branch.sh "${TAG_NAME}"
+          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft')"
+            if [[ "${is_draft}" == "true" ]]; then
+              scripts/verify-release-draft-target.sh "${TAG_NAME}" HEAD
+            fi
+          fi
 
           export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
           cd ts && npm ci
