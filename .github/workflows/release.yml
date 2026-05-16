@@ -28,16 +28,61 @@ jobs:
           set -euo pipefail
 
           if [[ -n "${TAG_NAME}" ]]; then
-            target_commitish="$(gh release view "${TAG_NAME}" --json targetCommitish --jq '.targetCommitish')"
+            release_json="$(gh release view "${TAG_NAME}" --json tagName,targetCommitish,isDraft,isPrerelease,url 2>/dev/null || true)"
+            if [[ -z "${release_json}" ]]; then
+              echo "source_ref=${TAG_NAME}" >> "${GITHUB_OUTPUT}"
+              echo "release_is_draft=false" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+
+            mapfile -t release_fields < <(
+              RELEASE_JSON="${release_json}" python3 - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["RELEASE_JSON"])
+          print(data.get("tagName", ""))
+          print(data.get("targetCommitish", ""))
+          print("true" if data.get("isDraft") is True else "false")
+          print("true" if data.get("isPrerelease") is True else "false")
+          print(data.get("url", ""))
+          PY
+            )
+
+            release_tag="${release_fields[0]:-}"
+            target_commitish="${release_fields[1]:-}"
+            is_draft="${release_fields[2]:-false}"
+            is_prerelease="${release_fields[3]:-false}"
+            release_url="${release_fields[4]:-}"
+
+            if [[ "${release_tag}" != "${TAG_NAME}" ]]; then
+              echo "release-assets: FAIL (release tag ${release_tag:-<empty>} != ${TAG_NAME})"
+              exit 1
+            fi
             if [[ -z "${target_commitish}" ]]; then
               echo "release-assets: FAIL (${TAG_NAME} missing targetCommitish)"
               exit 1
             fi
+            if [[ "${is_draft}" == "true" ]]; then
+              if [[ "${TAG_NAME}" =~ -rc(\.|$) && "${is_prerelease}" != "true" ]]; then
+                echo "release-assets: FAIL (${TAG_NAME} draft must be marked prerelease)"
+                exit 1
+              fi
+              if [[ ! "${TAG_NAME}" =~ -rc(\.|$) && "${is_prerelease}" == "true" ]]; then
+                echo "release-assets: FAIL (${TAG_NAME} stable draft must not be marked prerelease)"
+                exit 1
+              fi
+              echo "release-assets: draft ${TAG_NAME} targets ${target_commitish} (${release_url})"
+            fi
+
             echo "source_ref=${target_commitish}" >> "${GITHUB_OUTPUT}"
+            echo "release_is_draft=${is_draft}" >> "${GITHUB_OUTPUT}"
+            echo "release_target=${target_commitish}" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
 
           echo "source_ref=${GITHUB_REF}" >> "${GITHUB_OUTPUT}"
+          echo "release_is_draft=false" >> "${GITHUB_OUTPUT}"
 
       - name: Checkout (for tag-triggered assets)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -59,6 +104,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
+          RELEASE_IS_DRAFT: ${{ steps.source.outputs.release_is_draft }}
+          RELEASE_TARGET: ${{ steps.source.outputs.release_target }}
         run: |
           set -euo pipefail
 
@@ -99,13 +146,15 @@ jobs:
           update_manifest(".release-please-manifest.premain.json")
           PY
 
-          scripts/verify-release-branch.sh "${TAG_NAME}"
-          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
-            is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft')"
-            if [[ "${is_draft}" == "true" ]]; then
-              scripts/verify-release-draft-target.sh "${TAG_NAME}" HEAD
+          if [[ "${RELEASE_IS_DRAFT}" == "true" && "${RELEASE_TARGET}" =~ ^[0-9a-f]{40}$ ]]; then
+            actual_commit="$(git rev-parse HEAD)"
+            if [[ "${actual_commit}" != "${RELEASE_TARGET}" ]]; then
+              echo "release-assets: FAIL (${TAG_NAME} draft targets ${RELEASE_TARGET}, checked out ${actual_commit})"
+              exit 1
             fi
           fi
+
+          scripts/verify-release-branch.sh "${TAG_NAME}"
 
           export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
           cd ts && npm ci
