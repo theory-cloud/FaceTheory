@@ -23,9 +23,11 @@ jobs:
   check-baseline:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     outputs:
-      ready: ${{ steps.baseline.outputs.ready }}
+      ready: ${{ steps.ready.outputs.ready }}
+      stable_ready: ${{ steps.stable.outputs.ready }}
+      prerelease_ready: ${{ steps.prerelease.outputs.ready }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -35,8 +37,25 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && 'premain' || github.sha }}
 
       - name: Check stable release baseline
-        id: baseline
+        id: stable
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.json
+
+      - name: Check premain prerelease baseline
+        id: prerelease
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: scripts/check-release-baseline-ready.sh .release-please-manifest.premain.json
+
+      - name: Mark prerelease PR baseline readiness
+        id: ready
+        run: |
+          if [[ "${{ steps.stable.outputs.ready }}" == "true" && "${{ steps.prerelease.outputs.ready }}" == "true" ]]; then
+            echo "ready=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "ready=false" >> "${GITHUB_OUTPUT}"
+          fi
 
   release-please:
     needs: check-baseline
