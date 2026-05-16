@@ -16,10 +16,14 @@ range="${base_ref}..${head_ref}"
 diff_range="${base_ref}...${head_ref}"
 
 echo "Checking commits in ${range}..."
-if git log --format=%s "${range}" | grep -Eq '^(feat|fix|perf)(\([^)]+\))?(!)?: '; then
-  echo "${context_label}-readiness: OK"
-  exit 0
-fi
+release_commit_subject_regex='^(feat|fix|perf)(\([^)]+\))?(!)?:[[:space:]]'
+mapfile -t commit_subjects < <(git log --format=%s "${range}")
+for subject in "${commit_subjects[@]}"; do
+  if [[ "${subject}" =~ ${release_commit_subject_regex} ]]; then
+    echo "${context_label}-readiness: OK"
+    exit 0
+  fi
+done
 
 mapfile -t changed_files < <(git diff --name-only --diff-filter=ACMR "${diff_range}")
 if [[ "${#changed_files[@]}" -gt 0 ]]; then
@@ -39,11 +43,21 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
       | docs/getting-started.md \
       | scripts/build-release-assets.sh \
       | scripts/check-release-baseline-ready.sh \
+      | scripts/release-json-by-tag.sh \
+      | scripts/resolve-release-source-ref.sh \
+      | scripts/publish-draft-release-assets.sh \
+      | scripts/test-check-release-baseline-ready.sh \
+      | scripts/test-resolve-release-source-ref.sh \
+      | scripts/test-publish-draft-release-assets.sh \
       | scripts/generate-checksums.sh \
       | scripts/read-version.sh \
       | scripts/render-release-notes.sh \
+      | scripts/test-release-workflow-changelog-preservation.sh \
       | scripts/verify-release-branch.sh \
+      | scripts/verify-release-draft-target.sh \
       | scripts/verify-release-readiness.sh \
+      | scripts/test-verify-release-draft-target.sh \
+      | scripts/test-verify-release-readiness.sh \
       | scripts/verify-ts-pack.sh \
       | scripts/verify-version-alignment.sh \
       | ts/README.md \
@@ -69,5 +83,5 @@ echo "No user-facing conventional commits (feat:/fix:/perf:) found in ${range}."
 echo "release-please will skip, so no new release PR will be cut."
 echo
 echo "Commit subjects:"
-git log --format=%s "${range}" || true
+printf '%s\n' "${commit_subjects[@]}"
 exit 1

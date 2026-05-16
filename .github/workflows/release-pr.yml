@@ -23,9 +23,11 @@ jobs:
   check-baseline:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     outputs:
-      ready: ${{ steps.baseline.outputs.ready }}
+      ready: ${{ steps.ready.outputs.ready }}
+      stable_ready: ${{ steps.baseline.outputs.ready }}
+      premain_ready: ${{ steps.premain.outputs.ready }}
       release_as: ${{ steps.version.outputs.release_as }}
     steps:
       - name: Checkout
@@ -37,6 +39,8 @@ jobs:
 
       - name: Check current release baseline
         id: baseline
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.json
 
       - name: Compute release-as (align to premain RC)
@@ -79,6 +83,24 @@ jobs:
           echo "release_as=${release_as}" >> "${GITHUB_OUTPUT}"
           echo "release-as: ${release_as:-}"
 
+      - name: Check premain release-candidate baseline
+        id: premain
+        if: steps.version.outputs.release_as != ''
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+        run: scripts/check-release-baseline-ready.sh .release-please-manifest.premain.json
+
+      - name: Mark release PR baseline readiness
+        id: ready
+        run: |
+          if [[ "${{ steps.baseline.outputs.ready }}" != "true" ]]; then
+            echo "ready=false" >> "${GITHUB_OUTPUT}"
+          elif [[ "${{ steps.version.outputs.release_as }}" != "" && "${{ steps.premain.outputs.ready }}" != "true" ]]; then
+            echo "ready=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "ready=true" >> "${GITHUB_OUTPUT}"
+          fi
+
   release-please:
     needs: check-baseline
     if: needs.check-baseline.outputs.ready == 'true'
@@ -93,7 +115,7 @@ jobs:
         id: release_aligned
         uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           target-branch: main
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
@@ -105,7 +127,7 @@ jobs:
         id: release_default
         uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           target-branch: main
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
