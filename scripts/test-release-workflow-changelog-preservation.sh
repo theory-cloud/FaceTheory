@@ -33,4 +33,17 @@ grep -Fq 'scripts/check-release-baseline-ready.sh .release-please-manifest.prema
 grep -Fq 'steps.version.outputs.release_as }}" != "" &&' .github/workflows/release-pr.yml ||
   fail "release-pr.yml must fail closed when an aligned stable release depends on an unpublished premain RC"
 
+for workflow in .github/workflows/prerelease-pr.yml .github/workflows/release-pr.yml .github/workflows/prerelease.yml; do
+  python3 - "${workflow}" <<'PY' || fail "${workflow} check-baseline job must use contents: write for draft release visibility"
+import sys
+from pathlib import Path
+
+workflow = Path(sys.argv[1])
+text = workflow.read_text(encoding="utf-8")
+needle = "  check-baseline:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n"
+if needle not in text:
+    raise SystemExit(1)
+PY
+done
+
 echo "test-release-workflow-changelog-preservation: PASS"

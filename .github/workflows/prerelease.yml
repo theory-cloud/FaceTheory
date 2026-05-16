@@ -12,7 +12,7 @@ jobs:
   check-baseline:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     outputs:
       ready: ${{ steps.baseline.outputs.ready }}
     steps:

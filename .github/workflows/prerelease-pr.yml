@@ -23,7 +23,7 @@ jobs:
   check-baseline:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     outputs:
       ready: ${{ steps.ready.outputs.ready }}
       stable_ready: ${{ steps.stable.outputs.ready }}
