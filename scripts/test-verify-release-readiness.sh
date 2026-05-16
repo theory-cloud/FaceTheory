@@ -25,6 +25,17 @@ commit_file() {
     commit -m "${message}" >/dev/null
 }
 
+commit_empty() {
+  local work_dir="$1"
+  local message="$2"
+
+  git -C "${work_dir}" \
+    -c commit.gpgSign=false \
+    -c tag.gpgSign=false \
+    -c core.hooksPath=/dev/null \
+    commit --allow-empty -m "${message}" >/dev/null
+}
+
 assert_contains() {
   local haystack="$1"
   local needle="$2"
@@ -58,20 +69,18 @@ trap 'rm -rf "${tmpdir}"' EXIT
 
 # Regression for a pipefail/SIGPIPE bug: the old implementation piped
 # `git log` into `grep -q`; with `pipefail`, a conventional commit near the
-# beginning of a multi-commit range could make grep exit before git log
-# finished and incorrectly fail release readiness. Keep this range large
-# enough to exercise non-trivial scanning but small enough to avoid GitHub
-# runner temp-repo object flakiness.
+# beginning of a long range could make grep exit before git log finished and
+# incorrectly fail release readiness. Use empty filler commits so this test
+# stresses commit-subject scanning without creating throwaway blob objects in
+# GitHub runner temp repos.
 work_dir="${tmpdir}/with-fix"
 current_case="setup with conventional fix"
 setup_repo "${work_dir}"
 work_script="$(copy_script "${work_dir}")"
-for i in $(seq 1 24); do
-  printf 'doc %s\n' "${i}" > "${work_dir}/docs-${i}.md"
-  commit_file "${work_dir}" "docs: filler ${i}" "docs-${i}.md"
+for i in $(seq 1 180); do
+  commit_empty "${work_dir}" "docs: filler ${i}"
 done
-printf '%s\n' fix > "${work_dir}/fix.txt"
-commit_file "${work_dir}" "fix(release): exercise readiness scan" fix.txt
+commit_empty "${work_dir}" "fix(release): exercise readiness scan"
 current_case="range with conventional fix"
 with_fix_out="$(cd "${work_dir}" && bash "${work_script}" base HEAD release)"
 assert_contains "${with_fix_out}" 'release-readiness: OK' "range with conventional fix"
