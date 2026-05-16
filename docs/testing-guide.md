@@ -52,6 +52,44 @@ Use this when changing:
 - hydration data output
 - static file layout
 
+### OAC Mutating Form Transport
+
+```bash
+cd ts
+npx tsx test/unit/oac-form.test.ts
+```
+
+Use this when changing:
+
+- `startAwsOacFormTransport()`
+- URL-encoded form field collection or payload hashing
+- AppTheorySsrSite OAC mutating-form documentation
+- response navigation, CSP, redirect, or unsupported-encoding behavior for marked forms
+
+Local expected result:
+
+- marked same-origin POSTs send `content-type: application/x-www-form-urlencoded;charset=UTF-8`
+- marked same-origin POSTs send `x-amz-content-sha256` for the exact body bytes passed to `fetch`
+- unmarked, `GET`, and `dialog` forms keep native behavior
+- cross-origin actions and marked unsupported encodings fail before sending
+- mutating fetches use `redirect: "error"`
+- default HTML document replacement refuses CSP-protected responses unless the host handles the response
+
+Release-candidate validation for an AppTheorySsrSite consumer should use the published GitHub Release tarball, not a
+workspace link:
+
+1. install the FaceTheory RC tarball exactly in the consuming app;
+2. mark a same-origin URL-encoded form with `data-facetheory-oac-form`;
+3. install `startAwsOacFormTransport()` from the client bootstrap module;
+4. route the action path through AppTheory/CloudFront to Lambda, usually with `ssrPathPatterns`;
+5. submit through the deployed CloudFront URL and confirm the request reaches Lambda without changing the Function URL
+   auth type away from `AWS_IAM`;
+6. confirm marked multipart/text/plain forms fail closed and do not send a request;
+7. if the response uses CSP headers, confirm the host handles it through `onResponse` or `onNavigate`.
+
+For the original lab driver, theory-mcp-server should validate `POST /agents/new` through CloudFront OAC before stable
+promotion. A successful RC validation means the app-local workaround can be removed while keeping OAC enabled.
+
 ### React SSR And Streaming
 
 ```bash

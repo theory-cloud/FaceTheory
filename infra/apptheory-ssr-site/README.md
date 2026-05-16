@@ -34,4 +34,7 @@ npm run synth
 
 - Deploy and smoke-test instructions should follow the canonical AWS docs first.
 - This reference stack intentionally does **not** forward viewer-supplied tenant headers such as `x-facetheory-tenant`.
+- Same-origin mutating form actions belong on the Lambda/AppTheory path with `AWS_IAM` + CloudFront OAC intact. Mark
+  URL-encoded forms with `data-facetheory-oac-form` and install `startAwsOacFormTransport()` rather than posting
+  directly to the Function URL or weakening Function URL auth.
 - Use this README for stack-local commands and folder context only.

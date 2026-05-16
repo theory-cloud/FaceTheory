@@ -345,6 +345,7 @@ async function submitForm(input: SubmitAwsOacFormInput): Promise<void> {
     credentials: 'same-origin',
     headers,
     method: input.method,
+    redirect: 'error',
   });
 
   const context: AwsOacFormTransportResponseContext = {
@@ -392,6 +393,7 @@ async function applyDefaultNavigationPolicy(
   }
 
   if (isHtmlResponse(context.response)) {
+    const responseHasCsp = hasResponseCsp(context.response);
     const html = await context.response.text();
     const navigationContext: AwsOacFormTransportNavigationContext = {
       ...context,
@@ -400,6 +402,11 @@ async function applyDefaultNavigationPolicy(
       navigation: 'replace-document',
     };
     if (await customNavigationHandled(input.options, navigationContext)) return;
+    if (responseHasCsp) {
+      throw new Error(
+        'FaceTheory OAC form transport refused to replace the current document with an HTML response protected by Content-Security-Policy because fetch cannot install response CSP headers during document.write navigation; handle the response with onNavigate instead',
+      );
+    }
     replaceDocument(input.form.ownerDocument, input.window, html, finalUrl);
     return;
   }
@@ -429,6 +436,17 @@ function isHtmlResponse(response: Response): boolean {
     contentType.startsWith('text/html') ||
     contentType.startsWith('application/xhtml+xml')
   );
+}
+
+function hasResponseCsp(response: Response): boolean {
+  return (
+    hasHeaderValue(response.headers, 'content-security-policy') ||
+    hasHeaderValue(response.headers, 'content-security-policy-report-only')
+  );
+}
+
+function hasHeaderValue(headers: Headers, name: string): boolean {
+  return (headers.get(name)?.trim() ?? '') !== '';
 }
 
 function replaceDocument(

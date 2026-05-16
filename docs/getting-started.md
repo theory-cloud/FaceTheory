@@ -21,7 +21,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=3.1.1 # x-release-please-version
+export FACETHEORY_VERSION=3.1.2-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -31,7 +31,7 @@ npm install --save-exact \
 - React: `npm install react react-dom`
 - React + AntD/Emotion: `npm install antd @emotion/react @emotion/cache @emotion/server`
 - Vue: `npm install vue @vue/server-renderer`
-- Svelte: `npm install svelte`
+- Svelte: `npm install svelte@^5.55.7`
 
 ### Step 3: Install optional companion packages
 
@@ -39,10 +39,10 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.5.0/theory-cloud-apptheory-1.5.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.6.0/theory-cloud-apptheory-1.6.0.tgz
 
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.8.2/theory-cloud-tabletheory-ts-1.8.2.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz
 ```
 
 Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoint. Use TableTheory when you want the documented production ISR metadata store adapter.
@@ -95,6 +95,115 @@ runtime.get("/{proxy+}", createAppTheoryFaceHandler({ app }));
 
 export const handler = createLambdaFunctionURLStreamingHandler(runtime);
 ```
+
+## Add An OAC-Safe Mutating SSR Form
+
+When a FaceTheory app is deployed through `AppTheorySsrSite` with Lambda Function URL OAC and `AWS_IAM`, native browser
+form POSTs cannot attach the `x-amz-content-sha256` header that CloudFront signs for mutating Lambda URL payloads. Keep
+the form action same-origin and opt the form into FaceTheory's URL-encoded OAC transport instead of posting directly to
+the Lambda Function URL.
+
+Server-render the form and the action route through the same SSR Face:
+
+```ts
+import {
+  createFaceApp,
+  escapeHTML,
+  type FaceModule,
+} from "@theory-cloud/facetheory";
+
+const oacBootstrapModule = "/assets/oac-form-bootstrap.js";
+
+function formDocument(message = "") {
+  const alert = message
+    ? `<p role="alert">${escapeHTML(message)}</p>`
+    : "";
+
+  return `
+    <main>
+      <h1>Create control-plane item</h1>
+      ${alert}
+      <form action="/control/items/new" method="post" data-facetheory-oac-form>
+        <label>
+          Name
+          <input name="name" required />
+        </label>
+        <button name="intent" value="create">Create</button>
+      </form>
+    </main>
+  `;
+}
+
+const faces: FaceModule[] = [
+  {
+    route: "/control/items/new",
+    mode: "ssr",
+    render: async ({ request }) => {
+      if (request.method === "POST") {
+        const fields = new URLSearchParams(
+          new TextDecoder().decode(request.body),
+        );
+        const name = fields.get("name")?.trim() ?? "";
+
+        if (!name) {
+          return {
+            status: 400,
+            html: formDocument("Name is required."),
+            hydration: { bootstrapModule: oacBootstrapModule, data: null },
+          };
+        }
+
+        // Persist through application-owned auth, CSRF, idempotency, and
+        // business validation here. The OAC payload hash is AWS signing
+        // plumbing only; it is not application authentication.
+        return {
+          html: `
+            <main>
+              <h1>Created</h1>
+              <p>${escapeHTML(name)} was accepted.</p>
+              <a href="/control/items">Back to items</a>
+            </main>
+          `,
+          hydration: { bootstrapModule: oacBootstrapModule, data: null },
+        };
+      }
+
+      return {
+        html: formDocument(),
+        hydration: { bootstrapModule: oacBootstrapModule, data: null },
+      };
+    },
+  },
+];
+
+export const app = createFaceApp({ faces });
+```
+
+Install the browser helper from the bootstrap module emitted with that Face:
+
+```ts
+import { startAwsOacFormTransport } from "@theory-cloud/facetheory";
+
+startAwsOacFormTransport();
+```
+
+Route both `GET` and `POST` for the same-origin action path to Lambda/AppTheory, not to S3 or a direct Lambda Function
+URL:
+
+```ts
+import { createAppTheoryFaceHandler } from "@theory-cloud/facetheory/apptheory";
+
+const actionFace = createAppTheoryFaceHandler({ app });
+
+runtime.get("/control/items/new", actionFace);
+runtime.post("/control/items/new", actionFace);
+```
+
+The helper sends the exact URL-encoded bytes that it hashes, sets `x-amz-content-sha256`, and includes same-origin
+credentials. Marked forms that resolve to `multipart/form-data`, `text/plain`, or another unsupported encoding fail
+closed before a request is sent; file uploads need a separately scoped transport. If the HTML response carries a
+`Content-Security-Policy` header, handle the result explicitly through `onResponse` or `onNavigate` because fetched CSP
+headers cannot become the active document policy during default document replacement.
 
 ## Add Stitch Control-Plane Primitives
 
@@ -234,7 +343,7 @@ Important ISR default:
 
 ## Reference Bundle
 
-The `v3.1.1` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v3.1.2-rc` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples

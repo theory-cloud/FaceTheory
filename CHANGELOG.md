@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.1.2-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.1.1...v3.1.2-rc) (2026-05-16)
+
+
+### Bug Fixes
+
+* **deps:** align upstream release pins ([7f80417](https://github.com/theory-cloud/FaceTheory/commit/7f80417c97c200c0b057d226cc3eb969039972e0))
+* **deps:** exclude vulnerable Svelte peer range ([ba12782](https://github.com/theory-cloud/FaceTheory/commit/ba12782b12786265c1c13c2b5ba8c364b3c420d2))
+* **deps:** update Svelte audit baseline ([6249afe](https://github.com/theory-cloud/FaceTheory/commit/6249afe4b00e230ca00d6655aeefa248577f4628))
+* **oac:** fail closed for unsafe form navigation ([9b9a396](https://github.com/theory-cloud/FaceTheory/commit/9b9a396bba4a8e81746a2cc2f6dcd1919612b92d))
+* **release:** avoid token exposure in baseline checks ([a6c2d05](https://github.com/theory-cloud/FaceTheory/commit/a6c2d05273be1b872c6470abd750e8f556c2ac13))
+* **release:** isolate token jobs from repo scripts ([3b7b1c8](https://github.com/theory-cloud/FaceTheory/commit/3b7b1c838b8be8c657bcbd7be3422ff0978662de))
+
 ## [3.1.1](https://github.com/theory-cloud/FaceTheory/compare/v3.1.0...v3.1.1) (2026-05-12)
 
 
