@@ -27,4 +27,10 @@ grep -Fq 'scripts/check-release-baseline-ready.sh .release-please-manifest.prema
 grep -Fq "needs.check-baseline.outputs.ready == 'true'" .github/workflows/prerelease-pr.yml ||
   fail "prerelease-pr.yml must gate Release Please PR generation on combined baseline readiness"
 
+grep -Fq 'scripts/check-release-baseline-ready.sh .release-please-manifest.premain.json' .github/workflows/release-pr.yml ||
+  fail "release-pr.yml must verify the premain RC baseline before generating an aligned stable release PR"
+
+grep -Fq 'steps.version.outputs.release_as }}" != "" &&' .github/workflows/release-pr.yml ||
+  fail "release-pr.yml must fail closed when an aligned stable release depends on an unpublished premain RC"
+
 echo "test-release-workflow-changelog-preservation: PASS"
