@@ -46,6 +46,16 @@ assert_contains() {
   fi
 }
 
+assert_source_avoids_git_log_grep_pipe() {
+  local implementation
+
+  implementation="$(tr '\n' ' ' < "${script_path}")"
+  if [[ "${implementation}" =~ git[[:space:]]+log.*\|.*grep ]]; then
+    fail "verify-release-readiness must not pipe git log into grep; that reintroduces the pipefail/SIGPIPE regression"
+  fi
+  assert_contains "${implementation}" 'mapfile -t commit_subjects' "implementation source"
+}
+
 setup_repo() {
   local work_dir="$1"
   git init -b main "${work_dir}" >/dev/null
@@ -67,17 +77,20 @@ copy_script() {
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 
+current_case="source regression guard"
+assert_source_avoids_git_log_grep_pipe
+
 # Regression for a pipefail/SIGPIPE bug: the old implementation piped
 # `git log` into `grep -q`; with `pipefail`, a conventional commit near the
 # beginning of a long range could make grep exit before git log finished and
-# incorrectly fail release readiness. Use empty filler commits so this test
-# stresses commit-subject scanning without creating throwaway blob objects in
-# GitHub runner temp repos.
+# incorrectly fail release readiness. The source guard above prevents that
+# exact pipe shape from returning; this temp repo only verifies that the
+# mapfile-based scanner still accepts conventional release commits.
 work_dir="${tmpdir}/with-fix"
 current_case="setup with conventional fix"
 setup_repo "${work_dir}"
 work_script="$(copy_script "${work_dir}")"
-for i in $(seq 1 180); do
+for i in $(seq 1 3); do
   commit_empty "${work_dir}" "docs: filler ${i}"
 done
 commit_empty "${work_dir}" "fix(release): exercise readiness scan"
