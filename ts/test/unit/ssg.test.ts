@@ -237,3 +237,126 @@ test('ssg: allows explicit fetch mock', async () => {
     await rm(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('ssg: strict CSP hydration emits canonical sidecar without inline data', async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-strict-'));
+  const outDir = path.resolve(tempRoot, 'out');
+
+  const faces: FaceModule[] = [
+    {
+      route: '/',
+      mode: 'ssg',
+      render: () => ({
+        csp: {
+          inlineScripts: false,
+          inlineStyles: false,
+          rawHead: false,
+        },
+        head: { title: 'Strict Home' },
+        html: '<main>strict</main>',
+        hydration: {
+          data: {
+            message: '</script><script>alert("xss")</script>',
+            count: 1,
+          },
+          bootstrapModule: '/assets/client-entry.js',
+        },
+      }),
+    },
+  ];
+
+  try {
+    const result = await buildSsgSite({ faces, outDir });
+
+    assert.equal(result.pages.length, 1);
+    assert.equal(
+      result.pages[0]?.hydrationDataFile,
+      '_facetheory/data/index.json',
+    );
+
+    const html = await readFile(path.resolve(outDir, 'index.html'), 'utf8');
+    assert.ok(html.includes('id="__FACETHEORY_DATA_URL__"'));
+    assert.ok(html.includes('href="/_facetheory/data/index.json"'));
+    assert.ok(html.includes('src="/assets/client-entry.js"'));
+    assert.equal(html.includes('id="__FACETHEORY_DATA__"'), false);
+    assert.equal(html.includes('</script><script>alert'), false);
+
+    const hydrationJson = await readFile(
+      path.resolve(outDir, '_facetheory/data/index.json'),
+      'utf8',
+    );
+    assert.equal(
+      hydrationJson,
+      '{"message":"\\u003c/script\\u003e\\u003cscript\\u003ealert(\\"xss\\")\\u003c/script\\u003e","count":1}\n',
+    );
+
+    const manifestRaw = await readFile(
+      path.resolve(outDir, '.facetheory/ssg-manifest.json'),
+      'utf8',
+    );
+    const manifest = JSON.parse(manifestRaw) as {
+      pages: Array<{ path: string; hydrationDataFile?: string }>;
+    };
+    assert.deepEqual(
+      manifest.pages.map((page) => `${page.path} -> ${page.hydrationDataFile}`),
+      ['/ -> _facetheory/data/index.json'],
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('ssg: non-strict hydration sidecars remain opt-in compatibility output', async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-compat-'));
+  const outDir = path.resolve(tempRoot, 'out');
+
+  const faces: FaceModule[] = [
+    {
+      route: '/',
+      mode: 'ssg',
+      render: () => ({
+        html: '<main>legacy</main>',
+        hydration: {
+          data: { message: 'legacy' },
+          bootstrapModule: '/assets/client-entry.js',
+        },
+      }),
+    },
+  ];
+
+  try {
+    const withoutCompatibilitySidecar = await buildSsgSite({
+      faces,
+      outDir,
+    });
+
+    assert.equal(
+      withoutCompatibilitySidecar.pages[0]?.hydrationDataFile,
+      undefined,
+    );
+    let html = await readFile(path.resolve(outDir, 'index.html'), 'utf8');
+    assert.ok(html.includes('id="__FACETHEORY_DATA__"'));
+
+    const withCompatibilitySidecar = await buildSsgSite({
+      faces,
+      outDir,
+      emitHydrationData: true,
+    });
+
+    assert.equal(
+      withCompatibilitySidecar.pages[0]?.hydrationDataFile,
+      '_facetheory/data/index.json',
+    );
+    html = await readFile(path.resolve(outDir, 'index.html'), 'utf8');
+    assert.ok(html.includes('id="__FACETHEORY_DATA__"'));
+    assert.ok(html.includes('{"message":"legacy"}'));
+
+    const hydrationJson = await readFile(
+      path.resolve(outDir, '_facetheory/data/index.json'),
+      'utf8',
+    );
+    assert.equal(hydrationJson, '{"message":"legacy"}\n');
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});

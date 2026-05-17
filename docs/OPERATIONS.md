@@ -15,6 +15,9 @@ This document describes production hardening guidance for FaceTheory apps and th
 - Security headers:
   - Set baseline security headers at the CDN layer (HSTS, nosniff, frame-options, referrer-policy, permissions-policy).
   - Do not attempt to set a nonce-based CSP at CloudFront (nonces are per-request).
+  - Attach strict no-inline CSP headers from the Face response when a route opts into
+    `csp: { inlineScripts:false, inlineStyles:false, rawHead:false }`; the runtime validates output but does not add the
+    header automatically.
 - Timeouts/limits:
   - Configure Lambda timeout and memory for worst-case SSR render + streaming.
   - For React streaming, ensure `abortDelayMs` is comfortably below your Lambda timeout.
@@ -73,6 +76,29 @@ Important constraint:
 Helper:
 - `createCspNonce()` is available at `ts/src/security.ts`.
 
+### Strict no-inline CSP operations
+
+Strict no-inline routes replace inline hydration with same-origin JSON sidecars and should be checked as a render/data
+pair:
+
+- SSR: confirm the response carries `content-security-policy` from the Face and the external hydration `dataUrl` is
+  same-origin. If the data is request-time, route the sidecar URL to Lambda/AppTheory or another host-owned same-origin
+  endpoint that can reproduce the exact render data.
+- SSG: confirm HTML and `/_facetheory/data/*` sidecars are uploaded together and routed to S3 through CloudFront. Cache
+  headers and invalidations should keep the HTML and sidecar from different builds from being mixed.
+- ISR: confirm `x-facetheory-isr` behavior stays normal and hydration sidecar URLs with
+  `__facetheory_isr_hydration=...` route to Lambda/FaceTheory. The runtime validates the opaque pointer token and serves
+  the pointer-derived `.hydration.json` object from the same `S3HtmlStore` used for HTML.
+- SPA navigation: confirm `startFaceNavigation()` or `startAwsOacFormTransport({ navigationPolicy: "spa" })` loads
+  external hydration data before mutating the document. Use `navigationPolicy: "full-page"` when fetched CSP-protected
+  HTML should become a real browser navigation instead of a document-write replacement.
+
+Evidence boundary:
+- A local strict-CSP test or example build proves repository behavior only.
+- A successful RC validation must name the exact FaceTheory GitHub Release tarball installed by the consuming app.
+- Do not record "AWS deployment verified", "Simulacrum verified", or "customer deployed" unless that system supplied
+  independent evidence through the owning operator or steward.
+
 ### Response headers policy guidance
 
 Recommended baseline (CDN layer preferred):
@@ -123,6 +149,31 @@ Prefer versioned prefixes for HTML/data outputs:
 If using stable keys:
 - Invalidate HTML keys (`/*` or targeted paths) on deploy.
 - Do not invalidate immutable hashed assets.
+
+### Strict CSP RC and stable release handoff
+
+Use this checklist before promoting strict-CSP changes from release candidate to stable:
+
+1. Release Please owns the RC and stable tags/releases; do not hand-create tags, GitHub Releases, changelogs, or assets.
+2. Install the RC in the validating app from the immutable GitHub Release tarball, not a workspace link.
+3. Ask Simulacrum validation to exercise the strict-CSP surface it owns, including:
+   - an SSR strict route with explicit CSP header attachment
+   - SSG sidecar routing through CloudFront/S3 for `/_facetheory/data/*`
+   - ISR sidecar hydration through the Lambda/FaceTheory query-param URL
+   - OAC form navigation policy behavior when CSP-protected HTML responses are involved
+4. Capture evidence as RC validation, not as publication proof: exact RC version, PR/release URL, commands or browser
+   route checks, observed headers/URLs, and whether app-local workarounds were removed.
+5. Stable promotion criteria:
+   - FaceTheory CI and local release checks are green
+   - strict-CSP docs and examples match the implementation
+   - Simulacrum or another authorized consumer has validated the RC from the release tarball if the release scope depends
+     on deployed behavior
+   - no docs claim AWS/customer deployment proof beyond the evidence captured
+   - `main` is back-merged to `staging` after stable release per the normal release flow
+
+Rollback:
+- pin consumers to the previous FaceTheory release tarball, or remove the strict-CSP opt-in on affected routes.
+- do not weaken OAC, expose direct Lambda Function URLs, or remove CSP headers as the framework rollback path.
 
 ### ISR lock contention diagnostics
 

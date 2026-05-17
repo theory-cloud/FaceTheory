@@ -3,9 +3,14 @@ import { PassThrough } from 'node:stream';
 import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server';
 
+import {
+  enforceAdapterStrictCspResult,
+  enforceReactStrictCspStreamingOptions,
+} from '../adapter-csp.js';
 import { prepareUIIntegrations } from '../types.js';
 import type {
   FaceContext,
+  FaceCspPolicy,
   FaceHead,
   FaceHeadTag,
   FaceHydration,
@@ -24,6 +29,7 @@ export interface RenderReactOptions {
   headTags?: FaceHeadTag[];
   styleTags?: FaceStyleTag[];
   hydration?: FaceHydration;
+  csp?: FaceCspPolicy;
   integrations?: Array<UIIntegration<React.ReactElement>>;
 }
 
@@ -70,7 +76,11 @@ export async function renderReact(
     UIIntegration<React.ReactElement>
   >(options.integrations ?? [], ctx);
 
-  let tree: React.ReactElement = React.createElement(React.Fragment, null, node);
+  let tree: React.ReactElement = React.createElement(
+    React.Fragment,
+    null,
+    node,
+  );
 
   for (const { integration, state } of integrations) {
     if (integration.wrapTree) {
@@ -84,8 +94,10 @@ export async function renderReact(
   for (const { integration, state } of integrations) {
     if (!integration.contribute) continue;
     const contribution = await integration.contribute(ctx, state);
-    if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
-    if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
+    if (contribution.headTags)
+      integrationHeadTags.push(...contribution.headTags);
+    if (contribution.styleTags)
+      integrationStyleTags.push(...contribution.styleTags);
   }
 
   const html = ReactDOMServer.renderToString(tree);
@@ -100,12 +112,15 @@ export async function renderReact(
   if (headTags.length) out.headTags = headTags;
   if (styleTags.length) out.styleTags = styleTags;
   if (options.hydration !== undefined) out.hydration = options.hydration;
+  if (options.csp !== undefined) out.csp = options.csp;
 
   for (const { integration, state } of integrations) {
     if (integration.finalize) {
       out = await integration.finalize(out, ctx, state);
     }
   }
+
+  enforceAdapterStrictCspResult(out, { adapterName: 'React adapter' });
 
   return out;
 }
@@ -120,7 +135,11 @@ export async function renderReactStream(
     UIIntegration<React.ReactElement>
   >(options.integrations ?? [], ctx);
 
-  let tree: React.ReactElement = React.createElement(React.Fragment, null, node);
+  let tree: React.ReactElement = React.createElement(
+    React.Fragment,
+    null,
+    node,
+  );
 
   for (const { integration, state } of integrations) {
     if (integration.wrapTree) {
@@ -134,8 +153,10 @@ export async function renderReactStream(
   for (const { integration, state } of integrations) {
     if (!integration.contribute) continue;
     const contribution = await integration.contribute(ctx, state);
-    if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
-    if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
+    if (contribution.headTags)
+      integrationHeadTags.push(...contribution.headTags);
+    if (contribution.styleTags)
+      integrationStyleTags.push(...contribution.styleTags);
   }
 
   const headTags = [...integrationHeadTags, ...(options.headTags ?? [])];
@@ -144,8 +165,14 @@ export async function renderReactStream(
   const stream = new PassThrough();
   const abortDelayMs = options.abortDelayMs ?? 5000;
   const styleStrategy = options.styleStrategy ?? 'all-ready';
+  enforceReactStrictCspStreamingOptions({
+    adapterName: 'React adapter',
+    policy: options.csp,
+    styleStrategy,
+  });
   const startedAt = Date.now();
-  const requestId = String(ctx.request.headers['x-request-id']?.[0] ?? '').trim() || null;
+  const requestId =
+    String(ctx.request.headers['x-request-id']?.[0] ?? '').trim() || null;
 
   let didPipe = false;
   let shellSettled = false;
@@ -250,7 +277,9 @@ export async function renderReactStream(
     await shellReady;
   }
 
-  let out: FaceRenderResult = { html: stream as unknown as AsyncIterable<Uint8Array> };
+  let out: FaceRenderResult = {
+    html: stream as unknown as AsyncIterable<Uint8Array>,
+  };
   if (options.status !== undefined) out.status = options.status;
   if (options.headers !== undefined) out.headers = options.headers;
   if (options.cookies !== undefined) out.cookies = options.cookies;
@@ -258,12 +287,15 @@ export async function renderReactStream(
   if (headTags.length) out.headTags = headTags;
   if (styleTags.length) out.styleTags = styleTags;
   if (options.hydration !== undefined) out.hydration = options.hydration;
+  if (options.csp !== undefined) out.csp = options.csp;
 
   for (const { integration, state } of integrations) {
     if (integration.finalize) {
       out = await integration.finalize(out, ctx, state);
     }
   }
+
+  enforceAdapterStrictCspResult(out, { adapterName: 'React adapter' });
 
   return out;
 }
@@ -272,10 +304,16 @@ export interface ReactFaceOptions<Data = unknown> {
   route: string;
   mode: FaceMode;
   load?: (ctx: FaceContext) => Promise<Data>;
-  render: (ctx: FaceContext, data: Data) => React.ReactNode | Promise<React.ReactNode>;
+  render: (
+    ctx: FaceContext,
+    data: Data,
+  ) => React.ReactNode | Promise<React.ReactNode>;
   renderOptions?:
     | RenderReactOptions
-    | ((ctx: FaceContext, data: Data) => RenderReactOptions | Promise<RenderReactOptions>);
+    | ((
+        ctx: FaceContext,
+        data: Data,
+      ) => RenderReactOptions | Promise<RenderReactOptions>);
 }
 
 export function createReactFace<Data = unknown>(
@@ -295,7 +333,9 @@ export function createReactFace<Data = unknown>(
   };
 
   if (options.load) {
-    mod.load = options.load as unknown as (ctx: FaceContext) => Promise<unknown>;
+    mod.load = options.load as unknown as (
+      ctx: FaceContext,
+    ) => Promise<unknown>;
   }
 
   return mod;
@@ -305,7 +345,10 @@ export interface ReactStreamFaceOptions<Data = unknown> {
   route: string;
   mode: FaceMode;
   load?: (ctx: FaceContext) => Promise<Data>;
-  render: (ctx: FaceContext, data: Data) => React.ReactNode | Promise<React.ReactNode>;
+  render: (
+    ctx: FaceContext,
+    data: Data,
+  ) => React.ReactNode | Promise<React.ReactNode>;
   renderOptions?:
     | RenderReactStreamOptions
     | ((
@@ -331,7 +374,9 @@ export function createReactStreamFace<Data = unknown>(
   };
 
   if (options.load) {
-    mod.load = options.load as unknown as (ctx: FaceContext) => Promise<unknown>;
+    mod.load = options.load as unknown as (
+      ctx: FaceContext,
+    ) => Promise<unknown>;
   }
 
   return mod;

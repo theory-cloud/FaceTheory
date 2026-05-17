@@ -37,7 +37,7 @@ Use this table as the public entrypoint map for package consumers. It reflects t
 
 | Export                                               | Surface                              | Primary interfaces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ---------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@theory-cloud/facetheory`                           | Core runtime                         | `createFaceApp`, `FaceApp`, `FaceModule`, `FaceMode`, `FaceRequest`, `FaceResponse`, `FaceRenderResult`, `buildSsgSite`, `createLambdaUrlStreamingHandler`, `S3HtmlStore`, `InMemoryHtmlStore`, `InMemoryIsrMetaStore`, `blockingIsrCacheControl`, `viteAssetsForEntry`, `viteHydrationForEntry`, `createCspNonce`, `readFaceHydrationData`, `parseFaceNavigationSnapshot`, `fetchFaceNavigationSnapshot`, `applyFaceNavigationSnapshot`, `loadFaceNavigationModule`, `startFaceNavigation`, `startAwsOacFormTransport`, `createAwsOacUrlEncodedFormPayload` |
+| `@theory-cloud/facetheory`                           | Core runtime                         | `createFaceApp`, `FaceApp`, `FaceModule`, `FaceMode`, `FaceRequest`, `FaceResponse`, `FaceRenderResult`, `buildSsgSite`, `createLambdaUrlStreamingHandler`, `S3HtmlStore`, `InMemoryHtmlStore`, `InMemoryIsrMetaStore`, `blockingIsrCacheControl`, `viteAssetsForEntry`, `viteHydrationForEntry`, `externalHydrationForEntry`, `createCspNonce`, `buildStrictCspHeader`, `validateStrictCspDocument`, `readFaceHydrationData`, `parseFaceNavigationSnapshot`, `fetchFaceNavigationSnapshot`, `applyFaceNavigationSnapshot`, `loadFaceNavigationModule`, `startFaceNavigation`, `startAwsOacFormTransport`, `createAwsOacUrlEncodedFormPayload` |
 | `@theory-cloud/facetheory/apptheory`                 | AppTheory adapter                    | `createAppTheoryFaceHandler`, `appTheoryContextToFaceRequest`, `faceResponseToAppTheoryResponse`                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `@theory-cloud/facetheory/aws-s3`                    | AWS SDK S3 adapter                   | `createAwsSdkS3HtmlStoreClient`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `@theory-cloud/facetheory/stitch-tokens`             | Shared Stitch token utilities        | `StitchTokenSet` (with optional `surface` classification), `StitchCssVarOptions` (supports `prefix` and `additionalPrefixes`), `stitchToCssVars`, `stitchCssVarsToRootBlock`                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -115,7 +115,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 | `FaceMode`         | Rendering mode                       | One of `ssr`, `ssg`, or `isr`.                                                                                                                                                                                                                           |
 | `FaceRequest`      | Normalized request input             | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`.                                                                                                                                                                          |
 | `FaceResponse`     | Runtime response                     | Includes normalized headers, cookies array, status, body, and `isBase64`.                                                                                                                                                                                |
-| `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `html`, cookies, headers, and hydration payload. `head.html` is legacy escaped head text; prefer structured `headTags` / `styleTags` for actual tags. |
+| `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `csp`, `html`, cookies, headers, and hydration payload. `head.html` is legacy escaped head text; prefer structured `headTags` / `styleTags` for actual tags. |
 | `FaceContext`      | Per-request context                  | Exposes normalized request, route params, and proxy match.                                                                                                                                                                                               |
 | `FaceAppOptions`   | App constructor options              | Accepts `faces`, optional ISR config, and optional observability hooks.                                                                                                                                                                                  |
 | `FaceIsrOptions`   | ISR runtime tuning                   | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation.                                                                                                                             |
@@ -194,6 +194,8 @@ React:
 - `renderReactStream(..., { styleStrategy: 'all-ready' | 'shell' })`
 - Integrations compose through `createState`, `wrapTree`, `contribute`, and `finalize`
 - Keep request-local mutable data inside `createState`; static integration instances can then be reused safely across renders
+- Strict no-inline CSP (`csp.inlineScripts === false`) rejects React shell streaming. Use the default `all-ready` style strategy so FaceTheory can validate the complete document before bytes flush.
+- Strict no-inline styles (`csp.inlineStyles === false`) reject adapter-emitted inline styles, including Emotion/AntD extraction output. Use external CSS/asset delivery for routes that must run under a no-inline policy.
 
 Vue:
 
@@ -206,6 +208,7 @@ Svelte:
 - `renderSvelte()` supports legacy `Component.render()` and Svelte 5 server rendering
 - `renderSvelte()` passes the same request-local integration state through `wrapTree`, `contribute`, and `finalize`
 - Packaged Svelte libraries should import their CSS from the client entry and use `viteAssetsForEntry()` + `viteHydrationForEntry()` to keep SSR asset tags and hydration aligned
+- Strict no-inline CSP rejects raw Svelte SSR head output and inline CSS fallback output. Keep strict Svelte pages on structured FaceTheory `headTags`, external CSS from the client entry, and external hydration data.
 
 ## ISR Storage And Cache APIs
 
@@ -251,12 +254,90 @@ Use these helpers when a Vite SSR build needs deterministic asset tags and a mat
 | ------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `viteAssetsForEntry(manifest, entry, options)`          | Produces deterministic `modulepreload`, `stylesheet`, and optional asset hint tags. |
 | `viteHydrationForEntry(manifest, entry, data, options)` | Produces a `FaceHydration` payload using the manifest bootstrap module.             |
+| `externalHydrationForEntry(manifest, entry, data, options)` | Produces a same-origin external hydration contract for strict no-inline CSP routes. |
 | `viteDynamicImportPolicy()`                             | Returns the current dynamic import policy, which is `ignore`.                       |
 
 Current behavior:
 
 - `dynamicImports` from Vite manifests are intentionally ignored
 - `includeAssets: true` adds preload or prefetch hints for manifest asset files
+
+## Strict CSP Rendering
+
+FaceTheory supports two CSP-compatible rendering styles:
+
+- **Nonce-compatible CSP** keeps FaceTheory-owned inline hydration scripts and inline style tags available, but adds a
+  per-request `nonce` through `FaceRequest.cspNonce`. Use this only for per-request SSR HTML where the CSP header can
+  carry the same nonce as the document.
+- **Strict no-inline CSP** sets `FaceRenderResult.csp` to `{ inlineScripts: false, inlineStyles: false, rawHead: false }`
+  and requires all executable code, CSS, and hydration data to be external and same-origin. This is the required shape
+  for cached SSG/ISR HTML when a nonce would not be stable across requests.
+
+Core strict-CSP exports:
+
+- `FaceCspPolicy` is the route-level render policy surface. `inlineScripts:false` rejects inline script bodies,
+  inline hydration JSON, inline event-handler attributes, and cross-origin bootstrap/data URLs. `inlineStyles:false`
+  rejects inline style tags and `style` attributes. `rawHead:false` rejects caller-owned raw head HTML.
+- `buildStrictCspHeader({ cspNonce? })` returns FaceTheory's same-origin CSP header baseline. Header attachment is
+  explicit through `FaceRenderResult.headers`; FaceTheory validates output but does not silently add response headers.
+- `validateStrictCspDocument(html, { policy })` is the body-level validator used by the runtime before returning strict
+  buffered HTML. It catches raw body output that structured head validation cannot see.
+- `externalHydrationForEntry(manifest, entry, data, { dataUrl, ...options })` pairs Vite asset tags with
+  `FaceExternalHydration`. The rendered document emits a `<link rel="facetheory-hydration" ...>` marker instead of
+  `__FACETHEORY_DATA__` inline JSON, and the client bootstrap fetches `dataUrl` before hydration.
+
+Strict route sketch:
+
+```ts
+import {
+  buildStrictCspHeader,
+  externalHydrationForEntry,
+  viteAssetsForEntry,
+} from "@theory-cloud/facetheory";
+
+const strictCsp = {
+  inlineScripts: false,
+  inlineStyles: false,
+  rawHead: false,
+} as const;
+
+renderOptions: async (_ctx, data) => {
+  const { headTags } = viteAssetsForEntry(manifest, "src/entry-client.ts", {
+    includeAssets: true,
+  });
+
+  return {
+    csp: strictCsp,
+    headers: {
+      "content-security-policy": buildStrictCspHeader(),
+    },
+    headTags,
+    hydration: externalHydrationForEntry(
+      manifest,
+      "src/entry-client.ts",
+      data,
+      { dataUrl: "/_facetheory/data/home.json" },
+    ),
+  };
+};
+```
+
+Adapter notes:
+
+- React strict no-inline routes cannot use shell streaming because bytes would flush before whole-document validation.
+  Use `styleStrategy: "all-ready"` and avoid inline CSS-in-JS extraction on routes with `inlineStyles:false`.
+- Vue strict no-inline routes must use external hydration data and external stylesheet assets.
+- Svelte strict no-inline routes must avoid `<svelte:head>` raw SSR output and Svelte component `<style>` fallback
+  output. Import CSS from the Vite client entry and emit head through FaceTheory's structured `headTags`.
+
+Client navigation:
+
+- `startFaceNavigation()` parses the next FaceTheory document, loads external hydration JSON before DOM mutation, then
+  invokes `hydrateFaceNavigation(context)` when the bootstrap module exports it.
+- Navigation rejects cross-origin documents, cross-origin bootstrap modules, and cross-origin external hydration URLs
+  before mutating the current document.
+- A route that still uses legacy inline hydration remains compatible in non-strict mode, but a strict no-inline route
+  must migrate to `FaceExternalHydration`.
 
 ## OAC Mutating Form Helpers
 

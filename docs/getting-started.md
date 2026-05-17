@@ -96,6 +96,63 @@ runtime.get("/{proxy+}", createAppTheoryFaceHandler({ app }));
 export const handler = createLambdaFunctionURLStreamingHandler(runtime);
 ```
 
+## Add Strict No-Inline CSP Hydration
+
+Use this path when a route must run without inline scripts, inline styles, or raw head HTML. The server render still owns
+the first paint, but hydration data moves to a same-origin JSON sidecar instead of the legacy inline
+`__FACETHEORY_DATA__` script.
+
+```ts
+import {
+  buildStrictCspHeader,
+  externalHydrationForEntry,
+  viteAssetsForEntry,
+} from "@theory-cloud/facetheory";
+
+const strictCsp = {
+  inlineScripts: false,
+  inlineStyles: false,
+  rawHead: false,
+} as const;
+
+renderOptions: async (_ctx, data) => {
+  const { headTags } = viteAssetsForEntry(manifest, "src/entry-client.ts", {
+    includeAssets: true,
+  });
+
+  return {
+    csp: strictCsp,
+    headers: {
+      "content-security-policy": buildStrictCspHeader(),
+    },
+    headTags,
+    hydration: externalHydrationForEntry(
+      manifest,
+      "src/entry-client.ts",
+      data,
+      { dataUrl: "/_facetheory/data/home.json" },
+    ),
+  };
+};
+```
+
+Client bootstrap modules should fetch the `<link rel="facetheory-hydration">` URL before hydrating and should reject
+cross-origin data URLs or redirects. The repository example at `ts/examples/vite-strict-csp-svelte/` demonstrates the
+full Svelte/Vite shape: external CSS/assets, same-origin module bootstrap, external hydration JSON, no `<svelte:head>`
+raw output, and SPA navigation that loads external data before `hydrateFaceNavigation(context)`.
+
+Validation:
+
+```bash
+cd ts
+npm run example:vite:svelte:strict-csp:build
+node --import tsx test/unit/vite-strict-csp-svelte-example.test.ts
+```
+
+If a route still needs FaceTheory-owned inline scripts or styles, use the nonce-compatible CSP path for per-request SSR
+HTML only: pass `FaceRequest.cspNonce`, include the matching nonce in your CSP header, and do not cache that HTML as
+SSG/ISR unless the header and cached nonce stay identical for every request.
+
 ## Add An OAC-Safe Mutating SSR Form
 
 When a FaceTheory app is deployed through `AppTheorySsrSite` with Lambda Function URL OAC and `AWS_IAM`, native browser

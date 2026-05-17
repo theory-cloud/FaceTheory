@@ -6,10 +6,26 @@ import { Typography } from 'antd';
 import * as React from 'react';
 
 import { createFaceApp } from '../../src/app.js';
-import { createReactFace } from '../../src/adapters/react.js';
+import { createReactFace, renderReact } from '../../src/adapters/react.js';
+import type { FaceContext } from '../../src/types.js';
 import { createAntdEmotionTokenIntegration } from '../../src/react/antd-emotion.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
 import { createEmotionIntegration } from '../../src/react/emotion.js';
+
+const baseCtx: FaceContext = {
+  request: {
+    method: 'GET',
+    path: '/',
+    query: {},
+    headers: { 'x-request-id': ['test-emotion'] },
+    cookies: {},
+    body: new Uint8Array(),
+    isBase64: false,
+    cspNonce: null,
+  },
+  params: {},
+  proxy: null,
+};
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -17,7 +33,15 @@ function delay(ms: number): Promise<void> {
 
 function ThemedBox() {
   const theme = useTheme() as { color: string };
-  return jsx('div', { css: css`color: ${theme.color};` }, 'Hello');
+  return jsx(
+    'div',
+    {
+      css: css`
+        color: ${theme.color};
+      `,
+    },
+    'Hello',
+  );
 }
 
 test('emotion integration: extracts SSR styles and preserves theme values', async () => {
@@ -28,13 +52,19 @@ test('emotion integration: extracts SSR styles and preserves theme values', asyn
         mode: 'ssr',
         render: () => jsx(ThemedBox, {}),
         renderOptions: {
-          integrations: [createEmotionIntegration({ theme: { color: 'rgb(1, 2, 3)' } })],
+          integrations: [
+            createEmotionIntegration({ theme: { color: 'rgb(1, 2, 3)' } }),
+          ],
         },
       }),
     ],
   });
 
-  const resp = await app.handle({ method: 'GET', path: '/', cspNonce: 'nonce-xyz' });
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/',
+    cspNonce: 'nonce-xyz',
+  });
   const body = new TextDecoder().decode(resp.body as Uint8Array);
 
   assert.ok(body.includes('Hello'));
@@ -48,7 +78,11 @@ test('emotion integration: can consume Ant Design tokens (portal pattern)', asyn
     const theme = useTheme() as { colorPrimary: string };
     return jsx(
       'div',
-      { css: css`color: ${theme.colorPrimary};` },
+      {
+        css: css`
+          color: ${theme.colorPrimary};
+        `,
+      },
       theme.colorPrimary,
     );
   }
@@ -79,7 +113,11 @@ test('emotion integration: can consume Ant Design tokens (portal pattern)', asyn
     ],
   });
 
-  const resp = await app.handle({ method: 'GET', path: '/', cspNonce: 'nonce-bridge' });
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/',
+    cspNonce: 'nonce-bridge',
+  });
   const body = new TextDecoder().decode(resp.body as Uint8Array);
 
   assert.ok(body.includes('AntD'));
@@ -101,7 +139,11 @@ test('emotion integration: shared instances stay isolated across overlapping ren
           const color = String(ctx.request.query.color?.[0] ?? 'rgb(0, 0, 0)');
           return jsx(
             'div',
-            { css: css`color: ${color};` },
+            {
+              css: css`
+                color: ${color};
+              `,
+            },
             color,
           );
         },
@@ -136,4 +178,17 @@ test('emotion integration: shared instances stay isolated across overlapping ren
   assert.ok(!bodyA.includes(colorB));
   assert.ok(bodyB.includes(colorB));
   assert.ok(!bodyB.includes(colorA));
+});
+
+test('emotion integration: strict CSP rejects inline style extraction', async () => {
+  await assert.rejects(
+    () =>
+      renderReact(baseCtx, jsx(ThemedBox, {}), {
+        csp: { inlineStyles: false },
+        integrations: [
+          createEmotionIntegration({ theme: { color: 'rgb(7, 8, 9)' } }),
+        ],
+      }),
+    /React adapter strict CSP rejects inline adapter style output/,
+  );
 });

@@ -1,9 +1,11 @@
 import { createSSRApp, h, type App, type VNode } from 'vue';
 import { renderToString } from '@vue/server-renderer';
 
+import { enforceAdapterStrictCspResult } from '../adapter-csp.js';
 import { prepareUIIntegrations } from '../types.js';
 import type {
   FaceContext,
+  FaceCspPolicy,
   FaceHead,
   FaceHeadTag,
   FaceHydration,
@@ -14,8 +16,10 @@ import type {
   UIIntegration,
 } from '../types.js';
 
-export interface VueUIIntegration<TState = unknown>
-  extends UIIntegration<VNode, TState> {
+export interface VueUIIntegration<TState = unknown> extends UIIntegration<
+  VNode,
+  TState
+> {
   wrapApp?: (app: App, ctx: FaceContext, state: TState) => void | Promise<void>;
 }
 
@@ -27,6 +31,7 @@ export interface RenderVueOptions {
   headTags?: FaceHeadTag[];
   styleTags?: FaceStyleTag[];
   hydration?: FaceHydration;
+  csp?: FaceCspPolicy;
   integrations?: Array<VueUIIntegration>;
 }
 
@@ -57,8 +62,10 @@ export async function renderVue(
   for (const { integration, state } of integrations) {
     if (!integration.contribute) continue;
     const contribution = await integration.contribute(ctx, state);
-    if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
-    if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
+    if (contribution.headTags)
+      integrationHeadTags.push(...contribution.headTags);
+    if (contribution.styleTags)
+      integrationStyleTags.push(...contribution.styleTags);
   }
 
   const html = await renderToString(app);
@@ -74,11 +81,14 @@ export async function renderVue(
   if (headTags.length) out.headTags = headTags;
   if (styleTags.length) out.styleTags = styleTags;
   if (options.hydration !== undefined) out.hydration = options.hydration;
+  if (options.csp !== undefined) out.csp = options.csp;
 
   for (const { integration, state } of integrations) {
     if (!integration.finalize) continue;
     out = await integration.finalize(out, ctx, state);
   }
+
+  enforceAdapterStrictCspResult(out, { adapterName: 'Vue adapter' });
 
   return out;
 }
@@ -90,10 +100,15 @@ export interface VueFaceOptions<Data = unknown> {
   render: (ctx: FaceContext, data: Data) => VNode | Promise<VNode>;
   renderOptions?:
     | RenderVueOptions
-    | ((ctx: FaceContext, data: Data) => RenderVueOptions | Promise<RenderVueOptions>);
+    | ((
+        ctx: FaceContext,
+        data: Data,
+      ) => RenderVueOptions | Promise<RenderVueOptions>);
 }
 
-export function createVueFace<Data = unknown>(options: VueFaceOptions<Data>): FaceModule {
+export function createVueFace<Data = unknown>(
+  options: VueFaceOptions<Data>,
+): FaceModule {
   const mod: FaceModule = {
     route: options.route,
     mode: options.mode,
@@ -108,7 +123,9 @@ export function createVueFace<Data = unknown>(options: VueFaceOptions<Data>): Fa
   };
 
   if (options.load) {
-    mod.load = options.load as unknown as (ctx: FaceContext) => Promise<unknown>;
+    mod.load = options.load as unknown as (
+      ctx: FaceContext,
+    ) => Promise<unknown>;
   }
 
   return mod;

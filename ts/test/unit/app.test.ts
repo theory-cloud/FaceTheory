@@ -217,6 +217,63 @@ test('FaceApp: emits document shell attrs through the public render contract', a
   );
 });
 
+
+
+test('FaceApp: strict CSP validates body HTML before returning a response', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          hydration: {
+            type: 'external',
+            data: { page: 'strict' },
+            dataUrl: '/_facetheory/hydration/home.json',
+            bootstrapModule: '/assets/entry.js',
+          },
+          html: '<main><button onclick="bad()">Unsafe</button></main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  assert.equal(resp.status, 500);
+  assert.ok(resp.body instanceof Uint8Array);
+
+  const body = decodeBody(resp.body as Uint8Array);
+  assert.ok(body.includes('<h1>Internal Server Error</h1>'));
+  assert.equal(body.includes('onclick'), false);
+  assert.equal(body.includes('Unsafe'), false);
+});
+
+test('FaceApp: non-strict routes preserve legacy inline body output', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          html: '<main><button onclick="legacy()" style="color:red">Legacy</button></main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  assert.equal(resp.status, 200);
+
+  const body = decodeBody(resp.body as Uint8Array);
+  assert.ok(body.includes('onclick="legacy()"'));
+  assert.ok(body.includes('style="color:red"'));
+});
+
 test('parseCookiesFromHeaders: supports mixed case cookie header names', () => {
   const parsed = parseCookiesFromHeaders({
     Cookie: ['token=xyz'],
