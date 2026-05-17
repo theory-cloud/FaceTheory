@@ -29,6 +29,49 @@ export interface FaceStyleTag {
   attrs?: FaceAttributes;
 }
 
+export interface FaceCspPolicy {
+  /**
+   * Whether FaceTheory-owned `<script>` tags may contain inline body text.
+   * Set this to `false` for strict no-inline CSP routes.
+   */
+  inlineScripts?: boolean;
+  /**
+   * Whether FaceTheory-owned `<style>` tags may contain inline CSS text or
+   * structured head attributes may contain inline style declarations.
+   * Set this to `false` for strict no-inline CSP routes.
+   */
+  inlineStyles?: boolean;
+  /**
+   * Whether raw, caller-owned head HTML may be emitted through
+   * `headTags: [{ type: "raw", html }]`.
+   */
+  rawHead?: boolean;
+}
+
+export interface FaceInlineHydration {
+  /**
+   * Optional for backward compatibility: the legacy hydration object shape is
+   * still `{ data, bootstrapModule }`, and is treated as inline hydration.
+   */
+  type?: 'inline';
+  data: unknown;
+  bootstrapModule: string;
+}
+
+export interface FaceExternalHydration {
+  type: 'external';
+  /**
+   * The exact data used for the server render. Strict renderers do not inline
+   * this value, but SSG/ISR/SSR sidecar helpers can persist it at `dataUrl`.
+   */
+  data: unknown;
+  /**
+   * Same-origin JSON URL from which the client loads `data` before hydration.
+   */
+  dataUrl: string;
+  bootstrapModule: string;
+}
+
 export interface FaceRequest {
   method: string;
   path: string;
@@ -69,10 +112,7 @@ export interface FaceHead {
   html?: string;
 }
 
-export interface FaceHydration {
-  data: unknown;
-  bootstrapModule: string;
-}
+export type FaceHydration = FaceInlineHydration | FaceExternalHydration;
 
 export interface FaceRenderResult {
   status?: number;
@@ -84,6 +124,7 @@ export interface FaceRenderResult {
   head?: FaceHead;
   headTags?: FaceHeadTag[];
   styleTags?: FaceStyleTag[];
+  csp?: FaceCspPolicy;
   html: string | AsyncIterable<Uint8Array>;
   hydration?: FaceHydration;
 }
