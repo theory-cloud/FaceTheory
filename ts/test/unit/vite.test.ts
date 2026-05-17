@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  externalHydrationForEntry,
   viteAssetsForEntry,
   viteDynamicImportPolicy,
   viteHydrationForEntry,
@@ -157,6 +158,86 @@ test('vite: hydration helper sets bootstrap module', () => {
   const hydration = viteHydrationForEntry(manifest, 'src/entry-client.tsx', { ok: true });
   assert.equal(hydration.bootstrapModule, '/assets/entry.aaa.js');
   assert.deepEqual(hydration.data, { ok: true });
+});
+
+test('vite: external hydration helper preserves dataUrl and bootstrap metadata', () => {
+  const manifest = {
+    'src/entry-client.tsx': { file: 'assets/entry.aaa.js' },
+  };
+
+  const hydration = externalHydrationForEntry(
+    manifest,
+    'src/entry-client.tsx',
+    { ok: true },
+    {
+      base: '/portal/',
+      dataUrl: '/portal/_facetheory/hydration/page.json',
+    },
+  );
+
+  assert.deepEqual(hydration, {
+    type: 'external',
+    data: { ok: true },
+    dataUrl: '/portal/_facetheory/hydration/page.json',
+    bootstrapModule: '/portal/assets/entry.aaa.js',
+  });
+});
+
+test('vite: external hydration helper accepts same-origin absolute dataUrl', () => {
+  const manifest = {
+    'src/entry-client.tsx': { file: 'assets/entry.aaa.js' },
+  };
+
+  const hydration = externalHydrationForEntry(
+    manifest,
+    'src/entry-client.tsx',
+    { ok: true },
+    {
+      base: 'https://app.example/assets-base/',
+      allowedOrigin: 'https://app.example',
+      dataUrl: 'https://app.example/_facetheory/hydration/page.json',
+    },
+  );
+
+  assert.equal(
+    hydration.bootstrapModule,
+    'https://app.example/assets-base/assets/entry.aaa.js',
+  );
+  assert.equal(
+    hydration.dataUrl,
+    'https://app.example/_facetheory/hydration/page.json',
+  );
+});
+
+test('vite: external hydration helper rejects unsafe and cross-origin dataUrl', () => {
+  const manifest = {
+    'src/entry-client.tsx': { file: 'assets/entry.aaa.js' },
+  };
+
+  assert.throws(
+    () =>
+      externalHydrationForEntry(manifest, 'src/entry-client.tsx', {}, {
+        dataUrl: 'javascript:alert(1)',
+      }),
+    /dataUrl must be http\(s\) or same-origin/,
+  );
+
+  assert.throws(
+    () =>
+      externalHydrationForEntry(manifest, 'src/entry-client.tsx', {}, {
+        allowedOrigin: 'https://app.example',
+        dataUrl: 'https://evil.example/page.json',
+      }),
+    /dataUrl resolved cross-origin/,
+  );
+
+  assert.throws(
+    () =>
+      externalHydrationForEntry(manifest, 'src/entry-client.tsx', {}, {
+        dataUrl: 'https://app.example/page.json',
+      }),
+    /dataUrl must be same-origin or relative/,
+  );
 });
 
 test('vite: dynamic import policy is ignore', () => {
