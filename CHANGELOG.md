@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.2.0...v3.2.1-rc) (2026-05-17)
+
+
+### Bug Fixes
+
+* **oac:** fail closed on malformed response urls ([4a0dafc](https://github.com/theory-cloud/FaceTheory/commit/4a0dafc64e3b30e0f6a6c121a995775d41cedbb4))
+* **release:** harden token provenance ([b07ded9](https://github.com/theory-cloud/FaceTheory/commit/b07ded9e02b335d3752d64c299c253f84d445411))
+
 ## [3.2.0](https://github.com/theory-cloud/FaceTheory/compare/v3.1.2...v3.2.0) (2026-05-17)
 
 
