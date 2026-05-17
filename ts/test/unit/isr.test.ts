@@ -7,6 +7,8 @@ import {
   createIsrRuntime,
   defaultIsrCacheKey,
   type FaceIsrOptions,
+  type HtmlStoreWriteInput,
+  type HtmlStoreWriteResult,
   InMemoryHtmlStore,
   InMemoryIsrMetaStore,
   type IsrMetaRecord,
@@ -19,6 +21,14 @@ import {
 
 function decodeBody(body: Uint8Array): string {
   return new TextDecoder().decode(body);
+}
+
+function externalHydrationHref(html: string): string {
+  const tag = /<link\b[^>]*__FACETHEORY_DATA_URL__[^>]*>/i.exec(html)?.[0];
+  assert.ok(tag, 'expected external hydration link tag');
+  const href = /\bhref="([^"]+)"/i.exec(tag)?.[1];
+  assert.ok(href, 'expected external hydration href');
+  return href;
 }
 
 function delay(ms: number): Promise<void> {
@@ -682,4 +692,212 @@ test('isr: metadata commits never include HTML body text', async () => {
         typeof commit.htmlPointer === 'string' && commit.htmlPointer.length > 0,
     ),
   );
+});
+
+test('isr: strict CSP hydration writes and serves pointer-derived sidecars', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  const secret = 'HYDRATION_SECRET_PAYLOAD';
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/posts/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: (ctx) => {
+          const seq = ++renderCount;
+          return {
+            csp: {
+              inlineScripts: false,
+              inlineStyles: false,
+              rawHead: false,
+            },
+            html: `<main>${ctx.params.slug}-${seq}</main>`,
+            hydration: {
+              data: {
+                slug: ctx.params.slug,
+                seq,
+                secret,
+                terminator: '</script>',
+              },
+              bootstrapModule: '/assets/client-entry.js',
+            },
+          };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => 1_000,
+    },
+  });
+
+  const miss = await app.handle({ method: 'GET', path: '/posts/a' });
+  const missHtml = decodeBody(miss.body as Uint8Array);
+  const sidecarHref = externalHydrationHref(missHtml);
+
+  assert.equal(miss.headers['x-facetheory-isr']?.[0], 'miss');
+  assert.ok(missHtml.includes('<main>a-1</main>'));
+  assert.ok(missHtml.includes('src="/assets/client-entry.js"'));
+  assert.equal(missHtml.includes('id="__FACETHEORY_DATA__"'), false);
+  assert.equal(missHtml.includes(secret), false);
+  assert.match(sidecarHref, /^\/posts\/a\?__facetheory_isr_hydration=/);
+
+  const sidecar = await app.handle({ method: 'GET', path: sidecarHref });
+  assert.equal(sidecar.status, 200);
+  assert.equal(sidecar.headers['content-type']?.[0], 'application/json; charset=utf-8');
+  assert.equal(renderCount, 1);
+
+  const sidecarJson = decodeBody(sidecar.body as Uint8Array);
+  assert.equal(sidecarJson.includes('<'), false);
+  assert.deepEqual(JSON.parse(sidecarJson), {
+    slug: 'a',
+    seq: 1,
+    secret,
+    terminator: '</script>',
+  });
+
+  const hit = await app.handle({ method: 'GET', path: '/posts/a' });
+  const hitHtml = decodeBody(hit.body as Uint8Array);
+  assert.equal(hit.headers['x-facetheory-isr']?.[0], 'hit');
+  assert.equal(externalHydrationHref(hitHtml), sidecarHref);
+  assert.equal(renderCount, 1);
+
+  const serializedMeta = JSON.stringify(metaStore.debugSnapshot());
+  assert.equal(serializedMeta.includes(secret), false);
+  assert.equal(serializedMeta.includes('terminator'), false);
+});
+
+class FailingSidecarHtmlStore extends InMemoryHtmlStore {
+  failSidecarWrites = false;
+
+  override async write(
+    input: HtmlStoreWriteInput,
+  ): Promise<HtmlStoreWriteResult> {
+    if (this.failSidecarWrites && input.key.endsWith('.hydration.json')) {
+      throw new Error('sidecar write failed');
+    }
+    return await super.write(input);
+  }
+}
+
+test('isr: failed strict sidecar writes fail closed to stale HTML/data pairs', async () => {
+  const htmlStore = new FailingSidecarHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+
+  let nowMs = 10_000;
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/strict',
+        mode: 'isr',
+        revalidateSeconds: 1,
+        render: () => {
+          const seq = ++renderCount;
+          return {
+            csp: {
+              inlineScripts: false,
+              inlineStyles: false,
+              rawHead: false,
+            },
+            html: `<main>v${seq}</main>`,
+            hydration: {
+              data: { seq },
+              bootstrapModule: '/assets/client-entry.js',
+            },
+          };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+    },
+  });
+
+  const warm = await app.handle({ method: 'GET', path: '/strict' });
+  const warmHtml = decodeBody(warm.body as Uint8Array);
+  const warmHref = externalHydrationHref(warmHtml);
+  assert.ok(warmHtml.includes('<main>v1</main>'));
+
+  const cacheKey = defaultIsrCacheKey({
+    tenant: 'default',
+    routePattern: '/strict',
+    params: {},
+    query: {},
+    headers: {},
+    cookies: {},
+  });
+  const beforeFailure = await metaStore.get(cacheKey);
+  assert.ok(beforeFailure?.htmlPointer);
+
+  nowMs = 11_000;
+  htmlStore.failSidecarWrites = true;
+  const stale = await app.handle({ method: 'GET', path: '/strict' });
+  const staleHtml = decodeBody(stale.body as Uint8Array);
+  assert.ok(staleHtml.includes('<main>v1</main>'));
+  assert.equal(externalHydrationHref(staleHtml), warmHref);
+  assert.equal(renderCount, 2);
+
+  const afterFailure = await metaStore.get(cacheKey);
+  assert.equal(afterFailure?.htmlPointer, beforeFailure?.htmlPointer);
+
+  const warmSidecar = await app.handle({ method: 'GET', path: warmHref });
+  assert.deepEqual(JSON.parse(decodeBody(warmSidecar.body as Uint8Array)), {
+    seq: 1,
+  });
+
+  htmlStore.failSidecarWrites = false;
+  nowMs = 11_001;
+  const recovered = await app.handle({ method: 'GET', path: '/strict' });
+  const recoveredHtml = decodeBody(recovered.body as Uint8Array);
+  const recoveredHref = externalHydrationHref(recoveredHtml);
+  assert.ok(recoveredHtml.includes('<main>v3</main>'));
+  assert.notEqual(recoveredHref, warmHref);
+
+  const recoveredSidecar = await app.handle({
+    method: 'GET',
+    path: recoveredHref,
+  });
+  assert.deepEqual(
+    JSON.parse(decodeBody(recoveredSidecar.body as Uint8Array)),
+    { seq: 3 },
+  );
+});
+
+test('isr: invalid strict sidecar tokens fail closed without rendering', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'isr',
+        render: () => {
+          renderCount += 1;
+          return { html: '<main>should-not-render</main>' };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+    },
+  });
+
+  const response = await app.handle({
+    method: 'GET',
+    path: '/?__facetheory_isr_hydration=not-a-valid-token',
+  });
+
+  assert.equal(response.status, 404);
+  assert.equal(renderCount, 0);
 });

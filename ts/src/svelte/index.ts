@@ -1,6 +1,8 @@
+import { enforceAdapterStrictCspResult } from '../adapter-csp.js';
 import { prepareUIIntegrations } from '../types.js';
 import type {
   FaceContext,
+  FaceCspPolicy,
   FaceHead,
   FaceHeadTag,
   FaceHydration,
@@ -29,6 +31,7 @@ export interface RenderSvelteOptions {
   headTags?: FaceHeadTag[];
   styleTags?: FaceStyleTag[];
   hydration?: FaceHydration;
+  csp?: FaceCspPolicy;
   integrations?: Array<SvelteUIIntegration>;
 }
 
@@ -67,26 +70,42 @@ export async function renderSvelte<Props extends Record<string, unknown>>(
   for (const { integration, state } of integrations) {
     if (!integration.contribute) continue;
     const contribution = await integration.contribute(ctx, state);
-    if (contribution.headTags) integrationHeadTags.push(...contribution.headTags);
-    if (contribution.styleTags) integrationStyleTags.push(...contribution.styleTags);
+    if (contribution.headTags)
+      integrationHeadTags.push(...contribution.headTags);
+    if (contribution.styleTags)
+      integrationStyleTags.push(...contribution.styleTags);
   }
 
   let rendered: SvelteSSRRenderResult;
 
-  const maybeLegacy = currentInput.component as Partial<SvelteLegacySSRComponent<Props>>;
+  const maybeLegacy = currentInput.component as Partial<
+    SvelteLegacySSRComponent<Props>
+  >;
   if (typeof maybeLegacy.render === 'function') {
     try {
       rendered = maybeLegacy.render(currentInput.props);
     } catch (err) {
       if (!isSvelte5DeprecatedRenderError(err)) throw err;
-      rendered = await renderWithSvelteServer(currentInput.component, currentInput.props);
+      rendered = await renderWithSvelteServer(
+        currentInput.component,
+        currentInput.props,
+      );
     }
   } else {
-    rendered = await renderWithSvelteServer(currentInput.component, currentInput.props);
+    rendered = await renderWithSvelteServer(
+      currentInput.component,
+      currentInput.props,
+    );
   }
 
-  const headTags: FaceHeadTag[] = [...integrationHeadTags, ...(options.headTags ?? [])];
-  const styleTags: FaceStyleTag[] = [...integrationStyleTags, ...(options.styleTags ?? [])];
+  const headTags: FaceHeadTag[] = [
+    ...integrationHeadTags,
+    ...(options.headTags ?? []),
+  ];
+  const styleTags: FaceStyleTag[] = [
+    ...integrationStyleTags,
+    ...(options.styleTags ?? []),
+  ];
 
   if (rendered.head) {
     headTags.push({ type: 'raw', html: rendered.head });
@@ -107,18 +126,23 @@ export async function renderSvelte<Props extends Record<string, unknown>>(
   if (headTags.length) out.headTags = headTags;
   if (styleTags.length) out.styleTags = styleTags;
   if (options.hydration !== undefined) out.hydration = options.hydration;
+  if (options.csp !== undefined) out.csp = options.csp;
 
   for (const { integration, state } of integrations) {
     if (!integration.finalize) continue;
     out = await integration.finalize(out, ctx, state);
   }
 
+  enforceAdapterStrictCspResult(out, { adapterName: 'Svelte adapter' });
+
   return out;
 }
 
 function isSvelte5DeprecatedRenderError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
-  return err.message.includes('Component.render(...) is no longer valid in Svelte 5');
+  return err.message.includes(
+    'Component.render(...) is no longer valid in Svelte 5',
+  );
 }
 
 async function renderWithSvelteServer<Props extends Record<string, unknown>>(
@@ -158,10 +182,16 @@ export interface SvelteFaceOptions<
   route: string;
   mode: FaceMode;
   load?: (ctx: FaceContext) => Promise<Data>;
-  render: (ctx: FaceContext, data: Data) => SvelteRenderInput<Props> | Promise<SvelteRenderInput<Props>>;
+  render: (
+    ctx: FaceContext,
+    data: Data,
+  ) => SvelteRenderInput<Props> | Promise<SvelteRenderInput<Props>>;
   renderOptions?:
     | RenderSvelteOptions
-    | ((ctx: FaceContext, data: Data) => RenderSvelteOptions | Promise<RenderSvelteOptions>);
+    | ((
+        ctx: FaceContext,
+        data: Data,
+      ) => RenderSvelteOptions | Promise<RenderSvelteOptions>);
 }
 
 export function createSvelteFace<
@@ -182,7 +212,9 @@ export function createSvelteFace<
   };
 
   if (options.load) {
-    mod.load = options.load as unknown as (ctx: FaceContext) => Promise<unknown>;
+    mod.load = options.load as unknown as (
+      ctx: FaceContext,
+    ) => Promise<unknown>;
   }
 
   return mod;

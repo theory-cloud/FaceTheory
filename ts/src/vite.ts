@@ -1,4 +1,4 @@
-import type { FaceHeadTag, FaceHydration } from './types.js';
+import type { FaceExternalHydration, FaceHeadTag, FaceHydration } from './types.js';
 
 export interface ViteManifestChunk {
   file: string;
@@ -17,6 +17,11 @@ export interface ViteAssetsOptions {
   crossorigin?: boolean;
   includeAssets?: boolean;
   dynamicImports?: DynamicImportPolicy;
+}
+
+export interface ViteExternalHydrationOptions extends ViteAssetsOptions {
+  dataUrl: string;
+  allowedOrigin?: string | URL;
 }
 
 export type DynamicImportPolicy = 'ignore';
@@ -117,6 +122,58 @@ function requireEntryChunk(manifest: ViteManifest, entry: string): ViteManifestC
     throw new Error(`vite manifest entry missing file: ${entry}`);
   }
   return chunk;
+}
+
+function isAbsoluteOrProtocolRelativeUrl(value: string): boolean {
+  return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value) || value.startsWith('//');
+}
+
+function originFromAbsoluteHttpUrl(value: string | URL | undefined): string | null {
+  if (value === undefined) return null;
+  const normalized = String(value);
+  if (!isAbsoluteOrProtocolRelativeUrl(normalized)) return null;
+  const parsed = new URL(normalized, 'https://facetheory.invalid');
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  return parsed.origin;
+}
+
+function assertSameOriginDataUrl(
+  dataUrl: string,
+  allowedOrigin: string | null,
+): string {
+  const trimmed = String(dataUrl ?? '').trim();
+  if (!trimmed) {
+    throw new Error('external hydration dataUrl must not be empty');
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed, 'https://facetheory.invalid');
+  } catch {
+    throw new Error(`external hydration dataUrl is invalid: ${trimmed}`);
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(
+      `external hydration dataUrl must be http(s) or same-origin: ${trimmed}`,
+    );
+  }
+
+  if (!isAbsoluteOrProtocolRelativeUrl(trimmed)) return trimmed;
+
+  if (!allowedOrigin) {
+    throw new Error(
+      `external hydration dataUrl must be same-origin or relative: ${trimmed}`,
+    );
+  }
+
+  if (parsed.origin !== allowedOrigin) {
+    throw new Error(
+      `external hydration dataUrl resolved cross-origin: expected ${allowedOrigin}, received ${parsed.origin}`,
+    );
+  }
+
+  return trimmed;
 }
 
 function stripSearchAndHash(path: string): string {
@@ -255,4 +312,23 @@ export function viteHydrationForEntry(
 ): FaceHydration {
   const { bootstrapModule } = viteAssetsForEntry(manifest, entry, options);
   return { data, bootstrapModule };
+}
+
+export function externalHydrationForEntry(
+  manifest: ViteManifest,
+  entry: string,
+  data: unknown,
+  options: ViteExternalHydrationOptions,
+): FaceExternalHydration {
+  const { bootstrapModule } = viteAssetsForEntry(manifest, entry, options);
+  const allowedOrigin =
+    options.allowedOrigin !== undefined
+      ? new URL(String(options.allowedOrigin)).origin
+      : originFromAbsoluteHttpUrl(options.base);
+  return {
+    type: 'external',
+    data,
+    dataUrl: assertSameOriginDataUrl(options.dataUrl, allowedOrigin),
+    bootstrapModule,
+  };
 }

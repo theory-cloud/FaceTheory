@@ -9,7 +9,23 @@ import { pathToFileURL } from 'node:url';
 import { assertDocumentTagNonces } from '../helpers/csp.js';
 
 import { createFaceApp } from '../../src/app.js';
-import { createSvelteFace } from '../../src/svelte/index.js';
+import { createSvelteFace, renderSvelte } from '../../src/svelte/index.js';
+import type { FaceContext } from '../../src/types.js';
+
+const baseCtx: FaceContext = {
+  request: {
+    method: 'GET',
+    path: '/',
+    query: {},
+    headers: { 'x-request-id': ['test-svelte'] },
+    cookies: {},
+    body: new Uint8Array(),
+    isBase64: false,
+    cspNonce: null,
+  },
+  params: {},
+  proxy: null,
+};
 
 test('svelte adapter: renders component + extracts css', async () => {
   const source = `
@@ -155,7 +171,9 @@ test('svelte adapter: integration hooks provide deterministic head/style orderin
                   styleTags: [
                     {
                       cssText: `.from-int{letter-spacing:1px;} .from-int-state-${String((state as { id: number }).id)}{display:block;}`,
-                      attrs: { id: `style-int-${String((state as { id: number }).id)}` },
+                      attrs: {
+                        id: `style-int-${String((state as { id: number }).id)}`,
+                      },
                     },
                   ],
                 }),
@@ -215,4 +233,80 @@ test('svelte adapter: integration hooks provide deterministic head/style orderin
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('svelte adapter: strict CSP emits external hydration without inline data', async () => {
+  const Component = {
+    render: () => ({ html: '<main>Strict Svelte</main>' }),
+  };
+
+  const app = createFaceApp({
+    faces: [
+      createSvelteFace({
+        route: '/',
+        mode: 'ssr',
+        render: () => ({ component: Component }),
+        renderOptions: {
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          hydration: {
+            type: 'external',
+            data: { message: '<strict-svelte>' },
+            dataUrl: '/_facetheory/data/svelte.json',
+            bootstrapModule: '/assets/svelte-entry.js',
+          },
+        },
+      }),
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  assert.equal(resp.status, 200);
+
+  const body = new TextDecoder().decode(resp.body as Uint8Array);
+  assert.ok(body.includes('Strict Svelte'));
+  assert.ok(body.includes('id="__FACETHEORY_DATA_URL__"'));
+  assert.ok(body.includes('href="/_facetheory/data/svelte.json"'));
+  assert.ok(
+    body.includes(
+      '<script src="/assets/svelte-entry.js" type="module"></script>',
+    ),
+  );
+  assert.ok(!body.includes('id="__FACETHEORY_DATA__"'));
+  assert.ok(!body.includes('<strict-svelte>'));
+});
+
+test('svelte adapter: strict CSP rejects raw SSR head and CSS fallback', async () => {
+  await assert.rejects(
+    () =>
+      renderSvelte(
+        baseCtx,
+        {
+          component: {
+            render: () => ({
+              html: '<main>Unsafe head</main>',
+              head: '<meta name="svelte-raw" content="yes">',
+            }),
+          },
+        },
+        { csp: { inlineScripts: false } },
+      ),
+    /Svelte adapter strict CSP rejects raw adapter head output/,
+  );
+
+  await assert.rejects(
+    () =>
+      renderSvelte(
+        baseCtx,
+        {
+          component: {
+            render: () => ({
+              html: '<main>Unsafe CSS</main>',
+              css: { code: 'main{color:red;}' },
+            }),
+          },
+        },
+        { csp: { inlineStyles: false } },
+      ),
+    /Svelte adapter strict CSP rejects inline adapter style output/,
+  );
 });

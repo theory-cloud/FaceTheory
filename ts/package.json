@@ -1,6 +1,6 @@
 {
   "name": "@theory-cloud/facetheory",
-  "version": "3.1.2-rc",
+  "version": "3.1.2",
   "description": "AWS-first SSR, SSG, and blocking ISR runtime for Node.js with React, Vue, and Svelte adapters.",
   "license": "Apache-2.0",
   "type": "module",
@@ -183,7 +183,9 @@
     "example:vite:svelte:library:build": "vite build --config examples/vite-ssr-svelte-library/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-svelte-library/vite.config.ts",
     "example:vite:svelte:library:serve": "tsx examples/vite-ssr-svelte-library/node-server.ts",
     "example:operator-visibility:build": "tsx examples/operator-visibility-react/build.ts",
-    "example:operator-visibility:serve": "tsx examples/operator-visibility-react/node-server.ts"
+    "example:operator-visibility:serve": "tsx examples/operator-visibility-react/node-server.ts",
+    "example:vite:svelte:strict-csp:build": "vite build --config examples/vite-strict-csp-svelte/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-strict-csp-svelte/vite.config.ts",
+    "example:vite:svelte:strict-csp:serve": "tsx examples/vite-strict-csp-svelte/node-server.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1005.0",

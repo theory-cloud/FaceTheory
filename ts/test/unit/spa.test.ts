@@ -6,9 +6,11 @@ import { JSDOM } from 'jsdom';
 import {
   applyFaceNavigationSnapshot,
   DEFAULT_FACE_VIEW_SELECTOR,
+  loadFaceNavigationHydrationData,
   loadFaceNavigationModule,
   parseFaceNavigationSnapshot,
   readFaceHydrationData,
+  readFaceHydrationDataUrl,
   startFaceNavigation,
 } from '../../src/spa.js';
 
@@ -51,6 +53,99 @@ test('spa helpers: parse FaceTheory documents into navigation snapshots', () => 
     assert.deepEqual(snapshot.hydration, {
       bootstrapModule: '/assets/entry-client.js',
       data: { page: 'next' },
+    });
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('spa helpers: parse external hydration metadata without inline data', () => {
+  const html = `<!doctype html>
+    <html lang="en">
+      <head>
+        <title>External</title>
+        <link id="__FACETHEORY_DATA_URL__" rel="facetheory-hydration" href="/_facetheory/hydration/next.json" type="application/json">
+        <script src="/assets/entry-client.js" type="module"></script>
+      </head>
+      <body>
+        <main data-facetheory-view><h1>External Page</h1></main>
+      </body>
+    </html>`;
+
+  const dom = new JSDOM(html, { url: 'http://localhost/next' });
+
+  try {
+    assert.equal(readFaceHydrationData(dom.window.document), null);
+    assert.equal(
+      readFaceHydrationDataUrl(dom.window.document),
+      '/_facetheory/hydration/next.json',
+    );
+
+    const snapshot = parseFaceNavigationSnapshot(html, {
+      parser: new dom.window.DOMParser(),
+      url: 'http://localhost/next',
+      viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
+    });
+
+    assert.deepEqual(snapshot.hydration, {
+      type: 'external',
+      data: undefined,
+      dataUrl: '/_facetheory/hydration/next.json',
+      bootstrapModule: '/assets/entry-client.js',
+    });
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('spa helpers: load external hydration data before module hydration', async () => {
+  const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>', {
+    url: 'http://localhost/',
+  });
+
+  try {
+    const snapshot = parseFaceNavigationSnapshot(
+      `<!doctype html>
+        <html lang="en">
+          <head>
+            <title>External</title>
+            <link rel="facetheory-hydration" href="/_facetheory/hydration/next.json" type="application/json">
+            <script src="/assets/entry-client.js" type="module"></script>
+          </head>
+          <body>
+            <main data-facetheory-view><h1>External Page</h1></main>
+          </body>
+        </html>`,
+      {
+        parser: new dom.window.DOMParser(),
+        url: 'http://localhost/next',
+        viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
+      },
+    );
+
+    await assert.rejects(
+      loadFaceNavigationModule(snapshot, { document: dom.window.document }),
+      /external hydration data must be loaded/,
+    );
+
+    const fetched: string[] = [];
+    const loaded = await loadFaceNavigationHydrationData(snapshot, {
+      allowedOrigin: 'http://localhost',
+      fetcher: async (input) => {
+        fetched.push(String(input));
+        return new Response(JSON.stringify({ page: 'external' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      },
+    });
+
+    assert.deepEqual(fetched, ['http://localhost/_facetheory/hydration/next.json']);
+    assert.deepEqual(loaded.hydration, {
+      type: 'external',
+      data: { page: 'external' },
+      dataUrl: '/_facetheory/hydration/next.json',
+      bootstrapModule: '/assets/entry-client.js',
     });
   } finally {
     dom.window.close();
@@ -204,6 +299,178 @@ test('spa helpers: startFaceNavigation intercepts links and invokes hydration ho
   }
 });
 
+test('spa helpers: startFaceNavigation loads external hydration before DOM mutation', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body class="shell">
+          <nav><a href="/next" id="next-link">Next</a></nav>
+          <main data-facetheory-view><p>Home</p></main>
+        </body>
+      </html>`,
+    { url: 'http://localhost/' },
+  );
+  dom.window.scrollTo = (() => {}) as typeof dom.window.scrollTo;
+
+  const fetched: Array<{ init: RequestInit | undefined; input: string }> = [];
+  const hydrated: Array<{ data: unknown; text: string | null; url: string }> = [];
+
+  const controller = startFaceNavigation({
+    document: dom.window.document,
+    window: dom.window as unknown as Window,
+    viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
+    hydrationRequestInit: {
+      credentials: 'include',
+      headers: { 'x-hydration': 'custom' },
+    },
+    fetcher: async (input, init) => {
+      fetched.push({ input: String(input), init });
+      if (String(input).endsWith('/_facetheory/hydration/next.json')) {
+        return new Response(JSON.stringify({ page: 'external-next' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(
+        `<!doctype html>
+          <html data-theme="night" lang="en">
+            <head>
+              <title>Next</title>
+              <link rel="facetheory-hydration" href="/_facetheory/hydration/next.json" type="application/json">
+              <script src="/assets/entry-client.js" type="module"></script>
+            </head>
+            <body class="shell-next">
+              <nav><a href="/next" id="next-link">Next</a></nav>
+              <main data-facetheory-view><p>Next Page</p></main>
+            </body>
+          </html>`,
+        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+      );
+    },
+    importModule: async () => ({
+      hydrateFaceNavigation: async (context) => {
+        hydrated.push({
+          data: context.data,
+          text: context.view?.textContent?.trim() ?? null,
+          url: context.url.toString(),
+        });
+      },
+    }),
+  });
+
+  try {
+    const link = dom.window.document.getElementById('next-link');
+    assert.ok(link instanceof dom.window.HTMLAnchorElement);
+
+    link.dispatchEvent(
+      new dom.window.MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    );
+
+    await flushEventLoop();
+
+    assert.deepEqual(
+      fetched.map((entry) => entry.input),
+      ['http://localhost/next', 'http://localhost/_facetheory/hydration/next.json'],
+    );
+    assert.equal(
+      (fetched[0]?.init?.headers as Record<string, string> | undefined)?.accept,
+      'text/html,application/xhtml+xml',
+    );
+    assert.equal(fetched[1]?.init?.credentials, 'include');
+    assert.equal(
+      (fetched[1]?.init?.headers as Record<string, string> | undefined)?.accept,
+      'application/json',
+    );
+    assert.equal(
+      (fetched[1]?.init?.headers as Record<string, string> | undefined)?.['x-hydration'],
+      'custom',
+    );
+    assert.equal(dom.window.location.pathname, '/next');
+    assert.equal(dom.window.document.title, 'Next');
+    assert.deepEqual(hydrated, [
+      {
+        data: { page: 'external-next' },
+        text: 'Next Page',
+        url: 'http://localhost/next',
+      },
+    ]);
+  } finally {
+    controller.stop();
+    dom.window.close();
+  }
+});
+
+test('spa helpers: startFaceNavigation can opt out of external hydration loading', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body class="shell">
+          <main data-facetheory-view><p>Home</p></main>
+        </body>
+      </html>`,
+    { url: 'http://localhost/' },
+  );
+  dom.window.scrollTo = (() => {}) as typeof dom.window.scrollTo;
+
+  const fetched: string[] = [];
+  const rendered: Array<{ data: unknown; hydrationData: unknown }> = [];
+  const controller = startFaceNavigation({
+    document: dom.window.document,
+    window: dom.window as unknown as Window,
+    loadExternalHydration: false,
+    fetcher: async (input) => {
+      fetched.push(String(input));
+      return new Response(
+        `<!doctype html>
+          <html lang="en">
+            <head>
+              <title>Next</title>
+              <link rel="facetheory-hydration" href="/_facetheory/hydration/next.json" type="application/json">
+              <script src="/assets/entry-client.js" type="module"></script>
+            </head>
+            <body class="shell-next">
+              <main data-facetheory-view><p>Next Page</p></main>
+            </body>
+          </html>`,
+        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+      );
+    },
+    render: (snapshot, context) => {
+      rendered.push({
+        data: context.data,
+        hydrationData: snapshot.hydration?.data,
+      });
+    },
+  });
+
+  try {
+    await controller.navigate('/next');
+
+    assert.deepEqual(fetched, ['http://localhost/next']);
+    assert.deepEqual(rendered, [
+      {
+        data: null,
+        hydrationData: undefined,
+      },
+    ]);
+    assert.equal(dom.window.location.pathname, '/next');
+    assert.equal(dom.window.document.title, 'Home');
+    assert.equal(
+      dom.window.document.querySelector(DEFAULT_FACE_VIEW_SELECTOR)?.textContent?.trim(),
+      'Home',
+    );
+  } finally {
+    controller.stop();
+    dom.window.close();
+  }
+});
+
 test('spa helpers: startFaceNavigation rejects cross-origin programmatic navigation', async () => {
   const dom = new JSDOM(
     `<!doctype html>
@@ -331,6 +598,119 @@ test('spa helpers: startFaceNavigation rejects remote hydration modules before D
     await assert.rejects(
       controller.navigate('/next'),
       /FaceTheory SPA hydration module resolved cross-origin/,
+    );
+
+    assert.equal(dom.window.location.href, 'http://localhost/');
+    assert.equal(dom.window.document.title, 'Home');
+    assert.equal(
+      dom.window.document.querySelector(DEFAULT_FACE_VIEW_SELECTOR)?.textContent?.trim(),
+      'Home',
+    );
+  } finally {
+    controller.stop();
+    dom.window.close();
+  }
+});
+
+test('spa helpers: startFaceNavigation rejects cross-origin hydration data before DOM mutation', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body class="shell">
+          <main data-facetheory-view><p>Home</p></main>
+        </body>
+      </html>`,
+    { url: 'http://localhost/' },
+  );
+
+  const fetched: string[] = [];
+  const controller = startFaceNavigation({
+    document: dom.window.document,
+    window: dom.window as unknown as Window,
+    onError: () => {},
+    fetcher: async (input) => {
+      fetched.push(String(input));
+      return new Response(
+        `<!doctype html>
+          <html lang="en">
+            <head>
+              <title>Next</title>
+              <link rel="facetheory-hydration" href="https://evil.example/data.json" type="application/json">
+              <script src="/assets/entry-client.js" type="module"></script>
+            </head>
+            <body class="shell-next">
+              <main data-facetheory-view><p>Next Page</p></main>
+            </body>
+          </html>`,
+        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+      );
+    },
+  });
+
+  try {
+    await assert.rejects(
+      controller.navigate('/next'),
+      /FaceTheory SPA hydration data resolved cross-origin/,
+    );
+
+    assert.deepEqual(fetched, ['http://localhost/next']);
+    assert.equal(dom.window.location.href, 'http://localhost/');
+    assert.equal(dom.window.document.title, 'Home');
+    assert.equal(
+      dom.window.document.querySelector(DEFAULT_FACE_VIEW_SELECTOR)?.textContent?.trim(),
+      'Home',
+    );
+  } finally {
+    controller.stop();
+    dom.window.close();
+  }
+});
+
+test('spa helpers: startFaceNavigation fails closed on invalid external hydration data', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body class="shell">
+          <main data-facetheory-view><p>Home</p></main>
+        </body>
+      </html>`,
+    { url: 'http://localhost/' },
+  );
+
+  const controller = startFaceNavigation({
+    document: dom.window.document,
+    window: dom.window as unknown as Window,
+    onError: () => {},
+    fetcher: async (input) => {
+      if (String(input).endsWith('/_facetheory/hydration/bad.json')) {
+        return new Response('not-json', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(
+        `<!doctype html>
+          <html lang="en">
+            <head>
+              <title>Next</title>
+              <link rel="facetheory-hydration" href="/_facetheory/hydration/bad.json" type="application/json">
+              <script src="/assets/entry-client.js" type="module"></script>
+            </head>
+            <body class="shell-next">
+              <main data-facetheory-view><p>Next Page</p></main>
+            </body>
+          </html>`,
+        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+      );
+    },
+  });
+
+  try {
+    await assert.rejects(
+      controller.navigate('/next'),
+      /hydration data response was not valid JSON/,
     );
 
     assert.equal(dom.window.location.href, 'http://localhost/');
