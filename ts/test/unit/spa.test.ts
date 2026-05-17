@@ -313,15 +313,19 @@ test('spa helpers: startFaceNavigation loads external hydration before DOM mutat
   );
   dom.window.scrollTo = (() => {}) as typeof dom.window.scrollTo;
 
-  const fetched: string[] = [];
+  const fetched: Array<{ init: RequestInit | undefined; input: string }> = [];
   const hydrated: Array<{ data: unknown; text: string | null; url: string }> = [];
 
   const controller = startFaceNavigation({
     document: dom.window.document,
     window: dom.window as unknown as Window,
     viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
-    fetcher: async (input) => {
-      fetched.push(String(input));
+    hydrationRequestInit: {
+      credentials: 'include',
+      headers: { 'x-hydration': 'custom' },
+    },
+    fetcher: async (input, init) => {
+      fetched.push({ input: String(input), init });
       if (String(input).endsWith('/_facetheory/hydration/next.json')) {
         return new Response(JSON.stringify({ page: 'external-next' }), {
           status: 200,
@@ -369,10 +373,23 @@ test('spa helpers: startFaceNavigation loads external hydration before DOM mutat
 
     await flushEventLoop();
 
-    assert.deepEqual(fetched, [
-      'http://localhost/next',
-      'http://localhost/_facetheory/hydration/next.json',
-    ]);
+    assert.deepEqual(
+      fetched.map((entry) => entry.input),
+      ['http://localhost/next', 'http://localhost/_facetheory/hydration/next.json'],
+    );
+    assert.equal(
+      (fetched[0]?.init?.headers as Record<string, string> | undefined)?.accept,
+      'text/html,application/xhtml+xml',
+    );
+    assert.equal(fetched[1]?.init?.credentials, 'include');
+    assert.equal(
+      (fetched[1]?.init?.headers as Record<string, string> | undefined)?.accept,
+      'application/json',
+    );
+    assert.equal(
+      (fetched[1]?.init?.headers as Record<string, string> | undefined)?.['x-hydration'],
+      'custom',
+    );
     assert.equal(dom.window.location.pathname, '/next');
     assert.equal(dom.window.document.title, 'Next');
     assert.deepEqual(hydrated, [
@@ -382,6 +399,72 @@ test('spa helpers: startFaceNavigation loads external hydration before DOM mutat
         url: 'http://localhost/next',
       },
     ]);
+  } finally {
+    controller.stop();
+    dom.window.close();
+  }
+});
+
+test('spa helpers: startFaceNavigation can opt out of external hydration loading', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body class="shell">
+          <main data-facetheory-view><p>Home</p></main>
+        </body>
+      </html>`,
+    { url: 'http://localhost/' },
+  );
+  dom.window.scrollTo = (() => {}) as typeof dom.window.scrollTo;
+
+  const fetched: string[] = [];
+  const rendered: Array<{ data: unknown; hydrationData: unknown }> = [];
+  const controller = startFaceNavigation({
+    document: dom.window.document,
+    window: dom.window as unknown as Window,
+    loadExternalHydration: false,
+    fetcher: async (input) => {
+      fetched.push(String(input));
+      return new Response(
+        `<!doctype html>
+          <html lang="en">
+            <head>
+              <title>Next</title>
+              <link rel="facetheory-hydration" href="/_facetheory/hydration/next.json" type="application/json">
+              <script src="/assets/entry-client.js" type="module"></script>
+            </head>
+            <body class="shell-next">
+              <main data-facetheory-view><p>Next Page</p></main>
+            </body>
+          </html>`,
+        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+      );
+    },
+    render: (snapshot, context) => {
+      rendered.push({
+        data: context.data,
+        hydrationData: snapshot.hydration?.data,
+      });
+    },
+  });
+
+  try {
+    await controller.navigate('/next');
+
+    assert.deepEqual(fetched, ['http://localhost/next']);
+    assert.deepEqual(rendered, [
+      {
+        data: null,
+        hydrationData: undefined,
+      },
+    ]);
+    assert.equal(dom.window.location.pathname, '/next');
+    assert.equal(dom.window.document.title, 'Home');
+    assert.equal(
+      dom.window.document.querySelector(DEFAULT_FACE_VIEW_SELECTOR)?.textContent?.trim(),
+      'Home',
+    );
   } finally {
     controller.stop();
     dom.window.close();

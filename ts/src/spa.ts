@@ -384,6 +384,12 @@ export function startFaceNavigation(
     };
     if (options.fetcher !== undefined) fetchOptions.fetcher = options.fetcher;
     if (options.requestInit !== undefined) fetchOptions.requestInit = options.requestInit;
+    if (options.hydrationRequestInit !== undefined) {
+      fetchOptions.hydrationRequestInit = options.hydrationRequestInit;
+    }
+    if (options.loadExternalHydration !== undefined) {
+      fetchOptions.loadExternalHydration = options.loadExternalHydration;
+    }
     if (options.parser !== undefined) {
       fetchOptions.parser = options.parser;
     } else if (typeof winWithParser.DOMParser === 'function') {
