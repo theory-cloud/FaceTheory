@@ -61,12 +61,10 @@ if [[ -z "${tag}" ]]; then
   exit 0
 fi
 
-if ! command -v "${gh_bin}" >/dev/null 2>&1; then
-  echo "release-source-ref: FAIL (${gh_bin} not found)" >&2
-  exit 1
+release_json="${RELEASE_JSON:-}"
+if [[ -z "${release_json}" ]] && command -v "${gh_bin}" >/dev/null 2>&1; then
+  release_json="$(GH_BIN="${gh_bin}" "${script_dir}/release-json-by-tag.sh" "${tag}" || true)"
 fi
-
-release_json="$(GH_BIN="${gh_bin}" "${script_dir}/release-json-by-tag.sh" "${tag}" || true)"
 
 if [[ -z "${release_json}" ]]; then
   echo "source_ref=${tag}"
