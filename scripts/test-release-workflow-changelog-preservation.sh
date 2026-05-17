@@ -65,7 +65,7 @@ grep -Fq 'Resolve draft release metadata' .github/workflows/release.yml ||
   fail "release.yml must resolve hidden draft release metadata before repo checkout"
 
 for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; do
-  grep -Fq 'for attempt in $(seq 1 36); do' "${workflow}" ||
+  grep -Fq 'for attempt in $(seq 1 72); do' "${workflow}" ||
     fail "${workflow} must tolerate delayed GitHub draft release visibility"
 done
 
