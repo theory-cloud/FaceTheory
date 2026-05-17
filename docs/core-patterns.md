@@ -450,7 +450,7 @@ Why this is incorrect:
 Encoding note:
 
 - `startAwsOacFormTransport()` is intentionally URL-encoded. Submitter `formenctype` overrides form `enctype`, matching browser form resolution. Marked forms that resolve to `multipart/form-data`, `text/plain`, or another unsupported encoding are not silently transformed and do not fall back to native POST; they fail closed through `onError` until a separate, explicitly scoped transport exists.
-- Marked forms do not follow HTTP redirects in the fetch transport. Return a direct response for the mutation result, or handle the response with `onResponse` / `onNavigate` and explicitly choose a safe same-origin browser navigation after the mutating request completes.
+- Marked forms do not follow HTTP redirects in the fetch transport. Return a direct response for the mutation result, or handle the response with `onResponse` / `onNavigate` and explicitly choose a safe same-origin browser navigation after the mutating request completes. Redirected or replacement response URLs that are malformed or resolve outside the configured same-origin boundary fail closed before FaceTheory mutates the document or assigns `window.location`.
 
 ## Pattern: Use `startFaceNavigation()` with a stable view container
 
