@@ -3,6 +3,8 @@ import type { FaceAttributes, FaceHydration } from './types.js';
 export const DEFAULT_FACE_VIEW_SELECTOR = '[data-facetheory-view]';
 
 const HYDRATION_DATA_SCRIPT_ID = '__FACETHEORY_DATA__';
+const HYDRATION_DATA_LINK_ID = '__FACETHEORY_DATA_URL__';
+const HYDRATION_DATA_LINK_REL = 'facetheory-hydration';
 const NAVIGATION_CACHE_BUST_PARAM = 'facetheory-nav';
 
 export interface FaceNavigationSnapshot {
@@ -26,6 +28,14 @@ export interface ParseFaceNavigationSnapshotOptions extends SnapshotFaceDocument
 }
 
 export interface FetchFaceNavigationSnapshotOptions extends ParseFaceNavigationSnapshotOptions {
+  allowedOrigin?: string | URL;
+  fetcher?: typeof fetch;
+  hydrationRequestInit?: RequestInit;
+  loadExternalHydration?: boolean;
+  requestInit?: RequestInit;
+}
+
+export interface LoadFaceNavigationHydrationDataOptions {
   allowedOrigin?: string | URL;
   fetcher?: typeof fetch;
   requestInit?: RequestInit;
@@ -57,6 +67,10 @@ export interface LoadFaceNavigationModuleOptions {
   importModule?: (specifier: string) => Promise<FaceNavigationBootstrapModule>;
   reloadOnMissingHook?: boolean;
   viewSelector?: string;
+}
+
+export interface ValidateFaceNavigationSnapshotOptions {
+  allowedOrigin?: string | URL;
 }
 
 export interface StartFaceNavigationOptions
@@ -96,14 +110,38 @@ export function readFaceHydrationData<T = unknown>(doc: Document = document): T 
   }
 }
 
+export function readFaceHydrationDataUrl(doc: Document = document): string | null {
+  const byId = doc.getElementById(HYDRATION_DATA_LINK_ID);
+  if (byId?.tagName.toLowerCase() === 'link') {
+    const href = byId.getAttribute('href');
+    if (href) return href;
+  }
+
+  const byRel = doc.querySelector(`link[rel="${HYDRATION_DATA_LINK_REL}"]`);
+  if (!byRel) return null;
+  const href = byRel.getAttribute('href');
+  return href || null;
+}
+
 export function snapshotFaceDocument(
   doc: Document,
   options: SnapshotFaceDocumentOptions = {},
 ): FaceNavigationSnapshot {
   const viewSelector = options.viewSelector ?? DEFAULT_FACE_VIEW_SELECTOR;
   const bootstrapModule = readHydrationBootstrapModule(doc);
+  const dataUrl = readFaceHydrationDataUrl(doc);
   const data = readFaceHydrationData(doc);
   const view = doc.querySelector(viewSelector);
+  const hydration: FaceHydration | null = dataUrl
+    ? {
+        type: 'external',
+        data: undefined,
+        dataUrl,
+        bootstrapModule: bootstrapModule ?? '',
+      }
+    : bootstrapModule
+      ? { bootstrapModule, data }
+      : null;
 
   return {
     url: resolveSnapshotUrl(doc, options.url),
@@ -113,7 +151,7 @@ export function snapshotFaceDocument(
     headHtml: doc.head.innerHTML,
     bodyHtml: doc.body.innerHTML,
     viewHtml: view ? view.innerHTML : null,
-    hydration: bootstrapModule ? { bootstrapModule, data } : null,
+    hydration,
   };
 }
 
@@ -173,7 +211,76 @@ export async function fetchFaceNavigationSnapshot(
     parseOptions.parser = options.parser;
   }
 
-  return parseFaceNavigationSnapshot(await response.text(), parseOptions);
+  const snapshot = parseFaceNavigationSnapshot(await response.text(), parseOptions);
+  if (options.loadExternalHydration === false) return snapshot;
+
+  const hydrationOptions: LoadFaceNavigationHydrationDataOptions = {};
+  if (allowedOrigin) hydrationOptions.allowedOrigin = allowedOrigin;
+  if (options.fetcher !== undefined) hydrationOptions.fetcher = options.fetcher;
+  if (options.hydrationRequestInit !== undefined) {
+    hydrationOptions.requestInit = options.hydrationRequestInit;
+  }
+  return loadFaceNavigationHydrationData(snapshot, hydrationOptions);
+}
+
+export async function loadFaceNavigationHydrationData(
+  snapshot: FaceNavigationSnapshot,
+  options: LoadFaceNavigationHydrationDataOptions = {},
+): Promise<FaceNavigationSnapshot> {
+  if (!isExternalHydration(snapshot.hydration)) return snapshot;
+
+  const fetcher = options.fetcher ?? globalThis.fetch;
+  if (typeof fetcher !== 'function') {
+    throw new Error('FaceTheory SPA helpers require fetch in the current environment');
+  }
+
+  const allowedOrigin =
+    resolveAllowedNavigationOrigin(options.allowedOrigin) ??
+    resolveNavigationUrl(snapshot.url, 'http://localhost/').origin;
+  const dataUrl = assertSameOriginNavigationUrl(
+    snapshot.hydration.dataUrl,
+    allowedOrigin,
+    snapshot.url,
+    'FaceTheory SPA hydration data resolved cross-origin',
+  );
+
+  const response = await fetcher(dataUrl.toString(), {
+    ...options.requestInit,
+    headers: {
+      accept: 'application/json',
+      ...(options.requestInit?.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `FaceTheory hydration data fetch failed (${response.status}) for ${dataUrl.toString()}`,
+    );
+  }
+
+  assertSameOriginNavigationUrl(
+    response.url || dataUrl,
+    allowedOrigin,
+    snapshot.url,
+    'FaceTheory SPA hydration data fetch resolved cross-origin',
+  );
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch (error) {
+    throw new Error('FaceTheory hydration data response was not valid JSON', {
+      cause: error,
+    });
+  }
+
+  return {
+    ...snapshot,
+    hydration: {
+      ...snapshot.hydration,
+      data,
+    },
+  };
 }
 
 export function applyFaceNavigationSnapshot(
@@ -205,14 +312,20 @@ export async function loadFaceNavigationModule(
   snapshot: FaceNavigationSnapshot,
   options: LoadFaceNavigationModuleOptions = {},
 ): Promise<void> {
-  if (!snapshot.hydration?.bootstrapModule) return;
+  if (!snapshot.hydration) return;
+  if (isExternalHydration(snapshot.hydration) && snapshot.hydration.data === undefined) {
+    throw new Error(
+      'FaceTheory SPA external hydration data must be loaded before hydration',
+    );
+  }
+  if (!snapshot.hydration.bootstrapModule) return;
 
   const doc = options.document ?? document;
   const allowedOrigin =
     resolveAllowedNavigationOrigin(options.allowedOrigin) ??
     doc.defaultView?.location.origin ??
     resolveNavigationUrl(snapshot.url, 'http://localhost/').origin;
-  assertSameOriginHydrationModule(snapshot, allowedOrigin);
+  assertSameOriginHydrationReferences(snapshot, allowedOrigin);
   const importModule = options.importModule ?? importFaceNavigationModule;
   const context = createBootstrapContext(
     snapshot,
@@ -232,6 +345,16 @@ export async function loadFaceNavigationModule(
   if (typeof reloaded.hydrateFaceNavigation === 'function') {
     await reloaded.hydrateFaceNavigation(context);
   }
+}
+
+export function validateFaceNavigationSnapshot(
+  snapshot: FaceNavigationSnapshot,
+  options: ValidateFaceNavigationSnapshotOptions = {},
+): void {
+  const allowedOrigin =
+    resolveAllowedNavigationOrigin(options.allowedOrigin) ??
+    resolveNavigationUrl(snapshot.url, 'http://localhost/').origin;
+  assertSameOriginHydrationReferences(snapshot, allowedOrigin);
 }
 
 export function startFaceNavigation(
@@ -275,6 +398,12 @@ export function startFaceNavigation(
     };
     if (options.fetcher !== undefined) fetchOptions.fetcher = options.fetcher;
     if (options.requestInit !== undefined) fetchOptions.requestInit = options.requestInit;
+    if (options.hydrationRequestInit !== undefined) {
+      fetchOptions.hydrationRequestInit = options.hydrationRequestInit;
+    }
+    if (options.loadExternalHydration !== undefined) {
+      fetchOptions.loadExternalHydration = options.loadExternalHydration;
+    }
     if (options.parser !== undefined) {
       fetchOptions.parser = options.parser;
     } else if (typeof winWithParser.DOMParser === 'function') {
@@ -282,7 +411,7 @@ export function startFaceNavigation(
     }
 
     const snapshot = await fetchFaceNavigationSnapshot(url, fetchOptions);
-    assertSameOriginHydrationModule(snapshot, win.location.origin);
+    assertSameOriginHydrationReferences(snapshot, win.location.origin);
 
     if (options.render) {
       await options.render(
@@ -446,10 +575,13 @@ function syncAttributes(element: Element, nextAttrs: FaceAttributes): void {
 }
 
 function readHydrationBootstrapModule(doc: Document): string | null {
-  const dataScript = doc.getElementById(HYDRATION_DATA_SCRIPT_ID);
-  if (!dataScript) return null;
+  const marker =
+    doc.getElementById(HYDRATION_DATA_SCRIPT_ID) ??
+    doc.getElementById(HYDRATION_DATA_LINK_ID) ??
+    doc.querySelector(`link[rel="${HYDRATION_DATA_LINK_REL}"]`);
+  if (!marker) return null;
 
-  let current = dataScript.nextElementSibling;
+  let current = marker.nextElementSibling;
   while (current) {
     if (
       current.tagName.toLowerCase() === 'script' &&
@@ -521,19 +653,34 @@ function createBootstrapContext(
   };
 }
 
-function assertSameOriginHydrationModule(
+function isExternalHydration(
+  hydration: FaceHydration | null,
+): hydration is Extract<FaceHydration, { type: 'external' }> {
+  return hydration?.type === 'external';
+}
+
+function assertSameOriginHydrationReferences(
   snapshot: FaceNavigationSnapshot,
   allowedOrigin: string,
 ): void {
   const specifier = snapshot.hydration?.bootstrapModule;
-  if (!specifier) return;
+  if (specifier) {
+    assertSameOriginNavigationUrl(
+      specifier,
+      allowedOrigin,
+      snapshot.url,
+      'FaceTheory SPA hydration module resolved cross-origin',
+    );
+  }
 
-  assertSameOriginNavigationUrl(
-    specifier,
-    allowedOrigin,
-    snapshot.url,
-    'FaceTheory SPA hydration module resolved cross-origin',
-  );
+  if (isExternalHydration(snapshot.hydration)) {
+    assertSameOriginNavigationUrl(
+      snapshot.hydration.dataUrl,
+      allowedOrigin,
+      snapshot.url,
+      'FaceTheory SPA hydration data resolved cross-origin',
+    );
+  }
 }
 
 async function importFaceNavigationModule(

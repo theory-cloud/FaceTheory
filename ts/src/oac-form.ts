@@ -1,3 +1,15 @@
+import {
+  applyFaceNavigationSnapshot,
+  DEFAULT_FACE_VIEW_SELECTOR,
+  fetchFaceNavigationSnapshot,
+  loadFaceNavigationHydrationData,
+  loadFaceNavigationModule,
+  parseFaceNavigationSnapshot,
+  validateFaceNavigationSnapshot,
+  type FaceNavigationSnapshot,
+  type FaceNavigationBootstrapModule,
+} from './spa.js';
+
 export const AWS_OAC_CONTENT_SHA256_HEADER = 'x-amz-content-sha256';
 export const AWS_OAC_FORM_MARKER_ATTRIBUTE = 'data-facetheory-oac-form';
 export const AWS_OAC_URL_ENCODED_FORM_ENCODING =
@@ -46,11 +58,22 @@ export interface AwsOacFormTransportResponseContext {
 }
 
 export type AwsOacFormNavigationKind = 'redirect' | 'replace-document';
+export type AwsOacFormNavigationPolicy = 'auto' | 'full-page' | 'spa';
+
+export interface AwsOacFormSpaNavigationOptions {
+  hydrationRequestInit?: RequestInit;
+  importModule?: (specifier: string) => Promise<FaceNavigationBootstrapModule>;
+  parser?: Pick<DOMParser, 'parseFromString'>;
+  reloadOnMissingHook?: boolean;
+  requestInit?: RequestInit;
+  syncHead?: boolean;
+  viewSelector?: string;
+}
 
 export interface AwsOacFormTransportNavigationContext extends AwsOacFormTransportResponseContext {
   finalUrl: URL;
   html: string | null;
-  navigation: AwsOacFormNavigationKind;
+  navigation: AwsOacFormNavigationKind | 'spa';
 }
 
 export interface AwsOacFormTransportErrorContext {
@@ -68,6 +91,7 @@ export interface StartAwsOacFormTransportOptions {
   document?: Document;
   fetcher?: typeof fetch;
   markerAttribute?: string;
+  navigationPolicy?: AwsOacFormNavigationPolicy;
   onError?: (
     error: unknown,
     context: AwsOacFormTransportErrorContext,
@@ -80,6 +104,8 @@ export interface StartAwsOacFormTransportOptions {
     context: AwsOacFormTransportResponseContext,
   ) => void | Promise<void>;
   requestInit?: RequestInit;
+  spaNavigation?: AwsOacFormSpaNavigationOptions;
+  strictCsp?: boolean;
   window?: Window;
 }
 
@@ -388,6 +414,11 @@ async function applyDefaultNavigationPolicy(
       navigation: 'redirect',
     };
     if (await customNavigationHandled(input.options, navigationContext)) return;
+    const policy = resolveNavigationPolicy(input.options);
+    if (policy === 'spa') {
+      await applySpaNavigationPolicy(input, context, finalUrl, null);
+      return;
+    }
     input.window.location.assign(finalUrl.toString());
     return;
   }
@@ -395,16 +426,25 @@ async function applyDefaultNavigationPolicy(
   if (isHtmlResponse(context.response)) {
     const responseHasCsp = hasResponseCsp(context.response);
     const html = await context.response.text();
+    const policy = resolveNavigationPolicy(input.options);
     const navigationContext: AwsOacFormTransportNavigationContext = {
       ...context,
       finalUrl,
       html,
-      navigation: 'replace-document',
+      navigation: policy === 'spa' ? 'spa' : 'replace-document',
     };
     if (await customNavigationHandled(input.options, navigationContext)) return;
+    if (policy === 'full-page') {
+      input.window.location.assign(finalUrl.toString());
+      return;
+    }
+    if (policy === 'spa') {
+      await applySpaNavigationPolicy(input, context, finalUrl, html);
+      return;
+    }
     if (responseHasCsp) {
       throw new Error(
-        'FaceTheory OAC form transport refused to replace the current document with an HTML response protected by Content-Security-Policy because fetch cannot install response CSP headers during document.write navigation; handle the response with onNavigate instead',
+        'FaceTheory OAC form transport refused to replace the current document with an HTML response protected by Content-Security-Policy because fetch cannot install response CSP headers during document.write navigation; use navigationPolicy:"full-page", navigationPolicy:"spa", or handle the response with onNavigate instead',
       );
     }
     replaceDocument(input.form.ownerDocument, input.window, html, finalUrl);
@@ -416,6 +456,116 @@ async function applyDefaultNavigationPolicy(
       `FaceTheory OAC form transport failed (${context.response.status}) for ${input.action.toString()}`,
     );
   }
+}
+
+async function applySpaNavigationPolicy(
+  input: SubmitAwsOacFormInput,
+  context: AwsOacFormTransportResponseContext,
+  finalUrl: URL,
+  html: string | null,
+): Promise<void> {
+  const snapshot = await resolveSpaNavigationSnapshot(
+    input,
+    finalUrl,
+    html,
+  );
+  const options = input.options.spaNavigation ?? {};
+  const viewSelector = options.viewSelector ?? DEFAULT_FACE_VIEW_SELECTOR;
+
+  validateFaceNavigationSnapshot(snapshot, {
+    allowedOrigin: input.allowedOrigin,
+  });
+  const applyOptions = {
+    document: input.form.ownerDocument,
+    viewSelector,
+    ...(options.syncHead !== undefined ? { syncHead: options.syncHead } : {}),
+  };
+  applyFaceNavigationSnapshot(snapshot, applyOptions);
+
+  const loadOptions = {
+    allowedOrigin: input.allowedOrigin,
+    document: input.form.ownerDocument,
+    viewSelector,
+    ...(options.importModule !== undefined
+      ? { importModule: options.importModule }
+      : {}),
+    ...(options.reloadOnMissingHook !== undefined
+      ? { reloadOnMissingHook: options.reloadOnMissingHook }
+      : {}),
+  };
+  await loadFaceNavigationModule(snapshot, loadOptions);
+
+  if (finalUrl.toString() !== input.window.location.href) {
+    input.window.history.replaceState({}, '', finalUrl);
+  }
+
+  void context;
+}
+
+async function resolveSpaNavigationSnapshot(
+  input: SubmitAwsOacFormInput,
+  finalUrl: URL,
+  html: string | null,
+): Promise<FaceNavigationSnapshot> {
+  const options = input.options.spaNavigation ?? {};
+  const hydrationOptions = {
+    allowedOrigin: input.allowedOrigin,
+    fetcher: input.fetcher,
+    ...(options.hydrationRequestInit !== undefined
+      ? { requestInit: options.hydrationRequestInit }
+      : {}),
+  };
+
+  if (html !== null) {
+    const parseOptions = {
+      url: finalUrl,
+      ...spaParserOption(input.window, options),
+      ...(options.viewSelector !== undefined
+        ? { viewSelector: options.viewSelector }
+        : {}),
+    };
+    const snapshot = parseFaceNavigationSnapshot(html, parseOptions);
+    validateFaceNavigationSnapshot(snapshot, {
+      allowedOrigin: input.allowedOrigin,
+    });
+    return loadFaceNavigationHydrationData(snapshot, hydrationOptions);
+  }
+
+  const fetchOptions = {
+    allowedOrigin: input.allowedOrigin,
+    fetcher: input.fetcher,
+    ...spaParserOption(input.window, options),
+    ...(options.hydrationRequestInit !== undefined
+      ? { hydrationRequestInit: options.hydrationRequestInit }
+      : {}),
+    ...(options.requestInit !== undefined
+      ? { requestInit: options.requestInit }
+      : {}),
+    ...(options.viewSelector !== undefined
+      ? { viewSelector: options.viewSelector }
+      : {}),
+  };
+  return fetchFaceNavigationSnapshot(finalUrl, fetchOptions);
+}
+
+function spaParserOption(
+  win: Window,
+  options: AwsOacFormSpaNavigationOptions,
+): { parser?: Pick<DOMParser, 'parseFromString'> } {
+  if (options.parser !== undefined) return { parser: options.parser };
+  const winWithParser = win as Window & { DOMParser?: typeof DOMParser };
+  if (typeof winWithParser.DOMParser === 'function') {
+    return { parser: new winWithParser.DOMParser() };
+  }
+  return {};
+}
+
+function resolveNavigationPolicy(
+  options: StartAwsOacFormTransportOptions,
+): AwsOacFormNavigationPolicy {
+  if (options.navigationPolicy !== undefined) return options.navigationPolicy;
+  if (options.strictCsp === true) return 'full-page';
+  return 'auto';
 }
 
 async function customNavigationHandled(

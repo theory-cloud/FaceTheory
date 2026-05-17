@@ -178,6 +178,57 @@ Rollback:
 Do not make `ssrUrlAuthType: NONE` a durable rollback. If an operator explicitly authorizes it to recover a broken
 deployment, record an owner, expiration date, and restoration plan back to `AWS_IAM` + OAC.
 
+## Migration 7: Move Legacy Inline Hydration To Strict CSP External Hydration
+
+Use this path when a route currently relies on inline `__FACETHEORY_DATA__`, inline style output, or raw head HTML and
+now needs to satisfy a strict no-inline CSP.
+
+1. Classify the route's policy:
+   - **Nonce-compatible SSR** can keep FaceTheory-owned inline hydration/styles only when each request receives a
+     unique `FaceRequest.cspNonce` and the response CSP header carries the matching nonce.
+   - **Strict no-inline** must set `csp: { inlineScripts: false, inlineStyles: false, rawHead: false }` and move scripts,
+     CSS, and hydration data to same-origin external resources.
+2. Replace `viteHydrationForEntry(manifest, entry, data)` with
+   `externalHydrationForEntry(manifest, entry, data, { dataUrl })`.
+3. Serve the `dataUrl` JSON sidecar from the same origin as the page:
+   - SSG sidecars should be uploaded under the static `/_facetheory/data/*` output and routed to S3.
+   - ISR sidecars should be stored with the HTML pointer-derived sidecar object so stale HTML and stale data remain
+     paired.
+   - SSR sidecars can be served by the same Lambda route family when the data is request-time and not static.
+4. Move CSS into the Vite client entry and emit assets with `viteAssetsForEntry(...)` instead of inline `<style>` tags.
+5. Replace raw head HTML and framework-specific head shortcuts with FaceTheory structured `headTags`.
+6. For Svelte strict pages, avoid `<svelte:head>` raw SSR output and component `<style>` fallback output; use external
+   CSS imported by the client entry.
+7. For React streaming strict pages, use `styleStrategy: "all-ready"` and avoid Emotion/AntD inline style extraction on
+   routes with `inlineStyles:false`.
+8. If the route uses SPA-style navigation, export `hydrateFaceNavigation(context)` and confirm
+   `startFaceNavigation()` loads external hydration data before it mutates the current document.
+
+Validation:
+
+```bash
+cd ts
+npm run example:vite:svelte:strict-csp:build
+node --import tsx test/unit/strict-csp-harness.test.ts
+node --import tsx test/unit/vite-strict-csp-svelte-example.test.ts
+```
+
+Deployed verification:
+
+- request the HTML document and confirm the CSP header is attached explicitly
+- confirm the HTML contains `<link rel="facetheory-hydration" ...>` rather than `__FACETHEORY_DATA__`
+- fetch the referenced hydration sidecar through the same CloudFront origin and confirm it is same-origin JSON
+- confirm external module, CSS, and asset URLs are routed through the documented S3/Lambda behavior split
+- run a browser hydration smoke and check for hydration warnings or strict-CSP console errors
+
+Rollback:
+
+- keep the previous FaceTheory release tarball available until strict-CSP output is verified in the consuming app
+- if a route cannot yet remove inline styles or inline hydration, leave it on the nonce-compatible SSR path and do not
+  claim it is strict no-inline
+- do not weaken the deployment CSP or publish a strict-CSP release claim without matching runtime, RC, and deployment
+  evidence
+
 ## Rollback Notes
 
 - Keep the prior handler or deployable artifact available until the new path is verified.

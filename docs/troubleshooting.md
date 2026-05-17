@@ -13,6 +13,7 @@ Use this guide for recurring setup, build, and runtime failures that already hav
 | ISR route returns a deterministic 500 when tenant headers are present | Known tenant boundary headers reached ISR without an explicit tenant/cache partition          | `docs/migration-guide.md` and `ts/src/isr.ts` tenant guard behavior |
 | ISR object keys look duplicated                                       | `S3HtmlStore.keyPrefix` and `htmlPointerPrefix` repeat the same prefix                        | `docs/core-patterns.md` and `docs/cdk/aws-deployment.md`            |
 | React streaming misses late styles                                    | `styleStrategy: shell` was used where `all-ready` was needed                                  | `docs/core-patterns.md`                                             |
+| Strict-CSP route fails before returning HTML                          | The route emitted inline hydration, inline styles/scripts, raw head, or unsafe body attrs     | `FaceRenderResult.csp` and `docs/core-patterns.md`                  |
 | Form POST behind AppTheorySsrSite OAC returns 403 before Lambda       | Native browser form cannot provide `x-amz-content-sha256` for the Lambda URL OAC signing path | `startAwsOacFormTransport()` and `docs/core-patterns.md`            |
 
 ## Issue: Node.js Version Mismatch
@@ -221,6 +222,47 @@ Release handoff:
   promotion
 - if emergency rollback is needed, pin the previous FaceTheory tarball or remove the opt-in marker/bootstrap; do not
   keep `ssrUrlAuthType: NONE` as a durable solution
+
+## Issue: Strict-CSP Route Fails Before Returning HTML
+
+Symptoms:
+
+- a route with `csp: { inlineScripts: false, inlineStyles: false, rawHead: false }` returns a deterministic server error
+- the error mentions strict CSP rejecting inline script tags, inline style tags, raw head output, event handler
+  attributes, style attributes, or non-external hydration
+- a React streaming route errors when `styleStrategy: "shell"` is used
+- a Svelte strict route errors after adding `<svelte:head>` or component `<style>` output
+
+Cause:
+
+- Strict no-inline CSP is fail-closed. FaceTheory validates structured head output, adapter contributions, and the final
+  rendered body before returning a strict document.
+- Legacy `viteHydrationForEntry()` emits inline `__FACETHEORY_DATA__` and is incompatible with `inlineScripts:false`.
+- React shell streaming can flush bytes before whole-document validation and is therefore rejected under strict
+  `inlineScripts:false`.
+- Adapter style extraction that emits `<style>` tags, including Emotion/AntD inline extraction, is incompatible with
+  `inlineStyles:false`.
+
+Solution:
+
+- Move hydration data to `externalHydrationForEntry(...)` and serve the JSON from a same-origin URL.
+- Attach an explicit CSP header such as `buildStrictCspHeader()` from the Face response.
+- Move CSS into the Vite client entry so `viteAssetsForEntry()` emits external stylesheet links.
+- Replace raw head HTML and `<svelte:head>` strict output with structured FaceTheory `headTags`.
+- For React streaming strict routes, use `styleStrategy: "all-ready"` or buffer the route so validation completes before
+  bytes flush.
+
+Verification:
+
+```bash
+cd ts
+npm run example:vite:svelte:strict-csp:build
+node --import tsx test/unit/strict-csp-harness.test.ts
+node --import tsx test/unit/vite-strict-csp-svelte-example.test.ts
+```
+
+If this is an AWS or release handoff, treat the local commands as runtime evidence only. They do not prove a release was
+published, a Simulacrum RC ran, or a CloudFront/S3/Lambda deployment is serving the route.
 
 ## Issue: Streaming HTML Ships Without Expected Late Styles
 

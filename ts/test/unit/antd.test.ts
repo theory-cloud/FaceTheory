@@ -5,8 +5,24 @@ import { Button, Menu, theme as antdTheme, Typography } from 'antd';
 import * as React from 'react';
 
 import { createFaceApp } from '../../src/app.js';
-import { createReactFace } from '../../src/adapters/react.js';
+import { createReactFace, renderReact } from '../../src/adapters/react.js';
+import type { FaceContext } from '../../src/types.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
+
+const baseCtx: FaceContext = {
+  request: {
+    method: 'GET',
+    path: '/',
+    query: {},
+    headers: { 'x-request-id': ['test-antd'] },
+    cookies: {},
+    body: new Uint8Array(),
+    isBase64: false,
+    cspNonce: null,
+  },
+  params: {},
+  proxy: null,
+};
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -89,7 +105,11 @@ test('antd integration: shared instances stay isolated across overlapping render
           if (kind === 'menu') {
             return React.createElement(MenuFixture);
           }
-          return React.createElement(Button, { type: 'primary' }, 'Primary request');
+          return React.createElement(
+            Button,
+            { type: 'primary' },
+            'Primary request',
+          );
         },
         renderOptions: {
           integrations: [
@@ -132,3 +152,18 @@ function MenuFixture() {
     ],
   });
 }
+
+test('antd integration: strict CSP rejects inline style extraction', async () => {
+  await assert.rejects(
+    () =>
+      renderReact(
+        baseCtx,
+        React.createElement(Button, { type: 'primary' }, 'Strict Button'),
+        {
+          csp: { inlineStyles: false },
+          integrations: [createAntdIntegration({ hashed: false })],
+        },
+      ),
+    /React adapter strict CSP rejects inline adapter style output/,
+  );
+});

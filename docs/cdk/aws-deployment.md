@@ -13,9 +13,9 @@ FaceTheory's supported production shape is:
 ## Origin Layout
 
 Primary components:
-- S3 bucket for hashed assets and optional SSG HTML output
+- S3 bucket for hashed assets, optional SSG HTML output, and strict-CSP SSG hydration JSON sidecars
 - Lambda Function URL origin for SSR and ISR
-- Optional S3 bucket or prefix for ISR HTML objects
+- Optional S3 bucket or prefix for ISR HTML objects and pointer-derived strict-CSP hydration sidecars
 - DynamoDB table for ISR metadata and lease state
 
 Recommended static paths:
@@ -44,6 +44,9 @@ Reference-stack stance:
 - do not model viewer-supplied tenant-header passthrough as the default copy-paste shape
 - keep same-origin mutating form action paths on Lambda/AppTheory behaviors, usually through `ssrPathPatterns`
 - use FaceTheory's marked URL-encoded OAC form helper for browser forms that submit through Lambda Function URL OAC
+- keep `/_facetheory/data/*` on S3 for SSG hydration sidecars, but keep ISR hydration query URLs on Lambda/FaceTheory
+- attach strict CSP headers from the Face response; baseline CloudFront response headers do not substitute for a
+  route-owned `content-security-policy`
 
 ### Mutating Forms Behind Lambda Function URL OAC
 
@@ -63,6 +66,37 @@ The helper hashes the exact `application/x-www-form-urlencoded` bytes it sends a
 signing. It fails closed for marked multipart, text/plain, unknown encodings, cross-origin actions, unsafe redirect
 handling, and default document replacement of CSP-protected HTML responses. Do not turn `ssrUrlAuthType` to `NONE` as a
 durable solution; use it only as an explicitly authorized temporary rollback with an owner and removal date.
+
+### Strict CSP Hydration Sidecars
+
+Strict no-inline CSP uses same-origin external hydration data instead of inline `__FACETHEORY_DATA__`.
+
+SSG:
+
+- `/_facetheory/data/*` should be listed in `directS3PathPatterns` so CloudFront serves generated hydration JSON from S3.
+- Upload and invalidate each generated HTML file and its hydration JSON sidecar together.
+- Use JSON content type and cache headers coordinated with the referencing HTML; hashed client assets can still be
+  immutable.
+
+ISR:
+
+- Hydration sidecars are stored in the same `S3HtmlStore` namespace as generated HTML, with `.hydration.json` derived
+  from the HTML pointer.
+- The browser URL is the route URL plus `__facetheory_isr_hydration=<opaque-token>`. Route that request to
+  Lambda/FaceTheory so the runtime can validate and serve the sidecar.
+- Do not add a public S3 behavior for arbitrary ISR object keys or expose the raw pointer as a stable client contract.
+
+SSR:
+
+- If a strict SSR Face uses a dynamic external hydration endpoint, route that same-origin JSON endpoint to
+  Lambda/AppTheory and make sure it returns the exact data used by the server render.
+
+OAC navigation policy:
+
+- Use `startAwsOacFormTransport()`'s default full-page navigation for strict-CSP form outcomes unless the host has
+  explicitly chosen the SPA navigation contract.
+- Use `navigationPolicy: "spa"` only when the response is a FaceTheory document and external hydration can be loaded
+  before DOM mutation.
 
 ## CloudFront Behavior Options
 
@@ -106,12 +140,14 @@ SSR:
 
 SSG:
 - HTML can use bounded shared caching
+- strict hydration JSON under `/_facetheory/data/*` should use cache headers coordinated with the HTML that references it
 - hashed assets should be long-lived and immutable
 
 ISR:
 - use FaceTheory's blocking ISR cache helper semantics
 - observe `x-facetheory-isr` on responses
 - do not treat ISR HTML as immutable static content
+- treat pointer-derived hydration sidecars as part of the ISR HTML generation result, not as independent static assets
 
 ## ISR Storage Notes
 

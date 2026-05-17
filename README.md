@@ -21,12 +21,12 @@ The single-path philosophy extends to client delivery: one way to render, one wa
 FaceTheory's ISR implementation uses TableTheory for cache metadata and regeneration leases, ensuring the same
 deterministic patterns that govern the backend also govern the frontend.
 
-## Install v3.1.2 <!-- x-release-please-version -->
+## Install v3.2.0-rc <!-- x-release-please-version -->
 
 Install the exact GitHub release tarball:
 
 ```bash
-export FACETHEORY_VERSION=3.1.2 # x-release-please-version
+export FACETHEORY_VERSION=3.2.0-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -73,7 +73,7 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
-The `v3.1.2` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+The `v3.2.0-rc` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
 
 ## OAC Mutating Forms
 
@@ -104,6 +104,14 @@ See [Migration Guide](./docs/migration-guide.md#migration-4-adopt-isr-tenant-fai
 [Troubleshooting](./docs/troubleshooting.md#issue-isr-fails-closed-when-tenant-headers-are-present) for upgrade
 steps and verification.
 
+## Strict CSP Hydration
+
+Routes that need a no-inline CSP can set `FaceRenderResult.csp` to disable inline scripts, inline styles, and raw head
+HTML, emit `buildStrictCspHeader()`, and use `externalHydrationForEntry()` so hydration data is served from a
+same-origin JSON sidecar instead of inline `__FACETHEORY_DATA__`. See
+[Getting Started](./docs/getting-started.md#add-strict-no-inline-csp-hydration) and
+[Core Patterns](./docs/core-patterns.md#pattern-render-strict-no-inline-csp-pages-with-external-hydration).
+
 ## Repository Development
 
 ```bash
@@ -119,6 +127,7 @@ High-signal examples:
 - Vue Vite SSR: `npm run example:vite:vue:build && npm run example:vite:vue:serve`
 - Svelte Vite SSR: `npm run example:vite:svelte:build && npm run example:vite:svelte:serve`
 - Svelte external library host: `npm run example:vite:svelte:library:build && npm run example:vite:svelte:library:serve`
+- Strict CSP Svelte/Vite: `npm run example:vite:svelte:strict-csp:build && npm run example:vite:svelte:strict-csp:serve`
 - Operator visibility SSR example: `npm run example:operator-visibility:build && npm run example:operator-visibility:serve`
 - SSG: `npm run example:ssg:build && npm run example:ssg:serve`
 

@@ -319,6 +319,89 @@ Why this is incorrect:
 - It bypasses the package asset graph and makes stylesheet delivery drift from the hydrated client bundle.
 - It creates a second, undocumented integration path that tests will not cover.
 
+## Pattern: Render strict no-inline CSP pages with external hydration
+
+Problem:
+You need a FaceTheory route to pass a CSP that forbids inline scripts, inline styles, and raw head HTML while still
+hydrating the same data that was used for the server render.
+
+**CORRECT**
+
+```ts
+import {
+  buildStrictCspHeader,
+  externalHydrationForEntry,
+  viteAssetsForEntry,
+} from "@theory-cloud/facetheory";
+
+const strictCsp = {
+  inlineScripts: false,
+  inlineStyles: false,
+  rawHead: false,
+} as const;
+
+renderOptions: async (_ctx, data) => {
+  const { headTags } = viteAssetsForEntry(manifest, "src/entry-client.ts", {
+    includeAssets: true,
+  });
+
+  return {
+    csp: strictCsp,
+    headers: {
+      "content-security-policy": buildStrictCspHeader(),
+    },
+    headTags,
+    hydration: externalHydrationForEntry(
+      manifest,
+      "src/entry-client.ts",
+      data,
+      { dataUrl: "/_facetheory/data/example.json" },
+    ),
+  };
+};
+```
+
+Why this is correct:
+
+- The strict policy tells FaceTheory to validate both structured head output and the rendered body before returning HTML.
+- Hydration data is fetched from a same-origin JSON sidecar instead of being embedded in `__FACETHEORY_DATA__`.
+- Vite owns the client module and CSS/asset graph, so scripts and styles remain external and deterministic.
+- The CSP header is attached explicitly by the Face; FaceTheory validates output, but it does not silently choose a
+  response policy for the host.
+
+Framework notes:
+
+- React routes that set `inlineScripts:false` must not use shell streaming. Use `styleStrategy: "all-ready"` so
+  FaceTheory can validate the whole document before bytes flush.
+- React + Emotion/AntD inline style extraction is incompatible with `inlineStyles:false`; use external CSS for strict
+  no-inline routes.
+- Svelte strict routes should avoid `<svelte:head>` raw output and component `<style>` fallback output. Import CSS from
+  the client entry and emit titles/meta/links through FaceTheory `headTags`.
+- `startFaceNavigation()` loads the external hydration sidecar before applying a same-origin navigation snapshot and
+  calling `hydrateFaceNavigation(context)`.
+
+Reference example:
+
+- `ts/examples/vite-strict-csp-svelte/`
+
+**INCORRECT**
+
+```ts
+return {
+  csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+  headTags: [{ type: "raw", html: "<script>window.boot()</script>" }],
+  hydration: viteHydrationForEntry(manifest, "src/entry-client.ts", data),
+  html: '<main style="display:none">...</main>',
+};
+```
+
+Why this is incorrect:
+
+- `viteHydrationForEntry()` emits legacy inline hydration JSON; strict no-inline routes need `FaceExternalHydration`.
+- Raw head HTML, inline event handlers, inline style attributes, inline style tags, and inline scripts all fail closed
+  under the strict policy.
+- Warning-only documentation is not enough: strict routes should let FaceTheory fail before returning invalid HTML.
+
 ## Pattern: Mark same-origin mutating forms for OAC transport
 
 Problem:
