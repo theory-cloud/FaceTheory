@@ -2,8 +2,14 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { createFaceApp } from './app.js';
-import { renderHTMLDocument } from './html.js';
-import type { FaceBody, FaceModule, Headers } from './types.js';
+import { renderHTMLDocument, safeJson } from './html.js';
+import type {
+  FaceBody,
+  FaceHydration,
+  FaceModule,
+  FaceRenderResult,
+  Headers,
+} from './types.js';
 import {
   normalizePath,
   trimLeadingSlashes,
@@ -63,6 +69,10 @@ interface PlannedPage {
   path: string;
 }
 
+interface SsgHydrationSidecar {
+  data: unknown;
+}
+
 const DEFAULT_ASSET_MANIFEST_PATH = '.vite/manifest.json';
 const DEFAULT_404_HTML = renderHTMLDocument({
   head: '<title>Not Found</title>',
@@ -87,7 +97,13 @@ export async function buildSsgSite(
   }
   await mkdir(outDir, { recursive: true });
 
-  const app = createFaceApp({ faces: options.faces });
+  const strictHydrationSidecars = new Map<string, SsgHydrationSidecar>();
+  const app = createFaceApp({
+    faces: withSsgStrictHydrationSidecars(
+      options.faces,
+      strictHydrationSidecars,
+    ),
+  });
   const plannedPages = await planSsgPages(options.faces);
 
   const builtPages: SsgPageEntry[] = [];
@@ -125,8 +141,16 @@ export async function buildSsgSite(
 
         await writeOutFile(outDir, file, html);
 
+        const strictHydrationSidecar = strictHydrationSidecars.get(page.path);
         let hydrationDataFile: string | undefined;
-        if (emitHydrationData) {
+        if (strictHydrationSidecar !== undefined) {
+          hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
+          await writeOutFile(
+            outDir,
+            hydrationDataFile,
+            `${safeJson(strictHydrationSidecar.data)}\n`,
+          );
+        } else if (emitHydrationData) {
           const hydrationJson = extractHydrationDataJson(html);
           if (hydrationJson !== null) {
             hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
@@ -251,6 +275,53 @@ export async function planSsgPages(
   }
 
   return planned;
+}
+
+function withSsgStrictHydrationSidecars(
+  faces: FaceModule[],
+  sidecars: Map<string, SsgHydrationSidecar>,
+): FaceModule[] {
+  return faces.map((face) => {
+    if (face.mode !== 'ssg') return face;
+
+    return {
+      ...face,
+      render: async (ctx, data) => {
+        const out = await face.render(ctx, data);
+        if (!requiresSsgStrictHydrationSidecar(out)) return out;
+
+        const routePath = normalizePath(ctx.request.path);
+        const hydrationDataFile = ssgHydrationDataFilePathForRoute(routePath);
+        sidecars.set(routePath, { data: out.hydration.data });
+
+        return {
+          ...out,
+          hydration: externalizeSsgHydration(
+            out.hydration,
+            `/${hydrationDataFile}`,
+          ),
+        };
+      },
+    };
+  });
+}
+
+function requiresSsgStrictHydrationSidecar(
+  out: FaceRenderResult,
+): out is FaceRenderResult & { hydration: FaceHydration } {
+  return out.csp?.inlineScripts === false && out.hydration !== undefined;
+}
+
+function externalizeSsgHydration(
+  hydration: FaceHydration,
+  dataUrl: string,
+): FaceHydration {
+  return {
+    type: 'external',
+    data: hydration.data,
+    dataUrl,
+    bootstrapModule: hydration.bootstrapModule,
+  };
 }
 
 export function ssgFilePathForRoute(

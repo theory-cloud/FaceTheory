@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
+import { utf8 } from './bytes.js';
+import { safeJson } from './html.js';
 import type {
   CookieMap,
   FaceContext,
@@ -30,6 +32,9 @@ const DEFAULT_TENANT_BOUNDARY_HEADERS = [
   'x-tenant-id',
   'x-facetheory-tenant',
 ] as const;
+const ISR_HYDRATION_QUERY_PARAM = '__facetheory_isr_hydration';
+const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
+const HYDRATION_SIDECAR_CACHE_CONTROL = 'no-store';
 
 export type IsrFailurePolicy = 'serve-stale' | 'error';
 export type IsrLockContentionPolicy = 'wait' | 'serve-stale';
@@ -136,7 +141,17 @@ export interface HandleIsrFaceInput {
   face: FaceModule;
   ctx: FaceContext;
   routePattern: string;
-  renderFresh: () => Promise<FaceResponse>;
+  renderFresh: (options?: IsrRenderFreshOptions) => Promise<FaceResponse>;
+}
+
+export interface IsrHydrationSidecar {
+  data: unknown;
+  dataUrl: string;
+}
+
+export interface IsrRenderFreshOptions {
+  strictExternalHydrationDataUrl?: string;
+  onHydrationSidecar?: (sidecar: IsrHydrationSidecar) => void;
 }
 
 export interface IsrRuntime {
@@ -394,6 +409,20 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         input.face.revalidateSeconds,
       );
       assertPartitionedTenantBoundary(runtimeOptions, input.ctx);
+
+      const hydrationSidecarPointer = hydrationSidecarPointerFromRequest(
+        input.ctx.request.query,
+        runtimeOptions.htmlPointerPrefix,
+      );
+      if (hydrationSidecarPointer.present) {
+        return hydrationSidecarPointer.pointer
+          ? cachedHydrationSidecarResponse(
+              runtimeOptions,
+              hydrationSidecarPointer.pointer,
+            )
+          : hydrationSidecarNotFoundResponse();
+      }
+
       const tenant = resolveTenant(runtimeOptions, input.ctx);
       const cacheKey = runtimeOptions.cacheKey({
         tenant,
@@ -617,17 +646,44 @@ async function regenerateAndCommit(
   staleRecord: IsrMetaRecord,
 ): Promise<FaceResponse> {
   const generatedAt = runtimeOptions.now();
+  const htmlPointer = buildHtmlPointer(
+    cacheKey,
+    generatedAt,
+    runtimeOptions.htmlPointerPrefix,
+  );
+  const hydrationSidecarPointer =
+    buildHydrationSidecarPointerFromHtmlPointer(htmlPointer);
+  const hydrationDataUrl = buildHydrationSidecarDataUrl(
+    input.ctx.request.path,
+    hydrationSidecarPointer,
+  );
+  const hydrationSidecarRef: { current: IsrHydrationSidecar | null } = {
+    current: null,
+  };
+
   try {
-    const prepared = await prepareFreshResponse(await input.renderFresh());
+    const prepared = await prepareFreshResponse(
+      await input.renderFresh({
+        strictExternalHydrationDataUrl: hydrationDataUrl,
+        onHydrationSidecar: (sidecar) => {
+          hydrationSidecarRef.current = sidecar;
+        },
+      }),
+    );
     if (prepared.status >= 500) {
       throw new Error(`ISR regeneration produced status ${prepared.status}`);
     }
 
-    const htmlPointer = buildHtmlPointer(
-      cacheKey,
-      generatedAt,
-      runtimeOptions.htmlPointerPrefix,
-    );
+    const hydrationSidecar = hydrationSidecarRef.current;
+    if (hydrationSidecar !== null) {
+      await runtimeOptions.htmlStore.write({
+        key: hydrationSidecarPointer,
+        body: utf8(`${safeJson(hydrationSidecar.data)}\n`),
+        contentType: JSON_CONTENT_TYPE,
+        cacheControl: HYDRATION_SIDECAR_CACHE_CONTROL,
+      });
+    }
+
     const write = await runtimeOptions.htmlStore.write({
       key: htmlPointer,
       body: prepared.body,
@@ -855,6 +911,115 @@ function buildHtmlPointer(
     .digest('hex')
     .slice(0, 24);
   return `${prefix}${digest}/${generatedAt}-${randomUUID()}.html`;
+}
+
+function buildHydrationSidecarPointerFromHtmlPointer(
+  htmlPointer: string,
+): string {
+  return htmlPointer.endsWith('.html')
+    ? `${htmlPointer.slice(0, -'.html'.length)}.hydration.json`
+    : `${htmlPointer}.hydration.json`;
+}
+
+function buildHydrationSidecarDataUrl(
+  routePath: string,
+  sidecarPointer: string,
+): string {
+  const token = Buffer.from(sidecarPointer, 'utf8').toString('base64url');
+  return `${normalizePath(routePath)}?${ISR_HYDRATION_QUERY_PARAM}=${encodeURIComponent(token)}`;
+}
+
+function hydrationSidecarPointerFromRequest(
+  query: Query,
+  htmlPointerPrefix: string,
+): { present: false } | { present: true; pointer: string | null } {
+  const values = query[ISR_HYDRATION_QUERY_PARAM] ?? [];
+  if (values.length === 0) return { present: false };
+  if (values.length !== 1) return { present: true, pointer: null };
+
+  const token = String(values[0] ?? '').trim();
+  if (!token) return { present: true, pointer: null };
+
+  let pointer: string;
+  try {
+    pointer = Buffer.from(token, 'base64url').toString('utf8');
+  } catch {
+    return { present: true, pointer: null };
+  }
+
+  if (!isValidHydrationSidecarPointer(pointer, htmlPointerPrefix)) {
+    return { present: true, pointer: null };
+  }
+
+  return { present: true, pointer };
+}
+
+function isValidHydrationSidecarPointer(
+  pointer: string,
+  htmlPointerPrefix: string,
+): boolean {
+  const normalized = String(pointer ?? '').trim();
+  if (!normalized) return false;
+  if (normalized.startsWith('/') || normalized.includes('\\')) return false;
+  if (!normalized.endsWith('.hydration.json')) return false;
+  if (htmlPointerPrefix && !normalized.startsWith(htmlPointerPrefix)) {
+    return false;
+  }
+
+  const relative = htmlPointerPrefix
+    ? normalized.slice(htmlPointerPrefix.length)
+    : normalized;
+  const parts = relative.split('/');
+  if (
+    parts.length !== 2 ||
+    !/^[a-f0-9]{24}$/i.test(parts[0] ?? '') ||
+    !/^\d+-[a-f0-9-]{36}\.hydration\.json$/i.test(parts[1] ?? '')
+  ) {
+    return false;
+  }
+
+  for (const part of normalized.split('/')) {
+    if (!part || part === '.' || part === '..') return false;
+  }
+
+  return true;
+}
+
+async function cachedHydrationSidecarResponse(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  pointer: string,
+): Promise<FaceResponse> {
+  const sidecar = await runtimeOptions.htmlStore.read(pointer);
+  if (!sidecar) return hydrationSidecarNotFoundResponse();
+
+  const headers: Headers = {
+    'cache-control': [HYDRATION_SIDECAR_CACHE_CONTROL],
+    'content-type': [JSON_CONTENT_TYPE],
+  };
+  if (sidecar.etag) {
+    headers.etag = [sidecar.etag];
+  }
+
+  return {
+    status: 200,
+    headers: sortHeaders(headers),
+    cookies: [],
+    body: Uint8Array.from(sidecar.body),
+    isBase64: false,
+  };
+}
+
+function hydrationSidecarNotFoundResponse(): FaceResponse {
+  return {
+    status: 404,
+    headers: {
+      'cache-control': ['no-store'],
+      'content-type': ['text/plain; charset=utf-8'],
+    },
+    cookies: [],
+    body: utf8('Not Found'),
+    isBase64: false,
+  };
 }
 
 function createDefaultMetaRecord(
