@@ -154,6 +154,79 @@ test('FaceApp: streaming emits document shell attrs before the body stream', asy
   assert.ok(!first.includes('streamed'));
 });
 
+
+
+test('FaceApp: strict CSP streaming responses are coerced to validated buffered HTML', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          hydration: {
+            type: 'external',
+            data: { page: 'strict-stream' },
+            dataUrl: '/_facetheory/hydration/strict-stream.json',
+            bootstrapModule: '/assets/entry.js',
+          },
+          html: streamFromString('<main>strict streamed</main>'),
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  assert.equal(resp.status, 200);
+  assert.ok(resp.body instanceof Uint8Array);
+
+  const full = new TextDecoder().decode(resp.body);
+  assert.ok(full.includes('<main>strict streamed</main>'));
+  assert.ok(full.includes('rel="facetheory-hydration"'));
+  assert.equal(full.includes('__FACETHEORY_DATA__'), false);
+});
+
+test('FaceApp: strict CSP streaming violations fail before bytes flush', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          hydration: {
+            type: 'external',
+            data: { page: 'strict-stream' },
+            dataUrl: '/_facetheory/hydration/strict-stream.json',
+            bootstrapModule: '/assets/entry.js',
+          },
+          html: (async function* () {
+            yield utf8('<main>first chunk</main>');
+            yield utf8('<button onclick="bad()">unsafe</button>');
+          })(),
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  assert.equal(resp.status, 500);
+  assert.ok(resp.body instanceof Uint8Array);
+
+  const full = new TextDecoder().decode(resp.body);
+  assert.ok(full.includes('<h1>Internal Server Error</h1>'));
+  assert.equal(full.includes('first chunk'), false);
+  assert.equal(full.includes('onclick'), false);
+});
+
 test('react adapter: streaming includes AntD + Emotion styles in head before body', async () => {
   function EmotionBox() {
     return jsx(

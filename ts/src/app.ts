@@ -15,6 +15,10 @@ import {
   type IsrRuntime,
 } from './isr.js';
 import { logLevelForStatus, type FaceObservabilityHooks } from './ops.js';
+import {
+  requiresStrictCspDocumentValidation,
+  validateStrictCspDocument,
+} from './security.js';
 import { Router } from './router.js';
 import type {
   FaceContext,
@@ -339,17 +343,36 @@ async function toHTTPResponse(
   const documentParts = withDocumentShell(out);
 
   if (typeof out.html === 'string') {
+    const documentHtml = renderHTMLDocument({
+      ...documentParts,
+      head,
+      body: out.html,
+    });
+    validateStrictCspDocument(documentHtml, { policy: out.csp });
+
     return {
       status,
       headers,
       cookies,
-      body: utf8(
-        renderHTMLDocument({
-          ...documentParts,
-          head,
-          body: out.html,
-        }),
-      ),
+      body: utf8(documentHtml),
+      isBase64: false,
+    };
+  }
+
+  if (requiresStrictCspDocumentValidation(out.csp)) {
+    const strictBody = await collectStreamAsUtf8Text(out.html);
+    const documentHtml = renderHTMLDocument({
+      ...documentParts,
+      head,
+      body: strictBody,
+    });
+    validateStrictCspDocument(documentHtml, { policy: out.csp });
+
+    return {
+      status,
+      headers,
+      cookies,
+      body: utf8(documentHtml),
       isBase64: false,
     };
   }
@@ -361,6 +384,20 @@ async function toHTTPResponse(
   });
 
   return { status, headers, cookies, body, isBase64: false };
+}
+
+async function collectStreamAsUtf8Text(
+  input: AsyncIterable<Uint8Array>,
+): Promise<string> {
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let out = '';
+
+  for await (const chunk of input) {
+    out += decoder.decode(chunk, { stream: true });
+  }
+
+  out += decoder.decode();
+  return out;
 }
 
 function withDocumentShell(
