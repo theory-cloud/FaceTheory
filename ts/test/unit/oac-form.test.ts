@@ -1047,6 +1047,274 @@ test('oac form transport: refuses default document replacement when response CSP
   }
 });
 
+test('oac form transport: strict CSP defaults to full same-origin browser navigation', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html>
+        <head><title>Edit</title></head>
+        <body>
+          <form action="/save" method="post" data-facetheory-oac-form>
+            <input name="title" value="">
+          </form>
+        </body>
+      </html>`,
+    { url: 'https://example.test/edit' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    let writeCount = 0;
+    dom.window.document.write = () => {
+      writeCount += 1;
+    };
+
+    const assigned: string[] = [];
+    const replaced: string[] = [];
+    startAwsOacFormTransport({
+      document: dom.window.document,
+      fetcher: async () =>
+        responseWithUrl(
+          new Response(
+            '<!doctype html><html><head><title>Invalid</title></head><body><main>Title is required</main></body></html>',
+            {
+              headers: {
+                'content-security-policy': "script-src 'self'",
+                'content-type': 'text/html; charset=utf-8',
+              },
+              status: 422,
+            },
+          ),
+          'https://example.test/save',
+        ),
+      strictCsp: true,
+      window: fakeNavigationWindow(dom, assigned, replaced),
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(dom.window.document.title, 'Edit');
+    assert.equal(writeCount, 0);
+    assert.deepEqual(assigned, ['https://example.test/save']);
+    assert.deepEqual(replaced, []);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: SPA navigation policy loads external hydration before mutation', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html>
+        <head><title>Edit</title></head>
+        <body>
+          <form action="/save" method="post" data-facetheory-oac-form>
+            <input name="title" value="Draft">
+          </form>
+          <main data-facetheory-view>Editing</main>
+        </body>
+      </html>`,
+    { url: 'https://example.test/edit' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    let writeCount = 0;
+    dom.window.document.write = () => {
+      writeCount += 1;
+    };
+
+    const fetched: string[] = [];
+    const hydrated: Array<{ data: unknown; text: string | null; url: string }> =
+      [];
+    const replaced: string[] = [];
+    const navigated = new Promise<void>((resolve) => {
+      startAwsOacFormTransport({
+        document: dom.window.document,
+        fetcher: async (input) => {
+          fetched.push(String(input));
+          if (String(input).endsWith('/_facetheory/hydration/save.json')) {
+            return new Response(JSON.stringify({ saved: true }), {
+              headers: { 'content-type': 'application/json' },
+              status: 200,
+            });
+          }
+          return responseWithUrl(
+            new Response(
+              `<!doctype html>
+                <html>
+                  <head>
+                    <title>Saved</title>
+                    <link rel="facetheory-hydration" href="/_facetheory/hydration/save.json" type="application/json">
+                    <script src="/assets/entry-client.js" type="module"></script>
+                  </head>
+                  <body>
+                    <main data-facetheory-view>Saved view</main>
+                  </body>
+                </html>`,
+              {
+                headers: {
+                  'content-security-policy': "script-src 'self'",
+                  'content-type': 'text/html; charset=utf-8',
+                },
+                status: 200,
+              },
+            ),
+            'https://example.test/save',
+          );
+        },
+        navigationPolicy: 'spa',
+        onError: (error) => {
+          throw error;
+        },
+        spaNavigation: {
+          importModule: async () => ({
+            hydrateFaceNavigation: (context) => {
+              hydrated.push({
+                data: context.data,
+                text: context.view?.textContent?.trim() ?? null,
+                url: context.url.toString(),
+              });
+              resolve();
+            },
+          }),
+          parser: new dom.window.DOMParser(),
+        },
+        window: fakeNavigationWindow(dom, [], replaced),
+      });
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await navigated;
+    await flushEventLoop();
+
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(fetched, [
+      'https://example.test/save',
+      'https://example.test/_facetheory/hydration/save.json',
+    ]);
+    assert.equal(writeCount, 0);
+    assert.equal(dom.window.document.title, 'Saved');
+    assert.equal(
+      dom.window.document.querySelector('[data-facetheory-view]')?.textContent,
+      'Saved view',
+    );
+    assert.deepEqual(hydrated, [
+      {
+        data: { saved: true },
+        text: 'Saved view',
+        url: 'https://example.test/save',
+      },
+    ]);
+    assert.deepEqual(replaced, ['https://example.test/save']);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('oac form transport: SPA policy rejects unsafe hydration targets before mutation', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html>
+        <head><title>Edit</title></head>
+        <body>
+          <form action="/save" method="post" data-facetheory-oac-form>
+            <input name="title" value="Draft">
+          </form>
+          <main data-facetheory-view>Editing</main>
+        </body>
+      </html>`,
+    { url: 'https://example.test/edit' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    let writeCount = 0;
+    dom.window.document.write = () => {
+      writeCount += 1;
+    };
+
+    const errors: unknown[] = [];
+    const replaced: string[] = [];
+    const errored = new Promise<void>((resolve) => {
+      startAwsOacFormTransport({
+        document: dom.window.document,
+        fetcher: async () =>
+          responseWithUrl(
+            new Response(
+              `<!doctype html>
+                <html>
+                  <head>
+                    <title>Saved</title>
+                    <link rel="facetheory-hydration" href="https://evil.test/hydration.json" type="application/json">
+                    <script src="/assets/entry-client.js" type="module"></script>
+                  </head>
+                  <body>
+                    <main data-facetheory-view>Unsafe saved view</main>
+                  </body>
+                </html>`,
+              {
+                headers: {
+                  'content-security-policy': "script-src 'self'",
+                  'content-type': 'text/html; charset=utf-8',
+                },
+                status: 200,
+              },
+            ),
+            'https://example.test/save',
+          ),
+        navigationPolicy: 'spa',
+        onError: (error) => {
+          errors.push(error);
+          resolve();
+        },
+        spaNavigation: {
+          parser: new dom.window.DOMParser(),
+        },
+        window: fakeNavigationWindow(dom, [], replaced),
+      });
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await errored;
+
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(dom.window.document.title, 'Edit');
+    assert.equal(
+      dom.window.document.querySelector('[data-facetheory-view]')?.textContent,
+      'Editing',
+    );
+    assert.equal(writeCount, 0);
+    assert.deepEqual(replaced, []);
+    assert.equal(errors.length, 1);
+    assert.match(
+      String(errors[0]),
+      /FaceTheory SPA hydration data resolved cross-origin/,
+    );
+  } finally {
+    dom.window.close();
+  }
+});
+
 test('oac form transport: lets hosts override navigation outcomes', async () => {
   const dom = new JSDOM(
     `<!doctype html>
