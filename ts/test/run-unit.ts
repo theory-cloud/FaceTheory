@@ -33,4 +33,5 @@ await import('./unit/operator-visibility-example.test.js');
 await import('./unit/vite-ssr-example.test.js');
 await import('./unit/vite-ssr-vue-example.test.js');
 await import('./unit/vite-ssr-svelte-example.test.js');
+await import('./unit/vite-strict-csp-svelte-example.test.js');
 await import('./unit/vite-ssr-svelte-library-example.test.js');
