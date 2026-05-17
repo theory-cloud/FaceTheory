@@ -69,6 +69,10 @@ export interface LoadFaceNavigationModuleOptions {
   viewSelector?: string;
 }
 
+export interface ValidateFaceNavigationSnapshotOptions {
+  allowedOrigin?: string | URL;
+}
+
 export interface StartFaceNavigationOptions
   extends Omit<FetchFaceNavigationSnapshotOptions, 'url'>,
     Pick<ApplyFaceNavigationSnapshotOptions, 'syncHead'>,
@@ -341,6 +345,16 @@ export async function loadFaceNavigationModule(
   if (typeof reloaded.hydrateFaceNavigation === 'function') {
     await reloaded.hydrateFaceNavigation(context);
   }
+}
+
+export function validateFaceNavigationSnapshot(
+  snapshot: FaceNavigationSnapshot,
+  options: ValidateFaceNavigationSnapshotOptions = {},
+): void {
+  const allowedOrigin =
+    resolveAllowedNavigationOrigin(options.allowedOrigin) ??
+    resolveNavigationUrl(snapshot.url, 'http://localhost/').origin;
+  assertSameOriginHydrationReferences(snapshot, allowedOrigin);
 }
 
 export function startFaceNavigation(
