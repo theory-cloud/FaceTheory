@@ -1,8 +1,15 @@
 import { escapeHTML, safeJson } from './html.js';
-import type { FaceAttributes, FaceHeadTag, FaceRenderResult } from './types.js';
+import type {
+  FaceAttributes,
+  FaceCspPolicy,
+  FaceHeadTag,
+  FaceHydration,
+  FaceRenderResult,
+} from './types.js';
 
 export interface RenderFaceHeadOptions {
   cspNonce?: string | null;
+  allowedOrigin?: string | URL;
 }
 
 export interface NormalizeHeadTagsOptions {
@@ -28,6 +35,160 @@ function safeHttpUrl(value: string): string | null {
       : null;
   } catch {
     return null;
+  }
+}
+
+function requireSafeHttpUrl(value: string, label: string): string {
+  const safe = safeHttpUrl(value);
+  if (!safe) {
+    throw new Error(`FaceTheory ${label} must be an http(s) or same-origin URL`);
+  }
+  return safe;
+}
+
+function isExternalHydration(
+  hydration: FaceHydration,
+): hydration is Extract<FaceHydration, { type: 'external' }> {
+  return hydration.type === 'external';
+}
+
+function normalizeAllowedOrigin(origin: string | URL | undefined): string | null {
+  if (origin === undefined) return null;
+  return new URL(String(origin)).origin;
+}
+
+function isAbsoluteOrProtocolRelativeUrl(value: string): boolean {
+  return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value) || value.startsWith('//');
+}
+
+function assertStrictSameOriginUrl(
+  value: string,
+  label: string,
+  allowedOrigin: string | null,
+): void {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) {
+    throw new Error(`FaceTheory strict CSP ${label} URL must not be empty`);
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed, 'https://facetheory.invalid');
+  } catch {
+    throw new Error(`FaceTheory strict CSP ${label} URL is invalid: ${trimmed}`);
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(
+      `FaceTheory strict CSP ${label} URL must be http(s) or same-origin: ${trimmed}`,
+    );
+  }
+
+  if (!isAbsoluteOrProtocolRelativeUrl(trimmed)) return;
+
+  if (!allowedOrigin) {
+    throw new Error(
+      `FaceTheory strict CSP ${label} URL must be same-origin or relative: ${trimmed}`,
+    );
+  }
+
+  if (parsed.origin !== allowedOrigin) {
+    throw new Error(
+      `FaceTheory strict CSP ${label} URL resolved cross-origin: expected ${allowedOrigin}, received ${parsed.origin}`,
+    );
+  }
+}
+
+function isCspDisabled(
+  policy: FaceCspPolicy | undefined,
+  key: keyof FaceCspPolicy,
+): boolean {
+  return policy?.[key] === false;
+}
+
+function validateStrictAttributes(
+  tag: FaceHeadTag,
+  attrs: FaceAttributes | undefined,
+  policy: FaceCspPolicy | undefined,
+  allowedOrigin: string | null,
+): void {
+  if (!attrs) return;
+
+  for (const [name, rawValue] of Object.entries(attrs)) {
+    if (rawValue === undefined || rawValue === null || rawValue === false) continue;
+    const lowerName = name.trim().toLowerCase();
+
+    if (isCspDisabled(policy, 'inlineScripts') && /^on[a-z]/.test(lowerName)) {
+      throw new Error(
+        `FaceTheory strict CSP rejects inline event handler attribute "${name}" in head`,
+      );
+    }
+
+    if (isCspDisabled(policy, 'inlineStyles') && lowerName === 'style') {
+      throw new Error('FaceTheory strict CSP rejects inline style attributes in head');
+    }
+
+    if (
+      isCspDisabled(policy, 'inlineScripts') &&
+      tag.type === 'script' &&
+      lowerName === 'src'
+    ) {
+      assertStrictSameOriginUrl(String(rawValue), 'script src', allowedOrigin);
+    }
+
+    if (
+      (isCspDisabled(policy, 'inlineScripts') ||
+        isCspDisabled(policy, 'inlineStyles')) &&
+      tag.type === 'link' &&
+      lowerName === 'href'
+    ) {
+      assertStrictSameOriginUrl(String(rawValue), 'link href', allowedOrigin);
+    }
+  }
+}
+
+function validateStrictHeadTags(
+  tags: FaceHeadTag[],
+  policy: FaceCspPolicy | undefined,
+  options: {
+    allowedOrigin?: string | URL;
+    allowedEscapedRawHtml?: string | null;
+  } = {},
+): void {
+  if (!policy) return;
+
+  const allowedOrigin = normalizeAllowedOrigin(options.allowedOrigin);
+  const allowedEscapedRawHtml = options.allowedEscapedRawHtml ?? null;
+
+  for (const tag of tags) {
+    switch (tag.type) {
+      case 'raw':
+        if (
+          isCspDisabled(policy, 'rawHead') &&
+          tag.html !== allowedEscapedRawHtml
+        ) {
+          throw new Error('FaceTheory strict CSP rejects raw head HTML');
+        }
+        break;
+      case 'script':
+        if (isCspDisabled(policy, 'inlineScripts') && tag.body !== undefined) {
+          throw new Error('FaceTheory strict CSP rejects inline script tags');
+        }
+        validateStrictAttributes(tag, tag.attrs, policy, allowedOrigin);
+        break;
+      case 'style':
+        if (isCspDisabled(policy, 'inlineStyles')) {
+          throw new Error('FaceTheory strict CSP rejects inline style tags');
+        }
+        validateStrictAttributes(tag, tag.attrs, policy, allowedOrigin);
+        break;
+      case 'meta':
+      case 'link':
+        validateStrictAttributes(tag, tag.attrs, policy, allowedOrigin);
+        break;
+      case 'title':
+        break;
+    }
   }
 }
 
@@ -197,6 +358,9 @@ export function renderFaceHead(
   options: RenderFaceHeadOptions = {},
 ): string {
   const tags: FaceHeadTag[] = [];
+  const escapedLegacyHeadHtml = out.head?.html
+    ? escapeHTML(out.head.html)
+    : null;
 
   if (out.headTags) tags.push(...out.headTags);
 
@@ -213,24 +377,54 @@ export function renderFaceHead(
   if (out.head?.title) {
     tags.push({ type: 'title', text: out.head.title });
   }
-  if (out.head?.html) {
-    tags.push({ type: 'raw', html: escapeHTML(out.head.html) });
+  if (escapedLegacyHeadHtml) {
+    tags.push({ type: 'raw', html: escapedLegacyHeadHtml });
   }
 
   if (out.hydration) {
-    tags.push({
-      type: 'script',
-      attrs: { id: '__FACETHEORY_DATA__', type: 'application/json' },
-      body: safeJson(out.hydration.data),
-    });
-    const bootstrapModule = safeHttpUrl(out.hydration.bootstrapModule);
-    if (bootstrapModule) {
+    if (isExternalHydration(out.hydration)) {
+      const dataUrl = requireSafeHttpUrl(out.hydration.dataUrl, 'external hydration dataUrl');
+      const bootstrapModule = requireSafeHttpUrl(
+        out.hydration.bootstrapModule,
+        'external hydration bootstrapModule',
+      );
+      tags.push({
+        type: 'link',
+        attrs: {
+          id: '__FACETHEORY_DATA_URL__',
+          rel: 'facetheory-hydration',
+          href: dataUrl,
+          type: 'application/json',
+        },
+      });
       tags.push({
         type: 'script',
         attrs: { type: 'module', src: bootstrapModule },
       });
+    } else {
+      tags.push({
+        type: 'script',
+        attrs: { id: '__FACETHEORY_DATA__', type: 'application/json' },
+        body: safeJson(out.hydration.data),
+      });
+      const bootstrapModule = safeHttpUrl(out.hydration.bootstrapModule);
+      if (bootstrapModule) {
+        tags.push({
+          type: 'script',
+          attrs: { type: 'module', src: bootstrapModule },
+        });
+      }
     }
   }
+
+  const validationOptions: {
+    allowedOrigin?: string | URL;
+    allowedEscapedRawHtml?: string | null;
+  } = { allowedEscapedRawHtml: escapedLegacyHeadHtml };
+  if (options.allowedOrigin !== undefined) {
+    validationOptions.allowedOrigin = options.allowedOrigin;
+  }
+  validateStrictHeadTags(tags, out.csp, validationOptions);
 
   return normalizeHeadTags(tags, { cspNonce: options.cspNonce ?? null })
     .map(renderHeadTag)
