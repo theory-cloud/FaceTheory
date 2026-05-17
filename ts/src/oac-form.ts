@@ -577,7 +577,14 @@ async function customNavigationHandled(
 }
 
 function resolveResponseUrl(response: Response, fallback: URL): URL {
-  return new URL(response.url || fallback.toString(), fallback);
+  try {
+    return new URL(response.url || fallback.toString(), fallback);
+  } catch (error) {
+    throw new Error(
+      `FaceTheory OAC form transport rejected malformed response URL: ${response.url || '<empty>'}`,
+      { cause: error },
+    );
+  }
 }
 
 function isHtmlResponse(response: Response): boolean {
