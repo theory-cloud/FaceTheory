@@ -41,7 +41,7 @@ const STRICT_CSP_DIRECTIVES: Array<[name: string, values: string[]]> = [
 ];
 
 const START_TAG_RE = /<([a-zA-Z][a-zA-Z0-9:-]*)(\s[^<>]*?)?>/g;
-const SCRIPT_PAIR_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+const SCRIPT_PAIR_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi;
 
 /**
  * Builds FaceTheory's canonical strict CSP header value.
