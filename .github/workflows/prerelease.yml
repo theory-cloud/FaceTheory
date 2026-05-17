@@ -124,12 +124,14 @@ jobs:
           manifest-file: .release-please-manifest.premain.json
           skip-github-pull-request: true
 
-  build-release-assets:
+  resolve-draft-release:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
+    outputs:
+      release_json: ${{ steps.draft.outputs.release_json }}
     steps:
       - name: Resolve draft release metadata
         id: draft
@@ -203,6 +205,15 @@ jobs:
             echo "__FACETHEORY_RELEASE_JSON__"
           } >> "${GITHUB_OUTPUT}"
 
+  build-release-assets:
+    needs:
+      - release-please
+      - resolve-draft-release
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
       - name: Checkout (for release assets)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -218,7 +229,7 @@ jobs:
 
       - name: Verify draft release targets this commit
         env:
-          RELEASE_JSON: ${{ steps.draft.outputs.release_json }}
+          RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}
         run: scripts/verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
 
       - name: Verify release source branch
@@ -408,6 +419,7 @@ jobs:
   cleanup-failed-draft:
     needs:
       - release-please
+      - resolve-draft-release
       - build-release-assets
       - publish-prerelease
     if: >-
@@ -415,6 +427,8 @@ jobs:
         always() &&
         needs.release-please.outputs.release_created == 'true' &&
         (
+          needs.resolve-draft-release.result == 'failure' ||
+          needs.resolve-draft-release.result == 'cancelled' ||
           needs.build-release-assets.result == 'failure' ||
           needs.build-release-assets.result == 'cancelled' ||
           needs.publish-prerelease.result == 'failure' ||

@@ -77,11 +77,11 @@ for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; 
     fail "${workflow} must tolerate delayed GitHub draft release visibility"
 done
 
-grep -Fq 'RELEASE_JSON: ${{ steps.draft.outputs.release_json }}' .github/workflows/prerelease.yml ||
-  fail "prerelease.yml must pass draft metadata to verification without a token"
+grep -Fq 'RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}' .github/workflows/prerelease.yml ||
+  fail "prerelease.yml must pass control-plane draft metadata to verification without a token"
 
-grep -Fq 'RELEASE_JSON: ${{ steps.draft.outputs.release_json }}' .github/workflows/release.yml ||
-  fail "release.yml must pass draft metadata to verification without a token"
+grep -Fq 'RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}' .github/workflows/release.yml ||
+  fail "release.yml must pass control-plane draft metadata to verification without a token"
 
 grep -Fq 'RELEASE_JSON: ${{ steps.metadata.outputs.release_json }}' .github/workflows/release.yml ||
   fail "release.yml existing-tag path must pass resolved release metadata without a token"
@@ -157,6 +157,73 @@ from pathlib import Path
 text = Path(sys.argv[1]).read_text(encoding="utf-8")
 if not re.search(r"\n  build-release-assets:\n(?:.*\n)*?    permissions:\n      contents: read\n", text):
     raise SystemExit(1)
+PY
+
+done
+
+for workflow in .github/workflows/release.yml .github/workflows/prerelease.yml; do
+  python3 - "${workflow}" <<'PY' || fail "${workflow} draft metadata resolver must be a no-checkout control-plane job"
+import re
+import sys
+from pathlib import Path
+
+workflow = Path(sys.argv[1])
+text = workflow.read_text(encoding="utf-8")
+resolver_match = re.search(
+    r"\n  resolve-draft-release:\n(?P<block>(?:    .*\n|\n)+?)(?=\n  build-release-assets:)",
+    text,
+)
+if resolver_match is None:
+    raise SystemExit(f"missing resolve-draft-release job in {workflow}")
+resolver = resolver_match.group("block")
+required = (
+    "    needs: release-please\n",
+    "    if: needs.release-please.outputs.release_created == 'true'\n",
+    "    permissions:\n      contents: write\n",
+    "    outputs:\n      release_json: ${{ steps.draft.outputs.release_json }}\n",
+    "      - name: Resolve draft release metadata\n",
+    "          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}\n",
+)
+for needle in required:
+    if needle not in resolver:
+        raise SystemExit(f"missing resolver invariant {needle!r} in {workflow}")
+for forbidden in ("actions/checkout@", "run: scripts/", "make rubric", "npm ci", "build-release-assets.sh"):
+    if forbidden in resolver:
+        raise SystemExit(f"resolver job must not contain {forbidden!r} in {workflow}")
+
+build_match = re.search(
+    r"\n  build-release-assets:\n(?P<block>(?:    .*\n|\n)+?)(?=\n  publish-)",
+    text,
+)
+if build_match is None:
+    raise SystemExit(f"missing build-release-assets job in {workflow}")
+build = build_match.group("block")
+for required in (
+    "      - release-please\n",
+    "      - resolve-draft-release\n",
+    "    permissions:\n      contents: read\n",
+    "RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}",
+):
+    if required not in build:
+        raise SystemExit(f"missing build invariant {required!r} in {workflow}")
+for forbidden in ("GH_TOKEN:", "GITHUB_TOKEN:", "secrets.RELEASE_PLEASE_TOKEN"):
+    if forbidden in build:
+        raise SystemExit(f"build-release-assets must not receive {forbidden} in {workflow}")
+
+cleanup_match = re.search(
+    r"\n  cleanup-failed-draft:\n(?P<block>(?:    .*\n|\n)+?)$",
+    text,
+)
+if cleanup_match is None:
+    raise SystemExit(f"missing cleanup-failed-draft job in {workflow}")
+cleanup = cleanup_match.group("block")
+for required in (
+    "      - resolve-draft-release\n",
+    "needs.resolve-draft-release.result == 'failure'",
+    "needs.resolve-draft-release.result == 'cancelled'",
+):
+    if required not in cleanup:
+        raise SystemExit(f"cleanup must cover resolver failure invariant {required!r} in {workflow}")
 PY
 
 done
