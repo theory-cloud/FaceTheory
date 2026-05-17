@@ -23,7 +23,7 @@ jobs:
   check-baseline:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     outputs:
       ready: ${{ steps.ready.outputs.ready }}
       stable_ready: ${{ steps.stable.outputs.ready }}
@@ -39,13 +39,13 @@ jobs:
       - name: Check stable release baseline
         id: stable
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.json
 
       - name: Check premain prerelease baseline
         id: prerelease
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.premain.json
 
       - name: Mark prerelease PR baseline readiness

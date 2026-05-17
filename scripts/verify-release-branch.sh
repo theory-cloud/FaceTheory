@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="${REPO_ROOT:-$(cd "${script_dir}/.." && pwd)}"
+cd "${repo_root}"
 
 tag="${1:-${GITHUB_REF_NAME:-}}"
 if [[ -z "${tag}" ]]; then
@@ -14,7 +16,17 @@ if [[ ! -f "VERSION" ]]; then
   exit 1
 fi
 
-expected_version="$(./scripts/read-version.sh)"
+expected_version="$(
+  python3 - <<'PY'
+from pathlib import Path
+
+line = Path("VERSION").read_text(encoding="utf-8").splitlines()[0]
+version = line.split("#", 1)[0].strip()
+if not version:
+    raise SystemExit("version: FAIL (empty VERSION)")
+print(version)
+PY
+)"
 expected_tag="v${expected_version}"
 
 if [[ "${tag}" != "${expected_tag}" ]]; then

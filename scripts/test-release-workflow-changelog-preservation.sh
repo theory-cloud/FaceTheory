@@ -29,17 +29,28 @@ if grep -R -F 'gh release create' .github/workflows scripts | grep -v 'scripts/t
   fail "release recovery must not create GitHub Releases outside Release Please"
 fi
 
-grep -Fq 'scripts/resolve-release-source-ref.sh "${TAG_NAME}"' .github/workflows/release.yml ||
-  fail "release.yml must resolve existing draft source refs before checkout"
+grep -Fq 'facetheory-release-scripts' .github/workflows/release.yml ||
+  fail "release.yml must stage trusted release provenance scripts before checking out release source code"
 
-grep -Fq 'Checkout release workflow scripts' .github/workflows/release.yml ||
-  fail "release.yml must checkout current workflow scripts before resolving an existing draft source"
+grep -Fq 'resolve-release-source-ref.sh" "${TAG_NAME}"' .github/workflows/release.yml ||
+  fail "release.yml must resolve existing draft source refs from trusted staged scripts before checkout"
 
-grep -Fq 'scripts/publish-draft-release-assets.sh "${TAG_NAME}" dist' .github/workflows/release.yml ||
-  fail "release.yml must publish draft assets through the release-id aware publisher"
+grep -Fq 'RELEASE_SOURCE_COMMIT' .github/workflows/release.yml ||
+  fail "release.yml must carry immutable release source identity into the build job"
 
-grep -Fq 'scripts/publish-draft-release-assets.sh "${TAG_NAME}" dist' .github/workflows/prerelease.yml ||
-  fail "prerelease.yml must publish draft assets through the release-id aware publisher"
+grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" HEAD' .github/workflows/release.yml ||
+  fail "release.yml must revalidate existing draft target identity after checkout and before build"
+
+if grep -R -Fq 'run: scripts/publish-draft-release-assets.sh' .github/workflows; then
+  fail "release-capable publish tokens must not be exposed to mutable repo publish scripts"
+fi
+
+for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; do
+  grep -Fq 'repos/${repo}/releases/${release_id}/assets' "${workflow}" ||
+    fail "${workflow} must upload release assets through a minimal inline release-id API step"
+  grep -Fq -- '--method PATCH' "${workflow}" ||
+    fail "${workflow} must publish draft releases through a minimal inline PATCH API step"
+done
 
 grep -Fq 'scripts/check-release-baseline-ready.sh .release-please-manifest.premain.json' .github/workflows/prerelease-pr.yml ||
   fail "prerelease-pr.yml must verify the current premain prerelease baseline before generating the next RC PR"
@@ -54,16 +65,91 @@ grep -Fq 'steps.version.outputs.release_as }}" != "" &&' .github/workflows/relea
   fail "release-pr.yml must fail closed when an aligned stable release depends on an unpublished premain RC"
 
 for workflow in .github/workflows/prerelease-pr.yml .github/workflows/release-pr.yml .github/workflows/prerelease.yml; do
-  python3 - "${workflow}" <<'PY' || fail "${workflow} check-baseline job must use contents: write for draft release visibility"
+  python3 - "${workflow}" <<'PY' || fail "${workflow} check-baseline job must use contents: read"
 import sys
 from pathlib import Path
 
 workflow = Path(sys.argv[1])
 text = workflow.read_text(encoding="utf-8")
-needle = "  check-baseline:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n"
+needle = "  check-baseline:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n"
 if needle not in text:
     raise SystemExit(1)
 PY
+
 done
+
+for workflow in .github/workflows/prerelease-pr.yml .github/workflows/release-pr.yml .github/workflows/prerelease.yml; do
+  python3 - "${workflow}" <<'PY' || fail "${workflow} baseline scripts must receive only github.token"
+import sys
+from pathlib import Path
+
+workflow = Path(sys.argv[1])
+lines = workflow.read_text(encoding="utf-8").splitlines()
+for index, line in enumerate(lines):
+    if "scripts/check-release-baseline-ready.sh" not in line:
+        continue
+    window = "\n".join(lines[max(0, index - 6): index + 1])
+    if "secrets.RELEASE_PLEASE_TOKEN" in window:
+        raise SystemExit(1)
+    if "GH_TOKEN: ${{ github.token }}" not in window:
+        raise SystemExit(1)
+PY
+
+done
+
+for workflow in .github/workflows/release.yml .github/workflows/prerelease.yml; do
+  python3 - "${workflow}" <<'PY' || fail "${workflow} build-release-assets job must use contents: read"
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+if not re.search(r"\n  build-release-assets:\n(?:.*\n)*?    permissions:\n      contents: read\n", text):
+    raise SystemExit(1)
+PY
+
+done
+
+python3 - .github/workflows/release.yml <<'PY' || fail "release.yml existing-tag build job must use contents: read"
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+if not re.search(r"\n  build-existing-tag-assets:\n(?:.*\n)*?    permissions:\n      contents: read\n", text):
+    raise SystemExit(1)
+PY
+
+python3 - <<'PY' || fail "release-capable tokens must not be passed to repo-controlled scripts"
+from pathlib import Path
+
+for workflow in Path(".github/workflows").glob("*.yml"):
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+    for index, line in enumerate(lines):
+        if "run: scripts/" not in line:
+            continue
+        window = "\n".join(lines[max(0, index - 8): index + 1])
+        if "secrets.RELEASE_PLEASE_TOKEN" in window:
+            raise SystemExit(f"{workflow}:{index + 1}")
+PY
+
+python3 - <<'PY' || fail "release build and rubric steps must not receive GitHub token env"
+from pathlib import Path
+
+sensitive_runs = (
+    "cd ts && npm ci",
+    "make rubric",
+    "scripts/build-release-assets.sh",
+    "scripts/generate-checksums.sh",
+)
+for workflow in (Path(".github/workflows/release.yml"), Path(".github/workflows/prerelease.yml")):
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+    for index, line in enumerate(lines):
+        if not any(run in line for run in sensitive_runs):
+            continue
+        window = "\n".join(lines[max(0, index - 8): index + 1])
+        if "GH_TOKEN:" in window or "GITHUB_TOKEN:" in window or "secrets.RELEASE_PLEASE_TOKEN" in window:
+            raise SystemExit(f"{workflow}:{index + 1}")
+PY
 
 echo "test-release-workflow-changelog-preservation: PASS"

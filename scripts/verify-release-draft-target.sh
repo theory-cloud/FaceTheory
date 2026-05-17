@@ -18,7 +18,17 @@ if [[ ! -f "VERSION" ]]; then
   exit 1
 fi
 
-expected_version="$(./scripts/read-version.sh)"
+expected_version="$(
+  python3 - <<'PY'
+from pathlib import Path
+
+line = Path("VERSION").read_text(encoding="utf-8").splitlines()[0]
+version = line.split("#", 1)[0].strip()
+if not version:
+    raise SystemExit("version: FAIL (empty VERSION)")
+print(version)
+PY
+)"
 expected_tag="v${expected_version}"
 if [[ "${tag}" != "${expected_tag}" ]]; then
   echo "release-draft-target: FAIL (tag ${tag} != ${expected_tag})"
@@ -87,19 +97,38 @@ fi
 
 resolve_target_commit() {
   local ref="$1"
-
-  git rev-parse --verify --quiet "${ref}^{commit}" 2>/dev/null && return 0
-  git rev-parse --verify --quiet "refs/remotes/origin/${ref}^{commit}" 2>/dev/null && return 0
-
-  local remote="${GIT_REMOTE:-origin}"
+  local branch=""
   local resolved=""
-  resolved="$(git ls-remote "${remote}" "refs/heads/${ref}" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)"
-  if [[ -n "${resolved}" ]]; then
-    printf '%s\n' "${resolved}"
+
+  if [[ "${ref}" =~ ^[0-9a-f]{40}$ ]]; then
+    printf '%s\n' "${ref}"
     return 0
   fi
 
-  resolved="$(git ls-remote "${remote}" "refs/tags/${ref}" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)"
+  case "${ref}" in
+    refs/heads/*)
+      branch="${ref#refs/heads/}"
+      ;;
+    refs/*)
+      echo "release-draft-target: FAIL (draft target ${ref} is not a branch or immutable commit)" >&2
+      return 1
+      ;;
+    *)
+      branch="${ref}"
+      ;;
+  esac
+
+  if [[ -z "${branch}" ]]; then
+    echo "release-draft-target: FAIL (draft target branch is empty)" >&2
+    return 1
+  fi
+  if ! git check-ref-format "refs/heads/${branch}" >/dev/null 2>&1; then
+    echo "release-draft-target: FAIL (draft target ${ref} is not a valid branch ref)" >&2
+    return 1
+  fi
+
+  local remote="${GIT_REMOTE:-origin}"
+  resolved="$(git ls-remote --exit-code "${remote}" "refs/heads/${branch}" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)"
   if [[ -n "${resolved}" ]]; then
     printf '%s\n' "${resolved}"
     return 0

@@ -927,6 +927,54 @@ test('oac form transport: rejects cross-origin redirect targets', async () => {
   }
 });
 
+test('oac form transport: rejects malformed redirect targets', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <form action="/save" method="post" data-facetheory-oac-form>
+        <input name="title" value="Draft">
+      </form>`,
+    { url: 'https://example.test/edit' },
+  );
+
+  try {
+    const form = dom.window.document.querySelector('form');
+    assert.ok(form instanceof dom.window.HTMLFormElement);
+
+    const assigned: string[] = [];
+    const errors: unknown[] = [];
+    const errored = new Promise<void>((resolve) => {
+      startAwsOacFormTransport({
+        document: dom.window.document,
+        fetcher: async () =>
+          responseWithUrl(
+            new Response(null, { status: 200 }),
+            'https://[malformed',
+            true,
+          ),
+        onError: (error) => {
+          errors.push(error);
+          resolve();
+        },
+        window: fakeNavigationWindow(dom, assigned),
+      });
+    });
+
+    const event = new dom.window.SubmitEvent('submit', {
+      bubbles: true,
+      cancelable: true,
+    });
+    form.dispatchEvent(event);
+    await errored;
+
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(assigned, []);
+    assert.equal(errors.length, 1);
+    assert.match(String(errors[0]), /rejected malformed response URL/);
+  } finally {
+    dom.window.close();
+  }
+});
+
 test('oac form transport: replaces the document for same-origin HTML responses', async () => {
   const dom = new JSDOM(
     `<!doctype html>
