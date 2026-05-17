@@ -89,6 +89,159 @@ test('head: applies CSP nonce to inline styles and hydration scripts', () => {
   );
 });
 
+test('head: external hydration emits metadata without inline JSON', () => {
+  const head = renderFaceHead({
+    html: '<div>ok</div>',
+    hydration: {
+      type: 'external',
+      data: { a: '<script>&</script>' },
+      dataUrl: '/_facetheory/hydration/page.json',
+      bootstrapModule: '/assets/entry.js',
+    },
+  });
+
+  assert.ok(
+    head.includes(
+      '<link href="/_facetheory/hydration/page.json" id="__FACETHEORY_DATA_URL__" rel="facetheory-hydration" type="application/json">',
+    ),
+  );
+  assert.ok(head.includes('<script src="/assets/entry.js" type="module"></script>'));
+  assert.equal(head.includes('__FACETHEORY_DATA__'), false);
+  assert.equal(head.includes('\\u003cscript'), false);
+});
+
+test('head: strict CSP rejects inline script, style, raw head, and unsafe attributes', () => {
+  const csp = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+
+  assert.throws(
+    () =>
+      renderFaceHead({
+        html: '<div>ok</div>',
+        csp,
+        hydration: { data: { page: 'inline' }, bootstrapModule: '/assets/entry.js' },
+      }),
+    /strict CSP rejects inline script tags/,
+  );
+
+  assert.throws(
+    () =>
+      renderFaceHead({
+        html: '<div>ok</div>',
+        csp,
+        styleTags: [{ cssText: 'body{color:red}' }],
+      }),
+    /strict CSP rejects inline style tags/,
+  );
+
+  assert.throws(
+    () =>
+      renderFaceHead({
+        html: '<div>ok</div>',
+        csp,
+        headTags: [{ type: 'raw', html: '<meta name="unsafe" content="1">' }],
+      }),
+    /strict CSP rejects raw head HTML/,
+  );
+
+  assert.throws(
+    () =>
+      renderFaceHead({
+        html: '<div>ok</div>',
+        csp,
+        headTags: [{ type: 'meta', attrs: { onclick: 'alert(1)' } }],
+      }),
+    /inline event handler attribute/,
+  );
+
+  assert.throws(
+    () =>
+      renderFaceHead({
+        html: '<div>ok</div>',
+        csp,
+        headTags: [{ type: 'meta', attrs: { style: 'color:red' } }],
+      }),
+    /inline style attributes/,
+  );
+});
+
+test('head: strict CSP allows external hydration with same-origin URLs', () => {
+  const head = renderFaceHead(
+    {
+      html: '<div>ok</div>',
+      csp: {
+        inlineScripts: false,
+        inlineStyles: false,
+        rawHead: false,
+      },
+      head: {
+        title: 'Strict',
+        html: '<meta name="escaped">',
+      },
+      headTags: [{ type: 'link', attrs: { rel: 'stylesheet', href: '/assets/app.css' } }],
+      hydration: {
+        type: 'external',
+        data: { page: 'strict' },
+        dataUrl: '/_facetheory/hydration/strict.json',
+        bootstrapModule: '/assets/entry.js',
+      },
+    },
+    { allowedOrigin: 'https://app.example' },
+  );
+
+  assert.ok(head.includes('<title>Strict</title>'));
+  assert.ok(head.includes('&lt;meta name=&quot;escaped&quot;&gt;'));
+  assert.ok(head.includes('href="/_facetheory/hydration/strict.json"'));
+  assert.equal(head.includes('__FACETHEORY_DATA__'), false);
+});
+
+test('head: strict CSP rejects cross-origin bootstrap and data URLs', () => {
+  const csp = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp,
+          hydration: {
+            type: 'external',
+            data: { page: 'strict' },
+            dataUrl: '/_facetheory/hydration/strict.json',
+            bootstrapModule: 'https://evil.example/entry.js',
+          },
+        },
+        { allowedOrigin: 'https://app.example' },
+      ),
+    /script src URL resolved cross-origin/,
+  );
+
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp,
+          hydration: {
+            type: 'external',
+            data: { page: 'strict' },
+            dataUrl: 'https://evil.example/data.json',
+            bootstrapModule: '/assets/entry.js',
+          },
+        },
+        { allowedOrigin: 'https://app.example' },
+      ),
+    /link href URL resolved cross-origin/,
+  );
+});
+
 test('head: escapes legacy head fields and blocks unsafe hydration module URLs', () => {
   const head = renderFaceHead({
     html: '<div>ok</div>',
