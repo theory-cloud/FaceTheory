@@ -7,9 +7,27 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
+import { JSDOM } from 'jsdom';
+
+import type { FaceNavigationBootstrapModule } from '../../src/spa.js';
 import type { ViteManifest } from '../../src/vite.js';
+import {
+  assertStrictCspDocument,
+  createStrictCspFixtureFetch,
+  exerciseStrictCspExternalNavigation,
+  flushStrictCspBrowserTasks,
+  installStrictCspBrowserGlobals,
+} from '../helpers/strict-csp.js';
 
 const execFileAsync = promisify(execFile);
+
+declare global {
+  interface Window {
+    __FACETHEORY_STRICT_CSP_SVELTE_DATA__?: unknown;
+    __FACETHEORY_STRICT_CSP_SVELTE_HYDRATED__?: number;
+    __FACETHEORY_STRICT_CSP_SVELTE_NAVIGATED__?: number;
+  }
+}
 
 async function exists(filePath: string): Promise<boolean> {
   try {
@@ -18,15 +36,6 @@ async function exists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function assertNoInlineCspOutput(html: string): void {
-  assert.ok(!html.includes('id="__FACETHEORY_DATA__"'));
-  assert.ok(!/<script\b(?![^>]*\bsrc=)[^>]*>/i.test(html));
-  assert.ok(!/<script\b[^>]*>[\s\S]*?\S[\s\S]*?<\/script>/i.test(html));
-  assert.ok(!/<style\b/i.test(html));
-  assert.ok(!/\sstyle="/i.test(html));
-  assert.ok(!/\son[a-z]+=/i.test(html));
 }
 
 test(
@@ -76,7 +85,7 @@ test(
       body.includes('href="/_facetheory/data/strict-csp-svelte-home.json"'),
     );
     assert.ok(body.includes('type="module"'));
-    assertNoInlineCspOutput(body);
+    assertStrictCspDocument(body, { url: 'http://localhost/' });
 
     assert.equal(
       serverMod.strictCspSvelteHydrationJsonForPath('/'),
@@ -102,6 +111,124 @@ test(
         await exists(builtPath),
         `missing built asset: ${injectedPath}`,
       );
+    }
+  },
+);
+
+test(
+  'vite strict CSP svelte example: browser harness hydrates and navigates with external data',
+  { concurrency: false },
+  async () => {
+    const cwd = path.resolve('.');
+    await execFileAsync(
+      'npm',
+      ['run', 'example:vite:svelte:strict-csp:build'],
+      { cwd },
+    );
+
+    const manifestPath = path.resolve(
+      'examples/vite-strict-csp-svelte/dist/client/.vite/manifest.json',
+    );
+    const manifest = JSON.parse(
+      await readFile(manifestPath, 'utf8'),
+    ) as ViteManifest;
+    const serverEntryPath = path.resolve(
+      'examples/vite-strict-csp-svelte/dist/server/entry-server.js',
+    );
+    const serverMod = await import(pathToFileURL(serverEntryPath).href);
+    const app = serverMod.createViteStrictCspSvelteExampleApp(manifest);
+
+    const homeResp = await app.handle({ method: 'GET', path: '/' });
+    const homeHtml = new TextDecoder().decode(homeResp.body as Uint8Array);
+    const nextResp = await app.handle({ method: 'GET', path: '/next' });
+    const nextHtml = new TextDecoder().decode(nextResp.body as Uint8Array);
+
+    assertStrictCspDocument(homeHtml, { url: 'http://localhost/' });
+    assertStrictCspDocument(nextHtml, { url: 'http://localhost/next' });
+
+    const homeData = serverMod.strictCspSvelteDataForPath('/');
+    const nextData = serverMod.strictCspSvelteDataForPath('/next');
+    const { fetcher, requests } = createStrictCspFixtureFetch(
+      {
+        '/_facetheory/data/strict-csp-svelte-home.json': homeData,
+      },
+      { baseUrl: 'http://localhost/' },
+    );
+
+    const dom = new JSDOM(homeHtml, { url: 'http://localhost/' });
+    const restoreGlobals = installStrictCspBrowserGlobals(dom);
+    const originalFetch = globalThis.fetch;
+    const errors: unknown[][] = [];
+    const originalConsoleError = console.error;
+    const originalWindowConsoleError = dom.window.console.error;
+    let clientModule: FaceNavigationBootstrapModule | null = null;
+    globalThis.fetch = fetcher;
+    console.error = (...args: unknown[]) => errors.push(args);
+    dom.window.console.error = (...args: unknown[]) => errors.push(args);
+
+    try {
+      const clientEntry = manifest['src/entry-client.ts'];
+      assert.ok(clientEntry?.file);
+      const clientEntryPath = path.resolve(
+        'examples/vite-strict-csp-svelte/dist/client',
+        clientEntry.file,
+      );
+      clientModule = (await import(
+        `${pathToFileURL(clientEntryPath).href}?strictCspHydration=${Date.now()}`
+      )) as FaceNavigationBootstrapModule;
+      await flushStrictCspBrowserTasks();
+
+      assert.deepEqual(requests, [
+        'http://localhost/_facetheory/data/strict-csp-svelte-home.json',
+      ]);
+      assert.deepEqual(
+        dom.window.__FACETHEORY_STRICT_CSP_SVELTE_DATA__,
+        homeData,
+      );
+      assert.equal(dom.window.__FACETHEORY_STRICT_CSP_SVELTE_HYDRATED__, 1);
+      assert.deepEqual(errors, []);
+    } finally {
+      console.error = originalConsoleError;
+      dom.window.console.error = originalWindowConsoleError;
+      globalThis.fetch = originalFetch;
+      restoreGlobals();
+      dom.window.close();
+    }
+
+    const navigation = await exerciseStrictCspExternalNavigation({
+      currentHtml: homeHtml,
+      currentUrl: 'http://localhost/',
+      nextHtml,
+      nextUrl: 'http://localhost/next',
+      dataByUrl: {
+        '/_facetheory/data/strict-csp-svelte-next.json': nextData,
+      },
+      importModule: async () => {
+        assert.ok(clientModule);
+        return clientModule;
+      },
+    });
+
+    try {
+      assert.deepEqual(navigation.fetched, [
+        'http://localhost/next',
+        'http://localhost/_facetheory/data/strict-csp-svelte-next.json',
+      ]);
+      assert.deepEqual(
+        navigation.dom.window.__FACETHEORY_STRICT_CSP_SVELTE_DATA__,
+        nextData,
+      );
+      assert.equal(
+        navigation.dom.window.__FACETHEORY_STRICT_CSP_SVELTE_NAVIGATED__,
+        1,
+      );
+      assert.equal(
+        navigation.dom.window.document.title,
+        'FaceTheory Strict CSP Svelte',
+      );
+      assert.equal(navigation.dom.window.location.pathname, '/next');
+    } finally {
+      navigation.dom.window.close();
     }
   },
 );

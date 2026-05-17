@@ -18,6 +18,7 @@ export default defineConfig(({ isSsrBuild }) => {
       manifest: !ssr,
       ssr: ssr ? path.resolve(root, 'src/entry-server.ts') : undefined,
       rollupOptions: {
+        preserveEntrySignatures: ssr ? undefined : 'exports-only',
         input: ssr
           ? path.resolve(root, 'src/entry-server.ts')
           : path.resolve(root, 'src/entry-client.ts'),
