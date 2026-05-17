@@ -12,6 +12,7 @@ import {
   InMemoryHtmlStore,
   InMemoryIsrMetaStore,
   type FaceIsrOptions,
+  type IsrRenderFreshOptions,
   type IsrRuntime,
 } from './isr.js';
 import { logLevelForStatus, type FaceObservabilityHooks } from './ops.js';
@@ -22,6 +23,8 @@ import {
 import { Router } from './router.js';
 import type {
   FaceContext,
+  FaceExternalHydration,
+  FaceHydration,
   FaceMode,
   FaceModule,
   FaceRenderResult,
@@ -140,11 +143,16 @@ export class FaceApp {
     };
 
     try {
-      const renderFresh = async (): Promise<FaceResponse> => {
+      const renderFresh = async (
+        isrOptions?: IsrRenderFreshOptions,
+      ): Promise<FaceResponse> => {
         const renderStartedAt = now();
         const data = face.load ? await face.load(ctx) : null;
         try {
-          const out = await face.render(ctx, data);
+          const out = prepareRenderResultForIsr(
+            await face.render(ctx, data),
+            isrOptions,
+          );
           return await toHTTPResponse(out, normalizedReq);
         } finally {
           renderMs = Math.max(0, now() - renderStartedAt);
@@ -325,6 +333,43 @@ function toHeaders(input: FaceRenderResult['headers'], cookies: string[] | undef
     sortedHeaders[key] = headers[key] ?? [];
   }
   return sortedHeaders;
+}
+
+function prepareRenderResultForIsr(
+  out: FaceRenderResult,
+  options: IsrRenderFreshOptions | undefined,
+): FaceRenderResult {
+  const dataUrl = options?.strictExternalHydrationDataUrl;
+  if (
+    dataUrl === undefined ||
+    out.csp?.inlineScripts !== false ||
+    out.hydration === undefined
+  ) {
+    return out;
+  }
+
+  const hydration = externalizeHydrationForIsr(out.hydration, dataUrl);
+  options?.onHydrationSidecar?.({
+    data: hydration.data,
+    dataUrl: hydration.dataUrl,
+  });
+
+  return {
+    ...out,
+    hydration,
+  };
+}
+
+function externalizeHydrationForIsr(
+  hydration: FaceHydration,
+  dataUrl: string,
+): FaceExternalHydration {
+  return {
+    type: 'external',
+    data: hydration.data,
+    dataUrl,
+    bootstrapModule: hydration.bootstrapModule,
+  };
 }
 
 async function toHTTPResponse(
