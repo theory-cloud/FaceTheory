@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { escapeHTML, renderHTMLDocument, safeJson } from '../../src/html.js';
+import {
+  buildStrictCspHeader,
+  validateStrictCspDocument,
+} from '../../src/security.js';
 
 test('escapeHTML escapes basic characters', () => {
   assert.equal(escapeHTML(`a&b<c>d"e'f`), 'a&amp;b&lt;c&gt;d&quot;e&#39;f');
@@ -41,5 +45,84 @@ test('renderHTMLDocument merges document shell attrs deterministically', () => {
   assert.ok(
     html.includes('<body class="page" data-label="&lt;unsafe&gt;" hidden>ok</body>'),
     html,
+  );
+});
+
+
+test('security: strict CSP header uses deterministic same-origin no-inline defaults', () => {
+  const header = buildStrictCspHeader();
+
+  assert.equal(
+    header,
+    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'",
+  );
+  assert.equal(header.includes("'unsafe-inline'"), false);
+  assert.equal(header.includes("'unsafe-eval'"), false);
+});
+
+test('security: strict CSP header can include a deterministic nonce', () => {
+  const header = buildStrictCspHeader({ cspNonce: 'abc123' });
+
+  assert.ok(header.includes("script-src 'self' 'nonce-abc123'"));
+  assert.ok(header.includes("style-src 'self' 'nonce-abc123'"));
+  assert.equal(header.includes("'unsafe-inline'"), false);
+  assert.throws(
+    () => buildStrictCspHeader({ cspNonce: "bad; nonce" }),
+    /nonce contains unsafe characters/,
+  );
+});
+
+test('security: strict CSP document validator rejects inline document scripts and styles', () => {
+  const policy = { inlineScripts: false, inlineStyles: false, rawHead: false } as const;
+
+  assert.throws(
+    () =>
+      validateStrictCspDocument('<!doctype html><html><body><script>bad()</script></body></html>', {
+        policy,
+      }),
+    /inline script tags in document/,
+  );
+  assert.throws(
+    () =>
+      validateStrictCspDocument('<!doctype html><html><body><script type="application/json">{}</script></body></html>', {
+        policy,
+      }),
+    /inline script tags in document/,
+  );
+  assert.throws(
+    () =>
+      validateStrictCspDocument('<!doctype html><html><body><style>body{color:red}</style></body></html>', {
+        policy,
+      }),
+    /inline style tags in document/,
+  );
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument('<!doctype html><html><body><script src="/assets/app.js"></script></body></html>', {
+      policy,
+    }),
+  );
+});
+
+test('security: strict CSP document validator rejects inline body attributes', () => {
+  const policy = { inlineScripts: false, inlineStyles: false, rawHead: false } as const;
+
+  assert.throws(
+    () =>
+      validateStrictCspDocument('<!doctype html><html><body><button onclick="bad()">x</button></body></html>', {
+        policy,
+      }),
+    /inline event handler attribute "onclick" in document/,
+  );
+  assert.throws(
+    () =>
+      validateStrictCspDocument('<!doctype html><html><body><main style="color:red">x</main></body></html>', {
+        policy,
+      }),
+    /inline style attributes in document/,
+  );
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument('<!doctype html><html><body><main class="safe">x</main></body></html>', {
+      policy,
+    }),
   );
 });
