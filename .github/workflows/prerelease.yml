@@ -149,7 +149,7 @@ jobs:
           # Release Please can report release_created before GitHub's releases
           # listing API exposes the untagged draft. Poll long enough for that
           # API lag without handing release-capable credentials to repo scripts.
-          for attempt in $(seq 1 36); do
+          for attempt in $(seq 1 72); do
             for page in $(seq 1 10); do
               page_file="$(mktemp)"
               gh api "repos/${repo}/releases?per_page=100&page=${page}" > "${page_file}"
