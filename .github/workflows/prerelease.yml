@@ -42,6 +42,78 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
     steps:
+      - name: Checkout (prerelease state)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'premain' || github.sha }}
+
+      - name: Recover missing current prerelease Release Please state
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+
+          version="$(
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path(".release-please-manifest.premain.json").read_text(encoding="utf-8"))
+          version = str(data.get(".", "")).strip()
+          if not version:
+              raise SystemExit("missing prerelease release-please manifest version")
+          print(version)
+          PY
+          )"
+          tag="v${version}"
+
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            echo "release-recovery: ${tag} release already exists"
+            exit 0
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "release-recovery: ${tag} tag already exists"
+            exit 0
+          fi
+
+          expected_title="chore(premain): release ${version}"
+          pending_number="$(
+            EXPECTED_TITLE="${expected_title}" gh pr list \
+              --state merged \
+              --base premain \
+              --label "autorelease: pending" \
+              --limit 50 \
+              --json number,title \
+              --jq 'map(select(.title == env.EXPECTED_TITLE)) | .[0].number // ""'
+          )"
+          if [[ -n "${pending_number}" ]]; then
+            echo "release-recovery: ${tag} already pending on PR #${pending_number}"
+            exit 0
+          fi
+
+          tagged_number="$(
+            EXPECTED_TITLE="${expected_title}" gh pr list \
+              --state merged \
+              --base premain \
+              --label "autorelease: tagged" \
+              --limit 50 \
+              --json number,title \
+              --jq 'map(select(.title == env.EXPECTED_TITLE)) | .[0].number // ""'
+          )"
+
+          if [[ -z "${tagged_number}" ]]; then
+            echo "release-recovery: FAIL (${tag} is missing and no merged ${expected_title} PR is pending/tagged)"
+            exit 1
+          fi
+
+          echo "release-recovery: resetting PR #${tagged_number} from tagged to pending for ${tag}"
+          gh pr edit "${tagged_number}" \
+            --remove-label "autorelease: tagged" \
+            --add-label "autorelease: pending"
+
       - name: Release Please (Prerelease)
         id: release
         uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4

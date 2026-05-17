@@ -55,6 +55,12 @@ done
 grep -Fq 'Resolve draft release metadata' .github/workflows/prerelease.yml ||
   fail "prerelease.yml must resolve hidden draft release metadata before repo checkout"
 
+grep -Fq 'Recover missing current prerelease Release Please state' .github/workflows/prerelease.yml ||
+  fail "prerelease.yml must recover missing tagged prerelease Release Please state"
+
+grep -Fq 'expected_title="chore(premain): release ${version}"' .github/workflows/prerelease.yml ||
+  fail "prerelease.yml must recover the merged premain Release Please PR for the current RC"
+
 grep -Fq 'Resolve draft release metadata' .github/workflows/release.yml ||
   fail "release.yml must resolve hidden draft release metadata before repo checkout"
 
