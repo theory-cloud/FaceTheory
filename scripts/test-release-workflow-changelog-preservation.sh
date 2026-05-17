@@ -64,6 +64,11 @@ grep -Fq 'expected_title="chore(premain): release ${version}"' .github/workflows
 grep -Fq 'Resolve draft release metadata' .github/workflows/release.yml ||
   fail "release.yml must resolve hidden draft release metadata before repo checkout"
 
+for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; do
+  grep -Fq 'for attempt in $(seq 1 36); do' "${workflow}" ||
+    fail "${workflow} must tolerate delayed GitHub draft release visibility"
+done
+
 grep -Fq 'RELEASE_JSON: ${{ steps.draft.outputs.release_json }}' .github/workflows/prerelease.yml ||
   fail "prerelease.yml must pass draft metadata to verification without a token"
 
