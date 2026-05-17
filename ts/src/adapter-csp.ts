@@ -37,7 +37,11 @@ export function enforceAdapterStrictCspResult(
     }
   }
 
-  if (policy.rawHead === false) {
+  if (
+    policy.rawHead === false ||
+    policy.inlineScripts === false ||
+    policy.inlineStyles === false
+  ) {
     if (out.headTags?.some((tag) => tag.type === 'raw')) {
       throw new Error(
         `FaceTheory ${adapterName} strict CSP rejects raw adapter head output`,
