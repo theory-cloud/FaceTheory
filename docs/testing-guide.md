@@ -90,6 +90,36 @@ workspace link:
 For the original lab driver, theory-mcp-server should validate `POST /agents/new` through CloudFront OAC before stable
 promotion. A successful RC validation means the app-local workaround can be removed while keeping OAC enabled.
 
+### Strict CSP Hydration And Navigation
+
+```bash
+cd ts
+npm run example:vite:svelte:strict-csp:build
+node --import tsx test/unit/strict-csp-harness.test.ts
+node --import tsx test/unit/vite-strict-csp-svelte-example.test.ts
+```
+
+Use this when changing:
+
+- `FaceCspPolicy`, `buildStrictCspHeader()`, or `validateStrictCspDocument()`
+- `externalHydrationForEntry()` or sidecar URL/data handling
+- adapter strict-CSP enforcement for React, Vue, or Svelte
+- `startFaceNavigation()` external hydration loading or same-origin validation
+- docs that describe strict no-inline CSP, external hydration, or Svelte/Vite strict examples
+
+Local expected result:
+
+- rendered documents contain no `__FACETHEORY_DATA__` inline JSON script
+- every `<script>` has `src` and no inline body text
+- no `<style>` tags, `style` attributes, or `on*` event-handler attributes appear in validated scopes
+- strict Svelte/Vite output uses external CSS/assets and a same-origin module bootstrap
+- the browser harness loads external hydration JSON before initial hydration and before `hydrateFaceNavigation(context)`
+- same-origin navigation to the strict example's `/next` route preserves deterministic server/client hydration data
+
+For documentation reviews, explicitly check the unsafe-claim boundary: these tests prove local runtime behavior and
+example wiring, not that a release has been published, a Simulacrum RC has been validated, or an AWS/customer deployment
+has succeeded.
+
 ### React SSR And Streaming
 
 ```bash
