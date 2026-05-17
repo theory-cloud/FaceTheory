@@ -21,7 +21,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=3.1.2 # x-release-please-version
+export FACETHEORY_VERSION=3.2.0-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -400,7 +400,7 @@ Important ISR default:
 
 ## Reference Bundle
 
-The `v3.1.2` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v3.2.0-rc` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples
