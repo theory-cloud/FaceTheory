@@ -88,4 +88,32 @@ if REPO_ROOT="${work_c}" GH_BIN="${bin_c}/gh" bash "${script_path}" "v3.1.2-rc" 
   fail "published release unexpectedly passed"
 fi
 
+# A mutable branch target may be accepted only after it resolves to the exact
+# immutable commit being built. The mutable branch name itself must not be
+# enough to pass if it later moves.
+work_d="$(setup_repo branch-target "${tmpdir}")"
+head_d="$(git -C "${work_d}" rev-parse HEAD)"
+remote_d="${tmpdir}/branch-target-remote.git"
+git init --bare "${remote_d}" >/dev/null 2>&1
+git -C "${work_d}" remote add origin "${remote_d}"
+git -C "${work_d}" push origin HEAD:refs/heads/release-candidate >/dev/null 2>&1
+bin_d="${tmpdir}/bin-d"
+write_fake_gh "${bin_d}" "v3.1.2-rc" "release-candidate" "true" "true"
+REPO_ROOT="${work_d}" GIT_REMOTE="${remote_d}" GH_BIN="${bin_d}/gh" bash "${script_path}" "v3.1.2-rc" "${head_d}" >/dev/null ||
+  fail "branch target did not resolve to the checked-out commit"
+
+printf '%s\n' "moved branch" >> "${work_d}/README.md"
+git -C "${work_d}" add README.md
+git -C "${work_d}" commit -m "test: move release branch" >/dev/null 2>&1
+git -C "${work_d}" push origin HEAD:refs/heads/release-candidate >/dev/null 2>&1
+if REPO_ROOT="${work_d}" GIT_REMOTE="${remote_d}" GH_BIN="${bin_d}/gh" bash "${script_path}" "v3.1.2-rc" "${head_d}" >/dev/null 2>&1; then
+  fail "moved branch target unexpectedly passed for stale checkout"
+fi
+
+bin_e="${tmpdir}/bin-e"
+write_fake_gh "${bin_e}" "v3.1.2-rc" "refs/pull/1/head" "true" "true"
+if REPO_ROOT="${work_d}" GIT_REMOTE="${remote_d}" GH_BIN="${bin_e}/gh" bash "${script_path}" "v3.1.2-rc" "HEAD" >/dev/null 2>&1; then
+  fail "non-branch mutable ref unexpectedly passed"
+fi
+
 echo "test-verify-release-draft-target: PASS"
