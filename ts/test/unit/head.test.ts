@@ -2,6 +2,43 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { renderFaceHead } from '../../src/head.js';
+import type { FaceCspPolicy, FaceHydration, FaceRenderResult } from '../../src/types.js';
+
+test('head contracts: strict CSP policy and hydration shapes are additive', () => {
+  const strictPolicy = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } satisfies FaceCspPolicy;
+
+  const legacyHydration = {
+    data: { page: 'legacy' },
+    bootstrapModule: '/assets/legacy.js',
+  } satisfies FaceHydration;
+
+  const explicitInlineHydration = {
+    type: 'inline',
+    data: { page: 'inline' },
+    bootstrapModule: '/assets/inline.js',
+  } satisfies FaceHydration;
+
+  const externalHydration = {
+    type: 'external',
+    data: { page: 'external' },
+    dataUrl: '/_facetheory/hydration/external.json',
+    bootstrapModule: '/assets/external.js',
+  } satisfies FaceHydration;
+
+  const renderResult = {
+    html: '<main>ok</main>',
+    csp: strictPolicy,
+    hydration: externalHydration,
+  } satisfies FaceRenderResult;
+
+  assert.equal(legacyHydration.bootstrapModule, '/assets/legacy.js');
+  assert.equal(explicitInlineHydration.type, 'inline');
+  assert.equal(renderResult.csp.inlineScripts, false);
+});
 
 test('head: charset meta then title, with dedupe (last wins)', () => {
   const head = renderFaceHead({
