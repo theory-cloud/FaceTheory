@@ -202,11 +202,23 @@ for required in (
     "      - release-please\n",
     "      - resolve-draft-release\n",
     "    permissions:\n      contents: read\n",
+    "      - name: Checkout release workflow scripts\n",
+    "      - name: Stage trusted release provenance scripts\n",
+    "      - name: Resolve release source ref\n",
+    "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh",
+    "ref: ${{ steps.source.outputs.source_ref }}",
     "RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}",
+    "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh",
+    "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-branch.sh",
 ):
     if required not in build:
         raise SystemExit(f"missing build invariant {required!r} in {workflow}")
-for forbidden in ("GH_TOKEN:", "GITHUB_TOKEN:", "secrets.RELEASE_PLEASE_TOKEN"):
+for forbidden in (
+    "GH_TOKEN:",
+    "GITHUB_TOKEN:",
+    "secrets.RELEASE_PLEASE_TOKEN",
+    'verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"',
+):
     if forbidden in build:
         raise SystemExit(f"build-release-assets must not receive {forbidden} in {workflow}")
 

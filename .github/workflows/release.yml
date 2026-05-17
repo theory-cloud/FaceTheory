@@ -564,15 +564,42 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout release workflow scripts
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Stage trusted release provenance scripts
+        run: |
+          set -euo pipefail
+          trusted_dir="${RUNNER_TEMP}/facetheory-release-scripts"
+          mkdir -p "${trusted_dir}"
+          cp \
+            scripts/resolve-release-source-ref.sh \
+            scripts/verify-release-branch.sh \
+            scripts/verify-release-draft-target.sh \
+            "${trusted_dir}/"
+          chmod +x "${trusted_dir}"/*.sh
+
+      - name: Resolve release source ref
+        id: source
+        env:
+          RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh" "${TAG_NAME}" >> "${GITHUB_OUTPUT}"
+
       - name: Checkout (for release assets)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
           # Draft GitHub Releases do not guarantee a git tag exists until the
-          # release is published. Build from the release commit and verify the
-          # draft's target before uploading immutable assets.
-          ref: ${{ github.sha }}
+          # release is published. Build from the draft release source ref and
+          # verify the draft's target before uploading immutable assets.
+          ref: ${{ steps.source.outputs.source_ref }}
 
       - name: Fetch main + premain (release branch verification)
         run: |
@@ -582,10 +609,14 @@ jobs:
       - name: Verify draft release targets this commit
         env:
           RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}
-        run: scripts/verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
+        run: |
+          REPO_ROOT="${GITHUB_WORKSPACE}" \
+            "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" HEAD
 
       - name: Verify release source branch
-        run: scripts/verify-release-branch.sh "${{ needs.release-please.outputs.tag_name }}"
+        run: |
+          REPO_ROOT="${GITHUB_WORKSPACE}" \
+            "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-branch.sh" "${{ needs.release-please.outputs.tag_name }}"
 
       - name: Set SOURCE_DATE_EPOCH (deterministic artifacts)
         run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
