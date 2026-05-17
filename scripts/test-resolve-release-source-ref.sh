@@ -35,6 +35,34 @@ if [[ "$1" == "api" ]]; then
 ]
 JSON
           ;;
+        draft-branch)
+          cat <<'JSON'
+[
+  {
+    "id": 100,
+    "tag_name": "v1.2.4-rc",
+    "target_commitish": "release-candidate",
+    "draft": true,
+    "prerelease": true,
+    "html_url": "https://github.test/releases/branch"
+  }
+]
+JSON
+          ;;
+        malicious)
+          cat <<'JSON'
+[
+  {
+    "id": 101,
+    "tag_name": "v1.2.5-rc",
+    "target_commitish": "refs/pull/1/head",
+    "draft": true,
+    "prerelease": true,
+    "html_url": "https://github.test/releases/malicious"
+  }
+]
+JSON
+          ;;
         none|fallback)
           printf '[]\n'
           ;;
@@ -72,6 +100,20 @@ bin_dir="${tmpdir}/bin"
 log_file="${tmpdir}/gh.log"
 write_fake_gh "${bin_dir}"
 
+remote_dir="${tmpdir}/remote.git"
+source_dir="${tmpdir}/source"
+git init --bare "${remote_dir}" >/dev/null 2>&1
+git init "${source_dir}" >/dev/null 2>&1
+git -C "${source_dir}" config user.name "FaceTheory Test"
+git -C "${source_dir}" config user.email "facetheory-test@example.com"
+printf '%s\n' seed > "${source_dir}/README.md"
+git -C "${source_dir}" add README.md
+git -C "${source_dir}" -c commit.gpgSign=false commit -m "test: seed" >/dev/null 2>&1
+git -C "${source_dir}" branch release-candidate
+git -C "${source_dir}" remote add origin "${remote_dir}"
+git -C "${source_dir}" push origin release-candidate >/dev/null 2>&1
+branch_sha="$(git -C "${source_dir}" rev-parse release-candidate)"
+
 draft_out="$(
   FAKE_GH_LOG="${log_file}" \
   FAKE_RELEASE_MODE=draft \
@@ -88,6 +130,33 @@ grep -Fxq 'release_id=99' <<<"${draft_out}" || fail "draft output missing releas
 grep -Fq 'release-source-ref: draft v1.2.3-rc targets 1111111111111111111111111111111111111111' "${tmpdir}/draft.err" || fail "draft stderr did not describe resolved target"
 if grep -Fq 'release view v1.2.3-rc' "${log_file}"; then
   fail "draft lookup fell through to release view despite list API match"
+fi
+
+branch_out="$(
+  FAKE_GH_LOG="${log_file}" \
+  FAKE_RELEASE_MODE=draft-branch \
+  GH_BIN="${bin_dir}/gh" \
+  GIT_REMOTE="${remote_dir}" \
+  GITHUB_REPOSITORY="theory-cloud/FaceTheory" \
+  bash "${script_path}" v1.2.4-rc \
+    2>"${tmpdir}/branch.err"
+)"
+grep -Fxq "source_ref=${branch_sha}" <<<"${branch_out}" || fail "draft branch target did not resolve to immutable commit"
+grep -Fxq 'release_target=release-candidate' <<<"${branch_out}" || fail "draft branch output missing original target"
+grep -Fxq "release_source_commit=${branch_sha}" <<<"${branch_out}" || fail "draft branch output missing release_source_commit"
+if grep -Fxq 'source_ref=release-candidate' <<<"${branch_out}"; then
+  fail "draft branch target leaked mutable source_ref"
+fi
+grep -Fq "draft target release-candidate resolved to immutable commit ${branch_sha}" "${tmpdir}/branch.err" ||
+  fail "draft branch stderr did not describe immutable resolution"
+
+if FAKE_GH_LOG="${log_file}" \
+  FAKE_RELEASE_MODE=malicious \
+  GH_BIN="${bin_dir}/gh" \
+  GIT_REMOTE="${remote_dir}" \
+  GITHUB_REPOSITORY="theory-cloud/FaceTheory" \
+  bash "${script_path}" v1.2.5-rc >/dev/null 2>&1; then
+  fail "malicious draft ref unexpectedly resolved"
 fi
 
 none_out="$(

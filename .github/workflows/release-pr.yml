@@ -23,7 +23,7 @@ jobs:
   check-baseline:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     outputs:
       ready: ${{ steps.ready.outputs.ready }}
       stable_ready: ${{ steps.baseline.outputs.ready }}
@@ -40,7 +40,7 @@ jobs:
       - name: Check current release baseline
         id: baseline
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.json
 
       - name: Compute release-as (align to premain RC)
@@ -87,7 +87,7 @@ jobs:
         id: premain
         if: steps.version.outputs.release_as != ''
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/check-release-baseline-ready.sh .release-please-manifest.premain.json
 
       - name: Mark release PR baseline readiness

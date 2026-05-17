@@ -1,5 +1,59 @@
 # Changelog
 
+## [3.2.0](https://github.com/theory-cloud/FaceTheory/compare/v3.1.2...v3.2.0) (2026-05-17)
+
+
+### Features
+
+* **app:** enforce strict csp before streaming ([d1c290a](https://github.com/theory-cloud/FaceTheory/commit/d1c290ad4edb376fa0ce92c3adb3e5af8e2cdeaa))
+* **csp:** add strict csp core contracts ([2b3fa2d](https://github.com/theory-cloud/FaceTheory/commit/2b3fa2d4f032d1ac76d9b9966a863255a6ff5fd6))
+* **csp:** add strict policy and hydration contracts ([da4e93a](https://github.com/theory-cloud/FaceTheory/commit/da4e93a6da1ac3091f544f2b587a95396c9964b5))
+* **examples:** add strict csp svelte vite app ([eb3af68](https://github.com/theory-cloud/FaceTheory/commit/eb3af68e932bbed85ae99c60240362100125cc2e))
+* **head:** validate strict csp hydration output ([c26b6de](https://github.com/theory-cloud/FaceTheory/commit/c26b6de94768cf58d242eb1070a654369c14ff4b))
+* **isr:** cache strict hydration sidecars ([7fa5d5d](https://github.com/theory-cloud/FaceTheory/commit/7fa5d5d4eadbd99116e0b786798b634c8075868d))
+* **oac:** add strict csp navigation policies ([6776284](https://github.com/theory-cloud/FaceTheory/commit/6776284a376cd80db77fe76fd12596c577136caa))
+* **react:** enforce strict csp rendering ([ef43940](https://github.com/theory-cloud/FaceTheory/commit/ef439405c35e4999bbe5ceb74a626a592939c6c8))
+* **security:** add strict csp helpers ([1c7860a](https://github.com/theory-cloud/FaceTheory/commit/1c7860ab03b3c7cee1fd99e83965067f6e85aeee))
+* **spa:** load external hydration data ([9a11f55](https://github.com/theory-cloud/FaceTheory/commit/9a11f5541e1342eeefef4ce1adf26f3d69c9a810))
+* **ssg:** emit strict hydration sidecars ([b273a35](https://github.com/theory-cloud/FaceTheory/commit/b273a35cfba624ee9e435c978fb9709b30ad1e09))
+* **svelte:** reject raw strict csp head output ([8715293](https://github.com/theory-cloud/FaceTheory/commit/87152937d181227cc99c1f143670f5fd2926d5d5))
+* **vite:** add external hydration helper ([875bc53](https://github.com/theory-cloud/FaceTheory/commit/875bc5307f36db955e5bae06ecbc2f980940eaf5))
+* **vue:** support strict csp hydration ([5269c5d](https://github.com/theory-cloud/FaceTheory/commit/5269c5dd3d80978d419cc06155942d63a9d2a62a))
+
+
+### Bug Fixes
+
+* **release:** back-merge v3.1.2 with stable readiness harness ([9bcc1ba](https://github.com/theory-cloud/FaceTheory/commit/9bcc1ba8117d70273fe0f70fc3bb577c3722d37d))
+* **release:** simplify readiness regression harness ([6f8b390](https://github.com/theory-cloud/FaceTheory/commit/6f8b39088a44bebaa89f4e719c413d6a4e89f484))
+* **spa:** thread external hydration navigation options ([33a7768](https://github.com/theory-cloud/FaceTheory/commit/33a7768d141355055d2293363749534053839888))
+
+## [3.2.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.1.2...v3.2.0-rc) (2026-05-17)
+
+
+### Features
+
+* **app:** enforce strict csp before streaming ([d1c290a](https://github.com/theory-cloud/FaceTheory/commit/d1c290ad4edb376fa0ce92c3adb3e5af8e2cdeaa))
+* **csp:** add strict csp core contracts ([2b3fa2d](https://github.com/theory-cloud/FaceTheory/commit/2b3fa2d4f032d1ac76d9b9966a863255a6ff5fd6))
+* **csp:** add strict policy and hydration contracts ([da4e93a](https://github.com/theory-cloud/FaceTheory/commit/da4e93a6da1ac3091f544f2b587a95396c9964b5))
+* **examples:** add strict csp svelte vite app ([eb3af68](https://github.com/theory-cloud/FaceTheory/commit/eb3af68e932bbed85ae99c60240362100125cc2e))
+* **head:** validate strict csp hydration output ([c26b6de](https://github.com/theory-cloud/FaceTheory/commit/c26b6de94768cf58d242eb1070a654369c14ff4b))
+* **isr:** cache strict hydration sidecars ([7fa5d5d](https://github.com/theory-cloud/FaceTheory/commit/7fa5d5d4eadbd99116e0b786798b634c8075868d))
+* **oac:** add strict csp navigation policies ([6776284](https://github.com/theory-cloud/FaceTheory/commit/6776284a376cd80db77fe76fd12596c577136caa))
+* **react:** enforce strict csp rendering ([ef43940](https://github.com/theory-cloud/FaceTheory/commit/ef439405c35e4999bbe5ceb74a626a592939c6c8))
+* **security:** add strict csp helpers ([1c7860a](https://github.com/theory-cloud/FaceTheory/commit/1c7860ab03b3c7cee1fd99e83965067f6e85aeee))
+* **spa:** load external hydration data ([9a11f55](https://github.com/theory-cloud/FaceTheory/commit/9a11f5541e1342eeefef4ce1adf26f3d69c9a810))
+* **ssg:** emit strict hydration sidecars ([b273a35](https://github.com/theory-cloud/FaceTheory/commit/b273a35cfba624ee9e435c978fb9709b30ad1e09))
+* **svelte:** reject raw strict csp head output ([8715293](https://github.com/theory-cloud/FaceTheory/commit/87152937d181227cc99c1f143670f5fd2926d5d5))
+* **vite:** add external hydration helper ([875bc53](https://github.com/theory-cloud/FaceTheory/commit/875bc5307f36db955e5bae06ecbc2f980940eaf5))
+* **vue:** support strict csp hydration ([5269c5d](https://github.com/theory-cloud/FaceTheory/commit/5269c5dd3d80978d419cc06155942d63a9d2a62a))
+
+
+### Bug Fixes
+
+* **release:** back-merge v3.1.2 with stable readiness harness ([9bcc1ba](https://github.com/theory-cloud/FaceTheory/commit/9bcc1ba8117d70273fe0f70fc3bb577c3722d37d))
+* **release:** simplify readiness regression harness ([6f8b390](https://github.com/theory-cloud/FaceTheory/commit/6f8b39088a44bebaa89f4e719c413d6a4e89f484))
+* **spa:** thread external hydration navigation options ([33a7768](https://github.com/theory-cloud/FaceTheory/commit/33a7768d141355055d2293363749534053839888))
+
 ## [3.1.2](https://github.com/theory-cloud/FaceTheory/compare/v3.1.1...v3.1.2) (2026-05-16)
 
 
