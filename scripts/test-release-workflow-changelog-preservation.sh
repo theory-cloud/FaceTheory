@@ -25,6 +25,14 @@ if grep -R -Fq 'secrets.GITHUB_TOKEN' .github/workflows; then
   fail "workflows must fall back to github.token, not a non-existent secrets.GITHUB_TOKEN"
 fi
 
+release_please_pin='googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0'
+if grep -R -Fq 'googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38' .github/workflows; then
+  fail "workflows must not use the deprecated node20 release-please-action pin"
+fi
+if grep -R -F 'googleapis/release-please-action@' .github/workflows | grep -Fv "${release_please_pin}"; then
+  fail "workflows must pin release-please-action to the reviewed node24 SHA"
+fi
+
 if grep -R -F 'gh release create' .github/workflows scripts | grep -v 'scripts/test-release-workflow-changelog-preservation.sh'; then
   fail "release recovery must not create GitHub Releases outside Release Please"
 fi
