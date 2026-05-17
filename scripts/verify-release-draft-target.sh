@@ -37,13 +37,15 @@ fi
 
 expected_commit="$(git rev-parse "${expected_ref}^{commit}")"
 
-gh_bin="${GH_BIN:-gh}"
-if ! command -v "${gh_bin}" >/dev/null 2>&1; then
-  echo "release-draft-target: FAIL (${gh_bin} not found)"
-  exit 1
+release_json="${RELEASE_JSON:-}"
+if [[ -z "${release_json}" ]]; then
+  gh_bin="${GH_BIN:-gh}"
+  if ! command -v "${gh_bin}" >/dev/null 2>&1; then
+    echo "release-draft-target: FAIL (${gh_bin} not found)"
+    exit 1
+  fi
+  release_json="$(GH_BIN="${gh_bin}" "${script_dir}/release-json-by-tag.sh" "${tag}" 2>/dev/null || true)"
 fi
-
-release_json="$(GH_BIN="${gh_bin}" "${script_dir}/release-json-by-tag.sh" "${tag}" 2>/dev/null || true)"
 if [[ -z "${release_json}" ]]; then
   echo "release-draft-target: FAIL (draft release ${tag} not found)"
   exit 1

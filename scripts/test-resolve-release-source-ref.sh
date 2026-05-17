@@ -132,6 +132,19 @@ if grep -Fq 'release view v1.2.3-rc' "${log_file}"; then
   fail "draft lookup fell through to release view despite list API match"
 fi
 
+env_out="$(
+  RELEASE_JSON='{"id":102,"tag_name":"v1.2.3-rc","target_commitish":"3333333333333333333333333333333333333333","draft":true,"prerelease":true,"html_url":"https://github.test/releases/env"}' \
+  GH_BIN="${tmpdir}/missing-gh" \
+  bash "${script_path}" v1.2.3-rc \
+    2>"${tmpdir}/env.err"
+)"
+grep -Fxq 'source_ref=3333333333333333333333333333333333333333' <<<"${env_out}" ||
+  fail "environment-provided release metadata did not resolve source_ref"
+grep -Fxq 'release_is_draft=true' <<<"${env_out}" ||
+  fail "environment-provided release metadata did not preserve draft state"
+grep -Fxq 'release_id=102' <<<"${env_out}" ||
+  fail "environment-provided release metadata did not preserve release_id"
+
 branch_out="$(
   FAKE_GH_LOG="${log_file}" \
   FAKE_RELEASE_MODE=draft-branch \

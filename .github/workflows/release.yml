@@ -41,10 +41,73 @@ jobs:
             "${trusted_dir}/"
           chmod +x "${trusted_dir}"/*.sh
 
+      - name: Resolve release metadata
+        id: metadata
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          repo="${GITHUB_REPOSITORY:?}"
+          if [[ -z "${TAG_NAME}" ]]; then
+            echo "release-metadata: SKIP (missing tag name)"
+            exit 0
+          fi
+
+          release_json=""
+          for page in $(seq 1 10); do
+            page_file="$(mktemp)"
+            gh api "repos/${repo}/releases?per_page=100&page=${page}" > "${page_file}"
+            match="$(
+              TAG_NAME="${TAG_NAME}" python3 - "${page_file}" <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          for release in data:
+              if release.get("tag_name") != os.environ["TAG_NAME"]:
+                  continue
+              wanted = ("id", "tag_name", "target_commitish", "draft", "prerelease", "html_url")
+              print(json.dumps({key: release.get(key) for key in wanted}, separators=(",", ":")))
+              break
+          PY
+            )"
+            count="$(python3 - "${page_file}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          print(len(data) if isinstance(data, list) else 0)
+          PY
+            )"
+            rm -f "${page_file}"
+            if [[ -n "${match}" ]]; then
+              release_json="${match}"
+              break
+            fi
+            [[ "${count}" =~ ^[0-9]+$ ]] || count=0
+            [[ "${count}" -lt 100 ]] && break
+          done
+
+          if [[ -z "${release_json}" ]]; then
+            echo "release-metadata: SKIP (${TAG_NAME} not found)"
+            exit 0
+          fi
+
+          {
+            echo "release_json<<__FACETHEORY_RELEASE_JSON__"
+            printf '%s\n' "${release_json}"
+            echo "__FACETHEORY_RELEASE_JSON__"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Resolve release source ref
         id: source
         env:
-          GH_TOKEN: ${{ github.token }}
+          RELEASE_JSON: ${{ steps.metadata.outputs.release_json }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
         run: |
           "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh" "${TAG_NAME}" >> "${GITHUB_OUTPUT}"
@@ -117,7 +180,7 @@ jobs:
               echo "release-assets: FAIL (${TAG_NAME} source resolved to ${RELEASE_SOURCE_COMMIT}, checked out ${actual_commit})"
               exit 1
             fi
-            GH_TOKEN="${{ github.token }}" \
+            RELEASE_JSON="${{ steps.metadata.outputs.release_json }}" \
               REPO_ROOT="${GITHUB_WORKSPACE}" \
               "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh" "${TAG_NAME}" HEAD
           fi
@@ -418,6 +481,75 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Resolve draft release metadata
+        id: draft
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+
+          repo="${GITHUB_REPOSITORY:?}"
+          if [[ -z "${TAG_NAME}" ]]; then
+            echo "release-draft-metadata: FAIL (missing tag name)"
+            exit 1
+          fi
+
+          release_json=""
+          for attempt in $(seq 1 12); do
+            for page in $(seq 1 10); do
+              page_file="$(mktemp)"
+              gh api "repos/${repo}/releases?per_page=100&page=${page}" > "${page_file}"
+              match="$(
+                TAG_NAME="${TAG_NAME}" python3 - "${page_file}" <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          for release in data:
+              if release.get("tag_name") != os.environ["TAG_NAME"]:
+                  continue
+              if release.get("draft") is not True:
+                  continue
+              wanted = ("id", "tag_name", "target_commitish", "draft", "prerelease", "html_url")
+              print(json.dumps({key: release.get(key) for key in wanted}, separators=(",", ":")))
+              break
+          PY
+              )"
+              count="$(python3 - "${page_file}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          print(len(data) if isinstance(data, list) else 0)
+          PY
+              )"
+              rm -f "${page_file}"
+              if [[ -n "${match}" ]]; then
+                release_json="${match}"
+                break
+              fi
+              [[ "${count}" =~ ^[0-9]+$ ]] || count=0
+              [[ "${count}" -lt 100 ]] && break
+            done
+            [[ -n "${release_json}" ]] && break
+            sleep 5
+          done
+
+          if [[ -z "${release_json}" ]]; then
+            echo "release-draft-metadata: FAIL (draft release ${TAG_NAME} not found)"
+            exit 1
+          fi
+
+          {
+            echo "release_json<<__FACETHEORY_RELEASE_JSON__"
+            printf '%s\n' "${release_json}"
+            echo "__FACETHEORY_RELEASE_JSON__"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Checkout (for release assets)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -435,7 +567,7 @@ jobs:
 
       - name: Verify draft release targets this commit
         env:
-          GH_TOKEN: ${{ github.token }}
+          RELEASE_JSON: ${{ steps.draft.outputs.release_json }}
         run: scripts/verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
 
       - name: Verify release source branch

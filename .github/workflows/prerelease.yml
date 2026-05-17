@@ -42,6 +42,78 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
     steps:
+      - name: Checkout (prerelease state)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'premain' || github.sha }}
+
+      - name: Recover missing current prerelease Release Please state
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+
+          version="$(
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path(".release-please-manifest.premain.json").read_text(encoding="utf-8"))
+          version = str(data.get(".", "")).strip()
+          if not version:
+              raise SystemExit("missing prerelease release-please manifest version")
+          print(version)
+          PY
+          )"
+          tag="v${version}"
+
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            echo "release-recovery: ${tag} release already exists"
+            exit 0
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "release-recovery: ${tag} tag already exists"
+            exit 0
+          fi
+
+          expected_title="chore(premain): release ${version}"
+          pending_number="$(
+            EXPECTED_TITLE="${expected_title}" gh pr list \
+              --state merged \
+              --base premain \
+              --label "autorelease: pending" \
+              --limit 50 \
+              --json number,title \
+              --jq 'map(select(.title == env.EXPECTED_TITLE)) | .[0].number // ""'
+          )"
+          if [[ -n "${pending_number}" ]]; then
+            echo "release-recovery: ${tag} already pending on PR #${pending_number}"
+            exit 0
+          fi
+
+          tagged_number="$(
+            EXPECTED_TITLE="${expected_title}" gh pr list \
+              --state merged \
+              --base premain \
+              --label "autorelease: tagged" \
+              --limit 50 \
+              --json number,title \
+              --jq 'map(select(.title == env.EXPECTED_TITLE)) | .[0].number // ""'
+          )"
+
+          if [[ -z "${tagged_number}" ]]; then
+            echo "release-recovery: FAIL (${tag} is missing and no merged ${expected_title} PR is pending/tagged)"
+            exit 1
+          fi
+
+          echo "release-recovery: resetting PR #${tagged_number} from tagged to pending for ${tag}"
+          gh pr edit "${tagged_number}" \
+            --remove-label "autorelease: tagged" \
+            --add-label "autorelease: pending"
+
       - name: Release Please (Prerelease)
         id: release
         uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
@@ -59,6 +131,75 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Resolve draft release metadata
+        id: draft
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+
+          repo="${GITHUB_REPOSITORY:?}"
+          if [[ -z "${TAG_NAME}" ]]; then
+            echo "release-draft-metadata: FAIL (missing tag name)"
+            exit 1
+          fi
+
+          release_json=""
+          for attempt in $(seq 1 12); do
+            for page in $(seq 1 10); do
+              page_file="$(mktemp)"
+              gh api "repos/${repo}/releases?per_page=100&page=${page}" > "${page_file}"
+              match="$(
+                TAG_NAME="${TAG_NAME}" python3 - "${page_file}" <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          for release in data:
+              if release.get("tag_name") != os.environ["TAG_NAME"]:
+                  continue
+              if release.get("draft") is not True:
+                  continue
+              wanted = ("id", "tag_name", "target_commitish", "draft", "prerelease", "html_url")
+              print(json.dumps({key: release.get(key) for key in wanted}, separators=(",", ":")))
+              break
+          PY
+              )"
+              count="$(python3 - "${page_file}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          print(len(data) if isinstance(data, list) else 0)
+          PY
+              )"
+              rm -f "${page_file}"
+              if [[ -n "${match}" ]]; then
+                release_json="${match}"
+                break
+              fi
+              [[ "${count}" =~ ^[0-9]+$ ]] || count=0
+              [[ "${count}" -lt 100 ]] && break
+            done
+            [[ -n "${release_json}" ]] && break
+            sleep 5
+          done
+
+          if [[ -z "${release_json}" ]]; then
+            echo "release-draft-metadata: FAIL (draft release ${TAG_NAME} not found)"
+            exit 1
+          fi
+
+          {
+            echo "release_json<<__FACETHEORY_RELEASE_JSON__"
+            printf '%s\n' "${release_json}"
+            echo "__FACETHEORY_RELEASE_JSON__"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Checkout (for release assets)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -74,7 +215,7 @@ jobs:
 
       - name: Verify draft release targets this commit
         env:
-          GH_TOKEN: ${{ github.token }}
+          RELEASE_JSON: ${{ steps.draft.outputs.release_json }}
         run: scripts/verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
 
       - name: Verify release source branch

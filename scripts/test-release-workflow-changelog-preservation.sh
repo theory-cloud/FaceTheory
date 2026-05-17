@@ -52,6 +52,44 @@ for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; 
     fail "${workflow} must publish draft releases through a minimal inline PATCH API step"
 done
 
+grep -Fq 'Resolve draft release metadata' .github/workflows/prerelease.yml ||
+  fail "prerelease.yml must resolve hidden draft release metadata before repo checkout"
+
+grep -Fq 'Recover missing current prerelease Release Please state' .github/workflows/prerelease.yml ||
+  fail "prerelease.yml must recover missing tagged prerelease Release Please state"
+
+grep -Fq 'expected_title="chore(premain): release ${version}"' .github/workflows/prerelease.yml ||
+  fail "prerelease.yml must recover the merged premain Release Please PR for the current RC"
+
+grep -Fq 'Resolve draft release metadata' .github/workflows/release.yml ||
+  fail "release.yml must resolve hidden draft release metadata before repo checkout"
+
+grep -Fq 'RELEASE_JSON: ${{ steps.draft.outputs.release_json }}' .github/workflows/prerelease.yml ||
+  fail "prerelease.yml must pass draft metadata to verification without a token"
+
+grep -Fq 'RELEASE_JSON: ${{ steps.draft.outputs.release_json }}' .github/workflows/release.yml ||
+  fail "release.yml must pass draft metadata to verification without a token"
+
+grep -Fq 'RELEASE_JSON: ${{ steps.metadata.outputs.release_json }}' .github/workflows/release.yml ||
+  fail "release.yml existing-tag path must pass resolved release metadata without a token"
+
+python3 - <<'PY' || fail "release draft verification steps must not receive GitHub tokens"
+from pathlib import Path
+
+for workflow in (Path(".github/workflows/release.yml"), Path(".github/workflows/prerelease.yml")):
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+    for index, line in enumerate(lines):
+        if "verify-release-draft-target.sh" not in line:
+            continue
+        if "verify-release-draft-target.sh\"" not in line and "run: scripts/verify-release-draft-target.sh" not in line:
+            continue
+        window = "\n".join(lines[max(0, index - 8): index + 1])
+        if "GH_TOKEN:" in window or "GITHUB_TOKEN:" in window or "secrets.RELEASE_PLEASE_TOKEN" in window:
+            raise SystemExit(f"{workflow}:{index + 1}")
+        if "RELEASE_JSON" not in window:
+            raise SystemExit(f"{workflow}:{index + 1}")
+PY
+
 grep -Fq 'scripts/check-release-baseline-ready.sh .release-please-manifest.premain.json' .github/workflows/prerelease-pr.yml ||
   fail "prerelease-pr.yml must verify the current premain prerelease baseline before generating the next RC PR"
 
