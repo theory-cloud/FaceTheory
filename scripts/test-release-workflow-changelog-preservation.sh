@@ -40,6 +40,9 @@ fi
 grep -Fq 'facetheory-release-scripts' .github/workflows/release.yml ||
   fail "release.yml must stage trusted release provenance scripts before checking out release source code"
 
+grep -Fq 'scripts/checkout-release-source.sh' .github/workflows/release.yml ||
+  fail "release.yml must stage the tokenless release source checkout helper"
+
 grep -Fq 'resolve-release-source-ref.sh" "${TAG_NAME}"' .github/workflows/release.yml ||
   fail "release.yml must resolve existing draft source refs from trusted staged scripts before checkout"
 
@@ -75,6 +78,9 @@ grep -Fq 'Resolve draft release metadata' .github/workflows/release.yml ||
 for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; do
   grep -Fq 'for attempt in $(seq 1 72); do' "${workflow}" ||
     fail "${workflow} must tolerate delayed GitHub draft release visibility"
+  if grep -Fq 'ref: ${{ steps.source.outputs.source_ref }}' "${workflow}"; then
+    fail "${workflow} must not use actions/checkout with a dynamic release source ref"
+  fi
 done
 
 grep -Fq 'RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}' .github/workflows/prerelease.yml ||
@@ -206,7 +212,8 @@ for required in (
     "      - name: Stage trusted release provenance scripts\n",
     "      - name: Resolve release source ref\n",
     "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh",
-    "ref: ${{ steps.source.outputs.source_ref }}",
+    "      - name: Checkout release source\n",
+    "${RUNNER_TEMP}/facetheory-release-scripts/checkout-release-source.sh",
     "RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}",
     "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh",
     "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-branch.sh",
@@ -281,5 +288,31 @@ for workflow in (Path(".github/workflows/release.yml"), Path(".github/workflows/
         if "GH_TOKEN:" in window or "GITHUB_TOKEN:" in window or "secrets.RELEASE_PLEASE_TOKEN" in window:
             raise SystemExit(f"{workflow}:{index + 1}")
 PY
+
+checkout_tmp="$(mktemp -d)"
+trap 'rm -rf "${checkout_tmp}"' EXIT
+(
+  set -euo pipefail
+  git init --bare "${checkout_tmp}/remote.git" >/dev/null
+  git init "${checkout_tmp}/source" >/dev/null
+  cd "${checkout_tmp}/source"
+  git config user.email test@example.com
+  git config user.name "Test User"
+  printf 'release source\n' > README.md
+  git add README.md
+  git commit -m 'test release source' >/dev/null
+  commit="$(git rev-parse HEAD)"
+  git branch -M main
+  git remote add origin "${checkout_tmp}/remote.git"
+  git push --quiet origin main >/dev/null
+  git clone "${checkout_tmp}/remote.git" "${checkout_tmp}/work" >/dev/null 2>&1
+  cd "${checkout_tmp}/work"
+  GIT_REMOTE=origin "${repo_root}/scripts/checkout-release-source.sh" "${commit}" >/dev/null
+  [[ "$(git rev-parse HEAD)" == "${commit}" ]]
+  if GIT_REMOTE=origin "${repo_root}/scripts/checkout-release-source.sh" refs/heads/main >/dev/null 2>&1; then
+    echo "checkout-release-source accepted mutable branch" >&2
+    exit 1
+  fi
+) || fail "checkout-release-source.sh must detach immutable commits and reject mutable branches"
 
 echo "test-release-workflow-changelog-preservation: PASS"
