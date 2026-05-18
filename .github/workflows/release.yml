@@ -35,6 +35,7 @@ jobs:
           mkdir -p "${trusted_dir}"
           cp \
             scripts/release-json-by-tag.sh \
+            scripts/checkout-release-source.sh \
             scripts/resolve-release-source-ref.sh \
             scripts/verify-release-branch.sh \
             scripts/verify-release-draft-target.sh \
@@ -112,12 +113,9 @@ jobs:
         run: |
           "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh" "${TAG_NAME}" >> "${GITHUB_OUTPUT}"
 
-      - name: Checkout (for tag-triggered assets)
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-          ref: ${{ steps.source.outputs.source_ref }}
+      - name: Checkout release source
+        run: |
+          "${RUNNER_TEMP}/facetheory-release-scripts/checkout-release-source.sh" "${{ steps.source.outputs.source_ref }}"
 
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
@@ -577,6 +575,7 @@ jobs:
           trusted_dir="${RUNNER_TEMP}/facetheory-release-scripts"
           mkdir -p "${trusted_dir}"
           cp \
+            scripts/checkout-release-source.sh \
             scripts/resolve-release-source-ref.sh \
             scripts/verify-release-branch.sh \
             scripts/verify-release-draft-target.sh \
@@ -591,15 +590,12 @@ jobs:
         run: |
           "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh" "${TAG_NAME}" >> "${GITHUB_OUTPUT}"
 
-      - name: Checkout (for release assets)
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 0
-          persist-credentials: false
+      - name: Checkout release source
+        run: |
           # Draft GitHub Releases do not guarantee a git tag exists until the
           # release is published. Build from the draft release source ref and
           # verify the draft's target before uploading immutable assets.
-          ref: ${{ steps.source.outputs.source_ref }}
+          "${RUNNER_TEMP}/facetheory-release-scripts/checkout-release-source.sh" "${{ steps.source.outputs.source_ref }}"
 
       - name: Fetch main + premain (release branch verification)
         run: |
