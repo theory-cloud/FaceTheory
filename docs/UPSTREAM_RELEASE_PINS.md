@@ -7,13 +7,13 @@ This file records the currently pinned versions and the exact install strings we
 
 ## Pins
 
-- AppTheory (TypeScript): `v1.6.0`
-- AppTheory (CDK): `v1.6.0`
+- AppTheory (TypeScript): `v1.7.0`
+- AppTheory (CDK): `v1.7.0`
 - TableTheory (TypeScript): `v1.8.3`
 
 ## Known Audit Exception
 
-None currently. AppTheory CDK `v1.6.0` requires `aws-cdk-lib@2.254.0`, and the infra example lockfiles now resolve
+None currently. AppTheory CDK `v1.7.0` requires `aws-cdk-lib@2.254.0`, and the infra example lockfiles now resolve
 the previous nested `fast-uri` audit finding to the patched AWS CDK dependency set.
 
 ## Infra Lockfile Note
@@ -27,7 +27,7 @@ locks so `npm ci` can validate the AWS CDK package tree under npm 11.
 ```bash
   # AppTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.6.0/theory-cloud-apptheory-1.6.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.7.0/theory-cloud-apptheory-1.7.0.tgz
 
   # TableTheory (TS)
 npm install --save-exact \
@@ -35,7 +35,7 @@ npm install --save-exact \
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.6.0/theory-cloud-apptheory-cdk-1.6.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.7.0/theory-cloud-apptheory-cdk-1.7.0.tgz
 ```
 
 ## package.json Snippet (Pinned)
@@ -46,7 +46,7 @@ registry installs:
 ```json
 {
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.6.0/theory-cloud-apptheory-1.6.0.tgz",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.7.0/theory-cloud-apptheory-1.7.0.tgz",
     "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz"
   },
   "overrides": {
