@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.2](https://github.com/theory-cloud/FaceTheory/compare/v3.2.1...v3.2.2) (2026-05-18)
+
+
+### Bug Fixes
+
+* **deps:** align AppTheory v1.7.0 pins ([f9798dd](https://github.com/theory-cloud/FaceTheory/commit/f9798dd85a0816c5bcd22aed318381b563ab9e02))
+* **release:** avoid dynamic release source checkout ([4f7d98d](https://github.com/theory-cloud/FaceTheory/commit/4f7d98dcd21572811732ad64c4c0c0f6d06e592f))
+
 ## [3.2.2-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.2.1...v3.2.2-rc) (2026-05-18)
 
 
