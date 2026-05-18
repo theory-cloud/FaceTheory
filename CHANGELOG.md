@@ -1,5 +1,34 @@
 # Changelog
 
+## [3.2.1](https://github.com/theory-cloud/FaceTheory/compare/v3.2.0...v3.2.1) (2026-05-17)
+
+
+### Bug Fixes
+
+* **oac:** fail closed on malformed response urls ([4a0dafc](https://github.com/theory-cloud/FaceTheory/commit/4a0dafc64e3b30e0f6a6c121a995775d41cedbb4))
+* **release:** build from draft source ref ([f90c6f6](https://github.com/theory-cloud/FaceTheory/commit/f90c6f60ac3e114eca48b76a211bb3cac9f87756))
+* **release:** build from draft source ref ([b4b3f7b](https://github.com/theory-cloud/FaceTheory/commit/b4b3f7b23afd24fb0c15c3490a09ae4756c0a15b))
+* **release:** harden token provenance ([b07ded9](https://github.com/theory-cloud/FaceTheory/commit/b07ded9e02b335d3752d64c299c253f84d445411))
+* **release:** isolate draft metadata resolution ([1c22c2a](https://github.com/theory-cloud/FaceTheory/commit/1c22c2a08b15df2394c7a819f1803efa75276165))
+* **release:** isolate draft metadata resolution ([58029fa](https://github.com/theory-cloud/FaceTheory/commit/58029fad3f89beca1edcd71890f6db56f797ae55))
+* **release:** pin release-please node24 action ([c4fe6be](https://github.com/theory-cloud/FaceTheory/commit/c4fe6bef953898268ebbd8cb4eb92ca6c9e56860))
+* **release:** pin release-please node24 action ([6c42794](https://github.com/theory-cloud/FaceTheory/commit/6c4279453ca63312639f31de5e676097bba95bdf))
+* **release:** recover missing prerelease state ([6cdd4a6](https://github.com/theory-cloud/FaceTheory/commit/6cdd4a67aaae646d5ae0fee598d95eda4b47e079))
+* **release:** restore draft metadata handoff ([1ed56b2](https://github.com/theory-cloud/FaceTheory/commit/1ed56b2bfa2d412a223b705b50b97735ca38e626))
+* **release:** restore draft metadata handoff ([5968c34](https://github.com/theory-cloud/FaceTheory/commit/5968c348dd86604153399bb74233813ec5273288))
+* **release:** tolerate delayed draft visibility ([31f0a5b](https://github.com/theory-cloud/FaceTheory/commit/31f0a5b332167e8ae3bc674ce487d411030093d5))
+* **release:** tolerate delayed draft visibility ([42e8a4e](https://github.com/theory-cloud/FaceTheory/commit/42e8a4e09589e117da4e246763811be60a1abd5e))
+* **release:** widen draft visibility window ([3bd20ee](https://github.com/theory-cloud/FaceTheory/commit/3bd20ee270368ffb3b02873b59cead34856274f3))
+* **release:** widen draft visibility window ([7690fae](https://github.com/theory-cloud/FaceTheory/commit/7690fae50191bf081ed3495964129abb0606bead))
+
+## [3.2.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.2.0...v3.2.1-rc) (2026-05-17)
+
+
+### Bug Fixes
+
+* **oac:** fail closed on malformed response urls ([4a0dafc](https://github.com/theory-cloud/FaceTheory/commit/4a0dafc64e3b30e0f6a6c121a995775d41cedbb4))
+* **release:** harden token provenance ([b07ded9](https://github.com/theory-cloud/FaceTheory/commit/b07ded9e02b335d3752d64c299c253f84d445411))
+
 ## [3.2.0](https://github.com/theory-cloud/FaceTheory/compare/v3.1.2...v3.2.0) (2026-05-17)
 
 

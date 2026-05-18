@@ -64,6 +64,16 @@ write_fake_gh "${bin_a}" "v3.1.2-rc" "${head_a}" "true" "true"
 REPO_ROOT="${work_a}" GH_BIN="${bin_a}/gh" bash "${script_path}" "v3.1.2-rc" "HEAD" >/dev/null ||
   fail "untagged draft target did not pass"
 
+# The release-capable token is intentionally confined to an inline workflow
+# metadata step. The repo-controlled verifier must be able to validate that
+# metadata without invoking gh or receiving the token itself.
+work_env="$(setup_repo env-draft "${tmpdir}")"
+head_env="$(git -C "${work_env}" rev-parse HEAD)"
+release_json_env="{\"tagName\":\"v3.1.2-rc\",\"targetCommitish\":\"${head_env}\",\"isDraft\":true,\"isPrerelease\":true,\"url\":\"https://github.test/releases/untagged-env\"}"
+REPO_ROOT="${work_env}" GH_BIN="${tmpdir}/missing-gh" RELEASE_JSON="${release_json_env}" \
+  bash "${script_path}" "v3.1.2-rc" "HEAD" >/dev/null ||
+  fail "environment-provided draft metadata did not pass without gh"
+
 # A draft release pointing somewhere other than the checked-out commit must fail
 # closed; otherwise assets can be built from different code than the release.
 work_b="$(setup_repo wrong-target "${tmpdir}")"

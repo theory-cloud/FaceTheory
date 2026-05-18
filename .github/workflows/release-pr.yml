@@ -113,7 +113,7 @@ jobs:
       - name: Release Please (PR only) (aligned)
         if: needs.check-baseline.outputs.release_as != ''
         id: release_aligned
-        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           target-branch: main
@@ -125,7 +125,7 @@ jobs:
       - name: Release Please (PR only)
         if: needs.check-baseline.outputs.release_as == ''
         id: release_default
-        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           target-branch: main

@@ -41,10 +41,73 @@ jobs:
             "${trusted_dir}/"
           chmod +x "${trusted_dir}"/*.sh
 
+      - name: Resolve release metadata
+        id: metadata
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          repo="${GITHUB_REPOSITORY:?}"
+          if [[ -z "${TAG_NAME}" ]]; then
+            echo "release-metadata: SKIP (missing tag name)"
+            exit 0
+          fi
+
+          release_json=""
+          for page in $(seq 1 10); do
+            page_file="$(mktemp)"
+            gh api "repos/${repo}/releases?per_page=100&page=${page}" > "${page_file}"
+            match="$(
+              TAG_NAME="${TAG_NAME}" python3 - "${page_file}" <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          for release in data:
+              if release.get("tag_name") != os.environ["TAG_NAME"]:
+                  continue
+              wanted = ("id", "tag_name", "target_commitish", "draft", "prerelease", "html_url")
+              print(json.dumps({key: release.get(key) for key in wanted}, separators=(",", ":")))
+              break
+          PY
+            )"
+            count="$(python3 - "${page_file}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          print(len(data) if isinstance(data, list) else 0)
+          PY
+            )"
+            rm -f "${page_file}"
+            if [[ -n "${match}" ]]; then
+              release_json="${match}"
+              break
+            fi
+            [[ "${count}" =~ ^[0-9]+$ ]] || count=0
+            [[ "${count}" -lt 100 ]] && break
+          done
+
+          if [[ -z "${release_json}" ]]; then
+            echo "release-metadata: SKIP (${TAG_NAME} not found)"
+            exit 0
+          fi
+
+          {
+            echo "release_json<<__FACETHEORY_RELEASE_JSON__"
+            printf '%s\n' "${release_json}"
+            echo "__FACETHEORY_RELEASE_JSON__"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Resolve release source ref
         id: source
         env:
-          GH_TOKEN: ${{ github.token }}
+          RELEASE_JSON: ${{ steps.metadata.outputs.release_json }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
         run: |
           "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh" "${TAG_NAME}" >> "${GITHUB_OUTPUT}"
@@ -117,7 +180,7 @@ jobs:
               echo "release-assets: FAIL (${TAG_NAME} source resolved to ${RELEASE_SOURCE_COMMIT}, checked out ${actual_commit})"
               exit 1
             fi
-            GH_TOKEN="${{ github.token }}" \
+            RELEASE_JSON="${{ steps.metadata.outputs.release_json }}" \
               REPO_ROOT="${GITHUB_WORKSPACE}" \
               "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh" "${TAG_NAME}" HEAD
           fi
@@ -403,7 +466,7 @@ jobs:
 
       - name: Release Please (Stable)
         id: release
-        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           target-branch: main
@@ -411,22 +474,132 @@ jobs:
           manifest-file: .release-please-manifest.json
           skip-github-pull-request: true
 
-  build-release-assets:
+  resolve-draft-release:
     needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_json: ${{ steps.draft.outputs.release_json }}
+    steps:
+      - name: Resolve draft release metadata
+        id: draft
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+
+          repo="${GITHUB_REPOSITORY:?}"
+          if [[ -z "${TAG_NAME}" ]]; then
+            echo "release-draft-metadata: FAIL (missing tag name)"
+            exit 1
+          fi
+
+          release_json=""
+          # Release Please can report release_created before GitHub's releases
+          # listing API exposes the untagged draft. Poll long enough for that
+          # API lag without handing release-capable credentials to repo scripts.
+          for attempt in $(seq 1 72); do
+            for page in $(seq 1 10); do
+              page_file="$(mktemp)"
+              gh api "repos/${repo}/releases?per_page=100&page=${page}" > "${page_file}"
+              match="$(
+                TAG_NAME="${TAG_NAME}" python3 - "${page_file}" <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          for release in data:
+              if release.get("tag_name") != os.environ["TAG_NAME"]:
+                  continue
+              if release.get("draft") is not True:
+                  continue
+              wanted = ("id", "tag_name", "target_commitish", "draft", "prerelease", "html_url")
+              print(json.dumps({key: release.get(key) for key in wanted}, separators=(",", ":")))
+              break
+          PY
+              )"
+              count="$(python3 - "${page_file}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          print(len(data) if isinstance(data, list) else 0)
+          PY
+              )"
+              rm -f "${page_file}"
+              if [[ -n "${match}" ]]; then
+                release_json="${match}"
+                break
+              fi
+              [[ "${count}" =~ ^[0-9]+$ ]] || count=0
+              [[ "${count}" -lt 100 ]] && break
+            done
+            [[ -n "${release_json}" ]] && break
+            sleep 5
+          done
+
+          if [[ -z "${release_json}" ]]; then
+            echo "release-draft-metadata: FAIL (draft release ${TAG_NAME} not found)"
+            exit 1
+          fi
+
+          {
+            echo "release_json<<__FACETHEORY_RELEASE_JSON__"
+            printf '%s\n' "${release_json}"
+            echo "__FACETHEORY_RELEASE_JSON__"
+          } >> "${GITHUB_OUTPUT}"
+
+  build-release-assets:
+    needs:
+      - release-please
+      - resolve-draft-release
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
+      - name: Checkout release workflow scripts
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Stage trusted release provenance scripts
+        run: |
+          set -euo pipefail
+          trusted_dir="${RUNNER_TEMP}/facetheory-release-scripts"
+          mkdir -p "${trusted_dir}"
+          cp \
+            scripts/resolve-release-source-ref.sh \
+            scripts/verify-release-branch.sh \
+            scripts/verify-release-draft-target.sh \
+            "${trusted_dir}/"
+          chmod +x "${trusted_dir}"/*.sh
+
+      - name: Resolve release source ref
+        id: source
+        env:
+          RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh" "${TAG_NAME}" >> "${GITHUB_OUTPUT}"
+
       - name: Checkout (for release assets)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           persist-credentials: false
           # Draft GitHub Releases do not guarantee a git tag exists until the
-          # release is published. Build from the release commit and verify the
-          # draft's target before uploading immutable assets.
-          ref: ${{ github.sha }}
+          # release is published. Build from the draft release source ref and
+          # verify the draft's target before uploading immutable assets.
+          ref: ${{ steps.source.outputs.source_ref }}
 
       - name: Fetch main + premain (release branch verification)
         run: |
@@ -435,11 +608,15 @@ jobs:
 
       - name: Verify draft release targets this commit
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: scripts/verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
+          RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}
+        run: |
+          REPO_ROOT="${GITHUB_WORKSPACE}" \
+            "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" HEAD
 
       - name: Verify release source branch
-        run: scripts/verify-release-branch.sh "${{ needs.release-please.outputs.tag_name }}"
+        run: |
+          REPO_ROOT="${GITHUB_WORKSPACE}" \
+            "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-branch.sh" "${{ needs.release-please.outputs.tag_name }}"
 
       - name: Set SOURCE_DATE_EPOCH (deterministic artifacts)
         run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
@@ -625,6 +802,7 @@ jobs:
   cleanup-failed-draft:
     needs:
       - release-please
+      - resolve-draft-release
       - build-release-assets
       - publish-release
     if: >-
@@ -632,6 +810,8 @@ jobs:
         always() &&
         needs.release-please.outputs.release_created == 'true' &&
         (
+          needs.resolve-draft-release.result == 'failure' ||
+          needs.resolve-draft-release.result == 'cancelled' ||
           needs.build-release-assets.result == 'failure' ||
           needs.build-release-assets.result == 'cancelled' ||
           needs.publish-release.result == 'failure' ||
