@@ -34,8 +34,20 @@ export { default as WizardReconciliationPlanPanel } from './WizardReconciliation
 export { default as WizardDiffListPanel } from './WizardReconciliationPlanPanel.svelte';
 export { default as WizardAuthorityContextStripPanel } from './WizardAuthorityContextStripPanel.svelte';
 export { default as WizardServerResolvedContextBarPanel } from './WizardAuthorityContextStripPanel.svelte';
+export { default as SelectableCardGridPanel } from './SelectableCardGridPanel.svelte';
+export { default as ChoiceCard } from './ChoiceCard.svelte';
 export { default as WizardEditableTokenInputPanel } from './WizardEditableTokenInputPanel.svelte';
 export { default as WizardChipListPanel } from './WizardEditableTokenInputPanel.svelte';
+
+export type {
+  ChoiceCardProps,
+  SelectableCardGrid,
+  SelectableCardGridLayout,
+  SelectableCardGridSelection,
+  SelectableCardGridSize,
+  SelectableCardOption,
+  SelectableCardTone,
+} from '../../stitch-admin/selectable-card-grid-types.js';
 
 export type {
   WizardCapability,

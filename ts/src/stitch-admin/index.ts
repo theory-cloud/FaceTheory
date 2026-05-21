@@ -57,6 +57,16 @@ export type {
 } from './wizard-authority-context-strip-types.js';
 
 export type {
+  ChoiceCardProps,
+  SelectableCardGrid,
+  SelectableCardGridLayout,
+  SelectableCardGridSelection,
+  SelectableCardGridSize,
+  SelectableCardOption,
+  SelectableCardTone,
+} from './selectable-card-grid-types.js';
+
+export type {
   WizardChipList,
   WizardChipListFeedbackTone,
   WizardChipListItem,

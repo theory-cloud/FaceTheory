@@ -165,6 +165,20 @@ export {
 } from './wizard-authority-context-strip.js';
 
 export {
+  SelectableCardGridPanel,
+  ChoiceCard,
+  type SelectableCardGridPanelProps,
+  type ChoiceCardPanelProps,
+  type ChoiceCardProps,
+  type SelectableCardGrid,
+  type SelectableCardGridLayout,
+  type SelectableCardGridSelection,
+  type SelectableCardGridSize,
+  type SelectableCardOption,
+  type SelectableCardTone,
+} from './selectable-card-grid.js';
+
+export {
   WizardEditableTokenInputPanel,
   WizardChipListPanel,
   type WizardEditableTokenInputPanelProps,

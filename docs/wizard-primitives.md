@@ -36,9 +36,9 @@ primitive twice and asserting byte-identical SSR output.
 | Layer | Module | What it exports |
 | --- | --- | --- |
 | Framework-neutral types | `@theory-cloud/facetheory/stitch-admin` | `WizardProgressState`, `WizardPackageSummary`, `WizardFindingList`, `WizardReconcileSummary`, `WizardReconciliationPlan`, `WizardAuthorityContextStrip`, `WizardCapabilityReview`, `WizardEnablementChecklist`, `WizardRecoveryStatus`, `WizardEmptyStateConfig`, `WizardEditableTokenInput`, `WizardSafetyPolicy`, and supporting enums and aliases. |
-| React adapter | `@theory-cloud/facetheory/react/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`), `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
-| Vue adapter | `@theory-cloud/facetheory/vue/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`, `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`). |
-| Svelte adapter | `@theory-cloud/facetheory/svelte/stitch-admin` | Same primitive set as the Vue adapter, exposed as `.svelte` components with matching component-prop interfaces. |
+| React adapter | `@theory-cloud/facetheory/react/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`), `SelectableCardGridPanel`, `ChoiceCard`, `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
+| Vue adapter | `@theory-cloud/facetheory/vue/stitch-admin` | Same primitive set as React, including `SelectableCardGridPanel` and `ChoiceCard`. |
+| Svelte adapter | `@theory-cloud/facetheory/svelte/stitch-admin` | Same primitive set, exposed as `.svelte` components with matching component-prop interfaces. |
 
 ### Adapter parity status
 
@@ -349,6 +349,97 @@ color-only cues.
   }}
   onChange={(next) => host.setAllowedSenders(next)}
   onDraftChange={(next) => host.setDraft(next)}
+/>
+```
+
+## Selectable card grid / choice card
+
+`SelectableCardGridPanel` (with the lower-level `ChoiceCard` primitive) is the
+card-grid choice surface the TheoryMCP Agent Import & Completion Wizard
+renders for "pick an action / target / environment" steps. It supports both
+single-select and multi-select selection modes and three layouts (responsive
+grid, compact stacked list, two-column wizard panels).
+
+### Trust boundary
+
+- Presentation-only. FaceTheory does not decide whether a choice is
+  authorized.
+- theory-mcp-server (the host) supplies `allowed` / `disabled` / `blocked`
+  state from route-resolved server policy and TableTheory-backed state.
+- FaceTheory makes no authorization inference from option labels, package
+  fields, repository names, or action-family strings.
+- `recommended`, `riskLabel`, `disabledReason`, `blocked`, and
+  `blockedReason` fields are caller-supplied display values, never computed
+  by the primitive.
+
+### Option contract
+
+```ts
+interface SelectableCardOption {
+  key: string;
+  title: unknown;
+  description?: unknown;
+  icon?: unknown;
+  badge?: unknown;
+  tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'recommended';
+  riskLabel?: string;
+  disabledReason?: string;
+  recommended?: boolean;
+  blocked?: boolean;
+  blockedReason?: string;
+  metadata?: OperatorVisibilityMetadata;
+}
+```
+
+### Accessibility contract
+
+- Single-select grids render the outer container as `role="radiogroup"` and
+  each card as `role="radio"` with `aria-checked` and a tab index driven by
+  selection.
+- Multi-select grids render the outer container as `role="group"` and each
+  card as `role="checkbox"` with `aria-checked`.
+- Disabled options (those carrying `disabledReason` or `blocked: true`)
+  carry `aria-disabled="true"`; the host-supplied `disabledReason` is
+  rendered as text and wired via `aria-describedby` to the card.
+- `recommended`, `Blocked`, and risk states render as **text pills** (not
+  color-only) so high-contrast viewers see the cue.
+- Keyboard activation: `Space` or `Enter` calls the host's `onChange`
+  with the proposed next selected-key set. The primitive never toggles
+  state internally.
+
+### Selection model
+
+- `single`: `onChange([option.key])` on activate.
+- `multi`: `onChange([...selectedKeys, option.key])` or
+  `onChange(selectedKeys.filter(k => k !== option.key))` depending on whether
+  the option is currently selected.
+
+The host owns acceptance — passing back a different list is fine.
+
+### Example
+
+```tsx
+<SelectableCardGridPanel
+  grid={{
+    groupId: 'allowed-action',
+    selection: 'single',
+    selectedKeys: ['create'],
+    options: [
+      { key: 'create', title: 'Create new namespace', tone: 'success', recommended: true },
+      { key: 'reuse', title: 'Reuse existing namespace', tone: 'info' },
+      { key: 'replace', title: 'Replace existing namespace',
+        tone: 'warning', riskLabel: 'High blast radius' },
+      { key: 'archive', title: 'Archive without binding',
+        disabledReason: 'Requires operator review before archival.' },
+      { key: 'forbidden', title: 'Forbidden namespace',
+        blocked: true, blockedReason: 'Server policy blocks this option.' },
+    ],
+    label: 'Allowed action',
+    description: 'TheoryMCP resolves which of these are available per route.',
+    layout: 'grid',
+    safetyPolicy: 'no-secret-or-production-like-data',
+  }}
+  onChange={(next) => host.setAllowedAction(next[0])}
 />
 ```
 
