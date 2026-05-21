@@ -250,3 +250,217 @@ export declare const MetadataBadge: Component<MetadataBadgeProps>;
 export declare const MetadataBadgeGroup: Component<MetadataBadgeGroupProps>;
 export declare const NonAuthoritativeBanner: Component<NonAuthoritativeBannerProps>;
 export declare const OperatorEmptyState: Component<OperatorEmptyStateProps>;
+
+export interface WizardEditableTokenInputPanelProps {
+  input: import('../../stitch-admin/wizard-editable-token-input-types.js').WizardEditableTokenInput;
+  onChange: (next: string[]) => void;
+  onDraftChange?: (next: string) => void;
+}
+export type WizardChipListPanelProps = WizardEditableTokenInputPanelProps;
+export declare const WizardEditableTokenInputPanel: Component<WizardEditableTokenInputPanelProps>;
+export declare const WizardChipListPanel: Component<WizardChipListPanelProps>;
+export type {
+  WizardEditableTokenInput,
+  WizardEditableTokenInputFeedbackTone,
+  WizardEditableTokenInputItem,
+  WizardEditableTokenInputTone,
+  WizardEditableTokenInputValidationResult,
+} from '../../stitch-admin/wizard-editable-token-input-types.js';
+
+export type {
+  WizardCapability,
+  WizardCapabilityIntent,
+  WizardCapabilityReview,
+  WizardCapabilitySensitivity,
+  WizardEmptyStateConfig,
+  WizardEnablementChecklist,
+  WizardEnablementItem,
+  WizardEnablementItemStatus,
+  WizardFinding,
+  WizardFindingList,
+  WizardFindingSeverity,
+  WizardPackageFile,
+  WizardPackageSummary,
+  WizardProgressState,
+  WizardReconcileEntry,
+  WizardReconcileSummary,
+  WizardRecoveryState,
+  WizardRecoveryStatus,
+  WizardSafetyPolicy,
+  WizardStep,
+  WizardStepStatus,
+} from '../../stitch-admin/wizard-types.js';
+
+export type {
+  WizardDiffList,
+  WizardDiffListCanonicalKind,
+  WizardDiffListDetail,
+  WizardDiffListOperationKind,
+  WizardDiffListRow,
+  WizardReconciliationPlan,
+  WizardReconciliationPlanCanonicalKind,
+  WizardReconciliationPlanDetail,
+  WizardReconciliationPlanOperationKind,
+  WizardReconciliationPlanRow,
+} from '../../stitch-admin/wizard-reconciliation-plan-types.js';
+
+export type {
+  WizardAuthorityContextItem,
+  WizardAuthorityContextItemTone,
+  WizardAuthorityContextStrip,
+  WizardAuthorityContextStripLayout,
+  WizardAuthorityContextStripSize,
+  WizardServerResolvedContextBar,
+  WizardServerResolvedContextBarItem,
+  WizardServerResolvedContextBarLayout,
+  WizardServerResolvedContextBarSize,
+  WizardServerResolvedContextBarTone,
+} from '../../stitch-admin/wizard-authority-context-strip-types.js';
+
+export interface WizardProgressPanelProps {
+  title?: unknown;
+  description?: unknown;
+  state: import('../../stitch-admin/wizard-types.js').WizardProgressState;
+}
+export interface WizardPackageSummaryPanelProps {
+  title?: unknown;
+  summary: import('../../stitch-admin/wizard-types.js').WizardPackageSummary;
+  emptyLabel?: unknown;
+}
+export interface WizardFindingListPanelProps {
+  title?: unknown;
+  description?: unknown;
+  list: import('../../stitch-admin/wizard-types.js').WizardFindingList;
+  emptyLabel?: unknown;
+}
+export interface WizardReconcileSummaryPanelProps {
+  title?: unknown;
+  description?: unknown;
+  summary: import('../../stitch-admin/wizard-types.js').WizardReconcileSummary;
+  emptyLabel?: unknown;
+}
+export interface WizardCapabilityReviewPanelProps {
+  title?: unknown;
+  description?: unknown;
+  review: import('../../stitch-admin/wizard-types.js').WizardCapabilityReview;
+  emptyLabel?: unknown;
+}
+export interface WizardEnablementChecklistPanelProps {
+  title?: unknown;
+  description?: unknown;
+  checklist: import('../../stitch-admin/wizard-types.js').WizardEnablementChecklist;
+  emptyLabel?: unknown;
+}
+export interface WizardRecoveryStatusPanelProps {
+  title?: unknown;
+  status: import('../../stitch-admin/wizard-types.js').WizardRecoveryStatus;
+}
+export interface WizardEmptyStatePanelProps {
+  config: import('../../stitch-admin/wizard-types.js').WizardEmptyStateConfig;
+  action?: unknown;
+}
+export interface WizardReconciliationPlanPanelProps {
+  title?: unknown;
+  description?: unknown;
+  plan: import('../../stitch-admin/wizard-reconciliation-plan-types.js').WizardReconciliationPlan;
+  emptyLabel?: unknown;
+  onToggleRow?: (rowKey: string, nextExpanded: boolean) => void;
+}
+export type WizardDiffListPanelProps = WizardReconciliationPlanPanelProps;
+export interface WizardAuthorityContextStripPanelProps {
+  title?: unknown;
+  description?: unknown;
+  strip: import('../../stitch-admin/wizard-authority-context-strip-types.js').WizardAuthorityContextStrip;
+  onCopyItem?: (itemKey: string, copyValue: string) => void;
+}
+export type WizardServerResolvedContextBarPanelProps =
+  WizardAuthorityContextStripPanelProps;
+
+export type {
+  ChoiceCardProps,
+  SelectableCardGrid,
+  SelectableCardGridLayout,
+  SelectableCardGridSelection,
+  SelectableCardGridSize,
+  SelectableCardOption,
+  SelectableCardTone,
+} from '../../stitch-admin/selectable-card-grid-types.js';
+
+export interface SelectableCardGridPanelProps {
+  grid: import('../../stitch-admin/selectable-card-grid-types.js').SelectableCardGrid;
+  onChange: (nextSelectedKeys: string[]) => void;
+}
+export interface ChoiceCardPanelProps {
+  card: import('../../stitch-admin/selectable-card-grid-types.js').ChoiceCardProps;
+  onChange?: (selected: boolean) => void;
+}
+export declare const SelectableCardGridPanel: Component<SelectableCardGridPanelProps>;
+export declare const ChoiceCard: Component<ChoiceCardPanelProps>;
+
+export type {
+  CodeDropzoneProps,
+  PackageSourceInput,
+  PackageSourceInputActions,
+  PackageSourceInputError,
+  PackageSourceInputErrorKind,
+  PackageSourceInputFileMeta,
+  PackageSourceInputMode,
+  PackageSourceInputState,
+} from '../../stitch-admin/package-source-input-types.js';
+
+export interface PackageSourceInputPanelProps {
+  input: import('../../stitch-admin/package-source-input-types.js').PackageSourceInput;
+  onValueChange?: (next: string) => void;
+  onFiles?: (
+    files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[],
+  ) => void;
+  onClear?: () => void;
+  onReplace?: () => void;
+  onCopy?: (copyValue: string) => void;
+}
+export interface CodeDropzonePanelProps {
+  dropzone: import('../../stitch-admin/package-source-input-types.js').CodeDropzoneProps;
+  onFiles?: (
+    files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[],
+  ) => void;
+}
+export declare const PackageSourceInputPanel: Component<PackageSourceInputPanelProps>;
+export declare const CodeDropzone: Component<CodeDropzonePanelProps>;
+
+export declare const WizardProgress: Component<WizardProgressPanelProps>;
+export declare const WizardPackageSummaryPanel: Component<WizardPackageSummaryPanelProps>;
+export declare const WizardFindingListPanel: Component<WizardFindingListPanelProps>;
+export declare const WizardReconcileSummaryPanel: Component<WizardReconcileSummaryPanelProps>;
+export declare const WizardCapabilityReviewPanel: Component<WizardCapabilityReviewPanelProps>;
+export declare const WizardEnablementChecklistPanel: Component<WizardEnablementChecklistPanelProps>;
+export declare const WizardRecoveryStatusPanel: Component<WizardRecoveryStatusPanelProps>;
+export declare const WizardEmptyState: Component<WizardEmptyStatePanelProps>;
+export declare const WizardReconciliationPlanPanel: Component<WizardReconciliationPlanPanelProps>;
+export declare const WizardDiffListPanel: Component<WizardDiffListPanelProps>;
+export declare const WizardAuthorityContextStripPanel: Component<WizardAuthorityContextStripPanelProps>;
+export declare const WizardServerResolvedContextBarPanel: Component<WizardServerResolvedContextBarPanelProps>;
+
+export type {
+  AuditTrail,
+  AuditTrailEvent,
+  AuditTrailEventExternalLink,
+  AuditTrailEventGroup,
+  AuditTrailEventMetadataEntry,
+  AuditTrailEventStatus,
+  AuditTrailEventTone,
+  AuditTrailVariant,
+  DisclosurePanelProps,
+} from '../../stitch-admin/audit-trail-types.js';
+
+export interface AuditTrailPanelProps {
+  trail: import('../../stitch-admin/audit-trail-types.js').AuditTrail;
+  onToggleGroup?: (groupId: string, nextExpanded: boolean) => void;
+}
+
+export interface DisclosurePanelPanelProps {
+  panel: import('../../stitch-admin/audit-trail-types.js').DisclosurePanelProps;
+  onToggle?: (nextExpanded: boolean) => void;
+}
+
+export declare const AuditTrailPanel: Component<AuditTrailPanelProps>;
+export declare const DisclosurePanel: Component<DisclosurePanelPanelProps>;

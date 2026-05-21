@@ -22,6 +22,124 @@ export { default as MetadataBadge } from './MetadataBadge.svelte';
 export { default as MetadataBadgeGroup } from './MetadataBadgeGroup.svelte';
 export { default as NonAuthoritativeBanner } from './NonAuthoritativeBanner.svelte';
 export { default as OperatorEmptyState } from './OperatorEmptyState.svelte';
+export { default as WizardProgress } from './WizardProgress.svelte';
+export { default as WizardPackageSummaryPanel } from './WizardPackageSummaryPanel.svelte';
+export { default as WizardFindingListPanel } from './WizardFindingListPanel.svelte';
+export { default as WizardReconcileSummaryPanel } from './WizardReconcileSummaryPanel.svelte';
+export { default as WizardCapabilityReviewPanel } from './WizardCapabilityReviewPanel.svelte';
+export { default as WizardEnablementChecklistPanel } from './WizardEnablementChecklistPanel.svelte';
+export { default as WizardRecoveryStatusPanel } from './WizardRecoveryStatusPanel.svelte';
+export { default as WizardEmptyState } from './WizardEmptyState.svelte';
+export { default as WizardReconciliationPlanPanel } from './WizardReconciliationPlanPanel.svelte';
+export { default as WizardDiffListPanel } from './WizardReconciliationPlanPanel.svelte';
+export { default as WizardAuthorityContextStripPanel } from './WizardAuthorityContextStripPanel.svelte';
+export { default as WizardServerResolvedContextBarPanel } from './WizardAuthorityContextStripPanel.svelte';
+export { default as AuditTrailPanel } from './AuditTrailPanel.svelte';
+export { default as DisclosurePanel } from './DisclosurePanel.svelte';
+export { default as SelectableCardGridPanel } from './SelectableCardGridPanel.svelte';
+export { default as ChoiceCard } from './ChoiceCard.svelte';
+export { default as PackageSourceInputPanel } from './PackageSourceInputPanel.svelte';
+export { default as CodeDropzone } from './CodeDropzone.svelte';
+export { default as WizardEditableTokenInputPanel } from './WizardEditableTokenInputPanel.svelte';
+export { default as WizardChipListPanel } from './WizardEditableTokenInputPanel.svelte';
+
+export type {
+  CodeDropzoneProps,
+  PackageSourceInput,
+  PackageSourceInputActions,
+  PackageSourceInputError,
+  PackageSourceInputErrorKind,
+  PackageSourceInputFileMeta,
+  PackageSourceInputMode,
+  PackageSourceInputState,
+} from '../../stitch-admin/package-source-input-types.js';
+
+export type {
+  ChoiceCardProps,
+  SelectableCardGrid,
+  SelectableCardGridLayout,
+  SelectableCardGridSelection,
+  SelectableCardGridSize,
+  SelectableCardOption,
+  SelectableCardTone,
+} from '../../stitch-admin/selectable-card-grid-types.js';
+
+export type {
+  WizardCapability,
+  WizardCapabilityIntent,
+  WizardCapabilityReview,
+  WizardCapabilitySensitivity,
+  WizardEmptyStateConfig,
+  WizardEnablementChecklist,
+  WizardEnablementItem,
+  WizardEnablementItemStatus,
+  WizardFinding,
+  WizardFindingList,
+  WizardFindingSeverity,
+  WizardPackageFile,
+  WizardPackageSummary,
+  WizardProgressState,
+  WizardReconcileEntry,
+  WizardReconcileSummary,
+  WizardRecoveryState,
+  WizardRecoveryStatus,
+  WizardSafetyPolicy,
+  WizardStep,
+  WizardStepStatus,
+} from '../../stitch-admin/wizard-types.js';
+
+export type {
+  WizardDiffList,
+  WizardDiffListCanonicalKind,
+  WizardDiffListDetail,
+  WizardDiffListOperationKind,
+  WizardDiffListRow,
+  WizardReconciliationPlan,
+  WizardReconciliationPlanCanonicalKind,
+  WizardReconciliationPlanDetail,
+  WizardReconciliationPlanOperationKind,
+  WizardReconciliationPlanRow,
+} from '../../stitch-admin/wizard-reconciliation-plan-types.js';
+
+export type {
+  WizardAuthorityContextItem,
+  WizardAuthorityContextItemTone,
+  WizardAuthorityContextStrip,
+  WizardAuthorityContextStripLayout,
+  WizardAuthorityContextStripSize,
+  WizardServerResolvedContextBar,
+  WizardServerResolvedContextBarItem,
+  WizardServerResolvedContextBarLayout,
+  WizardServerResolvedContextBarSize,
+  WizardServerResolvedContextBarTone,
+} from '../../stitch-admin/wizard-authority-context-strip-types.js';
+
+export type {
+  AuditTrail,
+  AuditTrailEvent,
+  AuditTrailEventExternalLink,
+  AuditTrailEventGroup,
+  AuditTrailEventMetadataEntry,
+  AuditTrailEventStatus,
+  AuditTrailEventTone,
+  AuditTrailVariant,
+  DisclosurePanelProps,
+} from '../../stitch-admin/audit-trail-types.js';
+
+export type {
+  AuditTrailPanelProps,
+  DisclosurePanelPanelProps,
+} from './types.js';
+
+export type {
+  WizardEditableTokenInput,
+  WizardEditableTokenInputFeedbackTone,
+  WizardEditableTokenInputItem,
+  WizardEditableTokenInputTone,
+  WizardEditableTokenInputValidationResult,
+  WizardEditableTokenInputPanelProps,
+  WizardChipListPanelProps,
+} from './types.js';
 
 export type {
   DataTableToolbarSlots,
