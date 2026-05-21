@@ -203,6 +203,7 @@ function renderCardStatusPills(
   return h(
     'div',
     {
+      key: 'pills',
       className: 'facetheory-stitch-selectable-card-pills',
       style: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
     },
