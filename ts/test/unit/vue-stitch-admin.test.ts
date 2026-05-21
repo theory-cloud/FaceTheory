@@ -1209,3 +1209,27 @@ test('vue code-dropzone: renders state-labeled dropzone with file metadata', asy
   assert.ok(body.includes('Ready for server preview'));
   assert.ok(body.includes('data-file-name="acme.yaml"'));
 });
+
+test('vue package-source-input: only invalid-syntax renders evidence; forbidden/unsafe/other suppressed', async () => {
+  const input: VuePackageSourceInput = {
+    groupId: 'pkg-mixed-vue',
+    value: '',
+    state: 'invalid',
+    errors: [
+      { id: 'syntax-1', kind: 'invalid-syntax', message: 'Expected top-level mapping at line 1', evidence: 'line 1, col 1' },
+      { id: 'forbidden-1', kind: 'forbidden', message: 'Operator policy blocks this manifest.', evidence: 'AKIA-VUE-FORBIDDEN-EVIDENCE-1234567890' },
+      { id: 'unsafe-1', kind: 'unsafe', message: 'Manifest references an unsupported scheme.', evidence: 'AKIA-VUE-UNSAFE-EVIDENCE-1234567890' },
+      { id: 'other-1', kind: 'other', message: 'Validation could not complete.', evidence: 'AKIA-VUE-OTHER-EVIDENCE-1234567890' },
+    ],
+    modes: ['paste'],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VuePackageSourceInputPanel, { input, onValueChange: () => {} }));
+  assert.ok(body.includes('line 1, col 1'));
+  assert.equal(body.includes('AKIA-VUE-FORBIDDEN-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-VUE-UNSAFE-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-VUE-OTHER-EVIDENCE-1234567890'), false);
+  assert.ok(body.includes('Operator policy blocks this manifest.'));
+  assert.ok(body.includes('Manifest references an unsupported scheme.'));
+  assert.ok(body.includes('Validation could not complete.'));
+});

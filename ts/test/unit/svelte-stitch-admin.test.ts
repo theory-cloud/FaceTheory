@@ -1014,3 +1014,59 @@ test('svelte code-dropzone: renders state-labeled dropzone with file metadata', 
   assert.ok(body.includes('Ready for server preview'));
   assert.ok(body.includes('data-file-name="acme.yaml"'));
 });
+
+test('svelte package-source-input: only invalid-syntax renders evidence; forbidden/unsafe/other suppressed', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/PackageSourceInputPanel.svelte'),
+    {
+      input: {
+        groupId: 'pkg-mixed-svelte',
+        value: '',
+        state: 'invalid',
+        errors: [
+          { id: 'syntax-1', kind: 'invalid-syntax', message: 'Expected top-level mapping at line 1', evidence: 'line 1, col 1' },
+          { id: 'forbidden-1', kind: 'forbidden', message: 'Operator policy blocks this manifest.', evidence: 'AKIA-SVELTE-FORBIDDEN-EVIDENCE-1234567890' },
+          { id: 'unsafe-1', kind: 'unsafe', message: 'Manifest references an unsupported scheme.', evidence: 'AKIA-SVELTE-UNSAFE-EVIDENCE-1234567890' },
+          { id: 'other-1', kind: 'other', message: 'Validation could not complete.', evidence: 'AKIA-SVELTE-OTHER-EVIDENCE-1234567890' },
+        ],
+        modes: ['paste'],
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onValueChange: (): void => {},
+    },
+  );
+  assert.ok(body.includes('line 1, col 1'));
+  assert.equal(body.includes('AKIA-SVELTE-FORBIDDEN-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-SVELTE-UNSAFE-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-SVELTE-OTHER-EVIDENCE-1234567890'), false);
+  assert.ok(body.includes('Operator policy blocks this manifest.'));
+  assert.ok(body.includes('Manifest references an unsupported scheme.'));
+  assert.ok(body.includes('Validation could not complete.'));
+});
+
+test('svelte code-dropzone: only invalid-syntax renders evidence; forbidden/unsafe/other suppressed', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/CodeDropzone.svelte'),
+    {
+      dropzone: {
+        dropzoneId: 'drop-mixed-svelte',
+        label: 'Drop a package',
+        state: 'invalid',
+        safetyPolicy: 'no-secret-or-production-like-data',
+        errors: [
+          { id: 'syntax-1', kind: 'invalid-syntax', message: 'Expected top-level mapping at line 1', evidence: 'line 1, col 1' },
+          { id: 'forbidden-1', kind: 'forbidden', message: 'Policy blocks.', evidence: 'AKIA-SVELTE-DZ-FORBIDDEN-EVIDENCE-1234567890' },
+          { id: 'unsafe-1', kind: 'unsafe', message: 'Unsupported scheme.', evidence: 'AKIA-SVELTE-DZ-UNSAFE-EVIDENCE-1234567890' },
+          { id: 'other-1', kind: 'other', message: 'Validation could not complete.', evidence: 'AKIA-SVELTE-DZ-OTHER-EVIDENCE-1234567890' },
+        ],
+      },
+    },
+  );
+  assert.ok(body.includes('line 1, col 1'));
+  assert.equal(body.includes('AKIA-SVELTE-DZ-FORBIDDEN-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-SVELTE-DZ-UNSAFE-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-SVELTE-DZ-OTHER-EVIDENCE-1234567890'), false);
+  assert.ok(body.includes('Policy blocks.'));
+  assert.ok(body.includes('Unsupported scheme.'));
+  assert.ok(body.includes('Validation could not complete.'));
+});

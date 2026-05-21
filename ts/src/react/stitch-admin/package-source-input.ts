@@ -143,7 +143,7 @@ function renderErrors(
           ERROR_KIND_LABEL[error.kind],
         ),
         h('span', { className: 'facetheory-stitch-package-source-input-error-message' }, error.message as React.ReactNode),
-        error.evidence !== undefined && error.kind !== 'redacted'
+        error.evidence !== undefined && error.kind === 'invalid-syntax'
           ? h(
               'code',
               {

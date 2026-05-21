@@ -460,10 +460,12 @@ display contract.
 - theory-mcp-server remains authoritative server-side before preview / apply.
 - Hosts may pass convenience parse/validation status; the primitive displays
   it via `input.state` and `input.errors[]`.
-- For `kind: 'redacted'` errors the primitive **never renders** the host's
-  `evidence` field — only the human-readable `message`. The other error
-  kinds (`invalid-syntax`, `forbidden`, `unsafe`, `other`) render `evidence`
-  verbatim, on the explicit assumption that the host pre-redacted it.
+- The primitive enforces a strict evidence-suppression rule: **only
+  `invalid-syntax` errors render `evidence`**. Every other kind
+  (`forbidden`, `redacted`, `unsafe`, `other`) renders only the
+  human-readable `message` and suppresses caller-supplied `evidence`. This
+  protects against hosts accidentally passing secret-like content in
+  `evidence` for any of the sensitive error kinds.
 - The primitive never holds a real `File` object across renders.
   `input.fileMeta` (and `dropzone.fileMeta`) is a caller-supplied SSR-safe
   description (`name`, `sizeBytes?`, `mediaType?`, `sha256?`).

@@ -184,6 +184,59 @@ test('PackageSourceInputPanel renders forbidden error with role=alert + state la
   assert.ok(body.includes('Source not allowed'));
 });
 
+test('PackageSourceInputPanel only renders evidence for kind=invalid-syntax; forbidden/unsafe/other evidence is suppressed', async () => {
+  const input: PackageSourceInput = {
+    groupId: 'pkg-mixed',
+    value: '',
+    state: 'invalid',
+    errors: [
+      // Safe parse-location evidence — must still render.
+      {
+        id: 'syntax-1',
+        kind: 'invalid-syntax',
+        message: 'Expected top-level mapping at line 1',
+        evidence: 'line 1, col 1',
+      },
+      // Host accidentally puts a fake AWS-shaped secret into forbidden.evidence.
+      {
+        id: 'forbidden-1',
+        kind: 'forbidden',
+        message: 'Operator policy blocks this manifest.',
+        evidence: 'AKIA-FAKE-FORBIDDEN-EVIDENCE-1234567890',
+      },
+      // Host accidentally puts a fake secret into unsafe.evidence.
+      {
+        id: 'unsafe-1',
+        kind: 'unsafe',
+        message: 'Manifest references an unsupported scheme.',
+        evidence: 'AKIA-FAKE-UNSAFE-EVIDENCE-1234567890',
+      },
+      // Host accidentally puts a fake secret into other.evidence.
+      {
+        id: 'other-1',
+        kind: 'other',
+        message: 'Validation could not complete.',
+        evidence: 'AKIA-FAKE-OTHER-EVIDENCE-1234567890',
+      },
+    ],
+    modes: ['paste'],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(
+    h(PackageSourceInputPanel, { input, onValueChange: NOOP_VALUE_CHANGE }),
+  );
+  // invalid-syntax evidence renders verbatim (parse-location).
+  assert.ok(body.includes('line 1, col 1'));
+  // forbidden / unsafe / other evidence is suppressed across the board.
+  assert.equal(body.includes('AKIA-FAKE-FORBIDDEN-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-FAKE-UNSAFE-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-FAKE-OTHER-EVIDENCE-1234567890'), false);
+  // Messages still render for the sensitive kinds.
+  assert.ok(body.includes('Operator policy blocks this manifest.'));
+  assert.ok(body.includes('Manifest references an unsupported scheme.'));
+  assert.ok(body.includes('Validation could not complete.'));
+});
+
 test('PackageSourceInputPanel never renders caller-supplied evidence for kind=redacted', async () => {
   const body = await renderSSR(
     h(PackageSourceInputPanel, {

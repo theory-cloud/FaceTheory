@@ -149,7 +149,7 @@
             data-error-kind-label={error.kind}
           >{ERROR_KIND_LABEL[error.kind]}</strong>
           <span class="facetheory-stitch-package-source-input-error-message">{error.message}</span>
-          {#if error.evidence !== undefined && error.kind !== 'redacted'}
+          {#if error.evidence !== undefined && error.kind === 'invalid-syntax'}
             <code class="facetheory-stitch-package-source-input-error-evidence">{error.evidence}</code>
           {/if}
         </li>

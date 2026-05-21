@@ -117,7 +117,7 @@ function renderErrors(
             { class: 'facetheory-stitch-package-source-input-error-message' },
             renderPropContent(error.message as VNodeChild),
           ),
-          error.evidence !== undefined && error.kind !== 'redacted'
+          error.evidence !== undefined && error.kind === 'invalid-syntax'
             ? h(
                 'code',
                 { class: 'facetheory-stitch-package-source-input-error-evidence' },

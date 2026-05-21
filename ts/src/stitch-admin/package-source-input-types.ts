@@ -49,10 +49,18 @@ export type PackageSourceInputErrorKind =
   | 'other';
 
 /**
- * A single error to render. Hosts pre-redact `evidence` if it points at
- * sensitive content — the primitive does NOT try to clean evidence and
- * does NOT redact secrets by inspection. For `redacted` errors hosts
- * typically pass `evidence: undefined` and rely on the `message` text.
+ * A single error to render.
+ *
+ * The primitive enforces a strict evidence-suppression rule: **only
+ * `invalid-syntax` errors render `evidence`**. For every other kind
+ * (`forbidden`, `redacted`, `unsafe`, `other`) the primitive ignores
+ * `evidence` and renders only the `message`. This protects against hosts
+ * accidentally passing secret-like content in `evidence` for any of the
+ * sensitive kinds.
+ *
+ * Hosts should treat `evidence` as a safe place to surface parse-location
+ * info (line / column / offset) for `invalid-syntax`. For every other
+ * kind, pre-redact aggressively or pass `evidence: undefined`.
  */
 export interface PackageSourceInputError {
   /** Stable identifier used for keying. */
@@ -61,8 +69,10 @@ export interface PackageSourceInputError {
   /** Short human-readable message. Adapters narrow to their native node type. */
   message: unknown;
   /**
-   * Optional pre-redacted evidence (e.g. a line/column reference or a
-   * caller-friendly token). The primitive renders verbatim.
+   * Optional caller-supplied evidence. Rendered verbatim **only** when
+   * `kind === 'invalid-syntax'`; suppressed for every other kind. Hosts
+   * must still treat this as a presentation field — FaceTheory does NOT
+   * try to clean evidence or redact secrets by inspection.
    */
   evidence?: string;
 }
