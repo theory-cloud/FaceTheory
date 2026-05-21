@@ -57,6 +57,18 @@ export type {
 } from './wizard-authority-context-strip-types.js';
 
 export type {
+  AuditTrail,
+  AuditTrailEvent,
+  AuditTrailEventExternalLink,
+  AuditTrailEventGroup,
+  AuditTrailEventMetadataEntry,
+  AuditTrailEventStatus,
+  AuditTrailEventTone,
+  AuditTrailVariant,
+  DisclosurePanelProps,
+} from './audit-trail-types.js';
+
+export type {
   CodeDropzoneProps,
   PackageSourceInput,
   PackageSourceInputActions,

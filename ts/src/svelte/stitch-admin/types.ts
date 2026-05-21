@@ -270,7 +270,8 @@ export interface WizardAuthorityContextStripPanelProps {
   onCopyItem?: (itemKey: string, copyValue: string) => void;
 }
 
-export type WizardServerResolvedContextBarPanelProps = WizardAuthorityContextStripPanelProps;
+export type WizardServerResolvedContextBarPanelProps =
+  WizardAuthorityContextStripPanelProps;
 
 export type {
   ChoiceCardProps,
@@ -306,7 +307,9 @@ export type {
 export interface PackageSourceInputPanelProps {
   input: import('../../stitch-admin/package-source-input-types.js').PackageSourceInput;
   onValueChange?: (next: string) => void;
-  onFiles?: (files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[]) => void;
+  onFiles?: (
+    files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[],
+  ) => void;
   onClear?: () => void;
   onReplace?: () => void;
   onCopy?: (copyValue: string) => void;
@@ -314,5 +317,29 @@ export interface PackageSourceInputPanelProps {
 
 export interface CodeDropzonePanelProps {
   dropzone: import('../../stitch-admin/package-source-input-types.js').CodeDropzoneProps;
-  onFiles?: (files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[]) => void;
+  onFiles?: (
+    files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[],
+  ) => void;
+}
+
+export type {
+  AuditTrail,
+  AuditTrailEvent,
+  AuditTrailEventExternalLink,
+  AuditTrailEventGroup,
+  AuditTrailEventMetadataEntry,
+  AuditTrailEventStatus,
+  AuditTrailEventTone,
+  AuditTrailVariant,
+  DisclosurePanelProps,
+} from '../../stitch-admin/audit-trail-types.js';
+
+export interface AuditTrailPanelProps {
+  trail: import('../../stitch-admin/audit-trail-types.js').AuditTrail;
+  onToggleGroup?: (groupId: string, nextExpanded: boolean) => void;
+}
+
+export interface DisclosurePanelPanelProps {
+  panel: import('../../stitch-admin/audit-trail-types.js').DisclosurePanelProps;
+  onToggle?: (nextExpanded: boolean) => void;
 }

@@ -34,6 +34,8 @@ export { default as WizardReconciliationPlanPanel } from './WizardReconciliation
 export { default as WizardDiffListPanel } from './WizardReconciliationPlanPanel.svelte';
 export { default as WizardAuthorityContextStripPanel } from './WizardAuthorityContextStripPanel.svelte';
 export { default as WizardServerResolvedContextBarPanel } from './WizardAuthorityContextStripPanel.svelte';
+export { default as AuditTrailPanel } from './AuditTrailPanel.svelte';
+export { default as DisclosurePanel } from './DisclosurePanel.svelte';
 export { default as SelectableCardGridPanel } from './SelectableCardGridPanel.svelte';
 export { default as ChoiceCard } from './ChoiceCard.svelte';
 export { default as PackageSourceInputPanel } from './PackageSourceInputPanel.svelte';
@@ -111,6 +113,23 @@ export type {
   WizardServerResolvedContextBarSize,
   WizardServerResolvedContextBarTone,
 } from '../../stitch-admin/wizard-authority-context-strip-types.js';
+
+export type {
+  AuditTrail,
+  AuditTrailEvent,
+  AuditTrailEventExternalLink,
+  AuditTrailEventGroup,
+  AuditTrailEventMetadataEntry,
+  AuditTrailEventStatus,
+  AuditTrailEventTone,
+  AuditTrailVariant,
+  DisclosurePanelProps,
+} from '../../stitch-admin/audit-trail-types.js';
+
+export type {
+  AuditTrailPanelProps,
+  DisclosurePanelPanelProps,
+} from './types.js';
 
 export type {
   WizardEditableTokenInput,

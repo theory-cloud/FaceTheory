@@ -373,7 +373,8 @@ export interface WizardAuthorityContextStripPanelProps {
   strip: import('../../stitch-admin/wizard-authority-context-strip-types.js').WizardAuthorityContextStrip;
   onCopyItem?: (itemKey: string, copyValue: string) => void;
 }
-export type WizardServerResolvedContextBarPanelProps = WizardAuthorityContextStripPanelProps;
+export type WizardServerResolvedContextBarPanelProps =
+  WizardAuthorityContextStripPanelProps;
 
 export type {
   ChoiceCardProps,
@@ -410,14 +411,18 @@ export type {
 export interface PackageSourceInputPanelProps {
   input: import('../../stitch-admin/package-source-input-types.js').PackageSourceInput;
   onValueChange?: (next: string) => void;
-  onFiles?: (files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[]) => void;
+  onFiles?: (
+    files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[],
+  ) => void;
   onClear?: () => void;
   onReplace?: () => void;
   onCopy?: (copyValue: string) => void;
 }
 export interface CodeDropzonePanelProps {
   dropzone: import('../../stitch-admin/package-source-input-types.js').CodeDropzoneProps;
-  onFiles?: (files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[]) => void;
+  onFiles?: (
+    files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[],
+  ) => void;
 }
 export declare const PackageSourceInputPanel: Component<PackageSourceInputPanelProps>;
 export declare const CodeDropzone: Component<CodeDropzonePanelProps>;
@@ -434,3 +439,28 @@ export declare const WizardReconciliationPlanPanel: Component<WizardReconciliati
 export declare const WizardDiffListPanel: Component<WizardDiffListPanelProps>;
 export declare const WizardAuthorityContextStripPanel: Component<WizardAuthorityContextStripPanelProps>;
 export declare const WizardServerResolvedContextBarPanel: Component<WizardServerResolvedContextBarPanelProps>;
+
+export type {
+  AuditTrail,
+  AuditTrailEvent,
+  AuditTrailEventExternalLink,
+  AuditTrailEventGroup,
+  AuditTrailEventMetadataEntry,
+  AuditTrailEventStatus,
+  AuditTrailEventTone,
+  AuditTrailVariant,
+  DisclosurePanelProps,
+} from '../../stitch-admin/audit-trail-types.js';
+
+export interface AuditTrailPanelProps {
+  trail: import('../../stitch-admin/audit-trail-types.js').AuditTrail;
+  onToggleGroup?: (groupId: string, nextExpanded: boolean) => void;
+}
+
+export interface DisclosurePanelPanelProps {
+  panel: import('../../stitch-admin/audit-trail-types.js').DisclosurePanelProps;
+  onToggle?: (nextExpanded: boolean) => void;
+}
+
+export declare const AuditTrailPanel: Component<AuditTrailPanelProps>;
+export declare const DisclosurePanel: Component<DisclosurePanelPanelProps>;
