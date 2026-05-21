@@ -44,6 +44,19 @@ export type {
 export { canonicalizeWizardReconciliationPlanKind } from './wizard-reconciliation-plan-types.js';
 
 export type {
+  WizardAuthorityContextItem,
+  WizardAuthorityContextItemTone,
+  WizardAuthorityContextStrip,
+  WizardAuthorityContextStripLayout,
+  WizardAuthorityContextStripSize,
+  WizardServerResolvedContextBar,
+  WizardServerResolvedContextBarItem,
+  WizardServerResolvedContextBarLayout,
+  WizardServerResolvedContextBarSize,
+  WizardServerResolvedContextBarTone,
+} from './wizard-authority-context-strip-types.js';
+
+export type {
   AuthorityState,
   ConfidenceLevel,
   ConfidenceMetadata,
