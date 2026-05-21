@@ -641,3 +641,99 @@ test('vue stitch-admin: tabs, chips, key-value rows, copy code, logs, and policy
   assert.ok(body.includes('Deny'));
   assert.ok(body.includes('Warning'));
 });
+
+import { WizardEditableTokenInputPanel as VueWizardEditableTokenInputPanel, WizardChipListPanel as VueWizardChipListPanel } from '../../src/vue/stitch-admin/index.js';
+import type { WizardEditableTokenInput as VueWizardInput } from '../../src/stitch-admin/index.js';
+
+const VUE_NOOP_CHANGE = (): void => {};
+
+const VUE_BASE_INPUT: VueWizardInput = {
+  inputId: 'vue-allowed-senders',
+  value: ['qa@example.com', 'ops@example.com'],
+  label: 'Allowed senders',
+  description: 'Server validation remains authoritative.',
+  placeholder: 'Add another address…',
+  removeLabelKind: 'sender',
+  safetyPolicy: 'no-secret-or-production-like-data',
+};
+
+test('vue stitch-admin: WizardEditableTokenInputPanel renders parity DOM with React adapter', async () => {
+  const body = await renderSSR(
+    h(VueWizardEditableTokenInputPanel, {
+      input: VUE_BASE_INPUT,
+      onChange: VUE_NOOP_CHANGE,
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-wizard-editable-token-input'));
+  assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
+  assert.ok(body.includes('data-input-id="vue-allowed-senders"'));
+  assert.ok(body.includes('data-token-count="2"'));
+  assert.ok(body.includes('data-token-value="qa@example.com"'));
+  assert.ok(body.includes('data-token-value="ops@example.com"'));
+  // Accessible remove buttons with kind-aware aria-label.
+  assert.ok(body.includes('aria-label="Remove sender qa@example.com"'));
+  assert.ok(body.includes('aria-label="Remove sender ops@example.com"'));
+  // Label wired to input id and safety-policy footnote rendered.
+  assert.ok(body.includes('for="vue-allowed-senders"'));
+  assert.ok(body.includes('Safety policy: no-secret-or-production-like-data'));
+});
+
+test('vue stitch-admin: WizardEditableTokenInputPanel surfaces invalid+duplicate feedback with role=alert', async () => {
+  const invalidBody = await renderSSR(
+    h(VueWizardEditableTokenInputPanel, {
+      input: {
+        ...VUE_BASE_INPUT,
+        draftValue: 'not-an-email',
+        validateToken: (token: string) =>
+          token.includes('@')
+            ? { valid: true }
+            : { valid: false, message: 'Address must contain @' },
+      },
+      onChange: VUE_NOOP_CHANGE,
+    }),
+  );
+  assert.ok(invalidBody.includes('role="alert"'));
+  assert.ok(invalidBody.includes('data-feedback-source="validator"'));
+  assert.ok(invalidBody.includes('Address must contain @'));
+
+  const duplicateBody = await renderSSR(
+    h(VueWizardEditableTokenInputPanel, {
+      input: { ...VUE_BASE_INPUT, draftValue: 'qa@example.com' },
+      onChange: VUE_NOOP_CHANGE,
+    }),
+  );
+  assert.ok(duplicateBody.includes('data-feedback-source="duplicate"'));
+  assert.ok(duplicateBody.includes('is already in the list'));
+});
+
+test('vue stitch-admin: WizardEditableTokenInputPanel is byte-identical across repeated SSR renders', async () => {
+  const first = await renderSSR(
+    h(VueWizardEditableTokenInputPanel, {
+      input: VUE_BASE_INPUT,
+      onChange: VUE_NOOP_CHANGE,
+    }),
+  );
+  const second = await renderSSR(
+    h(VueWizardEditableTokenInputPanel, {
+      input: VUE_BASE_INPUT,
+      onChange: VUE_NOOP_CHANGE,
+    }),
+  );
+  assert.equal(first, second);
+});
+
+test('vue stitch-admin: WizardChipListPanel alias renders the same DOM as the canonical panel', async () => {
+  const canonical = await renderSSR(
+    h(VueWizardEditableTokenInputPanel, {
+      input: VUE_BASE_INPUT,
+      onChange: VUE_NOOP_CHANGE,
+    }),
+  );
+  const alias = await renderSSR(
+    h(VueWizardChipListPanel, {
+      input: VUE_BASE_INPUT,
+      onChange: VUE_NOOP_CHANGE,
+    }),
+  );
+  assert.equal(canonical, alias);
+});

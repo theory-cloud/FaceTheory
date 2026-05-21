@@ -22,6 +22,18 @@ export { default as MetadataBadge } from './MetadataBadge.svelte';
 export { default as MetadataBadgeGroup } from './MetadataBadgeGroup.svelte';
 export { default as NonAuthoritativeBanner } from './NonAuthoritativeBanner.svelte';
 export { default as OperatorEmptyState } from './OperatorEmptyState.svelte';
+export { default as WizardEditableTokenInputPanel } from './WizardEditableTokenInputPanel.svelte';
+export { default as WizardChipListPanel } from './WizardEditableTokenInputPanel.svelte';
+
+export type {
+  WizardEditableTokenInput,
+  WizardEditableTokenInputFeedbackTone,
+  WizardEditableTokenInputItem,
+  WizardEditableTokenInputTone,
+  WizardEditableTokenInputValidationResult,
+  WizardEditableTokenInputPanelProps,
+  WizardChipListPanelProps,
+} from './types.js';
 
 export type {
   DataTableToolbarSlots,

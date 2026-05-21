@@ -136,3 +136,19 @@ export interface OperatorEmptyStateProps {
   config: import('../../stitch-admin/operator-visibility-types.js').OperatorEmptyStateConfig;
   action?: unknown;
 }
+
+export type {
+  WizardEditableTokenInput,
+  WizardEditableTokenInputFeedbackTone,
+  WizardEditableTokenInputItem,
+  WizardEditableTokenInputTone,
+  WizardEditableTokenInputValidationResult,
+} from '../../stitch-admin/wizard-editable-token-input-types.js';
+
+export interface WizardEditableTokenInputPanelProps {
+  input: import('../../stitch-admin/wizard-editable-token-input-types.js').WizardEditableTokenInput;
+  onChange: (next: string[]) => void;
+  onDraftChange?: (next: string) => void;
+}
+
+export type WizardChipListPanelProps = WizardEditableTokenInputPanelProps;

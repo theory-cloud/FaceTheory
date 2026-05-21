@@ -163,3 +163,20 @@ export {
   type WizardServerResolvedContextBarSize,
   type WizardServerResolvedContextBarTone,
 } from './wizard-authority-context-strip.js';
+
+export {
+  WizardEditableTokenInputPanel,
+  WizardChipListPanel,
+  type WizardEditableTokenInputPanelProps,
+  type WizardChipListPanelProps,
+  type WizardChipList,
+  type WizardChipListFeedbackTone,
+  type WizardChipListItem,
+  type WizardChipListTone,
+  type WizardChipListValidationResult,
+  type WizardEditableTokenInput,
+  type WizardEditableTokenInputFeedbackTone,
+  type WizardEditableTokenInputItem,
+  type WizardEditableTokenInputTone,
+  type WizardEditableTokenInputValidationResult,
+} from './wizard-editable-token-input.js';

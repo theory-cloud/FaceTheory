@@ -458,3 +458,94 @@ test('svelte stitch-admin: VisibilityMatrix renders explicit empty matrix cells'
   assert.ok(body.includes('No imported visibility record'));
   assert.ok(body.includes('data-cell-state="unknown"'));
 });
+
+test('svelte stitch-admin: WizardEditableTokenInputPanel renders parity DOM with React adapter', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte'),
+    {
+      input: {
+        inputId: 'svelte-allowed-senders',
+        value: ['qa@example.com', 'ops@example.com'],
+        label: 'Allowed senders',
+        description: 'Server validation remains authoritative.',
+        placeholder: 'Add another address…',
+        removeLabelKind: 'sender',
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onChange: (): void => {},
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-wizard-editable-token-input'));
+  assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
+  assert.ok(body.includes('data-input-id="svelte-allowed-senders"'));
+  assert.ok(body.includes('data-token-count="2"'));
+  assert.ok(body.includes('data-token-value="qa@example.com"'));
+  assert.ok(body.includes('data-token-value="ops@example.com"'));
+  assert.ok(body.includes('aria-label="Remove sender qa@example.com"'));
+  assert.ok(body.includes('aria-label="Remove sender ops@example.com"'));
+  assert.ok(body.includes('for="svelte-allowed-senders"'));
+  assert.ok(body.includes('Safety policy: no-secret-or-production-like-data'));
+});
+
+test('svelte stitch-admin: WizardEditableTokenInputPanel surfaces invalid + duplicate feedback with role=alert', async () => {
+  const invalidBody = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte'),
+    {
+      input: {
+        inputId: 'svelte-allowed-senders-invalid',
+        value: ['qa@example.com'],
+        label: 'Allowed senders',
+        draftValue: 'not-an-email',
+        removeLabelKind: 'sender',
+        validateToken: (token: string) =>
+          token.includes('@')
+            ? { valid: true }
+            : { valid: false, message: 'Address must contain @' },
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onChange: (): void => {},
+    },
+  );
+  assert.ok(invalidBody.includes('role="alert"'));
+  assert.ok(invalidBody.includes('data-feedback-source="validator"'));
+  assert.ok(invalidBody.includes('Address must contain @'));
+
+  const duplicateBody = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte'),
+    {
+      input: {
+        inputId: 'svelte-allowed-senders-duplicate',
+        value: ['qa@example.com'],
+        label: 'Allowed senders',
+        draftValue: 'qa@example.com',
+        removeLabelKind: 'sender',
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onChange: (): void => {},
+    },
+  );
+  assert.ok(duplicateBody.includes('data-feedback-source="duplicate"'));
+  assert.ok(duplicateBody.includes('is already in the list'));
+});
+
+test('svelte stitch-admin: WizardEditableTokenInputPanel is byte-identical across repeated SSR renders', async () => {
+  const props = {
+    input: {
+      inputId: 'svelte-allowed-senders-determinism',
+      value: ['qa@example.com', 'ops@example.com'],
+      label: 'Allowed senders',
+      removeLabelKind: 'sender',
+      safetyPolicy: 'no-secret-or-production-like-data',
+    },
+    onChange: (): void => {},
+  };
+  const first = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte'),
+    props,
+  );
+  const second = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte'),
+    props,
+  );
+  assert.equal(first, second);
+});

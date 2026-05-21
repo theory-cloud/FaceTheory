@@ -78,3 +78,14 @@ export {
   type OperatorGuardState,
   type OperatorGuardStatus,
 } from './operator-guard.js';
+
+export {
+  WizardEditableTokenInputPanel,
+  WizardChipListPanel,
+  type WizardEditableTokenInputPanelProps,
+  type WizardChipListPanelProps,
+  type WizardEditableTokenInput,
+  type WizardEditableTokenInputFeedbackTone,
+  type WizardEditableTokenInputItem,
+  type WizardEditableTokenInputTone,
+} from './wizard-editable-token-input.js';
