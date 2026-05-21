@@ -25,6 +25,7 @@ await import('./unit/stitch-admin-wizard-authority-context-strip.test.js');
 await import('./unit/stitch-admin-selectable-card-grid.test.js');
 await import('./unit/stitch-admin-package-source-input.test.js');
 await import('./unit/stitch-admin-wizard-editable-token-input.test.js');
+await import('./unit/stitch-admin-audit-trail.test.js');
 await import('./unit/portal-fixtures.test.js');
 await import('./unit/antd-coverage.test.js');
 await import('./unit/portal-reference.test.js');

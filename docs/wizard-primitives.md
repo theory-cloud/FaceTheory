@@ -20,10 +20,10 @@ shape.
 
 The contract is deliberately **presentational**:
 
-- FaceTheory *displays* host-supplied data.
-- FaceTheory *does not* validate TheoryMCP routes, sessions, entitlements,
+- FaceTheory _displays_ host-supplied data.
+- FaceTheory _does not_ validate TheoryMCP routes, sessions, entitlements,
   GitHub bindings, mailbox bindings, capability decisions, or secrets.
-- FaceTheory *does not* parse, fetch, hash, or open archives, packages, or
+- FaceTheory _does not_ parse, fetch, hash, or open archives, packages, or
   evidence files. Hosts pre-compute those values.
 
 Every primitive renders the same DOM for the same input across server-side
@@ -33,12 +33,12 @@ primitive twice and asserting byte-identical SSR output.
 
 ## Where the primitives live
 
-| Layer | Module | What it exports |
-| --- | --- | --- |
-| Framework-neutral types | `@theory-cloud/facetheory/stitch-admin` | `WizardProgressState`, `WizardPackageSummary`, `WizardFindingList`, `WizardReconcileSummary`, `WizardReconciliationPlan`, `WizardAuthorityContextStrip`, `WizardCapabilityReview`, `WizardEnablementChecklist`, `WizardRecoveryStatus`, `WizardEmptyStateConfig`, `WizardEditableTokenInput`, `WizardSafetyPolicy`, and supporting enums and aliases. |
-| React adapter | `@theory-cloud/facetheory/react/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`), `SelectableCardGridPanel`, `ChoiceCard`, `PackageSourceInputPanel`, `CodeDropzone`, `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
-| Vue adapter | `@theory-cloud/facetheory/vue/stitch-admin` | Same primitive set as React, including `SelectableCardGridPanel` and `ChoiceCard`. |
-| Svelte adapter | `@theory-cloud/facetheory/svelte/stitch-admin` | Same primitive set, exposed as `.svelte` components with matching component-prop interfaces. |
+| Layer                   | Module                                         | What it exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework-neutral types | `@theory-cloud/facetheory/stitch-admin`        | `WizardProgressState`, `WizardPackageSummary`, `WizardFindingList`, `WizardReconcileSummary`, `WizardReconciliationPlan`, `WizardAuthorityContextStrip`, `WizardCapabilityReview`, `WizardEnablementChecklist`, `WizardRecoveryStatus`, `WizardEmptyStateConfig`, `WizardEditableTokenInput`, `WizardSafetyPolicy`, and supporting enums and aliases.                                                                                                                                                                         |
+| React adapter           | `@theory-cloud/facetheory/react/stitch-admin`  | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`), `SelectableCardGridPanel`, `ChoiceCard`, `PackageSourceInputPanel`, `CodeDropzone`, `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
+| Vue adapter             | `@theory-cloud/facetheory/vue/stitch-admin`    | Same primitive set as React, including `SelectableCardGridPanel` and `ChoiceCard`.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Svelte adapter          | `@theory-cloud/facetheory/svelte/stitch-admin` | Same primitive set, exposed as `.svelte` components with matching component-prop interfaces.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ### Adapter parity status
 
@@ -63,7 +63,7 @@ Every primitive that could otherwise leak production-looking or secret-like
 data carries an explicit `WizardSafetyPolicy` literal:
 
 ```ts
-type WizardSafetyPolicy = 'no-secret-or-production-like-data';
+type WizardSafetyPolicy = "no-secret-or-production-like-data";
 ```
 
 - The host **passes the literal in** to confirm the contract.
@@ -74,7 +74,7 @@ type WizardSafetyPolicy = 'no-secret-or-production-like-data';
   surfaces the assertion.
 
 `WizardReconcileEntry` and `WizardCapability` have additional redaction levers
-the primitive *does* enforce at render time:
+the primitive _does_ enforce at render time:
 
 - `WizardReconcileEntry.redacted: true` or `kind: 'redacted'` → the entry's
   detail is replaced with `[redacted]`.
@@ -99,15 +99,15 @@ These two primitives describe different things and live side by side:
   the **plan** the host intends to execute next, with the richer operation
   kinds:
 
-  | Canonical kind | Stable alias              | Meaning                                                 |
-  | -------------- | ------------------------- | ------------------------------------------------------- |
-  | `create`       | —                         | Will create a new resource                              |
-  | `update`       | —                         | Will update an existing resource                        |
-  | `satisfied`    | `already_satisfied`       | Desired state already matches; no work                  |
-  | `conflict`     | —                         | Incompatible with another row or external state         |
-  | `blocked`      | —                         | Cannot proceed; the host explains why in `reason`       |
-  | `external`     | `external_step_required`  | Will be completed outside this wizard                   |
-  | `noop`         | `not_requested`           | Explicitly requested as a no-op                         |
+  | Canonical kind | Stable alias             | Meaning                                           |
+  | -------------- | ------------------------ | ------------------------------------------------- |
+  | `create`       | —                        | Will create a new resource                        |
+  | `update`       | —                        | Will update an existing resource                  |
+  | `satisfied`    | `already_satisfied`      | Desired state already matches; no work            |
+  | `conflict`     | —                        | Incompatible with another row or external state   |
+  | `blocked`      | —                        | Cannot proceed; the host explains why in `reason` |
+  | `external`     | `external_step_required` | Will be completed outside this wizard             |
+  | `noop`         | `not_requested`          | Explicitly requested as a no-op                   |
 
   Aliases are accepted on input and normalized to the canonical kind at
   render time. The canonical kind appears in `data-row-kind`; the original
@@ -183,7 +183,7 @@ interface WizardAuthorityContextItem {
   value: unknown;
   icon?: unknown;
   badge?: unknown;
-  tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+  tone?: "neutral" | "info" | "success" | "warning" | "danger";
   copyable?: boolean;
   copyValue?: string;
   title?: string;
@@ -199,12 +199,12 @@ pairing, and `href` is filtered through the Stitch admin safe-href filter
 
 `layout` controls how items are arranged:
 
-| Value    | Behavior                                                                                            |
-| -------- | --------------------------------------------------------------------------------------------------- |
-| `strip`  | Single horizontal row. `wrap` controls whether items wrap (`true`, default) or scroll (`false`).    |
-| `grid`   | CSS Grid `auto-fit, minmax(220px, 1fr)`. Items reflow as the container narrows.                     |
-| `stack`  | Vertical stack — preferred in narrow admin sidebars.                                                |
-| `auto`   | Default. CSS-only responsive grid that stacks on narrow viewports **without hiding any cell**.      |
+| Value   | Behavior                                                                                         |
+| ------- | ------------------------------------------------------------------------------------------------ |
+| `strip` | Single horizontal row. `wrap` controls whether items wrap (`true`, default) or scroll (`false`). |
+| `grid`  | CSS Grid `auto-fit, minmax(220px, 1fr)`. Items reflow as the container narrows.                  |
+| `stack` | Vertical stack — preferred in narrow admin sidebars.                                             |
+| `auto`  | Default. CSS-only responsive grid that stacks on narrow viewports **without hiding any cell**.   |
 
 Layout is implemented in inline CSS (no media queries inside the component,
 no JavaScript layout), so SSR output and hydrated DOM are byte-identical.
@@ -242,18 +242,27 @@ authority and read-only state come from the host.
 <WizardAuthorityContextStripPanel
   strip={{
     items: [
-      { key: 'tenant', label: 'Tenant', value: 'theory-mcp' },
-      { key: 'namespace', label: 'Namespace', value: 'acme', tone: 'info' },
-      { key: 'route', label: 'MCP route', value: '/agents/acme',
-        copyable: true, copyValue: '/agents/acme' },
-      { key: 'operator', label: 'Operator', value: 'aron@equal-to.ai',
-        badge: 'session' },
+      { key: "tenant", label: "Tenant", value: "theory-mcp" },
+      { key: "namespace", label: "Namespace", value: "acme", tone: "info" },
+      {
+        key: "route",
+        label: "MCP route",
+        value: "/agents/acme",
+        copyable: true,
+        copyValue: "/agents/acme",
+      },
+      {
+        key: "operator",
+        label: "Operator",
+        value: "aron@equal-to.ai",
+        badge: "session",
+      },
     ],
-    authorityLabel: 'Server-derived',
-    readOnlyLabel: 'Read-only',
-    layout: 'auto',
-    size: 'md',
-    safetyPolicy: 'no-secret-or-production-like-data',
+    authorityLabel: "Server-derived",
+    readOnlyLabel: "Read-only",
+    layout: "auto",
+    size: "md",
+    safetyPolicy: "no-secret-or-production-like-data",
   }}
   onCopyItem={(itemKey, value) => host.copyToClipboard(itemKey, value)}
 />
@@ -292,11 +301,11 @@ are byte-identical for the same props.
 
 ### Key handling
 
-| Key       | Behavior                                                                  |
-| --------- | ------------------------------------------------------------------------- |
-| Enter     | Commit draft. Calls `onChange([...value, normalizedDraft])` and clears.   |
-| Comma     | Same as Enter.                                                            |
-| Backspace | If draft is empty and there is at least one token, remove the last one.   |
+| Key       | Behavior                                                                |
+| --------- | ----------------------------------------------------------------------- |
+| Enter     | Commit draft. Calls `onChange([...value, normalizedDraft])` and clears. |
+| Comma     | Same as Enter.                                                          |
+| Backspace | If draft is empty and there is at least one token, remove the last one. |
 
 Commit is suppressed when the draft is empty, when `validateToken` returns
 `{ valid: false }`, when the resulting token would be a duplicate and
@@ -336,15 +345,17 @@ color-only cues.
 ```tsx
 <WizardEditableTokenInputPanel
   input={{
-    inputId: 'allowed-senders',
-    value: ['qa@example.com', 'ops@example.com'],
-    label: 'Allowed senders',
-    description: 'Server validation remains authoritative.',
-    placeholder: 'Add another address…',
-    removeLabelKind: 'sender',
+    inputId: "allowed-senders",
+    value: ["qa@example.com", "ops@example.com"],
+    label: "Allowed senders",
+    description: "Server validation remains authoritative.",
+    placeholder: "Add another address…",
+    removeLabelKind: "sender",
     validateToken: (token) =>
-      token.includes('@') ? { valid: true } : { valid: false, message: 'Address must contain @' },
-    safetyPolicy: 'no-secret-or-production-like-data',
+      token.includes("@")
+        ? { valid: true }
+        : { valid: false, message: "Address must contain @" },
+    safetyPolicy: "no-secret-or-production-like-data",
     draftValue: host.draft,
   }}
   onChange={(next) => host.setAllowedSenders(next)}
@@ -381,7 +392,7 @@ interface SelectableCardOption {
   description?: unknown;
   icon?: unknown;
   badge?: unknown;
-  tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'recommended';
+  tone?: "neutral" | "info" | "success" | "warning" | "danger" | "recommended";
   riskLabel?: string;
   disabledReason?: string;
   recommended?: boolean;
@@ -421,23 +432,39 @@ The host owns acceptance — passing back a different list is fine.
 ```tsx
 <SelectableCardGridPanel
   grid={{
-    groupId: 'allowed-action',
-    selection: 'single',
-    selectedKeys: ['create'],
+    groupId: "allowed-action",
+    selection: "single",
+    selectedKeys: ["create"],
     options: [
-      { key: 'create', title: 'Create new namespace', tone: 'success', recommended: true },
-      { key: 'reuse', title: 'Reuse existing namespace', tone: 'info' },
-      { key: 'replace', title: 'Replace existing namespace',
-        tone: 'warning', riskLabel: 'High blast radius' },
-      { key: 'archive', title: 'Archive without binding',
-        disabledReason: 'Requires operator review before archival.' },
-      { key: 'forbidden', title: 'Forbidden namespace',
-        blocked: true, blockedReason: 'Server policy blocks this option.' },
+      {
+        key: "create",
+        title: "Create new namespace",
+        tone: "success",
+        recommended: true,
+      },
+      { key: "reuse", title: "Reuse existing namespace", tone: "info" },
+      {
+        key: "replace",
+        title: "Replace existing namespace",
+        tone: "warning",
+        riskLabel: "High blast radius",
+      },
+      {
+        key: "archive",
+        title: "Archive without binding",
+        disabledReason: "Requires operator review before archival.",
+      },
+      {
+        key: "forbidden",
+        title: "Forbidden namespace",
+        blocked: true,
+        blockedReason: "Server policy blocks this option.",
+      },
     ],
-    label: 'Allowed action',
-    description: 'TheoryMCP resolves which of these are available per route.',
-    layout: 'grid',
-    safetyPolicy: 'no-secret-or-production-like-data',
+    label: "Allowed action",
+    description: "TheoryMCP resolves which of these are available per route.",
+    layout: "grid",
+    safetyPolicy: "no-secret-or-production-like-data",
   }}
   onChange={(next) => host.setAllowedAction(next[0])}
 />
@@ -503,18 +530,23 @@ display contract.
 ```tsx
 <PackageSourceInputPanel
   input={{
-    groupId: 'pkg-src',
+    groupId: "pkg-src",
     value: host.pasteValue,
-    state: 'validating',
+    state: "validating",
     errors: host.errors,
-    modes: ['paste', 'dropzone', 'upload'],
-    label: 'Package source',
-    description: 'TheoryMCP parses and validates server-side before preview.',
-    placeholder: 'Paste your agent manifest…',
-    fileAccept: '.yaml,.yml,.json',
+    modes: ["paste", "dropzone", "upload"],
+    label: "Package source",
+    description: "TheoryMCP parses and validates server-side before preview.",
+    placeholder: "Paste your agent manifest…",
+    fileAccept: ".yaml,.yml,.json",
     fileMeta: host.attachedFile,
-    actions: { clear: true, replace: true, copy: true, copyValue: host.pasteValue },
-    safetyPolicy: 'no-secret-or-production-like-data',
+    actions: {
+      clear: true,
+      replace: true,
+      copy: true,
+      copyValue: host.pasteValue,
+    },
+    safetyPolicy: "no-secret-or-production-like-data",
   }}
   onValueChange={(next) => host.setPasteValue(next)}
   onFiles={(files) => host.handleFiles(files)}
@@ -541,7 +573,7 @@ import {
   WizardEnablementChecklistPanel,
   WizardRecoveryStatusPanel,
   WizardEmptyState,
-} from '@theory-cloud/facetheory/react/stitch-admin';
+} from "@theory-cloud/facetheory/react/stitch-admin";
 ```
 
 A typical reconciliation step in the TheoryMCP Agent Import & Completion
@@ -551,25 +583,65 @@ Wizard:
 <WizardReconciliationPlanPanel
   plan={{
     rows: [
-      { key: 'ns', label: 'Create namespace acme', kind: 'create',
-        summary: 'Will create namespace acme in tenant theory-mcp' },
-      { key: 'agent', label: 'Update agent acme', kind: 'update',
-        summary: 'Bump declared capabilities' },
-      { key: 'binding', label: 'Mailbox binding', kind: 'already_satisfied',
-        summary: 'Mailbox allowlist already includes the agent' },
-      { key: 'github', label: 'GitHub binding', kind: 'conflict',
-        reason: 'Existing binding targets theory-cloud/Other; resolve before continuing.' },
-      { key: 'policy', label: 'Enforcement policy', kind: 'blocked',
-        reason: 'Operator review record not present.' },
-      { key: 'secret', label: 'Rotate signing secret', kind: 'external_step_required',
-        reason: 'Cannot rotate from this wizard; complete in the rotation tool.' },
-      { key: 'deploy', label: 'Deployment', kind: 'not_requested',
-        summary: 'Deployment intentionally not part of this run' },
+      {
+        key: "ns",
+        label: "Create namespace acme",
+        kind: "create",
+        summary: "Will create namespace acme in tenant theory-mcp",
+      },
+      {
+        key: "agent",
+        label: "Update agent acme",
+        kind: "update",
+        summary: "Bump declared capabilities",
+      },
+      {
+        key: "binding",
+        label: "Mailbox binding",
+        kind: "already_satisfied",
+        summary: "Mailbox allowlist already includes the agent",
+      },
+      {
+        key: "github",
+        label: "GitHub binding",
+        kind: "conflict",
+        reason:
+          "Existing binding targets theory-cloud/Other; resolve before continuing.",
+      },
+      {
+        key: "policy",
+        label: "Enforcement policy",
+        kind: "blocked",
+        reason: "Operator review record not present.",
+      },
+      {
+        key: "secret",
+        label: "Rotate signing secret",
+        kind: "external_step_required",
+        reason:
+          "Cannot rotate from this wizard; complete in the rotation tool.",
+      },
+      {
+        key: "deploy",
+        label: "Deployment",
+        kind: "not_requested",
+        summary: "Deployment intentionally not part of this run",
+      },
     ],
-    totals: { create: 1, update: 1, satisfied: 1, conflict: 1, blocked: 1, external: 1, noop: 1 },
-    safetyPolicy: 'no-secret-or-production-like-data',
+    totals: {
+      create: 1,
+      update: 1,
+      satisfied: 1,
+      conflict: 1,
+      blocked: 1,
+      external: 1,
+      noop: 1,
+    },
+    safetyPolicy: "no-secret-or-production-like-data",
   }}
-  onToggleRow={(rowKey, nextExpanded) => host.setRowExpanded(rowKey, nextExpanded)}
+  onToggleRow={(rowKey, nextExpanded) =>
+    host.setRowExpanded(rowKey, nextExpanded)
+  }
 />
 ```
 
@@ -580,12 +652,12 @@ passes host-owned data straight in. For example:
 <WizardProgress
   state={{
     steps: [
-      { key: 'connect', label: 'Connect repository', status: 'complete' },
-      { key: 'validate', label: 'Validate manifest', status: 'in-progress' },
-      { key: 'review', label: 'Review capabilities', status: 'pending' },
-      { key: 'enable', label: 'Enable agent', status: 'pending' },
+      { key: "connect", label: "Connect repository", status: "complete" },
+      { key: "validate", label: "Validate manifest", status: "in-progress" },
+      { key: "review", label: "Review capabilities", status: "pending" },
+      { key: "enable", label: "Enable agent", status: "pending" },
     ],
-    currentStepKey: 'validate',
+    currentStepKey: "validate",
   }}
 />
 ```
@@ -595,11 +667,11 @@ Empty / error states must declare the wizard safety policy:
 ```tsx
 <WizardEmptyState
   config={{
-    intent: 'not-configured',
-    title: 'Configure a TheoryMCP binding to begin',
-    description: 'Connect a GitHub binding and a mailbox before importing.',
-    actionLabel: 'Open binding settings',
-    safetyPolicy: 'no-secret-or-production-like-data',
+    intent: "not-configured",
+    title: "Configure a TheoryMCP binding to begin",
+    description: "Connect a GitHub binding and a mailbox before importing.",
+    actionLabel: "Open binding settings",
+    safetyPolicy: "no-secret-or-production-like-data",
   }}
 />
 ```
@@ -609,11 +681,11 @@ Recovery / resume references must redact tokens before passing them in:
 ```tsx
 <WizardRecoveryStatusPanel
   status={{
-    state: 'resumable',
-    lastSavedAt: '2026-05-21T03:15:00.000Z',
-    ageLabel: 'saved 6 minutes ago',
+    state: "resumable",
+    lastSavedAt: "2026-05-21T03:15:00.000Z",
+    ageLabel: "saved 6 minutes ago",
     resumeTokenReference: {
-      label: 'session abc12…', // host-redacted label, never the raw token
+      label: "session abc12…", // host-redacted label, never the raw token
       redacted: true,
     },
   }}
@@ -699,3 +771,107 @@ is discarded and consumers re-pin against the published release tarball.
 The host (TheoryMCP) is responsible for redacting these before invoking the
 wizard primitives; the archive itself only contains the FaceTheory build
 output from `npm pack`.
+
+## Audit trail + disclosure panel
+
+`AuditTrailPanel` and the lower-level `DisclosurePanel` render the
+**validation-history / final-review** surface for the TheoryMCP Agent
+Import & Completion Wizard. They are framework-neutral by contract:
+
+- React adapter: `import { AuditTrailPanel, DisclosurePanel } from
+'@theory-cloud/facetheory/react/stitch-admin'`
+- Vue adapter: `import { AuditTrailPanel, DisclosurePanel } from
+'@theory-cloud/facetheory/vue/stitch-admin'`
+- Svelte adapter: `import { AuditTrailPanel, DisclosurePanel } from
+'@theory-cloud/facetheory/svelte/stitch-admin'`
+
+Shared types: `AuditTrail`, `AuditTrailEvent`, `AuditTrailEventGroup`,
+`AuditTrailEventMetadataEntry`, `AuditTrailEventExternalLink`,
+`AuditTrailEventStatus`, `AuditTrailEventTone`, `AuditTrailVariant`, and
+`DisclosurePanelProps` are re-exported from
+`@theory-cloud/facetheory/stitch-admin` and used identically by all three
+adapters.
+
+### Trust boundary
+
+- **Presentation-only.** FaceTheory does not decide redaction or audit
+  policy, parse event content, fetch external state, apply changes,
+  authorize anything, or invent operational receipts.
+- **theory-mcp-server is authoritative.** The host supplies already-redacted
+  event text, metadata, group structure, and per-event disclosure state.
+- **Redaction marker rule.** When an event carries `redactedMarker`, the
+  primitive renders the marker as text and **suppresses** the event's
+  `body`, `metadata`, and `externalLink` even if the caller supplied them.
+  The host is responsible for the marker copy (e.g. `"[redacted by policy]"`,
+  `"[redacted — mailbox secret]"`); the primitive renders it verbatim.
+- **External link rule.** `externalLink.href` is filtered through the
+  Stitch admin safe-href guard. Only `http:` and `https:` URLs survive;
+  `javascript:`, `data:`, and malformed values are dropped at render time.
+  Safe external links emit `rel="noopener noreferrer"` and
+  `target="_blank"`.
+
+### Event shape and accessibility
+
+- Each event renders as an `<li>` with `data-event-id`, `data-event-tone`,
+  `data-event-status`, and `data-event-redacted`. Events with
+  `status: 'error'` carry `role="alert"`; all other events carry
+  `role="listitem"`.
+- Tone (`neutral | info | success | warning | danger`) drives the visible
+  palette **and** a sibling text pill labeled `Neutral / Info / Success /
+Warning / Danger` so high-contrast viewers see the cue.
+- Status (`info | success | warning | error`) is rendered as a status pill
+  labeled `Info / Success / Warning / Error`.
+- Timestamps render in a `<time datetime="…">` element using the
+  caller-supplied stable string — the primitive never computes time.
+- Metadata entries render as `<dl>` / `<dt>` / `<dd>` pairs only when
+  `variant === 'detailed'`.
+
+### Group disclosure
+
+- Each group renders a real `<button type="button">` toggle with
+  `aria-expanded` and `aria-controls` wiring to the events region.
+- Group state is **caller-controlled** via `group.expanded`. The primitive
+  mirrors it in `aria-expanded` and renders the events region as `hidden`
+  when collapsed; the primitive never toggles itself.
+- Consumers wire `onToggleGroup(groupId, nextExpanded)` to receive intent.
+- The `<div role="region" aria-labelledby={group.id} hidden={!expanded}>`
+  events region keeps screen-reader users oriented when groups collapse.
+
+### Variants
+
+- `'detailed'` — full event body, metadata table, and external link
+  (subject to the redaction-marker and safe-href rules).
+- `'compact'` — timestamp, title, tone/status pills, actor row, and
+  external link only; body and metadata are omitted.
+
+### Empty state
+
+When no events are present across all groups, the primitive renders a
+`role="status"` empty-state element using either `trail.emptyLabel` or the
+default `"No audit events."` string. The safety-policy footnote is
+emitted regardless.
+
+### Standalone `DisclosurePanel`
+
+`DisclosurePanel` is the lower-level disclosure primitive used by the
+audit-trail panel and reusable on its own. It renders:
+
+- a real `<button type="button" aria-expanded aria-controls>` toggle,
+- an optional `description` paragraph under the toggle,
+- a `<div role="region" aria-labelledby hidden={!expanded}>` content panel
+  that renders its adapter-specific children only when expanded,
+- the explicit `Safety policy: …` footnote.
+
+When `status === 'error'`, the section also carries `role="alert"` so
+prominent failure copy is announced.
+
+### Trust-boundary tests
+
+The React / Vue / Svelte parity suites assert (via AKIA-shaped fake-secret
+fixtures) that:
+
+- caller-supplied `body`, `metadata`, and `externalLink.label` on a
+  redacted event are **never** rendered into the DOM;
+- `javascript:alert(1)` external links are dropped along with their label;
+- safe https links retain `rel="noopener noreferrer"` and `target="_blank"`;
+- repeated SSR renders of the same trail are byte-identical.

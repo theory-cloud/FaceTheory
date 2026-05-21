@@ -491,7 +491,9 @@ test('svelte stitch-admin: VisibilityMatrix renders explicit empty matrix cells'
 
 test('svelte stitch-admin: WizardEditableTokenInputPanel renders parity DOM with React adapter', async () => {
   const body = await renderComponent(
-    path.resolve('src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte'),
+    path.resolve(
+      'src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte',
+    ),
     {
       input: {
         inputId: 'svelte-allowed-senders',
@@ -506,7 +508,9 @@ test('svelte stitch-admin: WizardEditableTokenInputPanel renders parity DOM with
     },
   );
   assert.ok(body.includes('facetheory-stitch-wizard-editable-token-input'));
-  assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
+  assert.ok(
+    body.includes('data-safety-policy="no-secret-or-production-like-data"'),
+  );
   assert.ok(body.includes('data-input-id="svelte-allowed-senders"'));
   assert.ok(body.includes('data-token-count="2"'));
   assert.ok(body.includes('data-token-value="qa@example.com"'));
@@ -519,7 +523,9 @@ test('svelte stitch-admin: WizardEditableTokenInputPanel renders parity DOM with
 
 test('svelte stitch-admin: WizardEditableTokenInputPanel surfaces invalid + duplicate feedback with role=alert', async () => {
   const invalidBody = await renderComponent(
-    path.resolve('src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte'),
+    path.resolve(
+      'src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte',
+    ),
     {
       input: {
         inputId: 'svelte-allowed-senders-invalid',
@@ -541,7 +547,9 @@ test('svelte stitch-admin: WizardEditableTokenInputPanel surfaces invalid + dupl
   assert.ok(invalidBody.includes('Address must contain @'));
 
   const duplicateBody = await renderComponent(
-    path.resolve('src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte'),
+    path.resolve(
+      'src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte',
+    ),
     {
       input: {
         inputId: 'svelte-allowed-senders-duplicate',
@@ -570,11 +578,15 @@ test('svelte stitch-admin: WizardEditableTokenInputPanel is byte-identical acros
     onChange: (): void => {},
   };
   const first = await renderComponent(
-    path.resolve('src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte'),
+    path.resolve(
+      'src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte',
+    ),
     props,
   );
   const second = await renderComponent(
-    path.resolve('src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte'),
+    path.resolve(
+      'src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte',
+    ),
     props,
   );
   assert.equal(first, second);
@@ -628,7 +640,12 @@ test('svelte wizard parity: WizardFindingListPanel renders severity chips and ev
       list: {
         findings: [
           { id: 'f1', severity: 'info', title: 'Manifest parsed' },
-          { id: 'f2', severity: 'error', title: 'Bad capability', evidence: 'cap[0]' },
+          {
+            id: 'f2',
+            severity: 'error',
+            title: 'Bad capability',
+            evidence: 'cap[0]',
+          },
         ],
         safetyPolicy: 'no-secret-or-production-like-data',
       },
@@ -650,7 +667,13 @@ test('svelte wizard parity: WizardReconcileSummaryPanel replaces redacted detail
       summary: {
         entries: [
           { key: 'a', label: 'a', kind: 'added' },
-          { key: 'b', label: 'b', kind: 'changed', detail: 'super-secret', redacted: true },
+          {
+            key: 'b',
+            label: 'b',
+            kind: 'changed',
+            detail: 'super-secret',
+            redacted: true,
+          },
           { key: 'c', label: 'c', kind: 'redacted' },
         ],
         totals: { added: 1, removed: 0, changed: 1, unchanged: 0, redacted: 1 },
@@ -670,9 +693,27 @@ test('svelte wizard parity: WizardCapabilityReviewPanel suppresses sensitive/red
     {
       review: {
         capabilities: [
-          { key: 'pub', label: 'Pub', intent: 'granted', sensitivity: 'public', detail: 'visible' },
-          { key: 'sen', label: 'Sen', intent: 'requested', sensitivity: 'sensitive', detail: 'should-suppress' },
-          { key: 'red', label: 'Red', intent: 'denied', sensitivity: 'redacted', detail: 'should-redact' },
+          {
+            key: 'pub',
+            label: 'Pub',
+            intent: 'granted',
+            sensitivity: 'public',
+            detail: 'visible',
+          },
+          {
+            key: 'sen',
+            label: 'Sen',
+            intent: 'requested',
+            sensitivity: 'sensitive',
+            detail: 'should-suppress',
+          },
+          {
+            key: 'red',
+            label: 'Red',
+            intent: 'denied',
+            sensitivity: 'redacted',
+            detail: 'should-redact',
+          },
         ],
         safetyPolicy: 'no-secret-or-production-like-data',
       },
@@ -687,7 +728,9 @@ test('svelte wizard parity: WizardCapabilityReviewPanel suppresses sensitive/red
 
 test('svelte wizard parity: WizardEnablementChecklistPanel renders caller summary + allReady', async () => {
   const body = await renderComponent(
-    path.resolve('src/svelte/stitch-admin/WizardEnablementChecklistPanel.svelte'),
+    path.resolve(
+      'src/svelte/stitch-admin/WizardEnablementChecklistPanel.svelte',
+    ),
     {
       checklist: {
         items: [{ key: 'a', label: 'ready', status: 'ready' }],
@@ -728,7 +771,9 @@ test('svelte wizard parity: WizardEmptyState renders safety-policy footnote', as
 
 test('svelte wizard parity: WizardReconciliationPlanPanel marks conflict/blocked/external prominent', async () => {
   const body = await renderComponent(
-    path.resolve('src/svelte/stitch-admin/WizardReconciliationPlanPanel.svelte'),
+    path.resolve(
+      'src/svelte/stitch-admin/WizardReconciliationPlanPanel.svelte',
+    ),
     {
       plan: {
         rows: [
@@ -736,7 +781,15 @@ test('svelte wizard parity: WizardReconciliationPlanPanel marks conflict/blocked
           { key: 'b', label: 'b', kind: 'blocked', reason: 'r' },
           { key: 'e', label: 'e', kind: 'external_step_required', reason: 'r' },
         ],
-        totals: { create: 0, update: 0, satisfied: 0, conflict: 1, blocked: 1, external: 1, noop: 0 },
+        totals: {
+          create: 0,
+          update: 0,
+          satisfied: 0,
+          conflict: 1,
+          blocked: 1,
+          external: 1,
+          noop: 0,
+        },
         safetyPolicy: 'no-secret-or-production-like-data',
       },
     },
@@ -749,12 +802,19 @@ test('svelte wizard parity: WizardReconciliationPlanPanel marks conflict/blocked
 
 test('svelte wizard parity: WizardAuthorityContextStripPanel renders text-labeled authority + copy button', async () => {
   const body = await renderComponent(
-    path.resolve('src/svelte/stitch-admin/WizardAuthorityContextStripPanel.svelte'),
+    path.resolve(
+      'src/svelte/stitch-admin/WizardAuthorityContextStripPanel.svelte',
+    ),
     {
       strip: {
         items: [
           { key: 'tenant', label: 'Tenant', value: 'theory-mcp' },
-          { key: 'route', label: 'MCP route', value: '/agents/acme', copyable: true },
+          {
+            key: 'route',
+            label: 'MCP route',
+            value: '/agents/acme',
+            copyable: true,
+          },
         ],
         authorityLabel: 'Server-derived',
         readOnlyLabel: 'Read-only',
@@ -763,7 +823,9 @@ test('svelte wizard parity: WizardAuthorityContextStripPanel renders text-labele
       },
     },
   );
-  assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
+  assert.ok(
+    body.includes('data-safety-policy="no-secret-or-production-like-data"'),
+  );
   assert.ok(body.includes('data-layout="auto"'));
   assert.ok(body.includes('Server-derived'));
   assert.ok(body.includes('aria-label="Read-only"'));
@@ -802,7 +864,10 @@ test('svelte wizard parity: WizardFindingListPanel renders per-finding.metadata 
             id: 'f1',
             severity: 'warning',
             title: 'Imported with provenance',
-            metadata: { provenance: { source: 'Factory import' }, correlation: sampleCorrelation },
+            metadata: {
+              provenance: { source: 'Factory import' },
+              correlation: sampleCorrelation,
+            },
           },
         ],
         safetyPolicy: 'no-secret-or-production-like-data',
@@ -831,7 +896,9 @@ test('svelte wizard parity: WizardRecoveryStatusPanel renders status.metadata vi
 
 test('svelte wizard parity: WizardReconciliationPlanPanel renders row.metadata via MetadataBadgeGroup', async () => {
   const body = await renderComponent(
-    path.resolve('src/svelte/stitch-admin/WizardReconciliationPlanPanel.svelte'),
+    path.resolve(
+      'src/svelte/stitch-admin/WizardReconciliationPlanPanel.svelte',
+    ),
     {
       plan: {
         rows: [
@@ -842,7 +909,15 @@ test('svelte wizard parity: WizardReconciliationPlanPanel renders row.metadata v
             metadata: { provenance: { source: 'Plan diff' } },
           },
         ],
-        totals: { create: 0, update: 1, satisfied: 0, conflict: 0, blocked: 0, external: 0, noop: 0 },
+        totals: {
+          create: 0,
+          update: 1,
+          satisfied: 0,
+          conflict: 0,
+          blocked: 0,
+          external: 0,
+          noop: 0,
+        },
         safetyPolicy: 'no-secret-or-production-like-data',
       },
     },
@@ -861,11 +936,30 @@ test('svelte selectable-card-grid: single-select renders as radiogroup with role
         selection: 'single',
         selectedKeys: ['create'],
         options: [
-          { key: 'create', title: 'Create', tone: 'success', recommended: true },
+          {
+            key: 'create',
+            title: 'Create',
+            tone: 'success',
+            recommended: true,
+          },
           { key: 'reuse', title: 'Reuse', tone: 'info' },
-          { key: 'replace', title: 'Replace', tone: 'warning', riskLabel: 'High blast radius' },
-          { key: 'archive', title: 'Archive', disabledReason: 'Requires operator review.' },
-          { key: 'forbidden', title: 'Forbidden', blocked: true, blockedReason: 'Server policy blocks this.' },
+          {
+            key: 'replace',
+            title: 'Replace',
+            tone: 'warning',
+            riskLabel: 'High blast radius',
+          },
+          {
+            key: 'archive',
+            title: 'Archive',
+            disabledReason: 'Requires operator review.',
+          },
+          {
+            key: 'forbidden',
+            title: 'Forbidden',
+            blocked: true,
+            blockedReason: 'Server policy blocks this.',
+          },
         ],
         label: 'Allowed action',
         description: 'TheoryMCP resolves availability per route.',
@@ -935,7 +1029,9 @@ test('svelte ChoiceCard renders standalone card with selection family + safety p
   assert.ok(body.includes('aria-checked="true"'));
   assert.ok(body.includes('data-selection-family="single"'));
   assert.ok(body.includes('data-option-recommended="true"'));
-  assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
+  assert.ok(
+    body.includes('data-safety-policy="no-secret-or-production-like-data"'),
+  );
 });
 
 test('svelte package-source-input: renders paste/dropzone/upload with stable data attrs', async () => {
@@ -1024,10 +1120,30 @@ test('svelte package-source-input: only invalid-syntax renders evidence; forbidd
         value: '',
         state: 'invalid',
         errors: [
-          { id: 'syntax-1', kind: 'invalid-syntax', message: 'Expected top-level mapping at line 1', evidence: 'line 1, col 1' },
-          { id: 'forbidden-1', kind: 'forbidden', message: 'Operator policy blocks this manifest.', evidence: 'AKIA-SVELTE-FORBIDDEN-EVIDENCE-1234567890' },
-          { id: 'unsafe-1', kind: 'unsafe', message: 'Manifest references an unsupported scheme.', evidence: 'AKIA-SVELTE-UNSAFE-EVIDENCE-1234567890' },
-          { id: 'other-1', kind: 'other', message: 'Validation could not complete.', evidence: 'AKIA-SVELTE-OTHER-EVIDENCE-1234567890' },
+          {
+            id: 'syntax-1',
+            kind: 'invalid-syntax',
+            message: 'Expected top-level mapping at line 1',
+            evidence: 'line 1, col 1',
+          },
+          {
+            id: 'forbidden-1',
+            kind: 'forbidden',
+            message: 'Operator policy blocks this manifest.',
+            evidence: 'AKIA-SVELTE-FORBIDDEN-EVIDENCE-1234567890',
+          },
+          {
+            id: 'unsafe-1',
+            kind: 'unsafe',
+            message: 'Manifest references an unsupported scheme.',
+            evidence: 'AKIA-SVELTE-UNSAFE-EVIDENCE-1234567890',
+          },
+          {
+            id: 'other-1',
+            kind: 'other',
+            message: 'Validation could not complete.',
+            evidence: 'AKIA-SVELTE-OTHER-EVIDENCE-1234567890',
+          },
         ],
         modes: ['paste'],
         safetyPolicy: 'no-secret-or-production-like-data',
@@ -1036,7 +1152,10 @@ test('svelte package-source-input: only invalid-syntax renders evidence; forbidd
     },
   );
   assert.ok(body.includes('line 1, col 1'));
-  assert.equal(body.includes('AKIA-SVELTE-FORBIDDEN-EVIDENCE-1234567890'), false);
+  assert.equal(
+    body.includes('AKIA-SVELTE-FORBIDDEN-EVIDENCE-1234567890'),
+    false,
+  );
   assert.equal(body.includes('AKIA-SVELTE-UNSAFE-EVIDENCE-1234567890'), false);
   assert.equal(body.includes('AKIA-SVELTE-OTHER-EVIDENCE-1234567890'), false);
   assert.ok(body.includes('Operator policy blocks this manifest.'));
@@ -1054,19 +1173,242 @@ test('svelte code-dropzone: only invalid-syntax renders evidence; forbidden/unsa
         state: 'invalid',
         safetyPolicy: 'no-secret-or-production-like-data',
         errors: [
-          { id: 'syntax-1', kind: 'invalid-syntax', message: 'Expected top-level mapping at line 1', evidence: 'line 1, col 1' },
-          { id: 'forbidden-1', kind: 'forbidden', message: 'Policy blocks.', evidence: 'AKIA-SVELTE-DZ-FORBIDDEN-EVIDENCE-1234567890' },
-          { id: 'unsafe-1', kind: 'unsafe', message: 'Unsupported scheme.', evidence: 'AKIA-SVELTE-DZ-UNSAFE-EVIDENCE-1234567890' },
-          { id: 'other-1', kind: 'other', message: 'Validation could not complete.', evidence: 'AKIA-SVELTE-DZ-OTHER-EVIDENCE-1234567890' },
+          {
+            id: 'syntax-1',
+            kind: 'invalid-syntax',
+            message: 'Expected top-level mapping at line 1',
+            evidence: 'line 1, col 1',
+          },
+          {
+            id: 'forbidden-1',
+            kind: 'forbidden',
+            message: 'Policy blocks.',
+            evidence: 'AKIA-SVELTE-DZ-FORBIDDEN-EVIDENCE-1234567890',
+          },
+          {
+            id: 'unsafe-1',
+            kind: 'unsafe',
+            message: 'Unsupported scheme.',
+            evidence: 'AKIA-SVELTE-DZ-UNSAFE-EVIDENCE-1234567890',
+          },
+          {
+            id: 'other-1',
+            kind: 'other',
+            message: 'Validation could not complete.',
+            evidence: 'AKIA-SVELTE-DZ-OTHER-EVIDENCE-1234567890',
+          },
         ],
       },
     },
   );
   assert.ok(body.includes('line 1, col 1'));
-  assert.equal(body.includes('AKIA-SVELTE-DZ-FORBIDDEN-EVIDENCE-1234567890'), false);
-  assert.equal(body.includes('AKIA-SVELTE-DZ-UNSAFE-EVIDENCE-1234567890'), false);
-  assert.equal(body.includes('AKIA-SVELTE-DZ-OTHER-EVIDENCE-1234567890'), false);
+  assert.equal(
+    body.includes('AKIA-SVELTE-DZ-FORBIDDEN-EVIDENCE-1234567890'),
+    false,
+  );
+  assert.equal(
+    body.includes('AKIA-SVELTE-DZ-UNSAFE-EVIDENCE-1234567890'),
+    false,
+  );
+  assert.equal(
+    body.includes('AKIA-SVELTE-DZ-OTHER-EVIDENCE-1234567890'),
+    false,
+  );
   assert.ok(body.includes('Policy blocks.'));
   assert.ok(body.includes('Unsupported scheme.'));
   assert.ok(body.includes('Validation could not complete.'));
+});
+
+/* -------------------------------------------------------------------------- */
+/* AuditTrailPanel + DisclosurePanel parity                                   */
+/* -------------------------------------------------------------------------- */
+
+import type {
+  AuditTrail as SvelteAuditTrail,
+  DisclosurePanelProps as SvelteDisclosurePanelProps,
+} from '../../src/stitch-admin/index.js';
+
+const SVELTE_SAMPLE_TRAIL: SvelteAuditTrail = {
+  groupId: 'trail-root-svelte',
+  label: 'Validation history',
+  description: 'Server-derived audit events for this import.',
+  variant: 'detailed',
+  safetyPolicy: 'no-secret-or-production-like-data',
+  groups: [
+    {
+      id: 'parse-svelte',
+      label: 'Parse',
+      expanded: true,
+      events: [
+        {
+          id: 'parse-start-svelte',
+          timestamp: '2026-05-21T17:00:00.000Z',
+          title: 'Parse started',
+          status: 'info',
+          tone: 'info',
+          actor: 'theory-mcp-server',
+          actorSource: 'Server-derived',
+        },
+      ],
+    },
+    {
+      id: 'reconcile-svelte',
+      label: 'Reconcile',
+      expanded: true,
+      events: [
+        {
+          id: 'reconcile-error-svelte',
+          timestamp: '2026-05-21T17:00:04.000Z',
+          title: 'Conflict',
+          status: 'error',
+          tone: 'danger',
+          body: 'Two capabilities conflict.',
+          externalLink: { href: 'https://docs.example.com/c', label: 'Help' },
+        },
+      ],
+    },
+    {
+      id: 'apply-svelte',
+      label: 'Apply',
+      expanded: true,
+      events: [
+        {
+          id: 'apply-redacted-svelte',
+          timestamp: '2026-05-21T17:00:05.000Z',
+          title: 'Mailbox secret rotated',
+          status: 'info',
+          tone: 'neutral',
+          redactedMarker: '[redacted — mailbox secret]',
+          body: 'AKIA-SVELTE-NEVER-SHOWN-IN-BODY-1234567890',
+          metadata: [
+            {
+              key: 'secret',
+              label: 'Secret',
+              value: 'AKIA-SVELTE-NEVER-SHOWN-IN-META-1234567890',
+            },
+          ],
+          externalLink: {
+            href: 'https://docs.example.com/r',
+            label: 'AKIA-SVELTE-NEVER-SHOWN-IN-LINK-1234567890',
+          },
+        },
+        {
+          id: 'apply-unsafe-link-svelte',
+          timestamp: '2026-05-21T17:00:06.000Z',
+          title: 'Documented operator step',
+          externalLink: { href: 'javascript:alert(1)', label: 'Run unsafe' },
+        },
+      ],
+    },
+  ],
+};
+
+const SVELTE_DISCLOSURE_EXPANDED: SvelteDisclosurePanelProps = {
+  panelId: 'disc-svelte',
+  label: 'Server resolved details',
+  expanded: true,
+  tone: 'info',
+  status: 'info',
+  safetyPolicy: 'no-secret-or-production-like-data',
+};
+
+const SVELTE_DISCLOSURE_ERROR: SvelteDisclosurePanelProps = {
+  panelId: 'disc-svelte-err',
+  label: 'Apply failed',
+  expanded: true,
+  tone: 'danger',
+  status: 'error',
+  safetyPolicy: 'no-secret-or-production-like-data',
+};
+
+test('svelte audit-trail: AuditTrailPanel renders parity data attrs + safety footnote', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/AuditTrailPanel.svelte'),
+    { trail: SVELTE_SAMPLE_TRAIL },
+  );
+  assert.ok(body.includes('facetheory-stitch-audit-trail'));
+  assert.ok(
+    body.includes('data-safety-policy="no-secret-or-production-like-data"'),
+  );
+  assert.ok(body.includes('data-group-id="trail-root-svelte"'));
+  assert.ok(body.includes('data-variant="detailed"'));
+  assert.ok(body.includes('data-group-count="3"'));
+  assert.ok(body.includes('data-event-count="4"'));
+  assert.ok(body.includes('data-error-count="1"'));
+  assert.ok(body.includes('Safety policy: no-secret-or-production-like-data'));
+});
+
+test('svelte audit-trail: group toggles carry aria-expanded + aria-controls', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/AuditTrailPanel.svelte'),
+    { trail: SVELTE_SAMPLE_TRAIL },
+  );
+  assert.ok(body.includes('data-group-toggle="parse-svelte"'));
+  assert.ok(body.includes('aria-controls="parse-svelte-events"'));
+  assert.ok(body.includes('data-group-expanded="true"'));
+  assert.ok(body.includes('<button type="button"'));
+});
+
+test('svelte audit-trail: redacted event suppresses body/metadata/externalLink', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/AuditTrailPanel.svelte'),
+    { trail: SVELTE_SAMPLE_TRAIL },
+  );
+  assert.ok(body.includes('[redacted — mailbox secret]'));
+  assert.ok(body.includes('data-event-redacted="true"'));
+  assert.equal(
+    body.includes('AKIA-SVELTE-NEVER-SHOWN-IN-BODY-1234567890'),
+    false,
+  );
+  assert.equal(
+    body.includes('AKIA-SVELTE-NEVER-SHOWN-IN-META-1234567890'),
+    false,
+  );
+  assert.equal(
+    body.includes('AKIA-SVELTE-NEVER-SHOWN-IN-LINK-1234567890'),
+    false,
+  );
+});
+
+test('svelte audit-trail: javascript: external links dropped; safe links get noopener+target=_blank', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/AuditTrailPanel.svelte'),
+    { trail: SVELTE_SAMPLE_TRAIL },
+  );
+  assert.ok(body.includes('href="https://docs.example.com/c"'));
+  assert.equal(body.includes('javascript:alert(1)'), false);
+  assert.equal(body.includes('Run unsafe'), false);
+  assert.ok(body.includes('rel="noopener noreferrer"'));
+  assert.ok(body.includes('target="_blank"'));
+});
+
+test('svelte audit-trail: AuditTrailPanel byte-identical across repeated SSR renders', async () => {
+  const a = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/AuditTrailPanel.svelte'),
+    { trail: SVELTE_SAMPLE_TRAIL },
+  );
+  const b = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/AuditTrailPanel.svelte'),
+    { trail: SVELTE_SAMPLE_TRAIL },
+  );
+  assert.equal(a, b, 'Svelte AuditTrailPanel must be deterministic');
+});
+
+test('svelte audit-trail: DisclosurePanel renders expanded state and safety footnote', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/DisclosurePanel.svelte'),
+    { panel: SVELTE_DISCLOSURE_EXPANDED },
+  );
+  assert.ok(body.includes('data-disclosure-id="disc-svelte"'));
+  assert.ok(body.includes('aria-expanded="true"'));
+  assert.ok(body.includes('Safety policy: no-secret-or-production-like-data'));
+});
+
+test('svelte audit-trail: DisclosurePanel with status=error sets role=alert', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/DisclosurePanel.svelte'),
+    { panel: SVELTE_DISCLOSURE_ERROR },
+  );
+  assert.ok(body.includes('data-disclosure-status="error"'));
+  assert.ok(body.includes('role="alert"'));
 });
