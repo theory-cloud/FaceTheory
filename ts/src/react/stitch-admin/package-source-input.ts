@@ -169,25 +169,42 @@ function renderFileMeta(
       'data-file-name': fileMeta.name,
       style: { margin: 0, display: 'flex', flexWrap: 'wrap', gap: '6px 12px', fontSize: '12px' },
     },
-    h('div', { key: 'name' }, [h('dt', null, 'File'), h('dd', null, fileMeta.name)]),
+    h(
+      'div',
+      { key: 'name' },
+      h('dt', { key: 'dt' }, 'File'),
+      h('dd', { key: 'dd' }, fileMeta.name),
+    ),
     fileMeta.sizeBytes !== undefined
-      ? h('div', { key: 'size' }, [h('dt', null, 'Size'), h('dd', null, `${fileMeta.sizeBytes} B`)])
+      ? h(
+          'div',
+          { key: 'size' },
+          h('dt', { key: 'dt' }, 'Size'),
+          h('dd', { key: 'dd' }, `${fileMeta.sizeBytes} B`),
+        )
       : null,
     fileMeta.mediaType !== undefined
-      ? h('div', { key: 'media' }, [h('dt', null, 'Media type'), h('dd', null, fileMeta.mediaType)])
+      ? h(
+          'div',
+          { key: 'media' },
+          h('dt', { key: 'dt' }, 'Media type'),
+          h('dd', { key: 'dd' }, fileMeta.mediaType),
+        )
       : null,
     fileMeta.sha256 !== undefined
       ? h(
           'div',
           { key: 'sha' },
-          [
-            h('dt', null, 'sha256'),
+          h('dt', { key: 'dt' }, 'sha256'),
+          h(
+            'dd',
+            { key: 'dd' },
             h(
-              'dd',
-              null,
-              h('code', { style: { fontSize: '11px', overflowWrap: 'anywhere' } }, fileMeta.sha256),
+              'code',
+              { style: { fontSize: '11px', overflowWrap: 'anywhere' } },
+              fileMeta.sha256,
             ),
-          ],
+          ),
         )
       : null,
   );
