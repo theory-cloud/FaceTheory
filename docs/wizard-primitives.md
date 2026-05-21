@@ -25,7 +25,7 @@ primitive twice and asserting byte-identical SSR output.
 | Layer | Module | What it exports |
 | --- | --- | --- |
 | Framework-neutral types | `@theory-cloud/facetheory/stitch-admin` | `WizardProgressState`, `WizardPackageSummary`, `WizardFindingList`, `WizardReconcileSummary`, `WizardCapabilityReview`, `WizardEnablementChecklist`, `WizardRecoveryStatus`, `WizardEmptyStateConfig`, `WizardSafetyPolicy`, and supporting enums. |
-| React adapter | `@theory-cloud/facetheory/react/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
+| React adapter | `@theory-cloud/facetheory/react/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
 
 Vue and Svelte adapter parity is intentionally deferred for this milestone.
 The TheoryMCP control plane that consumes these primitives today is React; the
@@ -125,6 +125,114 @@ the wizard contracts. Two levers, both enforced at render time:
 
 The row's safety policy literal is still required and is still rendered into
 the DOM (`data-safety-policy`, plus the footnote).
+
+## Authority / server-resolved context strip
+
+`WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`)
+is the read-only context header that the TheoryMCP control plane renders above
+wizard content — the "tenant / namespace / MCP route / operator / partner /
+agent scope" surface.
+
+### Trust boundary
+
+This is the most security-relevant primitive in the wizard set, so the trust
+boundary is restated explicitly:
+
+- FaceTheory **never** resolves, verifies, derives, or validates tenant,
+  namespace, operator, MCP route, partner, agent, account, entitlement,
+  mailbox, GitHub, or authority state.
+- FaceTheory **never** enforces read-only. The read-only label (when
+  supplied) is informational text — it does not lock anything.
+- FaceTheory **never** invents copy payloads. Copyable cells use
+  `item.copyValue` if supplied, otherwise the rendered string `item.value`
+  verbatim. The host pre-resolves whatever should be copied.
+
+### Item contract
+
+Each item is a label/value cell:
+
+```ts
+interface WizardAuthorityContextItem {
+  key: string;
+  label: unknown;
+  value: unknown;
+  icon?: unknown;
+  badge?: unknown;
+  tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+  copyable?: boolean;
+  copyValue?: string;
+  title?: string;
+  href?: string;
+}
+```
+
+The cell renders as a real `<dt>` / `<dd>` pair so screen-readers read the
+pairing, and `href` is filtered through the Stitch admin safe-href filter
+(unsafe schemes like `javascript:` are dropped at render).
+
+### Layout matrix
+
+`layout` controls how items are arranged:
+
+| Value    | Behavior                                                                                            |
+| -------- | --------------------------------------------------------------------------------------------------- |
+| `strip`  | Single horizontal row. `wrap` controls whether items wrap (`true`, default) or scroll (`false`).    |
+| `grid`   | CSS Grid `auto-fit, minmax(220px, 1fr)`. Items reflow as the container narrows.                     |
+| `stack`  | Vertical stack — preferred in narrow admin sidebars.                                                |
+| `auto`   | Default. CSS-only responsive grid that stacks on narrow viewports **without hiding any cell**.      |
+
+Layout is implemented in inline CSS (no media queries inside the component,
+no JavaScript layout), so SSR output and hydrated DOM are byte-identical.
+
+### Copyable cells
+
+When `item.copyable` is `true` and a string copy payload is available, the
+component renders a real keyboard-accessible button:
+
+- `<button type="button">` (focusable by default, keyboard-operable)
+- `aria-label="Copy <label>"` so screen-readers announce the action
+- `data-copy-value="<host-supplied>"` carries the deterministic payload
+- An optional `onCopyItem(itemKey, copyValue)` prop performs the clipboard
+  write; if it's omitted, the markup still renders deterministically and the
+  host is expected to wire the action itself (e.g. via global delegation).
+
+The component never resolves what to copy; the host is the authority.
+
+### Read-only / authority cues
+
+Both cues render as **text**, not color-only:
+
+- `authorityLabel` (e.g. `"Server-derived"`, `"Autheory session"`,
+  `"Route-resolved"`) renders in the header with its own
+  `data-authority-label="true"`.
+- `readOnlyLabel` (e.g. `"Read-only"`) renders in the header with
+  `data-read-only-label="true"` and an explicit `aria-label`.
+
+The component does not imply enforcement. It is a presentational primitive;
+authority and read-only state come from the host.
+
+### Example
+
+```tsx
+<WizardAuthorityContextStripPanel
+  strip={{
+    items: [
+      { key: 'tenant', label: 'Tenant', value: 'theory-mcp' },
+      { key: 'namespace', label: 'Namespace', value: 'acme', tone: 'info' },
+      { key: 'route', label: 'MCP route', value: '/agents/acme',
+        copyable: true, copyValue: '/agents/acme' },
+      { key: 'operator', label: 'Operator', value: 'aron@equal-to.ai',
+        badge: 'session' },
+    ],
+    authorityLabel: 'Server-derived',
+    readOnlyLabel: 'Read-only',
+    layout: 'auto',
+    size: 'md',
+    safetyPolicy: 'no-secret-or-production-like-data',
+  }}
+  onCopyItem={(itemKey, value) => host.copyToClipboard(itemKey, value)}
+/>
+```
 
 ## Consuming the primitives from TheoryMCP
 

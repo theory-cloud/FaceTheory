@@ -146,3 +146,20 @@ export {
   type WizardReconciliationPlanOperationKind,
   type WizardReconciliationPlanRow,
 } from './wizard-reconciliation-plan.js';
+
+export {
+  WizardAuthorityContextStripPanel,
+  WizardServerResolvedContextBarPanel,
+  type WizardAuthorityContextStripPanelProps,
+  type WizardServerResolvedContextBarPanelProps,
+  type WizardAuthorityContextItem,
+  type WizardAuthorityContextItemTone,
+  type WizardAuthorityContextStrip,
+  type WizardAuthorityContextStripLayout,
+  type WizardAuthorityContextStripSize,
+  type WizardServerResolvedContextBar,
+  type WizardServerResolvedContextBarItem,
+  type WizardServerResolvedContextBarLayout,
+  type WizardServerResolvedContextBarSize,
+  type WizardServerResolvedContextBarTone,
+} from './wizard-authority-context-strip.js';
