@@ -549,3 +549,194 @@ test('svelte stitch-admin: WizardEditableTokenInputPanel is byte-identical acros
   );
   assert.equal(first, second);
 });
+
+test('svelte wizard parity: WizardProgress renders steps with stable data attrs', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardProgress.svelte'),
+    {
+      state: {
+        steps: [
+          { key: 'a', label: 'A', status: 'complete' },
+          { key: 'b', label: 'B', status: 'in-progress' },
+          { key: 'c', label: 'C', status: 'pending' },
+        ],
+        currentStepKey: 'b',
+      },
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-wizard-progress'));
+  assert.ok(body.includes('data-step-count="3"'));
+  assert.ok(body.includes('data-completed-count="1"'));
+  assert.ok(body.includes('data-step-key="b"'));
+  assert.ok(body.includes('data-step-status="in-progress"'));
+  assert.ok(body.includes('facetheory-stitch-wizard-step-active'));
+});
+
+test('svelte wizard parity: WizardPackageSummaryPanel renders file totals + safety footnote', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardPackageSummaryPanel.svelte'),
+    {
+      summary: {
+        name: 'pkg',
+        version: '0.1.0',
+        files: [{ key: 'a', path: 'agent.json' }],
+        totals: { fileCount: 1 },
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-wizard-package-summary'));
+  assert.ok(body.includes('data-file-count="1"'));
+  assert.ok(body.includes('agent.json'));
+  assert.ok(body.includes('Safety policy: no-secret-or-production-like-data'));
+});
+
+test('svelte wizard parity: WizardFindingListPanel renders severity chips and evidence', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardFindingListPanel.svelte'),
+    {
+      list: {
+        findings: [
+          { id: 'f1', severity: 'info', title: 'Manifest parsed' },
+          { id: 'f2', severity: 'error', title: 'Bad capability', evidence: 'cap[0]' },
+        ],
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-wizard-finding-list'));
+  assert.ok(body.includes('data-finding-count="2"'));
+  assert.ok(body.includes('data-finding-severity="info"'));
+  assert.ok(body.includes('data-finding-severity="error"'));
+  assert.ok(body.includes('Info: 1'));
+  assert.ok(body.includes('Error: 1'));
+  assert.ok(body.includes('cap[0]'));
+});
+
+test('svelte wizard parity: WizardReconcileSummaryPanel replaces redacted detail with marker', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardReconcileSummaryPanel.svelte'),
+    {
+      summary: {
+        entries: [
+          { key: 'a', label: 'a', kind: 'added' },
+          { key: 'b', label: 'b', kind: 'changed', detail: 'super-secret', redacted: true },
+          { key: 'c', label: 'c', kind: 'redacted' },
+        ],
+        totals: { added: 1, removed: 0, changed: 1, unchanged: 0, redacted: 1 },
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('Added: 1'));
+  assert.ok(body.includes('Redacted: 1'));
+  assert.ok(!body.includes('super-secret'));
+  assert.ok(body.includes('[redacted]'));
+});
+
+test('svelte wizard parity: WizardCapabilityReviewPanel suppresses sensitive/redacted detail', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardCapabilityReviewPanel.svelte'),
+    {
+      review: {
+        capabilities: [
+          { key: 'pub', label: 'Pub', intent: 'granted', sensitivity: 'public', detail: 'visible' },
+          { key: 'sen', label: 'Sen', intent: 'requested', sensitivity: 'sensitive', detail: 'should-suppress' },
+          { key: 'red', label: 'Red', intent: 'denied', sensitivity: 'redacted', detail: 'should-redact' },
+        ],
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('visible'));
+  assert.ok(!body.includes('should-suppress'));
+  assert.ok(!body.includes('should-redact'));
+  assert.ok(body.includes('Detail suppressed (sensitive).'));
+  assert.ok(body.includes('[redacted]'));
+});
+
+test('svelte wizard parity: WizardEnablementChecklistPanel renders caller summary + allReady', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardEnablementChecklistPanel.svelte'),
+    {
+      checklist: {
+        items: [{ key: 'a', label: 'ready', status: 'ready' }],
+        summaryLabel: '1 of 1 ready',
+        allReady: true,
+      },
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-wizard-enablement-checklist'));
+  assert.ok(body.includes('data-all-ready="true"'));
+  assert.ok(body.includes('1 of 1 ready'));
+});
+
+test('svelte wizard parity: WizardRecoveryStatusPanel uses role=alert for failed state', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardRecoveryStatusPanel.svelte'),
+    { status: { state: 'failed', description: 'Failed.' } },
+  );
+  assert.ok(body.includes('data-recovery-state="failed"'));
+  assert.ok(body.includes('role="alert"'));
+  assert.ok(body.includes('Failed'));
+});
+
+test('svelte wizard parity: WizardEmptyState renders safety-policy footnote', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardEmptyState.svelte'),
+    {
+      config: {
+        intent: 'no-data',
+        title: 'No data',
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('data-empty-intent="no-data"'));
+  assert.ok(body.includes('Safety policy: no-secret-or-production-like-data'));
+});
+
+test('svelte wizard parity: WizardReconciliationPlanPanel marks conflict/blocked/external prominent', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardReconciliationPlanPanel.svelte'),
+    {
+      plan: {
+        rows: [
+          { key: 'c', label: 'c', kind: 'conflict', reason: 'r' },
+          { key: 'b', label: 'b', kind: 'blocked', reason: 'r' },
+          { key: 'e', label: 'e', kind: 'external_step_required', reason: 'r' },
+        ],
+        totals: { create: 0, update: 0, satisfied: 0, conflict: 1, blocked: 1, external: 1, noop: 0 },
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('data-row-kind="external"'));
+  assert.ok(body.includes('data-row-kind-input="external_step_required"'));
+  assert.ok(body.includes('data-row-prominent="true"'));
+  assert.equal(body.split('role="alert"').length - 1, 3);
+});
+
+test('svelte wizard parity: WizardAuthorityContextStripPanel renders text-labeled authority + copy button', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardAuthorityContextStripPanel.svelte'),
+    {
+      strip: {
+        items: [
+          { key: 'tenant', label: 'Tenant', value: 'theory-mcp' },
+          { key: 'route', label: 'MCP route', value: '/agents/acme', copyable: true },
+        ],
+        authorityLabel: 'Server-derived',
+        readOnlyLabel: 'Read-only',
+        layout: 'auto',
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
+  assert.ok(body.includes('data-layout="auto"'));
+  assert.ok(body.includes('Server-derived'));
+  assert.ok(body.includes('aria-label="Read-only"'));
+  assert.ok(body.includes('aria-label="Copy MCP route"'));
+  assert.ok(body.includes('data-copy-value="/agents/acme"'));
+});

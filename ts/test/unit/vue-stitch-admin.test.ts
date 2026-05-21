@@ -737,3 +737,211 @@ test('vue stitch-admin: WizardChipListPanel alias renders the same DOM as the ca
   );
   assert.equal(canonical, alias);
 });
+
+import {
+  WizardProgress as VueWizardProgress,
+  WizardPackageSummaryPanel as VueWizardPackageSummaryPanel,
+  WizardFindingListPanel as VueWizardFindingListPanel,
+  WizardReconcileSummaryPanel as VueWizardReconcileSummaryPanel,
+  WizardCapabilityReviewPanel as VueWizardCapabilityReviewPanel,
+  WizardEnablementChecklistPanel as VueWizardEnablementChecklistPanel,
+  WizardRecoveryStatusPanel as VueWizardRecoveryStatusPanel,
+  WizardEmptyState as VueWizardEmptyState,
+  WizardReconciliationPlanPanel as VueWizardReconciliationPlanPanel,
+  WizardDiffListPanel as VueWizardDiffListPanel,
+  WizardAuthorityContextStripPanel as VueWizardAuthorityContextStripPanel,
+  WizardServerResolvedContextBarPanel as VueWizardServerResolvedContextBarPanel,
+} from '../../src/vue/stitch-admin/index.js';
+import type {
+  WizardCapabilityReview as VueCapabilityReview,
+  WizardEmptyStateConfig as VueEmptyStateConfig,
+  WizardEnablementChecklist as VueEnablementChecklist,
+  WizardFindingList as VueFindingList,
+  WizardPackageSummary as VuePackageSummary,
+  WizardProgressState as VueProgressState,
+  WizardReconcileSummary as VueReconcileSummary,
+  WizardRecoveryStatus as VueRecoveryStatus,
+  WizardReconciliationPlan as VueReconciliationPlan,
+  WizardAuthorityContextStrip as VueAuthorityContextStrip,
+} from '../../src/stitch-admin/index.js';
+
+test('vue wizard parity: WizardProgress renders caller-supplied steps with stable data attrs', async () => {
+  const state: VueProgressState = {
+    steps: [
+      { key: 'connect', label: 'Connect', status: 'complete' },
+      { key: 'validate', label: 'Validate', status: 'in-progress' },
+      { key: 'review', label: 'Review', status: 'pending' },
+    ],
+    currentStepKey: 'validate',
+  };
+  const body = await renderSSR(h(VueWizardProgress, { state }));
+  assert.ok(body.includes('facetheory-stitch-wizard-progress'));
+  assert.ok(body.includes('data-step-count="3"'));
+  assert.ok(body.includes('data-completed-count="1"'));
+  assert.ok(body.includes('data-step-key="validate"'));
+  assert.ok(body.includes('data-step-status="in-progress"'));
+  assert.ok(body.includes('facetheory-stitch-wizard-step-active'));
+});
+
+test('vue wizard parity: WizardPackageSummaryPanel renders totals + per-file metadata', async () => {
+  const summary: VuePackageSummary = {
+    name: 'pkg',
+    version: '0.1.0',
+    files: [
+      { key: 'a', path: 'agent.json', sizeBytes: 412, role: 'manifest' },
+    ],
+    totals: { fileCount: 1, byteCount: 412 },
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueWizardPackageSummaryPanel, { summary }));
+  assert.ok(body.includes('facetheory-stitch-wizard-package-summary'));
+  assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
+  assert.ok(body.includes('data-file-count="1"'));
+  assert.ok(body.includes('agent.json'));
+  assert.ok(body.includes('Safety policy: no-secret-or-production-like-data'));
+});
+
+test('vue wizard parity: WizardFindingListPanel renders severity counts and findings', async () => {
+  const list: VueFindingList = {
+    findings: [
+      { id: 'f1', severity: 'info', title: 'Manifest parsed' },
+      { id: 'f2', severity: 'error', title: 'Bad capability', evidence: 'cap[0]' },
+    ],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueWizardFindingListPanel, { list }));
+  assert.ok(body.includes('facetheory-stitch-wizard-finding-list'));
+  assert.ok(body.includes('data-finding-count="2"'));
+  assert.ok(body.includes('data-finding-severity="info"'));
+  assert.ok(body.includes('data-finding-severity="error"'));
+  assert.ok(body.includes('Info: 1'));
+  assert.ok(body.includes('Error: 1'));
+  assert.ok(body.includes('cap[0]'));
+});
+
+test('vue wizard parity: WizardReconcileSummaryPanel redacts entries marked sensitive', async () => {
+  const summary: VueReconcileSummary = {
+    entries: [
+      { key: 'a', label: 'a', kind: 'added' },
+      { key: 'b', label: 'b', kind: 'changed', detail: 'super-secret', redacted: true },
+      { key: 'c', label: 'c', kind: 'redacted' },
+    ],
+    totals: { added: 1, removed: 0, changed: 1, unchanged: 0, redacted: 1 },
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueWizardReconcileSummaryPanel, { summary }));
+  assert.ok(body.includes('facetheory-stitch-wizard-reconcile-summary'));
+  assert.ok(body.includes('Added: 1'));
+  assert.ok(body.includes('Redacted: 1'));
+  assert.ok(!body.includes('super-secret'));
+  assert.ok(body.includes('[redacted]'));
+});
+
+test('vue wizard parity: WizardCapabilityReviewPanel suppresses sensitive/redacted details', async () => {
+  const review: VueCapabilityReview = {
+    capabilities: [
+      { key: 'public', label: 'Public', intent: 'granted', sensitivity: 'public', detail: 'visible' },
+      { key: 'sensitive', label: 'Sensitive', intent: 'requested', sensitivity: 'sensitive', detail: 'should-suppress' },
+      { key: 'redacted', label: 'Redacted', intent: 'denied', sensitivity: 'redacted', detail: 'should-redact' },
+    ],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueWizardCapabilityReviewPanel, { review }));
+  assert.ok(body.includes('visible'));
+  assert.ok(!body.includes('should-suppress'));
+  assert.ok(!body.includes('should-redact'));
+  assert.ok(body.includes('Detail suppressed (sensitive).'));
+  assert.ok(body.includes('[redacted]'));
+});
+
+test('vue wizard parity: WizardEnablementChecklistPanel renders caller summary + all-ready data attr', async () => {
+  const checklist: VueEnablementChecklist = {
+    items: [{ key: 'a', label: 'ready', status: 'ready' }],
+    summaryLabel: '1 of 1 ready',
+    allReady: true,
+  };
+  const body = await renderSSR(h(VueWizardEnablementChecklistPanel, { checklist }));
+  assert.ok(body.includes('facetheory-stitch-wizard-enablement-checklist'));
+  assert.ok(body.includes('data-all-ready="true"'));
+  assert.ok(body.includes('1 of 1 ready'));
+});
+
+test('vue wizard parity: WizardRecoveryStatusPanel uses role=alert for failed state', async () => {
+  const status: VueRecoveryStatus = { state: 'failed', description: 'Failed.' };
+  const body = await renderSSR(h(VueWizardRecoveryStatusPanel, { status }));
+  assert.ok(body.includes('data-recovery-state="failed"'));
+  assert.ok(body.includes('role="alert"'));
+  assert.ok(body.includes('Failed'));
+});
+
+test('vue wizard parity: WizardEmptyState renders safety-policy footnote', async () => {
+  const config: VueEmptyStateConfig = {
+    intent: 'no-data',
+    title: 'No data',
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueWizardEmptyState, { config }));
+  assert.ok(body.includes('data-empty-intent="no-data"'));
+  assert.ok(body.includes('Safety policy: no-secret-or-production-like-data'));
+});
+
+test('vue wizard parity: WizardReconciliationPlanPanel marks conflict/blocked/external prominent', async () => {
+  const plan: VueReconciliationPlan = {
+    rows: [
+      { key: 'c', label: 'c', kind: 'conflict', reason: 'r' },
+      { key: 'b', label: 'b', kind: 'blocked', reason: 'r' },
+      { key: 'e', label: 'e', kind: 'external_step_required', reason: 'r' },
+      { key: 's', label: 's', kind: 'satisfied' },
+    ],
+    totals: { create: 0, update: 0, satisfied: 1, conflict: 1, blocked: 1, external: 1, noop: 0 },
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueWizardReconciliationPlanPanel, { plan }));
+  assert.ok(body.includes('data-row-kind="external"'));
+  assert.ok(body.includes('data-row-kind-input="external_step_required"'));
+  assert.ok(body.includes('data-row-prominent="true"'));
+  // 3 prominent rows → 3 role=alert
+  assert.equal(body.split('role="alert"').length - 1, 3);
+});
+
+test('vue wizard parity: WizardDiffListPanel alias renders identically to canonical', async () => {
+  const plan: VueReconciliationPlan = {
+    rows: [{ key: 'k', label: 'k', kind: 'create' }],
+    totals: { create: 1, update: 0, satisfied: 0, conflict: 0, blocked: 0, external: 0, noop: 0 },
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const canonical = await renderSSR(h(VueWizardReconciliationPlanPanel, { plan }));
+  const alias = await renderSSR(h(VueWizardDiffListPanel, { plan }));
+  assert.equal(canonical, alias);
+});
+
+test('vue wizard parity: WizardAuthorityContextStripPanel renders text-labeled authority + read-only cues', async () => {
+  const strip: VueAuthorityContextStrip = {
+    items: [
+      { key: 'tenant', label: 'Tenant', value: 'theory-mcp' },
+      { key: 'route', label: 'MCP route', value: '/agents/acme', copyable: true },
+    ],
+    authorityLabel: 'Server-derived',
+    readOnlyLabel: 'Read-only',
+    layout: 'auto',
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueWizardAuthorityContextStripPanel, { strip }));
+  assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
+  assert.ok(body.includes('data-layout="auto"'));
+  assert.ok(body.includes('Server-derived'));
+  assert.ok(body.includes('aria-label="Read-only"'));
+  assert.ok(body.includes('data-authority-label="true"'));
+  assert.ok(body.includes('aria-label="Copy MCP route"'));
+  assert.ok(body.includes('data-copy-value="/agents/acme"'));
+});
+
+test('vue wizard parity: WizardServerResolvedContextBarPanel alias renders identically', async () => {
+  const strip: VueAuthorityContextStrip = {
+    items: [{ key: 't', label: 'Tenant', value: 'theory-mcp' }],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const canonical = await renderSSR(h(VueWizardAuthorityContextStripPanel, { strip }));
+  const alias = await renderSSR(h(VueWizardServerResolvedContextBarPanel, { strip }));
+  assert.equal(canonical, alias);
+});

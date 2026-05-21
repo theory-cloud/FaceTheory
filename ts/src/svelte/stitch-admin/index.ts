@@ -22,8 +22,70 @@ export { default as MetadataBadge } from './MetadataBadge.svelte';
 export { default as MetadataBadgeGroup } from './MetadataBadgeGroup.svelte';
 export { default as NonAuthoritativeBanner } from './NonAuthoritativeBanner.svelte';
 export { default as OperatorEmptyState } from './OperatorEmptyState.svelte';
+export { default as WizardProgress } from './WizardProgress.svelte';
+export { default as WizardPackageSummaryPanel } from './WizardPackageSummaryPanel.svelte';
+export { default as WizardFindingListPanel } from './WizardFindingListPanel.svelte';
+export { default as WizardReconcileSummaryPanel } from './WizardReconcileSummaryPanel.svelte';
+export { default as WizardCapabilityReviewPanel } from './WizardCapabilityReviewPanel.svelte';
+export { default as WizardEnablementChecklistPanel } from './WizardEnablementChecklistPanel.svelte';
+export { default as WizardRecoveryStatusPanel } from './WizardRecoveryStatusPanel.svelte';
+export { default as WizardEmptyState } from './WizardEmptyState.svelte';
+export { default as WizardReconciliationPlanPanel } from './WizardReconciliationPlanPanel.svelte';
+export { default as WizardDiffListPanel } from './WizardReconciliationPlanPanel.svelte';
+export { default as WizardAuthorityContextStripPanel } from './WizardAuthorityContextStripPanel.svelte';
+export { default as WizardServerResolvedContextBarPanel } from './WizardAuthorityContextStripPanel.svelte';
 export { default as WizardEditableTokenInputPanel } from './WizardEditableTokenInputPanel.svelte';
 export { default as WizardChipListPanel } from './WizardEditableTokenInputPanel.svelte';
+
+export type {
+  WizardCapability,
+  WizardCapabilityIntent,
+  WizardCapabilityReview,
+  WizardCapabilitySensitivity,
+  WizardEmptyStateConfig,
+  WizardEnablementChecklist,
+  WizardEnablementItem,
+  WizardEnablementItemStatus,
+  WizardFinding,
+  WizardFindingList,
+  WizardFindingSeverity,
+  WizardPackageFile,
+  WizardPackageSummary,
+  WizardProgressState,
+  WizardReconcileEntry,
+  WizardReconcileSummary,
+  WizardRecoveryState,
+  WizardRecoveryStatus,
+  WizardSafetyPolicy,
+  WizardStep,
+  WizardStepStatus,
+} from '../../stitch-admin/wizard-types.js';
+
+export type {
+  WizardDiffList,
+  WizardDiffListCanonicalKind,
+  WizardDiffListDetail,
+  WizardDiffListOperationKind,
+  WizardDiffListRow,
+  WizardReconciliationPlan,
+  WizardReconciliationPlanCanonicalKind,
+  WizardReconciliationPlanDetail,
+  WizardReconciliationPlanOperationKind,
+  WizardReconciliationPlanRow,
+} from '../../stitch-admin/wizard-reconciliation-plan-types.js';
+
+export type {
+  WizardAuthorityContextItem,
+  WizardAuthorityContextItemTone,
+  WizardAuthorityContextStrip,
+  WizardAuthorityContextStripLayout,
+  WizardAuthorityContextStripSize,
+  WizardServerResolvedContextBar,
+  WizardServerResolvedContextBarItem,
+  WizardServerResolvedContextBarLayout,
+  WizardServerResolvedContextBarSize,
+  WizardServerResolvedContextBarTone,
+} from '../../stitch-admin/wizard-authority-context-strip-types.js';
 
 export type {
   WizardEditableTokenInput,

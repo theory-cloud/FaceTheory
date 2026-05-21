@@ -1,15 +1,17 @@
 # FaceTheory wizard primitives (Stitch admin)
 
 Status: pre-1.0. The framework-neutral contract is shared across all adapters.
-`WizardEditableTokenInputPanel` / `WizardChipListPanel` (THE-1450) ship with
-full React + Vue + Svelte parity. The earlier wizard families
-(`WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`,
-`WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel`,
-`WizardAuthorityContextStripPanel`, `WizardCapabilityReviewPanel`,
-`WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`,
-`WizardEmptyState`) currently ship only the React adapter; Vue and Svelte
-parity for those families is tracked by THE-1459 as a corrective backfill
-milestone and is not part of this document's "shipped now" surface.
+All wizard primitive families ship with full React + Vue + Svelte parity:
+`WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`,
+`WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel`
+(alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel`
+(alias `WizardServerResolvedContextBarPanel`),
+`WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`,
+`WizardRecoveryStatusPanel`, `WizardEmptyState`, and
+`WizardEditableTokenInputPanel` (alias `WizardChipListPanel`). The THE-1459
+corrective parity backfill (Vue + Svelte adapters for the THE-1458 / THE-1448
+/ THE-1449 families) completes the contract; future component-request
+milestones land with React + Vue + Svelte parity from the start.
 
 These primitives exist so the TheoryMCP Agent Import & Completion Wizard
 (and any future Theory Cloud setup flow) can render deterministic, host-driven
@@ -35,31 +37,25 @@ primitive twice and asserting byte-identical SSR output.
 | --- | --- | --- |
 | Framework-neutral types | `@theory-cloud/facetheory/stitch-admin` | `WizardProgressState`, `WizardPackageSummary`, `WizardFindingList`, `WizardReconcileSummary`, `WizardReconciliationPlan`, `WizardAuthorityContextStrip`, `WizardCapabilityReview`, `WizardEnablementChecklist`, `WizardRecoveryStatus`, `WizardEmptyStateConfig`, `WizardEditableTokenInput`, `WizardSafetyPolicy`, and supporting enums and aliases. |
 | React adapter | `@theory-cloud/facetheory/react/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`), `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
-| Vue adapter | `@theory-cloud/facetheory/vue/stitch-admin` | `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`). Parity for the remaining wizard families is tracked by THE-1459. |
-| Svelte adapter | `@theory-cloud/facetheory/svelte/stitch-admin` | `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`). Parity for the remaining wizard families is tracked by THE-1459. |
+| Vue adapter | `@theory-cloud/facetheory/vue/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`, `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`). |
+| Svelte adapter | `@theory-cloud/facetheory/svelte/stitch-admin` | Same primitive set as the Vue adapter, exposed as `.svelte` components with matching component-prop interfaces. |
 
 ### Adapter parity status
 
-- **Shipped with React + Vue + Svelte parity now (THE-1450):**
-  `WizardEditableTokenInputPanel` / `WizardChipListPanel`. SSR output is
-  byte-identical for the same props across all three adapters; the React,
-  Vue, and Svelte unit suites each render the component and assert matching
-  DOM, ARIA wiring, and feedback state.
-- **Shipped React-only today; Vue + Svelte parity tracked by THE-1459 as a
-  corrective backfill milestone:** the remaining wizard families listed
-  above (`WizardProgress`, `WizardPackageSummaryPanel`,
-  `WizardFindingListPanel`, `WizardReconcileSummaryPanel`,
-  `WizardReconciliationPlanPanel`, `WizardAuthorityContextStripPanel`,
-  `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`,
-  `WizardRecoveryStatusPanel`, `WizardEmptyState`). The framework-neutral
-  contracts for those families are already published from
-  `@theory-cloud/facetheory/stitch-admin`, so the THE-1459 backfill will
-  wrap the same types in Vue and Svelte renderers without re-shaping the
-  data.
+All wizard primitive families now ship with full **React + Vue + Svelte
+parity**. The THE-1459 corrective parity backfill closed the React-only gap
+left by THE-1458 / THE-1448 / THE-1449. The unit suites for each adapter
+(`ts/test/unit/stitch-admin-wizard*.test.ts`,
+`ts/test/unit/vue-stitch-admin.test.ts`, and
+`ts/test/unit/svelte-stitch-admin.test.ts`) render every primitive and
+assert the same testable contract: class names, `data-*` attributes, ARIA
+wiring, `role="alert"` for prominent conflict / blocked / external / failed
+states, the safety-policy footnote where required, and deterministic SSR
+output for the same input.
 
 Future component-request milestones land with React + Vue + Svelte parity
-from the start; the React-only paths above are corrective scope, not the
-forward shape.
+from the start; the React-only paths are no longer part of the shipped
+surface.
 
 ## Safety policy
 
