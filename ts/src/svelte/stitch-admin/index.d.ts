@@ -375,6 +375,27 @@ export interface WizardAuthorityContextStripPanelProps {
 }
 export type WizardServerResolvedContextBarPanelProps = WizardAuthorityContextStripPanelProps;
 
+export type {
+  ChoiceCardProps,
+  SelectableCardGrid,
+  SelectableCardGridLayout,
+  SelectableCardGridSelection,
+  SelectableCardGridSize,
+  SelectableCardOption,
+  SelectableCardTone,
+} from '../../stitch-admin/selectable-card-grid-types.js';
+
+export interface SelectableCardGridPanelProps {
+  grid: import('../../stitch-admin/selectable-card-grid-types.js').SelectableCardGrid;
+  onChange: (nextSelectedKeys: string[]) => void;
+}
+export interface ChoiceCardPanelProps {
+  card: import('../../stitch-admin/selectable-card-grid-types.js').ChoiceCardProps;
+  onChange?: (selected: boolean) => void;
+}
+export declare const SelectableCardGridPanel: Component<SelectableCardGridPanelProps>;
+export declare const ChoiceCard: Component<ChoiceCardPanelProps>;
+
 export declare const WizardProgress: Component<WizardProgressPanelProps>;
 export declare const WizardPackageSummaryPanel: Component<WizardPackageSummaryPanelProps>;
 export declare const WizardFindingListPanel: Component<WizardFindingListPanelProps>;

@@ -851,3 +851,89 @@ test('svelte wizard parity: WizardReconciliationPlanPanel renders row.metadata v
   assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
   assert.ok(body.includes('Plan diff'));
 });
+
+test('svelte selectable-card-grid: single-select renders as radiogroup with role=radio cards', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/SelectableCardGridPanel.svelte'),
+    {
+      grid: {
+        groupId: 'allowed-action',
+        selection: 'single',
+        selectedKeys: ['create'],
+        options: [
+          { key: 'create', title: 'Create', tone: 'success', recommended: true },
+          { key: 'reuse', title: 'Reuse', tone: 'info' },
+          { key: 'replace', title: 'Replace', tone: 'warning', riskLabel: 'High blast radius' },
+          { key: 'archive', title: 'Archive', disabledReason: 'Requires operator review.' },
+          { key: 'forbidden', title: 'Forbidden', blocked: true, blockedReason: 'Server policy blocks this.' },
+        ],
+        label: 'Allowed action',
+        description: 'TheoryMCP resolves availability per route.',
+        layout: 'grid',
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onChange: (): void => {},
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-selectable-card-grid'));
+  assert.ok(body.includes('data-selection="single"'));
+  assert.ok(body.includes('data-layout="grid"'));
+  assert.ok(body.includes('role="radiogroup"'));
+  assert.ok(body.includes('aria-labelledby="allowed-action-label"'));
+  assert.ok(body.includes('aria-describedby="allowed-action-description"'));
+  assert.equal(body.split('role="radio"').length - 1, 5);
+  assert.ok(body.includes('data-option-selected="true"'));
+  assert.ok(body.includes('data-pill="recommended"'));
+  assert.ok(body.includes('data-pill="risk"'));
+  assert.ok(body.includes('data-pill="blocked"'));
+  assert.ok(body.includes('id="allowed-action-archive-reason"'));
+  assert.ok(body.includes('Requires operator review.'));
+  assert.ok(body.includes('Server policy blocks this.'));
+});
+
+test('svelte selectable-card-grid: multi-select renders as checkbox group', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/SelectableCardGridPanel.svelte'),
+    {
+      grid: {
+        groupId: 'targets',
+        selection: 'multi',
+        selectedKeys: ['github', 'mailbox'],
+        options: [
+          { key: 'github', title: 'GitHub' },
+          { key: 'mailbox', title: 'Mailbox' },
+          { key: 'policy', title: 'Policy' },
+        ],
+        layout: 'stack',
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onChange: (): void => {},
+    },
+  );
+  assert.ok(body.includes('data-selection="multi"'));
+  assert.ok(body.includes('role="group"'));
+  assert.equal(body.split('role="checkbox"').length - 1, 3);
+  assert.equal(body.split('aria-checked="true"').length - 1, 2);
+  assert.equal(body.split('aria-checked="false"').length - 1, 1);
+});
+
+test('svelte ChoiceCard renders standalone card with selection family + safety policy', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/ChoiceCard.svelte'),
+    {
+      card: {
+        cardId: 'choice-create',
+        option: { key: 'create', title: 'Create', recommended: true },
+        selection: 'single',
+        selected: true,
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-choice-card'));
+  assert.ok(body.includes('role="radio"'));
+  assert.ok(body.includes('aria-checked="true"'));
+  assert.ok(body.includes('data-selection-family="single"'));
+  assert.ok(body.includes('data-option-recommended="true"'));
+  assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
+});

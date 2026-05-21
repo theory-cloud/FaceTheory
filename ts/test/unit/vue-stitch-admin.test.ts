@@ -1010,3 +1010,113 @@ test('vue wizard parity: WizardReconciliationPlanPanel renders row.metadata via 
   assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
   assert.ok(body.includes('Plan diff'));
 });
+
+import {
+  SelectableCardGridPanel as VueSelectableCardGridPanel,
+  ChoiceCard as VueChoiceCard,
+} from '../../src/vue/stitch-admin/index.js';
+import type {
+  ChoiceCardProps as VueChoiceCardProps,
+  SelectableCardGrid as VueSelectableCardGrid,
+} from '../../src/stitch-admin/index.js';
+
+const SELECTABLE_GRID_SINGLE: VueSelectableCardGrid = {
+  groupId: 'allowed-action',
+  selection: 'single',
+  selectedKeys: ['create'],
+  options: [
+    { key: 'create', title: 'Create', tone: 'success', recommended: true },
+    { key: 'reuse', title: 'Reuse', tone: 'info' },
+    { key: 'replace', title: 'Replace', tone: 'warning', riskLabel: 'High blast radius' },
+    { key: 'archive', title: 'Archive', disabledReason: 'Requires operator review.' },
+    { key: 'forbidden', title: 'Forbidden', blocked: true, blockedReason: 'Server policy blocks this.' },
+  ],
+  label: 'Allowed action',
+  description: 'TheoryMCP resolves availability per route.',
+  layout: 'grid',
+  safetyPolicy: 'no-secret-or-production-like-data',
+};
+
+test('vue selectable-card-grid: single-select renders as radiogroup with role=radio cards', async () => {
+  const body = await renderSSR(
+    h(VueSelectableCardGridPanel, {
+      grid: SELECTABLE_GRID_SINGLE,
+      onChange: () => {},
+    }),
+  );
+  assert.ok(body.includes('facetheory-stitch-selectable-card-grid'));
+  assert.ok(body.includes('data-selection="single"'));
+  assert.ok(body.includes('data-layout="grid"'));
+  assert.ok(body.includes('role="radiogroup"'));
+  assert.ok(body.includes('aria-labelledby="allowed-action-label"'));
+  assert.ok(body.includes('aria-describedby="allowed-action-description"'));
+  // 5 role=radio cards.
+  assert.equal(body.split('role="radio"').length - 1, 5);
+  assert.ok(body.includes('data-option-selected="true"'));
+});
+
+test('vue selectable-card-grid: renders recommended/risk/blocked TEXT pills + disabled reason wiring', async () => {
+  const body = await renderSSR(
+    h(VueSelectableCardGridPanel, {
+      grid: SELECTABLE_GRID_SINGLE,
+      onChange: () => {},
+    }),
+  );
+  assert.ok(body.includes('data-pill="recommended"'));
+  assert.ok(body.includes('Recommended'));
+  assert.ok(body.includes('data-pill="risk"'));
+  assert.ok(body.includes('High blast radius'));
+  assert.ok(body.includes('data-pill="blocked"'));
+  assert.ok(body.includes('Server policy blocks this.'));
+  assert.ok(body.includes('id="allowed-action-archive-reason"'));
+  assert.ok(body.includes('data-disabled-reason="true"'));
+  assert.ok(body.includes('Requires operator review.'));
+});
+
+test('vue selectable-card-grid: multi-select renders as checkbox group', async () => {
+  const grid: VueSelectableCardGrid = {
+    groupId: 'targets',
+    selection: 'multi',
+    selectedKeys: ['github', 'mailbox'],
+    options: [
+      { key: 'github', title: 'GitHub' },
+      { key: 'mailbox', title: 'Mailbox' },
+      { key: 'policy', title: 'Policy' },
+    ],
+    layout: 'stack',
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueSelectableCardGridPanel, { grid, onChange: () => {} }));
+  assert.ok(body.includes('data-selection="multi"'));
+  assert.ok(body.includes('role="group"'));
+  assert.equal(body.split('role="checkbox"').length - 1, 3);
+  assert.equal(body.split('aria-checked="true"').length - 1, 2);
+  assert.equal(body.split('aria-checked="false"').length - 1, 1);
+});
+
+test('vue selectable-card-grid: byte-identical SSR for the same input', async () => {
+  const first = await renderSSR(
+    h(VueSelectableCardGridPanel, { grid: SELECTABLE_GRID_SINGLE, onChange: () => {} }),
+  );
+  const second = await renderSSR(
+    h(VueSelectableCardGridPanel, { grid: SELECTABLE_GRID_SINGLE, onChange: () => {} }),
+  );
+  assert.equal(first, second);
+});
+
+test('vue ChoiceCard renders standalone card with selection family + safety policy', async () => {
+  const card: VueChoiceCardProps = {
+    cardId: 'choice-create',
+    option: { key: 'create', title: 'Create', recommended: true },
+    selection: 'single',
+    selected: true,
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueChoiceCard, { card }));
+  assert.ok(body.includes('facetheory-stitch-choice-card'));
+  assert.ok(body.includes('role="radio"'));
+  assert.ok(body.includes('aria-checked="true"'));
+  assert.ok(body.includes('data-selection-family="single"'));
+  assert.ok(body.includes('data-option-recommended="true"'));
+  assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
+});
