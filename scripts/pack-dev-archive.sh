@@ -125,6 +125,9 @@ pack-dev-archive: OK
   archive               : ${ARCHIVE_PATH}
   checksum              : ${SHA_PATH}
 
+Verify (the sidecar stores only the basename, so cd into the output dir):
+  ( cd "${OUTPUT_DIR}" && sha256sum --check "${ARCHIVE_BASENAME}.sha256" )
+
 This archive is a TEMPORARY LOCAL development handoff. It is not a release.
 Do NOT publish, tag, deploy, or attach it to a GitHub Release.
 EOF

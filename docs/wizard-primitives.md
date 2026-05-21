@@ -162,11 +162,24 @@ If you've already built `ts/dist`, you can skip the rebuild:
 scripts/pack-dev-archive.sh --skip-build
 ```
 
-To verify the archive:
+To verify the archive — the sidecar stores only the basename, so `cd` into the
+output directory before invoking `sha256sum --check`:
 
 ```bash
-sha256sum --check /tmp/theorycloud-facetheory-dev-archives/theory-cloud-facetheory-3.2.1-dev-<sha>.tgz.sha256
+( cd /tmp/theorycloud-facetheory-dev-archives \
+    && sha256sum --check theory-cloud-facetheory-3.2.1-dev-<sha>.tgz.sha256 )
 ```
+
+If you'd rather not `cd`, recompute the digest and compare it to the sidecar
+contents directly:
+
+```bash
+sha256sum /tmp/theorycloud-facetheory-dev-archives/theory-cloud-facetheory-3.2.1-dev-<sha>.tgz
+cat /tmp/theorycloud-facetheory-dev-archives/theory-cloud-facetheory-3.2.1-dev-<sha>.tgz.sha256
+```
+
+The script prints the cd-form `sha256sum --check` command in its success
+output so you can copy-paste it without retyping the path.
 
 ### What the dev archive is NOT
 
