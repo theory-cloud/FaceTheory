@@ -29,6 +29,21 @@ export type {
 } from './wizard-types.js';
 
 export type {
+  WizardDiffList,
+  WizardDiffListCanonicalKind,
+  WizardDiffListDetail,
+  WizardDiffListOperationKind,
+  WizardDiffListRow,
+  WizardReconciliationPlan,
+  WizardReconciliationPlanCanonicalKind,
+  WizardReconciliationPlanDetail,
+  WizardReconciliationPlanOperationKind,
+  WizardReconciliationPlanRow,
+} from './wizard-reconciliation-plan-types.js';
+
+export { canonicalizeWizardReconciliationPlanKind } from './wizard-reconciliation-plan-types.js';
+
+export type {
   AuthorityState,
   ConfidenceLevel,
   ConfidenceMetadata,
