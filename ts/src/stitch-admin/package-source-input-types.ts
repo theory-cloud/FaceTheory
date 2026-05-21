@@ -13,9 +13,15 @@
  *   - theory-mcp-server (the host) remains authoritative server-side
  *     before preview/apply.
  *   - Hosts may pass convenience parse/validation status; the primitive
- *     displays it. Hosts must pre-redact any error evidence — the
- *     primitive renders `evidence` verbatim and never asks for or displays
- *     raw secret values.
+ *     displays it.
+ *   - Error evidence policy: the primitive enforces an allow-list rule —
+ *     **only `kind: 'invalid-syntax'` renders `error.evidence`** (safe
+ *     parse-location details such as line / column / offset). Every other
+ *     kind (`forbidden`, `redacted`, `unsafe`, `other`) suppresses
+ *     caller-supplied `evidence` and renders only the human-readable
+ *     `message`. FaceTheory still does NOT parse, validate, scan,
+ *     classify, authorize, or clean secrets by inspection — the rule is
+ *     a presentation safety net, not a redaction service.
  *   - `state`, `errors`, and `fileMeta` are all caller-supplied. The
  *     primitive routes events back to the host via callbacks and never
  *     toggles its own state.
