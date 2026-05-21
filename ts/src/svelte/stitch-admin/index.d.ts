@@ -250,3 +250,19 @@ export declare const MetadataBadge: Component<MetadataBadgeProps>;
 export declare const MetadataBadgeGroup: Component<MetadataBadgeGroupProps>;
 export declare const NonAuthoritativeBanner: Component<NonAuthoritativeBannerProps>;
 export declare const OperatorEmptyState: Component<OperatorEmptyStateProps>;
+
+export interface WizardEditableTokenInputPanelProps {
+  input: import('../../stitch-admin/wizard-editable-token-input-types.js').WizardEditableTokenInput;
+  onChange: (next: string[]) => void;
+  onDraftChange?: (next: string) => void;
+}
+export type WizardChipListPanelProps = WizardEditableTokenInputPanelProps;
+export declare const WizardEditableTokenInputPanel: Component<WizardEditableTokenInputPanelProps>;
+export declare const WizardChipListPanel: Component<WizardChipListPanelProps>;
+export type {
+  WizardEditableTokenInput,
+  WizardEditableTokenInputFeedbackTone,
+  WizardEditableTokenInputItem,
+  WizardEditableTokenInputTone,
+  WizardEditableTokenInputValidationResult,
+} from '../../stitch-admin/wizard-editable-token-input-types.js';
