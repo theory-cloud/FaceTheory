@@ -57,6 +57,17 @@ export type {
 } from './wizard-authority-context-strip-types.js';
 
 export type {
+  CodeDropzoneProps,
+  PackageSourceInput,
+  PackageSourceInputActions,
+  PackageSourceInputError,
+  PackageSourceInputErrorKind,
+  PackageSourceInputFileMeta,
+  PackageSourceInputMode,
+  PackageSourceInputState,
+} from './package-source-input-types.js';
+
+export type {
   ChoiceCardProps,
   SelectableCardGrid,
   SelectableCardGridLayout,

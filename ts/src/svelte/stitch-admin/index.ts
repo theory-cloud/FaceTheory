@@ -36,8 +36,21 @@ export { default as WizardAuthorityContextStripPanel } from './WizardAuthorityCo
 export { default as WizardServerResolvedContextBarPanel } from './WizardAuthorityContextStripPanel.svelte';
 export { default as SelectableCardGridPanel } from './SelectableCardGridPanel.svelte';
 export { default as ChoiceCard } from './ChoiceCard.svelte';
+export { default as PackageSourceInputPanel } from './PackageSourceInputPanel.svelte';
+export { default as CodeDropzone } from './CodeDropzone.svelte';
 export { default as WizardEditableTokenInputPanel } from './WizardEditableTokenInputPanel.svelte';
 export { default as WizardChipListPanel } from './WizardEditableTokenInputPanel.svelte';
+
+export type {
+  CodeDropzoneProps,
+  PackageSourceInput,
+  PackageSourceInputActions,
+  PackageSourceInputError,
+  PackageSourceInputErrorKind,
+  PackageSourceInputFileMeta,
+  PackageSourceInputMode,
+  PackageSourceInputState,
+} from '../../stitch-admin/package-source-input-types.js';
 
 export type {
   ChoiceCardProps,

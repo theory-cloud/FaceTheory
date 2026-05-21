@@ -1120,3 +1120,116 @@ test('vue ChoiceCard renders standalone card with selection family + safety poli
   assert.ok(body.includes('data-option-recommended="true"'));
   assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
 });
+
+import {
+  PackageSourceInputPanel as VuePackageSourceInputPanel,
+  CodeDropzone as VueCodeDropzone,
+} from '../../src/vue/stitch-admin/index.js';
+import type {
+  CodeDropzoneProps as VueCodeDropzoneProps,
+  PackageSourceInput as VuePackageSourceInput,
+} from '../../src/stitch-admin/index.js';
+
+test('vue package-source-input: renders paste/dropzone/upload modes with stable data attrs', async () => {
+  const input: VuePackageSourceInput = {
+    groupId: 'pkg-src',
+    value: 'name: acme\n',
+    state: 'validating',
+    errors: [],
+    modes: ['paste', 'dropzone', 'upload'],
+    label: 'Package source',
+    description: 'TheoryMCP validates server-side.',
+    fileAccept: '.yaml,.yml,.json',
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(
+    h(VuePackageSourceInputPanel, { input, onValueChange: () => {}, onFiles: () => {} }),
+  );
+  assert.ok(body.includes('facetheory-stitch-package-source-input'));
+  assert.ok(body.includes('data-state="validating"'));
+  assert.ok(body.includes('data-modes="paste dropzone upload"'));
+  assert.ok(body.includes('id="pkg-src-paste"'));
+  assert.ok(body.includes('data-mode="paste"'));
+  assert.ok(body.includes('data-mode="dropzone"'));
+  assert.ok(body.includes('data-mode="upload"'));
+  assert.ok(body.includes('accept=".yaml,.yml,.json"'));
+  assert.ok(body.includes('Validating source'));
+  assert.ok(body.includes('role="status"'));
+});
+
+test('vue package-source-input: renders forbidden + redacted error kinds, never raw secret evidence', async () => {
+  const input: VuePackageSourceInput = {
+    groupId: 'pkg-redacted',
+    value: '',
+    state: 'redacted',
+    errors: [
+      {
+        id: 'red-1',
+        kind: 'redacted',
+        message: 'Manifest contains redacted content.',
+        evidence: 'AKIA-NEVER-SHOWN-VUE-1234567890',
+      },
+    ],
+    modes: ['paste'],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VuePackageSourceInputPanel, { input, onValueChange: () => {} }));
+  assert.ok(body.includes('data-state="redacted"'));
+  assert.ok(body.includes('data-error-kind="redacted"'));
+  assert.ok(body.includes('Manifest contains redacted content.'));
+  assert.equal(body.includes('AKIA-NEVER-SHOWN-VUE-1234567890'), false);
+});
+
+test('vue package-source-input: byte-identical SSR for same input', async () => {
+  const input: VuePackageSourceInput = {
+    groupId: 'pkg-det',
+    value: 'x',
+    state: 'idle',
+    errors: [],
+    modes: ['paste'],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const first = await renderSSR(h(VuePackageSourceInputPanel, { input, onValueChange: () => {} }));
+  const second = await renderSSR(h(VuePackageSourceInputPanel, { input, onValueChange: () => {} }));
+  assert.equal(first, second);
+});
+
+test('vue code-dropzone: renders state-labeled dropzone with file metadata', async () => {
+  const dropzone: VueCodeDropzoneProps = {
+    dropzoneId: 'drop-vue',
+    label: 'Drop a package',
+    state: 'ready',
+    fileMeta: { name: 'acme.yaml', sizeBytes: 412 },
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueCodeDropzone, { dropzone }));
+  assert.ok(body.includes('facetheory-stitch-code-dropzone'));
+  assert.ok(body.includes('data-dropzone-id="drop-vue"'));
+  assert.ok(body.includes('data-state="ready"'));
+  assert.ok(body.includes('Ready for server preview'));
+  assert.ok(body.includes('data-file-name="acme.yaml"'));
+});
+
+test('vue package-source-input: only invalid-syntax renders evidence; forbidden/unsafe/other suppressed', async () => {
+  const input: VuePackageSourceInput = {
+    groupId: 'pkg-mixed-vue',
+    value: '',
+    state: 'invalid',
+    errors: [
+      { id: 'syntax-1', kind: 'invalid-syntax', message: 'Expected top-level mapping at line 1', evidence: 'line 1, col 1' },
+      { id: 'forbidden-1', kind: 'forbidden', message: 'Operator policy blocks this manifest.', evidence: 'AKIA-VUE-FORBIDDEN-EVIDENCE-1234567890' },
+      { id: 'unsafe-1', kind: 'unsafe', message: 'Manifest references an unsupported scheme.', evidence: 'AKIA-VUE-UNSAFE-EVIDENCE-1234567890' },
+      { id: 'other-1', kind: 'other', message: 'Validation could not complete.', evidence: 'AKIA-VUE-OTHER-EVIDENCE-1234567890' },
+    ],
+    modes: ['paste'],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VuePackageSourceInputPanel, { input, onValueChange: () => {} }));
+  assert.ok(body.includes('line 1, col 1'));
+  assert.equal(body.includes('AKIA-VUE-FORBIDDEN-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-VUE-UNSAFE-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-VUE-OTHER-EVIDENCE-1234567890'), false);
+  assert.ok(body.includes('Operator policy blocks this manifest.'));
+  assert.ok(body.includes('Manifest references an unsupported scheme.'));
+  assert.ok(body.includes('Validation could not complete.'));
+});

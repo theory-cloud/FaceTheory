@@ -291,3 +291,28 @@ export interface ChoiceCardPanelProps {
   card: import('../../stitch-admin/selectable-card-grid-types.js').ChoiceCardProps;
   onChange?: (selected: boolean) => void;
 }
+
+export type {
+  CodeDropzoneProps,
+  PackageSourceInput,
+  PackageSourceInputActions,
+  PackageSourceInputError,
+  PackageSourceInputErrorKind,
+  PackageSourceInputFileMeta,
+  PackageSourceInputMode,
+  PackageSourceInputState,
+} from '../../stitch-admin/package-source-input-types.js';
+
+export interface PackageSourceInputPanelProps {
+  input: import('../../stitch-admin/package-source-input-types.js').PackageSourceInput;
+  onValueChange?: (next: string) => void;
+  onFiles?: (files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[]) => void;
+  onClear?: () => void;
+  onReplace?: () => void;
+  onCopy?: (copyValue: string) => void;
+}
+
+export interface CodeDropzonePanelProps {
+  dropzone: import('../../stitch-admin/package-source-input-types.js').CodeDropzoneProps;
+  onFiles?: (files: import('../../stitch-admin/package-source-input-types.js').PackageSourceInputFileMeta[]) => void;
+}

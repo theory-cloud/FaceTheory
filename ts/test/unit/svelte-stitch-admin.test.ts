@@ -937,3 +937,136 @@ test('svelte ChoiceCard renders standalone card with selection family + safety p
   assert.ok(body.includes('data-option-recommended="true"'));
   assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
 });
+
+test('svelte package-source-input: renders paste/dropzone/upload with stable data attrs', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/PackageSourceInputPanel.svelte'),
+    {
+      input: {
+        groupId: 'pkg-src',
+        value: 'name: acme\n',
+        state: 'validating',
+        errors: [],
+        modes: ['paste', 'dropzone', 'upload'],
+        label: 'Package source',
+        description: 'TheoryMCP validates server-side.',
+        fileAccept: '.yaml,.yml,.json',
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onValueChange: (): void => {},
+      onFiles: (): void => {},
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-package-source-input'));
+  assert.ok(body.includes('data-state="validating"'));
+  assert.ok(body.includes('data-modes="paste dropzone upload"'));
+  assert.ok(body.includes('id="pkg-src-paste"'));
+  assert.ok(body.includes('data-mode="dropzone"'));
+  assert.ok(body.includes('accept=".yaml,.yml,.json"'));
+  assert.ok(body.includes('Validating source'));
+  assert.ok(body.includes('role="status"'));
+});
+
+test('svelte package-source-input: never renders caller-supplied evidence for kind=redacted', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/PackageSourceInputPanel.svelte'),
+    {
+      input: {
+        groupId: 'pkg-red',
+        value: '',
+        state: 'redacted',
+        errors: [
+          {
+            id: 'red-1',
+            kind: 'redacted',
+            message: 'Manifest contains redacted content.',
+            evidence: 'AKIA-NEVER-SHOWN-SVELTE-1234567890',
+          },
+        ],
+        modes: ['paste'],
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onValueChange: (): void => {},
+    },
+  );
+  assert.ok(body.includes('data-state="redacted"'));
+  assert.ok(body.includes('data-error-kind="redacted"'));
+  assert.ok(body.includes('Manifest contains redacted content.'));
+  assert.equal(body.includes('AKIA-NEVER-SHOWN-SVELTE-1234567890'), false);
+});
+
+test('svelte code-dropzone: renders state-labeled dropzone with file metadata', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/CodeDropzone.svelte'),
+    {
+      dropzone: {
+        dropzoneId: 'drop-svelte',
+        label: 'Drop a package',
+        state: 'ready',
+        fileMeta: { name: 'acme.yaml', sizeBytes: 412 },
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-code-dropzone'));
+  assert.ok(body.includes('data-dropzone-id="drop-svelte"'));
+  assert.ok(body.includes('data-state="ready"'));
+  assert.ok(body.includes('Ready for server preview'));
+  assert.ok(body.includes('data-file-name="acme.yaml"'));
+});
+
+test('svelte package-source-input: only invalid-syntax renders evidence; forbidden/unsafe/other suppressed', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/PackageSourceInputPanel.svelte'),
+    {
+      input: {
+        groupId: 'pkg-mixed-svelte',
+        value: '',
+        state: 'invalid',
+        errors: [
+          { id: 'syntax-1', kind: 'invalid-syntax', message: 'Expected top-level mapping at line 1', evidence: 'line 1, col 1' },
+          { id: 'forbidden-1', kind: 'forbidden', message: 'Operator policy blocks this manifest.', evidence: 'AKIA-SVELTE-FORBIDDEN-EVIDENCE-1234567890' },
+          { id: 'unsafe-1', kind: 'unsafe', message: 'Manifest references an unsupported scheme.', evidence: 'AKIA-SVELTE-UNSAFE-EVIDENCE-1234567890' },
+          { id: 'other-1', kind: 'other', message: 'Validation could not complete.', evidence: 'AKIA-SVELTE-OTHER-EVIDENCE-1234567890' },
+        ],
+        modes: ['paste'],
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onValueChange: (): void => {},
+    },
+  );
+  assert.ok(body.includes('line 1, col 1'));
+  assert.equal(body.includes('AKIA-SVELTE-FORBIDDEN-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-SVELTE-UNSAFE-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-SVELTE-OTHER-EVIDENCE-1234567890'), false);
+  assert.ok(body.includes('Operator policy blocks this manifest.'));
+  assert.ok(body.includes('Manifest references an unsupported scheme.'));
+  assert.ok(body.includes('Validation could not complete.'));
+});
+
+test('svelte code-dropzone: only invalid-syntax renders evidence; forbidden/unsafe/other suppressed', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/CodeDropzone.svelte'),
+    {
+      dropzone: {
+        dropzoneId: 'drop-mixed-svelte',
+        label: 'Drop a package',
+        state: 'invalid',
+        safetyPolicy: 'no-secret-or-production-like-data',
+        errors: [
+          { id: 'syntax-1', kind: 'invalid-syntax', message: 'Expected top-level mapping at line 1', evidence: 'line 1, col 1' },
+          { id: 'forbidden-1', kind: 'forbidden', message: 'Policy blocks.', evidence: 'AKIA-SVELTE-DZ-FORBIDDEN-EVIDENCE-1234567890' },
+          { id: 'unsafe-1', kind: 'unsafe', message: 'Unsupported scheme.', evidence: 'AKIA-SVELTE-DZ-UNSAFE-EVIDENCE-1234567890' },
+          { id: 'other-1', kind: 'other', message: 'Validation could not complete.', evidence: 'AKIA-SVELTE-DZ-OTHER-EVIDENCE-1234567890' },
+        ],
+      },
+    },
+  );
+  assert.ok(body.includes('line 1, col 1'));
+  assert.equal(body.includes('AKIA-SVELTE-DZ-FORBIDDEN-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-SVELTE-DZ-UNSAFE-EVIDENCE-1234567890'), false);
+  assert.equal(body.includes('AKIA-SVELTE-DZ-OTHER-EVIDENCE-1234567890'), false);
+  assert.ok(body.includes('Policy blocks.'));
+  assert.ok(body.includes('Unsupported scheme.'));
+  assert.ok(body.includes('Validation could not complete.'));
+});

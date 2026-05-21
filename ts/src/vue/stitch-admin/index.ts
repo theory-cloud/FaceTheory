@@ -146,6 +146,21 @@ export {
 } from './wizard-authority-context-strip.js';
 
 export {
+  PackageSourceInputPanel,
+  CodeDropzone,
+  type PackageSourceInputPanelProps,
+  type CodeDropzonePanelProps,
+  type CodeDropzoneProps,
+  type PackageSourceInput,
+  type PackageSourceInputActions,
+  type PackageSourceInputError,
+  type PackageSourceInputErrorKind,
+  type PackageSourceInputFileMeta,
+  type PackageSourceInputMode,
+  type PackageSourceInputState,
+} from './package-source-input.js';
+
+export {
   SelectableCardGridPanel,
   ChoiceCard,
   type SelectableCardGridPanelProps,
