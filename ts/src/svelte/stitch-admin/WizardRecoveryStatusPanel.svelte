@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { WizardRecoveryState, WizardRecoveryStatus } from './types.js';
+  import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
   export let title: unknown = 'Wizard recovery';
   export let status: WizardRecoveryStatus;
@@ -49,6 +50,9 @@
       <span>Resume token</span>
       <code>{status.resumeTokenReference.label}</code>
     </div>
+  {/if}
+  {#if status.metadata !== undefined}
+    <MetadataBadgeGroup metadata={status.metadata} />
   {/if}
   <slot name="actions" />
 </section>

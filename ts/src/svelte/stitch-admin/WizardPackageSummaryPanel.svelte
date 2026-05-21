@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { WizardPackageSummary } from './types.js';
+  import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
   export let title: unknown = undefined;
   export let summary: WizardPackageSummary;
@@ -32,6 +33,9 @@
       {/if}
     </dl>
   </header>
+  {#if summary.metadata !== undefined}
+    <MetadataBadgeGroup metadata={summary.metadata} />
+  {/if}
   {#if summary.files.length > 0}
     <ul role="list">
       {#each summary.files as file (file.key)}

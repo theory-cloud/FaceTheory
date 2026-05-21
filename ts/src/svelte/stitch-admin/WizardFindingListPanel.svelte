@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { WizardFinding, WizardFindingList, WizardFindingSeverity } from './types.js';
+  import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
   export let title: unknown = 'Validation findings';
   export let description: unknown = undefined;
@@ -65,6 +66,9 @@
           {#if finding.description !== undefined}<p>{finding.description}</p>{/if}
           {#if finding.evidence !== undefined}
             <code class="facetheory-stitch-wizard-finding-evidence">{finding.evidence}</code>
+          {/if}
+          {#if finding.metadata !== undefined}
+            <MetadataBadgeGroup metadata={finding.metadata} />
           {/if}
         </li>
       {/each}

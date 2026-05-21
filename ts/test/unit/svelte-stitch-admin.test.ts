@@ -30,11 +30,41 @@ async function renderComponent(
   const dir = path.resolve('.tmp-facetheory-svelte-stitch-admin');
   await mkdir(dir, { recursive: true });
 
+  // Discover and compile dependent .svelte files in the same source dir so
+  // wizard components that embed (for example) MetadataBadgeGroup.svelte can
+  // resolve their imports under the temp dir at runtime.
+  const dependentSvelteImport = /from\s+['"](\.\/[A-Za-z0-9_\-]+\.svelte)['"]/g;
+  const componentDir = path.dirname(componentPath);
+  const dependentSources = new Set<string>();
+  for (const match of source.matchAll(dependentSvelteImport)) {
+    const importPath = match[1];
+    if (importPath === undefined) continue;
+    dependentSources.add(importPath.replace(/^\.\//, ''));
+  }
+  // Compile each dependent .svelte into a sibling .mjs in the temp dir.
+  for (const dep of dependentSources) {
+    const depSource = await readFile(path.join(componentDir, dep), 'utf8');
+    const depCompiled = compile(depSource, {
+      generate: 'server',
+      filename: dep,
+    } as never);
+    const depMjsName = dep.replace(/\.svelte$/, '.mjs');
+    await writeFile(path.join(dir, depMjsName), depCompiled.js.code, 'utf8');
+  }
+
+  // Rewrite ./Foo.svelte imports in the main component's compiled JS to
+  // point at the sibling .mjs files we just emitted, so Node can resolve
+  // them under the temp dir.
+  const rewrittenCode = compiled.js.code.replace(
+    /(['"])(\.\/[A-Za-z0-9_\-]+)\.svelte\1/g,
+    '$1$2.mjs$1',
+  );
+
   const file = path.join(
     dir,
     `${path.basename(componentPath, '.svelte')}-${process.pid}-${Date.now()}.mjs`,
   );
-  await writeFile(file, compiled.js.code, 'utf8');
+  await writeFile(file, rewrittenCode, 'utf8');
 
   try {
     const mod = await import(pathToFileURL(file).href);
@@ -739,4 +769,85 @@ test('svelte wizard parity: WizardAuthorityContextStripPanel renders text-labele
   assert.ok(body.includes('aria-label="Read-only"'));
   assert.ok(body.includes('aria-label="Copy MCP route"'));
   assert.ok(body.includes('data-copy-value="/agents/acme"'));
+});
+
+test('svelte wizard parity: WizardPackageSummaryPanel renders summary.metadata via MetadataBadgeGroup', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardPackageSummaryPanel.svelte'),
+    {
+      summary: {
+        name: 'pkg',
+        files: [],
+        totals: { fileCount: 0 },
+        safetyPolicy: 'no-secret-or-production-like-data',
+        metadata: {
+          authority: 'non-authoritative',
+          provenance: { source: 'Factory import' },
+        },
+      },
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
+  assert.ok(body.includes('Non-authoritative'));
+  assert.ok(body.includes('Factory import'));
+});
+
+test('svelte wizard parity: WizardFindingListPanel renders per-finding.metadata via MetadataBadgeGroup', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardFindingListPanel.svelte'),
+    {
+      list: {
+        findings: [
+          {
+            id: 'f1',
+            severity: 'warning',
+            title: 'Imported with provenance',
+            metadata: { provenance: { source: 'Factory import' }, correlation: sampleCorrelation },
+          },
+        ],
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
+  assert.ok(body.includes('Factory import'));
+  assert.ok(body.includes('corr_release_20260424_001'));
+});
+
+test('svelte wizard parity: WizardRecoveryStatusPanel renders status.metadata via MetadataBadgeGroup', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardRecoveryStatusPanel.svelte'),
+    {
+      status: {
+        state: 'resumable',
+        metadata: { provenance: { source: 'Session store' } },
+      },
+    },
+  );
+  assert.ok(body.includes('data-recovery-state="resumable"'));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
+  assert.ok(body.includes('Session store'));
+});
+
+test('svelte wizard parity: WizardReconciliationPlanPanel renders row.metadata via MetadataBadgeGroup', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/WizardReconciliationPlanPanel.svelte'),
+    {
+      plan: {
+        rows: [
+          {
+            key: 'k',
+            label: 'k',
+            kind: 'update',
+            metadata: { provenance: { source: 'Plan diff' } },
+          },
+        ],
+        totals: { create: 0, update: 1, satisfied: 0, conflict: 0, blocked: 0, external: 0, noop: 0 },
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('data-row-key="k"'));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
+  assert.ok(body.includes('Plan diff'));
 });

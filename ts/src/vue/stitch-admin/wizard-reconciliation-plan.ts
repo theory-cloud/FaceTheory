@@ -22,6 +22,7 @@ import type {
 import { canonicalizeWizardReconciliationPlanKind } from '../../stitch-admin/wizard-reconciliation-plan-types.js';
 import type { WizardSafetyPolicy } from '../../stitch-admin/wizard-types.js';
 import { renderPropContent, vnodeChildProp } from '../stitch-common.js';
+import { MetadataBadgeGroup } from './operator-notices.js';
 
 const REDACTED_MARKER = '[redacted]';
 
@@ -249,6 +250,9 @@ function renderRow(
             },
             row.reason,
           )
+        : null,
+      row.metadata !== undefined
+        ? h(MetadataBadgeGroup, { metadata: row.metadata })
         : null,
       hasDetails ? renderToggle(row, detailPanelId, expanded, statusLabel, onToggleRow) : null,
       hasDetails ? renderDetailPanel(row, detailPanelId, expanded) : null,

@@ -5,6 +5,7 @@
     WizardReconciliationPlanOperationKind,
     WizardReconciliationPlanRow,
   } from './types.js';
+  import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
   export let title: unknown = 'Reconciliation plan';
   export let description: unknown = undefined;
@@ -117,6 +118,9 @@
             <p
               class={`facetheory-stitch-wizard-reconciliation-plan-row-reason facetheory-stitch-wizard-reconciliation-plan-row-reason-${canonical}`}
             >{row.reason}</p>
+          {/if}
+          {#if row.metadata !== undefined}
+            <MetadataBadgeGroup metadata={row.metadata} />
           {/if}
           {#if hasDetails}
             <button

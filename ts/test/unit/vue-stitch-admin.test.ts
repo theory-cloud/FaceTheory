@@ -945,3 +945,68 @@ test('vue wizard parity: WizardServerResolvedContextBarPanel alias renders ident
   const alias = await renderSSR(h(VueWizardServerResolvedContextBarPanel, { strip }));
   assert.equal(canonical, alias);
 });
+
+test('vue wizard parity: WizardPackageSummaryPanel renders summary.metadata via MetadataBadgeGroup', async () => {
+  const summary: VuePackageSummary = {
+    name: 'pkg',
+    files: [],
+    totals: { fileCount: 0 },
+    safetyPolicy: 'no-secret-or-production-like-data',
+    metadata: {
+      authority: 'non-authoritative',
+      provenance: { source: 'Factory import' },
+    },
+  };
+  const body = await renderSSR(h(VueWizardPackageSummaryPanel, { summary }));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
+  assert.ok(body.includes('Non-authoritative'));
+  assert.ok(body.includes('Factory import'));
+});
+
+test('vue wizard parity: WizardFindingListPanel renders per-finding.metadata via MetadataBadgeGroup', async () => {
+  const list: VueFindingList = {
+    findings: [
+      {
+        id: 'f1',
+        severity: 'warning',
+        title: 'Imported with provenance',
+        metadata: { provenance: { source: 'Factory import' }, correlation: sampleCorrelation },
+      },
+    ],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueWizardFindingListPanel, { list }));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
+  assert.ok(body.includes('Factory import'));
+  assert.ok(body.includes('corr_release_20260424_001'));
+});
+
+test('vue wizard parity: WizardRecoveryStatusPanel renders status.metadata via MetadataBadgeGroup', async () => {
+  const status: VueRecoveryStatus = {
+    state: 'resumable',
+    metadata: { provenance: { source: 'Session store' } },
+  };
+  const body = await renderSSR(h(VueWizardRecoveryStatusPanel, { status }));
+  assert.ok(body.includes('data-recovery-state="resumable"'));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
+  assert.ok(body.includes('Session store'));
+});
+
+test('vue wizard parity: WizardReconciliationPlanPanel renders row.metadata via MetadataBadgeGroup', async () => {
+  const plan: VueReconciliationPlan = {
+    rows: [
+      {
+        key: 'k',
+        label: 'k',
+        kind: 'update',
+        metadata: { provenance: { source: 'Plan diff' } },
+      },
+    ],
+    totals: { create: 0, update: 1, satisfied: 0, conflict: 0, blocked: 0, external: 0, noop: 0 },
+    safetyPolicy: 'no-secret-or-production-like-data',
+  };
+  const body = await renderSSR(h(VueWizardReconciliationPlanPanel, { plan }));
+  assert.ok(body.includes('data-row-key="k"'));
+  assert.ok(body.includes('facetheory-stitch-metadata-badge-group'));
+  assert.ok(body.includes('Plan diff'));
+});

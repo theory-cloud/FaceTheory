@@ -38,6 +38,7 @@ import type {
 } from '../../stitch-admin/wizard-types.js';
 import type { OperatorEmptyStateIntent } from '../../stitch-admin/operator-visibility-types.js';
 import { renderPropContent, vnodeChildProp } from '../stitch-common.js';
+import { MetadataBadgeGroup } from './operator-notices.js';
 
 const REDACTED_MARKER = '[redacted]';
 
@@ -292,6 +293,9 @@ export const WizardPackageSummaryPanel = defineComponent({
                 : null,
             ]),
           ]),
+          summary.metadata !== undefined
+            ? h(MetadataBadgeGroup, { metadata: summary.metadata })
+            : null,
           summary.files.length > 0
             ? h(
                 'ul',
@@ -446,6 +450,9 @@ function renderFinding(finding: WizardFinding): VNodeChild {
             { class: 'facetheory-stitch-wizard-finding-evidence' },
             finding.evidence,
           )
+        : null,
+      finding.metadata !== undefined
+        ? h(MetadataBadgeGroup, { metadata: finding.metadata })
         : null,
     ],
   );
@@ -818,6 +825,9 @@ export const WizardRecoveryStatusPanel = defineComponent({
                   h('code', null, status.resumeTokenReference.label),
                 ],
               )
+            : null,
+          status.metadata !== undefined
+            ? h(MetadataBadgeGroup, { metadata: status.metadata })
             : null,
           actions.length > 0
             ? h(
