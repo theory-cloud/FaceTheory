@@ -937,3 +937,80 @@ test('svelte ChoiceCard renders standalone card with selection family + safety p
   assert.ok(body.includes('data-option-recommended="true"'));
   assert.ok(body.includes('data-safety-policy="no-secret-or-production-like-data"'));
 });
+
+test('svelte package-source-input: renders paste/dropzone/upload with stable data attrs', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/PackageSourceInputPanel.svelte'),
+    {
+      input: {
+        groupId: 'pkg-src',
+        value: 'name: acme\n',
+        state: 'validating',
+        errors: [],
+        modes: ['paste', 'dropzone', 'upload'],
+        label: 'Package source',
+        description: 'TheoryMCP validates server-side.',
+        fileAccept: '.yaml,.yml,.json',
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onValueChange: (): void => {},
+      onFiles: (): void => {},
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-package-source-input'));
+  assert.ok(body.includes('data-state="validating"'));
+  assert.ok(body.includes('data-modes="paste dropzone upload"'));
+  assert.ok(body.includes('id="pkg-src-paste"'));
+  assert.ok(body.includes('data-mode="dropzone"'));
+  assert.ok(body.includes('accept=".yaml,.yml,.json"'));
+  assert.ok(body.includes('Validating source'));
+  assert.ok(body.includes('role="status"'));
+});
+
+test('svelte package-source-input: never renders caller-supplied evidence for kind=redacted', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/PackageSourceInputPanel.svelte'),
+    {
+      input: {
+        groupId: 'pkg-red',
+        value: '',
+        state: 'redacted',
+        errors: [
+          {
+            id: 'red-1',
+            kind: 'redacted',
+            message: 'Manifest contains redacted content.',
+            evidence: 'AKIA-NEVER-SHOWN-SVELTE-1234567890',
+          },
+        ],
+        modes: ['paste'],
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+      onValueChange: (): void => {},
+    },
+  );
+  assert.ok(body.includes('data-state="redacted"'));
+  assert.ok(body.includes('data-error-kind="redacted"'));
+  assert.ok(body.includes('Manifest contains redacted content.'));
+  assert.equal(body.includes('AKIA-NEVER-SHOWN-SVELTE-1234567890'), false);
+});
+
+test('svelte code-dropzone: renders state-labeled dropzone with file metadata', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/CodeDropzone.svelte'),
+    {
+      dropzone: {
+        dropzoneId: 'drop-svelte',
+        label: 'Drop a package',
+        state: 'ready',
+        fileMeta: { name: 'acme.yaml', sizeBytes: 412 },
+        safetyPolicy: 'no-secret-or-production-like-data',
+      },
+    },
+  );
+  assert.ok(body.includes('facetheory-stitch-code-dropzone'));
+  assert.ok(body.includes('data-dropzone-id="drop-svelte"'));
+  assert.ok(body.includes('data-state="ready"'));
+  assert.ok(body.includes('Ready for server preview'));
+  assert.ok(body.includes('data-file-name="acme.yaml"'));
+});

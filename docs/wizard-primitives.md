@@ -36,7 +36,7 @@ primitive twice and asserting byte-identical SSR output.
 | Layer | Module | What it exports |
 | --- | --- | --- |
 | Framework-neutral types | `@theory-cloud/facetheory/stitch-admin` | `WizardProgressState`, `WizardPackageSummary`, `WizardFindingList`, `WizardReconcileSummary`, `WizardReconciliationPlan`, `WizardAuthorityContextStrip`, `WizardCapabilityReview`, `WizardEnablementChecklist`, `WizardRecoveryStatus`, `WizardEmptyStateConfig`, `WizardEditableTokenInput`, `WizardSafetyPolicy`, and supporting enums and aliases. |
-| React adapter | `@theory-cloud/facetheory/react/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`), `SelectableCardGridPanel`, `ChoiceCard`, `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
+| React adapter | `@theory-cloud/facetheory/react/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`), `SelectableCardGridPanel`, `ChoiceCard`, `PackageSourceInputPanel`, `CodeDropzone`, `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
 | Vue adapter | `@theory-cloud/facetheory/vue/stitch-admin` | Same primitive set as React, including `SelectableCardGridPanel` and `ChoiceCard`. |
 | Svelte adapter | `@theory-cloud/facetheory/svelte/stitch-admin` | Same primitive set, exposed as `.svelte` components with matching component-prop interfaces. |
 
@@ -440,6 +440,85 @@ The host owns acceptance — passing back a different list is fine.
     safetyPolicy: 'no-secret-or-production-like-data',
   }}
   onChange={(next) => host.setAllowedAction(next[0])}
+/>
+```
+
+## Package source input / code dropzone
+
+`PackageSourceInputPanel` (with the lower-level `CodeDropzone` primitive) is
+the "where does the package come from" surface the TheoryMCP Agent Import &
+Completion Wizard uses. It supports any subset of three input modes —
+**paste** (textarea), **dropzone** (drag/drop affordance), and **upload**
+(file picker) — combined with a presentational state machine and a per-error
+display contract.
+
+### Trust boundary
+
+- Presentation-only. FaceTheory does **not** parse package bodies, validate
+  syntax, scan for secrets, check entitlements, or check GitHub / email
+  policy.
+- theory-mcp-server remains authoritative server-side before preview / apply.
+- Hosts may pass convenience parse/validation status; the primitive displays
+  it via `input.state` and `input.errors[]`.
+- For `kind: 'redacted'` errors the primitive **never renders** the host's
+  `evidence` field — only the human-readable `message`. The other error
+  kinds (`invalid-syntax`, `forbidden`, `unsafe`, `other`) render `evidence`
+  verbatim, on the explicit assumption that the host pre-redacted it.
+- The primitive never holds a real `File` object across renders.
+  `input.fileMeta` (and `dropzone.fileMeta`) is a caller-supplied SSR-safe
+  description (`name`, `sizeBytes?`, `mediaType?`, `sha256?`).
+
+### State machine
+
+`input.state` is authoritative and caller-supplied:
+
+| State        | Role marker     | Meaning                                          |
+| ------------ | --------------- | ------------------------------------------------ |
+| `idle`       | (none)          | Awaiting source.                                 |
+| `loading`    | `role="status"` | Source is being loaded (e.g. fetch in progress). |
+| `validating` | `role="status"` | Source is being validated server-side.           |
+| `ready`      | `role="status"` | Ready for server preview.                        |
+| `invalid`    | `role="alert"`  | Source failed validation.                        |
+| `forbidden`  | `role="alert"`  | Policy blocks this source.                       |
+| `redacted`   | `role="alert"`  | Source contains redacted content.                |
+
+### Accessibility
+
+- Real `<textarea>` for paste, real `<input type="file">` for upload, real
+  `<button type="button">` for Clear / Replace / Copy.
+- The dropzone is a `role="group"` `<div>` with a text `aria-label` based on
+  the current state and `aria-describedby` wired to the help text and any
+  errors. `tabindex="0"` keeps it keyboard-focusable.
+- Each error renders as a `<li>` with `role="alert"` and
+  `aria-live="polite"`.
+- The state announcement renders as a `<p>` with `role="status"` /
+  `role="alert"` per the table above.
+- `aria-invalid="true"` on the paste textarea whenever the state is an
+  alert state.
+
+### Example
+
+```tsx
+<PackageSourceInputPanel
+  input={{
+    groupId: 'pkg-src',
+    value: host.pasteValue,
+    state: 'validating',
+    errors: host.errors,
+    modes: ['paste', 'dropzone', 'upload'],
+    label: 'Package source',
+    description: 'TheoryMCP parses and validates server-side before preview.',
+    placeholder: 'Paste your agent manifest…',
+    fileAccept: '.yaml,.yml,.json',
+    fileMeta: host.attachedFile,
+    actions: { clear: true, replace: true, copy: true, copyValue: host.pasteValue },
+    safetyPolicy: 'no-secret-or-production-like-data',
+  }}
+  onValueChange={(next) => host.setPasteValue(next)}
+  onFiles={(files) => host.handleFiles(files)}
+  onClear={() => host.clear()}
+  onReplace={() => host.openReplaceDialog()}
+  onCopy={(value) => host.copyToClipboard(value)}
 />
 ```
 
