@@ -25,7 +25,7 @@ primitive twice and asserting byte-identical SSR output.
 | Layer | Module | What it exports |
 | --- | --- | --- |
 | Framework-neutral types | `@theory-cloud/facetheory/stitch-admin` | `WizardProgressState`, `WizardPackageSummary`, `WizardFindingList`, `WizardReconcileSummary`, `WizardCapabilityReview`, `WizardEnablementChecklist`, `WizardRecoveryStatus`, `WizardEmptyStateConfig`, `WizardSafetyPolicy`, and supporting enums. |
-| React adapter | `@theory-cloud/facetheory/react/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
+| React adapter | `@theory-cloud/facetheory/react/stitch-admin` | `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`, `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel` (alias `WizardDiffListPanel`), `WizardAuthorityContextStripPanel` (alias `WizardServerResolvedContextBarPanel`), `WizardEditableTokenInputPanel` (alias `WizardChipListPanel`), `WizardCapabilityReviewPanel`, `WizardEnablementChecklistPanel`, `WizardRecoveryStatusPanel`, `WizardEmptyState`. |
 
 Vue and Svelte adapter parity is intentionally deferred for this milestone.
 The TheoryMCP control plane that consumes these primitives today is React; the
@@ -231,6 +231,99 @@ authority and read-only state come from the host.
     safetyPolicy: 'no-secret-or-production-like-data',
   }}
   onCopyItem={(itemKey, value) => host.copyToClipboard(itemKey, value)}
+/>
+```
+
+## Editable token input / chip list
+
+`WizardEditableTokenInputPanel` (alias `WizardChipListPanel`) is the
+controlled chip/token entry primitive the TheoryMCP Agent Import &
+Completion Wizard uses for steps like "Allowed senders" and "Allowed
+domains".
+
+### Trust boundary
+
+- Client validation is **UX only**. FaceTheory never claims a token is
+  safe to write.
+- TheoryMCP must still **server-validate** allowed senders / domains
+  before writing `AgentEmailBinding` policy.
+- FaceTheory does not resolve mailbox, tenant, namespace, agent, partner,
+  provider credentials, or email policy state.
+
+### Controlled contract
+
+The host owns state. The primitive is purely controlled:
+
+- `input.value: string[]` — current token list.
+- `onChange(next: string[])` — required. The primitive calls this whenever
+  it proposes a new token list (commit on Enter/comma, Backspace removes
+  the previous when the draft is empty, or the chip's Remove button is
+  clicked). The host accepts the new list (or doesn't).
+- `input.draftValue?: string` — controlled current draft text.
+- `onDraftChange?(next: string)` — called whenever the draft text changes.
+
+There is **no hidden state** inside the primitive. SSR and hydrated DOM
+are byte-identical for the same props.
+
+### Key handling
+
+| Key       | Behavior                                                                  |
+| --------- | ------------------------------------------------------------------------- |
+| Enter     | Commit draft. Calls `onChange([...value, normalizedDraft])` and clears.   |
+| Comma     | Same as Enter.                                                            |
+| Backspace | If draft is empty and there is at least one token, remove the last one.   |
+
+Commit is suppressed when the draft is empty, when `validateToken` returns
+`{ valid: false }`, when the resulting token would be a duplicate and
+`allowDuplicates !== true`, or when `value.length >= maxTokens`. The
+primitive never enforces these limits beyond suppressing its own commit
+proposal; the host can still pass any list back via `onChange`.
+
+### Per-token metadata
+
+Optional `input.items` carries `{ value, tone?, title?, disabled?,
+removable? }` per token. Tokens without an `items` entry render with
+`neutral` tone and remain removable.
+
+### Validation feedback
+
+Feedback below the input is computed deterministically and announced via
+`role="alert"` and `aria-live="polite"`. The priority order is:
+
+1. Caller-supplied `feedbackMessage` (highest — surfaces server messages).
+2. `validateToken(draft)` returning `{ valid: false }`.
+3. Duplicate of an existing token (only when `allowDuplicates !== true`).
+4. `value.length >= maxTokens` (when `maxTokens` is supplied).
+5. No feedback.
+
+The current source is exposed via `data-feedback-source` for testing and
+debugging.
+
+### Disabled / read-only
+
+`disabled` and `readOnly` render text labels in the header (with explicit
+`aria-label`), set the standard HTML attributes, and suppress the
+draft `<input>` plus the chip Remove buttons. They are **never**
+color-only cues.
+
+### Example
+
+```tsx
+<WizardEditableTokenInputPanel
+  input={{
+    inputId: 'allowed-senders',
+    value: ['qa@example.com', 'ops@example.com'],
+    label: 'Allowed senders',
+    description: 'Server validation remains authoritative.',
+    placeholder: 'Add another address…',
+    removeLabelKind: 'sender',
+    validateToken: (token) =>
+      token.includes('@') ? { valid: true } : { valid: false, message: 'Address must contain @' },
+    safetyPolicy: 'no-secret-or-production-like-data',
+    draftValue: host.draft,
+  }}
+  onChange={(next) => host.setAllowedSenders(next)}
+  onDraftChange={(next) => host.setDraft(next)}
 />
 ```
 

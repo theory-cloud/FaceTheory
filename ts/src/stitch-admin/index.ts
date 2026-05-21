@@ -57,6 +57,19 @@ export type {
 } from './wizard-authority-context-strip-types.js';
 
 export type {
+  WizardChipList,
+  WizardChipListFeedbackTone,
+  WizardChipListItem,
+  WizardChipListTone,
+  WizardChipListValidationResult,
+  WizardEditableTokenInput,
+  WizardEditableTokenInputFeedbackTone,
+  WizardEditableTokenInputItem,
+  WizardEditableTokenInputTone,
+  WizardEditableTokenInputValidationResult,
+} from './wizard-editable-token-input-types.js';
+
+export type {
   AuthorityState,
   ConfidenceLevel,
   ConfidenceMetadata,
