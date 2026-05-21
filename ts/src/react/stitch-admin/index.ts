@@ -129,3 +129,20 @@ export {
   type WizardStep,
   type WizardStepStatus,
 } from './wizard.js';
+
+export {
+  WizardReconciliationPlanPanel,
+  WizardDiffListPanel,
+  type WizardReconciliationPlanPanelProps,
+  type WizardDiffListPanelProps,
+  type WizardDiffList,
+  type WizardDiffListCanonicalKind,
+  type WizardDiffListDetail,
+  type WizardDiffListOperationKind,
+  type WizardDiffListRow,
+  type WizardReconciliationPlan,
+  type WizardReconciliationPlanCanonicalKind,
+  type WizardReconciliationPlanDetail,
+  type WizardReconciliationPlanOperationKind,
+  type WizardReconciliationPlanRow,
+} from './wizard-reconciliation-plan.js';
