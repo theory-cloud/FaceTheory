@@ -37,6 +37,20 @@ function decodeUrlPath(urlPath: string): string | null {
   }
 }
 
+function parseRequestTarget(
+  requestTarget: string,
+): { path: string; appPath: string } | null {
+  try {
+    const parsed = new URL(requestTarget, 'http://localhost');
+    return {
+      path: parsed.pathname,
+      appPath: `${parsed.pathname}${parsed.search}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function readStaticFile(
   root: string,
   urlPath: string,
@@ -76,7 +90,14 @@ async function main() {
       return;
     }
 
-    const requestPath = new URL(req.url, 'http://localhost').pathname;
+    const requestTarget = parseRequestTarget(req.url);
+    if (!requestTarget) {
+      res.writeHead(400);
+      res.end('Bad Request');
+      return;
+    }
+
+    const requestPath = requestTarget.path;
     if (requestPath.startsWith('/_facetheory/data/')) {
       const pathname = requestPath.endsWith('next.json') ? '/next' : '/';
       res.writeHead(200, {
@@ -107,7 +128,7 @@ async function main() {
 
     const resp = await app.handle({
       method: req.method ?? 'GET',
-      path: req.url,
+      path: requestTarget.appPath,
     });
     res.writeHead(
       resp.status,
