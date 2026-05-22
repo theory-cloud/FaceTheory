@@ -2,15 +2,19 @@
 set -euo pipefail
 
 source_ref="${1:-}"
+expected_commit="${2:-}"
 remote="${GIT_REMOTE:-origin}"
 
 if [[ -z "${source_ref}" ]]; then
   echo "release-source-checkout: FAIL (missing source ref)" >&2
   exit 1
 fi
+if [[ -n "${expected_commit}" && ! "${expected_commit}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "release-source-checkout: FAIL (expected commit must be a full 40-character SHA)" >&2
+  exit 1
+fi
 
 fetch_ref=""
-expected_commit=""
 case "${source_ref}" in
   refs/heads/*)
     echo "release-source-checkout: FAIL (mutable branch ref ${source_ref} is not allowed)" >&2
@@ -32,7 +36,9 @@ case "${source_ref}" in
   *)
     if [[ "${source_ref}" =~ ^[0-9a-f]{40}$ ]]; then
       fetch_ref="${source_ref}"
-      expected_commit="${source_ref}"
+      if [[ -z "${expected_commit}" ]]; then
+        expected_commit="${source_ref}"
+      fi
     else
       if ! git check-ref-format "refs/tags/${source_ref}" >/dev/null 2>&1; then
         echo "release-source-checkout: FAIL (source ref must be an immutable commit or release tag)" >&2
