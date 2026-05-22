@@ -103,6 +103,58 @@ test('security: strict CSP document validator rejects inline document scripts an
   );
 });
 
+test('security: strict CSP document validator rejects malformed script end tag bodies', () => {
+  const policy = { inlineScripts: false, rawHead: false } as const;
+
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><body><script src="/app.js"></script=not-end>alert(1)</script></body></html>',
+        { policy },
+      ),
+    /inline script tags in document/,
+  );
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><body><script src="/app.js"></script-foo>alert(1)</script></body></html>',
+        { policy },
+      ),
+    /inline script tags in document/,
+  );
+});
+
+test('security: strict CSP document validator accepts only empty external script bodies', () => {
+  const policy = { inlineScripts: false, rawHead: false } as const;
+
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(
+      '<!doctype html><html><body><script src="/app.js"></script></body></html>',
+      { policy },
+    ),
+  );
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(
+      '<!doctype html><html><body><script src="/app.js"></script data-ignored="yes" ></body></html>',
+      { policy },
+    ),
+  );
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(
+      '<!doctype html><html><body><script src="/app.js"></SCRIPT \t data-ignored=yes></body></html>',
+      { policy },
+    ),
+  );
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><body><script src="/app.js">alert(1)</script data-ignored="yes"></body></html>',
+        { policy },
+      ),
+    /inline script tags in document/,
+  );
+});
+
 test('security: strict CSP document validator rejects inline body attributes', () => {
   const policy = { inlineScripts: false, inlineStyles: false, rawHead: false } as const;
 
