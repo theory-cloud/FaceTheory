@@ -84,6 +84,10 @@ pair:
 - SSR: confirm the response carries `content-security-policy` from the Face and the external hydration `dataUrl` is
   same-origin. If the data is request-time, route the sidecar URL to Lambda/AppTheory or another host-owned same-origin
   endpoint that can reproduce the exact render data.
+- Streaming strict-CSP SSR is intentionally buffered for whole-document validation. FaceTheory enforces
+  `createFaceApp({ strictCsp: { maxStreamingBodyBytes } })` while reading raw stream chunks and defaults to 5 MiB. If the
+  limit is exceeded, the route fails closed with a bounded `413 Payload Too Large` response instead of validating or
+  returning a truncated partial document. Non-strict streaming remains streaming and is not collected by this limit.
 - SSG: confirm HTML and `/_facetheory/data/*` sidecars are uploaded together and routed to S3 through CloudFront. Cache
   headers and invalidations should keep the HTML and sidecar from different builds from being mixed.
 - ISR: confirm `x-facetheory-isr` behavior stays normal and hydration sidecar URLs with

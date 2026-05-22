@@ -45,12 +45,27 @@ export interface FaceAppOptions {
   faces: FaceModule[];
   isr?: FaceIsrOptions;
   observability?: FaceObservabilityHooks;
+  strictCsp?: FaceStrictCspOptions;
+}
+
+export interface FaceStrictCspOptions {
+  /**
+   * Maximum raw stream bytes FaceTheory will collect for strict no-inline CSP
+   * document validation. Strict streaming responses must be buffered before
+   * validation so this limit prevents unbounded body collection.
+   */
+  maxStreamingBodyBytes?: number;
 }
 
 const HTML_CONTENT_TYPE = 'text/html; charset=utf-8';
+export const DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES = 5 * 1024 * 1024;
 const SAFE_INTERNAL_ERROR_HTML = renderHTMLDocument({
   head: '<title>Internal Server Error</title>',
   body: '<h1>Internal Server Error</h1><template data-facetheory-error="true"></template>',
+});
+const SAFE_PAYLOAD_TOO_LARGE_HTML = renderHTMLDocument({
+  head: '<title>Payload Too Large</title>',
+  body: '<h1>Payload Too Large</h1><template data-facetheory-error="strict-csp-stream-body-too-large"></template>',
 });
 
 const REQUEST_ID_HEADER = 'x-request-id';
@@ -63,16 +78,33 @@ class StreamPreflightError extends Error {
   }
 }
 
+class StrictCspStreamBodyTooLargeError extends Error {
+  constructor(
+    readonly limitBytes: number,
+    readonly receivedBytes: number,
+  ) {
+    super(
+      `strict CSP streaming body exceeded ${String(limitBytes)} byte limit after ${String(receivedBytes)} bytes`,
+    );
+    this.name = 'StrictCspStreamBodyTooLargeError';
+  }
+}
+
 export class FaceApp {
   private readonly router: Router;
   private readonly faceByPattern: Map<string, FaceModule>;
   private readonly isrRuntime: IsrRuntime | null;
   private readonly observability: FaceObservabilityHooks | null;
+  private readonly strictCspMaxStreamingBodyBytes: number;
 
   constructor(options: FaceAppOptions) {
     this.router = new Router();
     this.faceByPattern = new Map();
     this.observability = options.observability ?? null;
+    this.strictCspMaxStreamingBodyBytes =
+      normalizeStrictCspMaxStreamingBodyBytes(
+        options.strictCsp?.maxStreamingBodyBytes,
+      );
 
     for (const face of options.faces) {
       const pattern = normalizePath(face.route);
@@ -153,7 +185,11 @@ export class FaceApp {
             await face.render(ctx, data),
             isrOptions,
           );
-          return await toHTTPResponse(out, normalizedReq);
+          return await toHTTPResponse(
+            out,
+            normalizedReq,
+            this.strictCspMaxStreamingBodyBytes,
+          );
         } finally {
           renderMs = Math.max(0, now() - renderStartedAt);
         }
@@ -182,8 +218,11 @@ export class FaceApp {
         mode,
         renderMs,
       });
-    } catch {
-      response = internalErrorResponse();
+    } catch (err) {
+      response =
+        err instanceof StrictCspStreamBodyTooLargeError
+          ? strictCspStreamBodyTooLargeResponse()
+          : internalErrorResponse();
       return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
         routePattern,
         mode,
@@ -375,6 +414,7 @@ function externalizeHydrationForIsr(
 async function toHTTPResponse(
   out: FaceRenderResult,
   req: Readonly<Required<FaceRequest>>,
+  strictCspMaxStreamingBodyBytes: number,
 ): Promise<FaceResponse> {
   const status = out.status ?? 200;
   const headers = toHeaders(out.headers, out.cookies);
@@ -405,7 +445,10 @@ async function toHTTPResponse(
   }
 
   if (requiresStrictCspDocumentValidation(out.csp)) {
-    const strictBody = await collectStreamAsUtf8Text(out.html);
+    const strictBody = await collectStreamAsUtf8Text(
+      out.html,
+      strictCspMaxStreamingBodyBytes,
+    );
     const documentHtml = renderHTMLDocument({
       ...documentParts,
       head,
@@ -433,16 +476,29 @@ async function toHTTPResponse(
 
 async function collectStreamAsUtf8Text(
   input: AsyncIterable<Uint8Array>,
+  maxBytes: number,
 ): Promise<string> {
-  const decoder = new TextDecoder('utf-8', { fatal: true });
-  let out = '';
+  const chunks: Uint8Array[] = [];
+  let total = 0;
 
   for await (const chunk of input) {
-    out += decoder.decode(chunk, { stream: true });
+    const normalizedChunk =
+      chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+    total += normalizedChunk.byteLength;
+    if (total > maxBytes) {
+      throw new StrictCspStreamBodyTooLargeError(maxBytes, total);
+    }
+    chunks.push(normalizedChunk);
   }
 
-  out += decoder.decode();
-  return out;
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
 }
 
 function withDocumentShell(
@@ -492,4 +548,31 @@ function internalErrorResponse(): FaceResponse {
     body: utf8(SAFE_INTERNAL_ERROR_HTML),
     isBase64: false,
   };
+}
+
+function strictCspStreamBodyTooLargeResponse(): FaceResponse {
+  return {
+    status: 413,
+    headers: { 'content-type': [HTML_CONTENT_TYPE] },
+    cookies: [],
+    body: utf8(SAFE_PAYLOAD_TOO_LARGE_HTML),
+    isBase64: false,
+  };
+}
+
+function normalizeStrictCspMaxStreamingBodyBytes(
+  value: number | undefined,
+): number {
+  if (value === undefined) {
+    return DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES;
+  }
+
+  const normalized = Math.trunc(Number(value));
+  if (!Number.isSafeInteger(normalized) || normalized < 0) {
+    throw new Error(
+      'strictCsp.maxStreamingBodyBytes must be a non-negative safe integer',
+    );
+  }
+
+  return normalized;
 }

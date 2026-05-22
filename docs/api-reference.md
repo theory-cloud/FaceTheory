@@ -117,7 +117,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 | `FaceResponse`     | Runtime response                     | Includes normalized headers, cookies array, status, body, and `isBase64`.                                                                                                                                                                                |
 | `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `csp`, `html`, cookies, headers, and hydration payload. `head.html` is legacy escaped head text; prefer structured `headTags` / `styleTags` for actual tags. |
 | `FaceContext`      | Per-request context                  | Exposes normalized request, route params, and proxy match.                                                                                                                                                                                               |
-| `FaceAppOptions`   | App constructor options              | Accepts `faces`, optional ISR config, and optional observability hooks.                                                                                                                                                                                  |
+| `FaceAppOptions`   | App constructor options              | Accepts `faces`, optional ISR config, optional observability hooks, and optional strict-CSP runtime limits.                                                                                                                                               |
 | `FaceIsrOptions`   | ISR runtime tuning                   | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation.                                                                                                                             |
 
 Structured head/style emission is the supported default:
@@ -275,6 +275,8 @@ FaceTheory supports two CSP-compatible rendering styles:
 
 Core strict-CSP exports:
 
+- `DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES` is the default maximum raw body size FaceTheory will collect from a
+  strict no-inline streaming render result before whole-document validation. The default is 5 MiB.
 - `FaceCspPolicy` is the route-level render policy surface. `inlineScripts:false` rejects inline script bodies,
   inline hydration JSON, inline event-handler attributes, and cross-origin bootstrap/data URLs. `inlineStyles:false`
   rejects inline style tags and `style` attributes. `rawHead:false` rejects caller-owned raw head HTML.
@@ -320,6 +322,30 @@ renderOptions: async (_ctx, data) => {
     ),
   };
 };
+```
+
+Strict streaming limit:
+
+- Strict no-inline streaming responses are buffered before validation because bytes must not flush before the final
+  document is known to satisfy the route policy.
+- During that buffer step, FaceTheory counts raw `Uint8Array` bytes as each chunk arrives and fails closed with a
+  deterministic `413 Payload Too Large` response when `strictCsp.maxStreamingBodyBytes` is exceeded.
+- The failed response does not validate or return a truncated partial document. Non-strict streaming responses are not
+  collected by this limit and still preflight only the first render chunk before returning an `AsyncIterable`.
+
+```ts
+import {
+  DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES,
+  createFaceApp,
+} from "@theory-cloud/facetheory";
+
+const app = createFaceApp({
+  faces,
+  strictCsp: {
+    // Optional: tune if a strict streaming route has a larger validated body budget.
+    maxStreamingBodyBytes: DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES,
+  },
+});
 ```
 
 Adapter notes:

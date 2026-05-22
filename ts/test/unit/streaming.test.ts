@@ -8,7 +8,10 @@ import * as React from 'react';
 import { assertDocumentTagNonces } from '../helpers/csp.js';
 
 import { streamFromString, utf8 } from '../../src/bytes.js';
-import { createFaceApp } from '../../src/app.js';
+import {
+  createFaceApp,
+  DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES,
+} from '../../src/app.js';
 import { createReactStreamFace } from '../../src/adapters/react.js';
 import { createAntdEmotionTokenIntegration } from '../../src/react/antd-emotion.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
@@ -154,7 +157,35 @@ test('FaceApp: streaming emits document shell attrs before the body stream', asy
   assert.ok(!first.includes('streamed'));
 });
 
+test('FaceApp: non-strict streaming preflights without buffering the full body', async () => {
+  let streamChunksRead = 0;
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          html: (async function* () {
+            streamChunksRead += 1;
+            yield utf8('<main>first</main>');
+            streamChunksRead += 1;
+            yield utf8('<footer>second</footer>');
+          })(),
+        }),
+      },
+    ],
+  });
 
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  assert.equal(resp.status, 200);
+  assert.ok(!(resp.body instanceof Uint8Array));
+  assert.equal(streamChunksRead, 1);
+
+  const full = new TextDecoder().decode(await collectBody(resp.body));
+  assert.ok(full.includes('<main>first</main>'));
+  assert.ok(full.includes('<footer>second</footer>'));
+  assert.equal(streamChunksRead, 2);
+});
 
 test('FaceApp: strict CSP streaming responses are coerced to validated buffered HTML', async () => {
   const app = createFaceApp({
@@ -188,6 +219,81 @@ test('FaceApp: strict CSP streaming responses are coerced to validated buffered 
   assert.ok(full.includes('<main>strict streamed</main>'));
   assert.ok(full.includes('rel="facetheory-hydration"'));
   assert.equal(full.includes('__FACETHEORY_DATA__'), false);
+});
+
+test('FaceApp: strict CSP streaming uses a default bounded collector', async () => {
+  const oversized = new Uint8Array(
+    DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES + 1,
+  );
+  oversized.fill('a'.charCodeAt(0));
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          html: (async function* () {
+            yield oversized;
+          })(),
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  assert.equal(resp.status, 413);
+  assert.ok(resp.body instanceof Uint8Array);
+
+  const full = new TextDecoder().decode(resp.body);
+  assert.ok(full.includes('<h1>Payload Too Large</h1>'));
+  assert.ok(full.includes('strict-csp-stream-body-too-large'));
+  assert.equal(full.includes('<main>'), false);
+  assert.ok(resp.body.byteLength < 512);
+});
+
+test('FaceApp: strict CSP streaming limit counts raw bytes and fails closed', async () => {
+  let streamChunksRead = 0;
+  const app = createFaceApp({
+    strictCsp: { maxStreamingBodyBytes: 4 },
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          html: (async function* () {
+            streamChunksRead += 1;
+            yield utf8('ab');
+            streamChunksRead += 1;
+            yield utf8('€');
+            streamChunksRead += 1;
+            yield utf8('<button onclick="bad()">unsafe</button>');
+          })(),
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  assert.equal(resp.status, 413);
+  assert.ok(resp.body instanceof Uint8Array);
+  assert.equal(streamChunksRead, 2);
+
+  const full = new TextDecoder().decode(resp.body);
+  assert.ok(full.includes('<h1>Payload Too Large</h1>'));
+  assert.equal(full.includes('ab'), false);
+  assert.equal(full.includes('€'), false);
+  assert.equal(full.includes('onclick'), false);
 });
 
 test('FaceApp: strict CSP streaming violations fail before bytes flush', async () => {
