@@ -40,16 +40,24 @@ fi
 grep -Fq 'facetheory-release-scripts' .github/workflows/release.yml ||
   fail "release.yml must stage trusted release provenance scripts before asset provenance checks"
 
-if grep -R -Fq 'resolve-release-source-ref.sh' .github/workflows/release.yml .github/workflows/prerelease.yml; then
-  fail "release/prerelease asset workflows must not resolve draft release branches to mutable remote HEADs"
-fi
+grep -Fq 'scripts/resolve-release-source-ref.sh' .github/workflows/release.yml ||
+  fail "release.yml existing-tag path must resolve requested tags through trusted provenance scripts"
 
-if grep -R -Fq 'checkout-release-source.sh' .github/workflows/release.yml .github/workflows/prerelease.yml; then
-  fail "release/prerelease asset workflows must not replace github.sha with a resolved draft source ref"
-fi
+grep -Fq 'scripts/checkout-release-source.sh' .github/workflows/release.yml ||
+  fail "release.yml existing-tag path must checkout the requested tag source through trusted provenance scripts"
 
-grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" "${{ github.sha }}"' .github/workflows/release.yml ||
-  fail "release.yml existing-tag path must compare draft target identity to github.sha"
+grep -Fq 'GH_BIN="${RUNNER_TEMP}/facetheory-gh-disabled"' .github/workflows/release.yml ||
+  fail "release.yml existing-tag source resolver must not perform repo-script GitHub API lookups"
+
+grep -Fq 'checkout-release-source.sh" "${source_ref}" "${source_commit}"' .github/workflows/release.yml ||
+  fail "release.yml existing-tag path must checkout the resolved immutable tag source"
+
+grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" "${RELEASE_SOURCE_COMMIT}"' .github/workflows/release.yml ||
+  fail "release.yml existing-tag path must compare draft target identity to the checked-out source commit"
+
+if grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" "${{ github.sha }}"' .github/workflows/release.yml; then
+  fail "release.yml existing-tag path must not compare draft target identity to workflow github.sha"
+fi
 
 if grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" HEAD' .github/workflows/release.yml; then
   fail "release.yml existing-tag path must not verify draft targets against mutable workspace HEAD"
