@@ -259,8 +259,9 @@ runtime.post("/control/items/new", actionFace);
 The helper sends the exact URL-encoded bytes that it hashes, sets `x-amz-content-sha256`, and includes same-origin
 credentials. Marked forms that resolve to `multipart/form-data`, `text/plain`, or another unsupported encoding fail
 closed before a request is sent; file uploads need a separately scoped transport. If the HTML response carries a
-`Content-Security-Policy` header, handle the result explicitly through `onResponse` or `onNavigate` because fetched CSP
-headers cannot become the active document policy during default document replacement.
+`Content-Security-Policy` header, use `navigationPolicy: "full-page"` or handle the result explicitly through
+`onResponse` / `onNavigate` because fetched CSP headers cannot become the active document policy during document-write
+replacement or explicit SPA DOM navigation.
 
 ## Add Stitch Control-Plane Primitives
 

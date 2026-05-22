@@ -89,9 +89,9 @@ pair:
 - ISR: confirm `x-facetheory-isr` behavior stays normal and hydration sidecar URLs with
   `__facetheory_isr_hydration=...` route to Lambda/FaceTheory. The runtime validates the opaque pointer token and serves
   the pointer-derived `.hydration.json` object from the same `S3HtmlStore` used for HTML.
-- SPA navigation: confirm `startFaceNavigation()` or `startAwsOacFormTransport({ navigationPolicy: "spa" })` loads
-  external hydration data before mutating the document. Use `navigationPolicy: "full-page"` when fetched CSP-protected
-  HTML should become a real browser navigation instead of a document-write replacement.
+- SPA navigation: confirm `startFaceNavigation()` or non-CSP `startAwsOacFormTransport({ navigationPolicy: "spa" })`
+  responses load external hydration data before mutating the document. Use `navigationPolicy: "full-page"` when fetched
+  CSP-protected HTML should become a real browser navigation instead of a document-write or SPA DOM replacement.
 
 Evidence boundary:
 - A local strict-CSP test or example build proves repository behavior only.
