@@ -126,3 +126,39 @@ test('security: strict CSP document validator rejects inline body attributes', (
     }),
   );
 });
+
+test('security: strict CSP document validator rejects slash-separated unsafe attributes', () => {
+  const scriptsOnlyPolicy = { inlineScripts: false, rawHead: false } as const;
+  const stylesOnlyPolicy = { inlineStyles: false, rawHead: false } as const;
+  const fullPolicy = { inlineScripts: false, inlineStyles: false, rawHead: false } as const;
+
+  assert.throws(
+    () =>
+      validateStrictCspDocument('<!doctype html><html><body><button/onclick=alert(1)>x</button></body></html>', {
+        policy: scriptsOnlyPolicy,
+      }),
+    /inline event handler attribute "onclick" in document/,
+  );
+  assert.throws(
+    () =>
+      validateStrictCspDocument('<!doctype html><html><body><main/style=color:red>x</main></body></html>', {
+        policy: stylesOnlyPolicy,
+      }),
+    /inline style attributes in document/,
+  );
+  assert.throws(
+    () =>
+      validateStrictCspDocument('<!doctype html><html><body><style/x>body{color:red}</style></body></html>', {
+        policy: stylesOnlyPolicy,
+      }),
+    /inline style tags in document/,
+  );
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(
+      '<!doctype html><html><body><main><br/><img src="/logo.png" alt="safe" /><a href=/style=color:red>safe</a></main></body></html>',
+      {
+        policy: fullPolicy,
+      },
+    ),
+  );
+});
