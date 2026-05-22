@@ -109,9 +109,12 @@ ISR sidecars:
 - The sidecar pointer is derived from the HTML pointer by replacing `.html` with `.hydration.json`, so stale HTML and
   stale hydration data remain paired through the same metadata pointer lifecycle.
 - The browser-facing data URL stays on the page route and uses the opaque `__facetheory_isr_hydration` query parameter.
-  That request must route to Lambda/FaceTheory, not directly to S3, so the runtime can validate and serve the pointer.
+  That request must route to Lambda/FaceTheory, not directly to S3, so the runtime can resolve the tenant/cache-key
+  variant, validate the pointer binding, and serve the sidecar only for an equivalent request context.
 - Do not create public CloudFront behaviors that expose arbitrary ISR sidecar object keys. The runtime validates the
-  pointer token and returns `404` for invalid or missing sidecars.
+  pointer token and request-variant binding, then returns `404` for invalid, missing, or cross-variant sidecars. The
+  sidecar URL is not a bearer credential; tenant, authorization-like headers, cookies, and query variants must still
+  match the HTML generation boundary.
 
 SSR sidecars:
 
@@ -204,13 +207,14 @@ Notes:
 
 1. Request reaches Lambda URL behavior.
 2. FaceTheory verifies tenant partition safety. Requests carrying known tenant boundary headers (`x-tenant-id` or `x-facetheory-tenant`) fail closed unless `tenantKey` or a custom `cacheKey` is configured.
-3. FaceTheory computes cache key (`tenant + route + params + query` by default).
+3. FaceTheory computes cache key (`tenant + route + params + query + authorization-like header/cookie digests` by default).
 4. Metadata lookup in DynamoDB:
    - fresh -> serve cached HTML pointer from S3
    - stale/miss -> attempt lease lock and regenerate
 5. Strict-CSP regeneration writes the pointer-derived hydration sidecar before the HTML metadata commit.
 6. Regeneration writes HTML to S3, then atomically updates metadata pointer.
 7. On regeneration failure, previous pointer stays valid; stale HTML and stale hydration data stay paired.
+8. Hydration sidecar reads resolve the same tenant/cache-key request variant before serving JSON.
 
 Default tenant note:
 - FaceTheory uses the `default` tenant unless `tenantKey` is configured.

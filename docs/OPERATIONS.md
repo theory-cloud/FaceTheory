@@ -87,8 +87,10 @@ pair:
 - SSG: confirm HTML and `/_facetheory/data/*` sidecars are uploaded together and routed to S3 through CloudFront. Cache
   headers and invalidations should keep the HTML and sidecar from different builds from being mixed.
 - ISR: confirm `x-facetheory-isr` behavior stays normal and hydration sidecar URLs with
-  `__facetheory_isr_hydration=...` route to Lambda/FaceTheory. The runtime validates the opaque pointer token and serves
-  the pointer-derived `.hydration.json` object from the same `S3HtmlStore` used for HTML.
+  `__facetheory_isr_hydration=...` route to Lambda/FaceTheory. The runtime validates the opaque pointer token against
+  the current tenant/cache-key request variant before serving the pointer-derived `.hydration.json` object from the same
+  `S3HtmlStore` used for HTML. Treat copied sidecar URLs as insufficient on their own; mismatched tenant, auth-like
+  headers, cookies, or query variants should fail closed with `404`.
 - SPA navigation: confirm `startFaceNavigation()` or non-CSP `startAwsOacFormTransport({ navigationPolicy: "spa" })`
   responses load external hydration data before mutating the document. Use `navigationPolicy: "full-page"` when fetched
   CSP-protected HTML should become a real browser navigation instead of a document-write or SPA DOM replacement.
