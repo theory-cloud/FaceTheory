@@ -40,6 +40,19 @@ export async function renderVue(
   vnode: VNode,
   options: RenderVueOptions = {},
 ): Promise<FaceRenderResult> {
+  return renderVueInternal(ctx, vnode, options);
+}
+
+interface VueRenderValidationOptions {
+  deferStrictCspHydrationValidation?: boolean;
+}
+
+async function renderVueInternal(
+  ctx: FaceContext,
+  vnode: VNode,
+  options: RenderVueOptions,
+  validationOptions: VueRenderValidationOptions = {},
+): Promise<FaceRenderResult> {
   const integrations = await prepareUIIntegrations<VNode, VueUIIntegration>(
     options.integrations ?? [],
     ctx,
@@ -88,9 +101,17 @@ export async function renderVue(
     out = await integration.finalize(out, ctx, state);
   }
 
-  enforceAdapterStrictCspResult(out, { adapterName: 'Vue adapter' });
+  enforceAdapterStrictCspResult(out, {
+    adapterName: 'Vue adapter',
+    deferHydrationValidation:
+      validationOptions.deferStrictCspHydrationValidation === true,
+  });
 
   return out;
+}
+
+function modeUsesRuntimeHydrationSidecars(mode: FaceMode): boolean {
+  return mode === 'isr' || mode === 'ssg';
 }
 
 export interface VueFaceOptions<Data = unknown> {
@@ -118,7 +139,11 @@ export function createVueFace<Data = unknown>(
         typeof options.renderOptions === 'function'
           ? await options.renderOptions(ctx, data as Data)
           : (options.renderOptions ?? {});
-      return renderVue(ctx, vnode, renderOptions);
+      return renderVueInternal(ctx, vnode, renderOptions, {
+        deferStrictCspHydrationValidation: modeUsesRuntimeHydrationSidecars(
+          options.mode,
+        ),
+      });
     },
   };
 
