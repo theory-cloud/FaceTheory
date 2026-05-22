@@ -40,10 +40,11 @@ const STRICT_CSP_DIRECTIVES: Array<[name: string, values: string[]]> = [
   ['form-action', ["'self'"]],
 ];
 
-const SCRIPT_PAIR_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi;
+const SCRIPT_TAG_NAME = 'script';
 
 interface HtmlStartTag {
   attrs: string;
+  end: number;
   tagName: string;
 }
 
@@ -113,19 +114,22 @@ function normalizeCspNonce(nonce: string | null): string | null {
 }
 
 function validateNoInlineScriptElements(html: string): void {
+  const scriptStartTags: HtmlStartTag[] = [];
+
   for (const startTag of scanHtmlStartTags(html)) {
     const tagName = startTag.tagName.toLowerCase();
-    if (tagName !== 'script') continue;
+    if (tagName !== SCRIPT_TAG_NAME) continue;
+
+    scriptStartTags.push(startTag);
 
     if (!hasHtmlAttribute(startTag.attrs, 'src')) {
       throw new Error('FaceTheory strict CSP rejects inline script tags in document');
     }
   }
 
-  SCRIPT_PAIR_RE.lastIndex = 0;
-  let pairMatch: RegExpExecArray | null;
-  while ((pairMatch = SCRIPT_PAIR_RE.exec(html)) !== null) {
-    const body = String(pairMatch[2] ?? '');
+  for (const startTag of scriptStartTags) {
+    const bodyEnd = findScriptEndTagStart(html, startTag.end);
+    const body = html.slice(startTag.end, bodyEnd);
     if (body.trim().length > 0) {
       throw new Error('FaceTheory strict CSP rejects inline script tags in document');
     }
@@ -186,10 +190,81 @@ function* scanHtmlStartTags(html: string): Generator<HtmlStartTag> {
 
     yield {
       attrs: html.slice(nameEnd, tagEnd),
+      end: tagEnd + 1,
       tagName: html.slice(nameStart, nameEnd),
     };
     cursor = tagEnd + 1;
   }
+}
+
+function findScriptEndTagStart(html: string, bodyStart: number): number {
+  let cursor = bodyStart;
+  while (cursor < html.length) {
+    const closeStart = html.indexOf('</', cursor);
+    if (closeStart === -1) return html.length;
+
+    const nameStart = closeStart + 2;
+    const nameEnd = nameStart + SCRIPT_TAG_NAME.length;
+    if (
+      htmlStartsWithAsciiCaseInsensitive(html, nameStart, SCRIPT_TAG_NAME) &&
+      isScriptEndTagBoundary(html, nameEnd) &&
+      findHtmlTagEnd(html, nameEnd) !== -1
+    ) {
+      return closeStart;
+    }
+
+    cursor = closeStart + 2;
+  }
+  return html.length;
+}
+
+function htmlStartsWithAsciiCaseInsensitive(
+  html: string,
+  start: number,
+  expected: string,
+): boolean {
+  if (start + expected.length > html.length) return false;
+
+  for (let offset = 0; offset < expected.length; offset += 1) {
+    const actualCode = html.charCodeAt(start + offset);
+    const expectedCode = expected.charCodeAt(offset);
+    if (toAsciiLowercaseCode(actualCode) !== expectedCode) return false;
+  }
+  return true;
+}
+
+function isScriptEndTagBoundary(html: string, index: number): boolean {
+  if (index >= html.length) return false;
+
+  const code = html.charCodeAt(index);
+  // Script data only recognizes `</script` as an end tag when the name is
+  // followed by whitespace, `/`, or `>`; `=`/`-` remain script text.
+  return code === 47 || code === 62 || isHtmlWhitespace(code);
+}
+
+function findHtmlTagEnd(html: string, start: number): number {
+  let cursor = start;
+  let quote: '"' | "'" | null = null;
+
+  while (cursor < html.length) {
+    const char = html[cursor];
+    if (quote) {
+      if (char === quote) quote = null;
+      cursor += 1;
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      cursor += 1;
+      continue;
+    }
+
+    if (char === '>') return cursor;
+    cursor += 1;
+  }
+
+  return -1;
 }
 
 function hasHtmlAttribute(attrs: string, name: string): boolean {
@@ -259,6 +334,11 @@ function skipHtmlWhitespace(value: string, start: number): number {
     cursor += 1;
   }
   return cursor;
+}
+
+function toAsciiLowercaseCode(code: number): number {
+  if (code >= 65 && code <= 90) return code + 32;
+  return code;
 }
 
 function isAsciiAlpha(code: number): boolean {
