@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
 import { assertDocumentTagNonces } from '../helpers/csp.js';
 
 import { createFaceApp } from '../../src/app.js';
+import { InMemoryHtmlStore, InMemoryIsrMetaStore } from '../../src/isr.js';
+import { buildSsgSite } from '../../src/ssg.js';
 import { createVueFace, h, renderVue } from '../../src/vue/index.js';
 import type { FaceContext } from '../../src/types.js';
 
@@ -21,6 +27,18 @@ const baseCtx: FaceContext = {
   params: {},
   proxy: null,
 };
+
+function decodeBody(body: Uint8Array): string {
+  return new TextDecoder().decode(body);
+}
+
+function externalHydrationHref(html: string): string {
+  const tag = /<link\b[^>]*__FACETHEORY_DATA_URL__[^>]*>/i.exec(html)?.[0];
+  assert.ok(tag, 'expected external hydration link tag');
+  const href = /\bhref="([^"]+)"/i.exec(tag)?.[1];
+  assert.ok(href, 'expected external hydration href');
+  return href;
+}
 
 test('vue adapter: renders VNode + head tags', async () => {
   const app = createFaceApp({
@@ -190,6 +208,121 @@ test('vue adapter: strict CSP emits external hydration without inline data', asy
   );
   assert.ok(!body.includes('id="__FACETHEORY_DATA__"'));
   assert.ok(!body.includes('<strict-vue>'));
+});
+
+test('vue adapter: ISR strict CSP lets runtime externalize legacy hydration sidecars', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  const secret = 'VUE_ISR_HYDRATION_SECRET';
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      createVueFace({
+        route: '/vue-isr',
+        mode: 'isr',
+        render: () => h('main', null, `Vue ISR ${++renderCount}`),
+        renderOptions: {
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          hydration: {
+            data: {
+              secret,
+              terminator: '</script>',
+            },
+            bootstrapModule: '/assets/vue-entry.js',
+          },
+        },
+      }),
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => 1_000,
+    },
+  });
+
+  const response = await app.handle({ method: 'GET', path: '/vue-isr' });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers['x-facetheory-isr']?.[0], 'miss');
+
+  const html = decodeBody(response.body as Uint8Array);
+  const sidecarHref = externalHydrationHref(html);
+  assert.ok(html.includes('<main>Vue ISR 1</main>'));
+  assert.ok(html.includes('src="/assets/vue-entry.js"'));
+  assert.equal(html.includes('id="__FACETHEORY_DATA__"'), false);
+  assert.equal(html.includes(secret), false);
+  assert.match(sidecarHref, /^\/vue-isr\?__facetheory_isr_hydration=/);
+
+  const sidecar = await app.handle({ method: 'GET', path: sidecarHref });
+  assert.equal(sidecar.status, 200);
+  assert.equal(
+    sidecar.headers['content-type']?.[0],
+    'application/json; charset=utf-8',
+  );
+  assert.equal(renderCount, 1);
+  assert.deepEqual(JSON.parse(decodeBody(sidecar.body as Uint8Array)), {
+    secret,
+    terminator: '</script>',
+  });
+});
+
+test('vue adapter: SSG strict CSP lets build externalize legacy hydration sidecars', async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-vue-ssg-'));
+  const outDir = path.resolve(tempRoot, 'out');
+
+  try {
+    const result = await buildSsgSite({
+      faces: [
+        createVueFace({
+          route: '/',
+          mode: 'ssg',
+          render: () => h('main', null, 'Vue SSG strict'),
+          renderOptions: {
+            csp: {
+              inlineScripts: false,
+              inlineStyles: false,
+              rawHead: false,
+            },
+            hydration: {
+              data: {
+                message: '</script><script>alert("vue")</script>',
+              },
+              bootstrapModule: '/assets/vue-entry.js',
+            },
+          },
+        }),
+      ],
+      outDir,
+    });
+
+    assert.equal(
+      result.pages[0]?.hydrationDataFile,
+      '_facetheory/data/index.json',
+    );
+
+    const html = await readFile(path.resolve(outDir, 'index.html'), 'utf8');
+    assert.ok(html.includes('<main>Vue SSG strict</main>'));
+    assert.ok(html.includes('id="__FACETHEORY_DATA_URL__"'));
+    assert.ok(html.includes('href="/_facetheory/data/index.json"'));
+    assert.ok(html.includes('src="/assets/vue-entry.js"'));
+    assert.equal(html.includes('id="__FACETHEORY_DATA__"'), false);
+    assert.equal(html.includes('</script><script>alert'), false);
+
+    const hydrationJson = await readFile(
+      path.resolve(outDir, '_facetheory/data/index.json'),
+      'utf8',
+    );
+    assert.equal(
+      hydrationJson,
+      '{"message":"\\u003c/script\\u003e\\u003cscript\\u003ealert(\\"vue\\")\\u003c/script\\u003e"}\n',
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test('vue adapter: strict CSP rejects inline hydration and styles', async () => {

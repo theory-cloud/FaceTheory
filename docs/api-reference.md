@@ -117,7 +117,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 | `FaceResponse`     | Runtime response                     | Includes normalized headers, cookies array, status, body, and `isBase64`.                                                                                                                                                                                |
 | `FaceRenderResult` | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head`, `headTags`, `styleTags`, `csp`, `html`, cookies, headers, and hydration payload. `head.html` is legacy escaped head text; prefer structured `headTags` / `styleTags` for actual tags. |
 | `FaceContext`      | Per-request context                  | Exposes normalized request, route params, and proxy match.                                                                                                                                                                                               |
-| `FaceAppOptions`   | App constructor options              | Accepts `faces`, optional ISR config, and optional observability hooks.                                                                                                                                                                                  |
+| `FaceAppOptions`   | App constructor options              | Accepts `faces`, optional ISR config, optional observability hooks, and optional strict-CSP runtime limits.                                                                                                                                               |
 | `FaceIsrOptions`   | ISR runtime tuning                   | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation.                                                                                                                             |
 
 Structured head/style emission is the supported default:
@@ -275,6 +275,8 @@ FaceTheory supports two CSP-compatible rendering styles:
 
 Core strict-CSP exports:
 
+- `DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES` is the default maximum raw body size FaceTheory will collect from a
+  strict no-inline streaming render result before whole-document validation. The default is 5 MiB.
 - `FaceCspPolicy` is the route-level render policy surface. `inlineScripts:false` rejects inline script bodies,
   inline hydration JSON, inline event-handler attributes, and cross-origin bootstrap/data URLs. `inlineStyles:false`
   rejects inline style tags and `style` attributes. `rawHead:false` rejects caller-owned raw head HTML.
@@ -322,6 +324,30 @@ renderOptions: async (_ctx, data) => {
 };
 ```
 
+Strict streaming limit:
+
+- Strict no-inline streaming responses are buffered before validation because bytes must not flush before the final
+  document is known to satisfy the route policy.
+- During that buffer step, FaceTheory counts raw `Uint8Array` bytes as each chunk arrives and fails closed with a
+  deterministic `413 Payload Too Large` response when `strictCsp.maxStreamingBodyBytes` is exceeded.
+- The failed response does not validate or return a truncated partial document. Non-strict streaming responses are not
+  collected by this limit and still preflight only the first render chunk before returning an `AsyncIterable`.
+
+```ts
+import {
+  DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES,
+  createFaceApp,
+} from "@theory-cloud/facetheory";
+
+const app = createFaceApp({
+  faces,
+  strictCsp: {
+    // Optional: tune if a strict streaming route has a larger validated body budget.
+    maxStreamingBodyBytes: DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES,
+  },
+});
+```
+
 Adapter notes:
 
 - React strict no-inline routes cannot use shell streaming because bytes would flush before whole-document validation.
@@ -352,7 +378,7 @@ Core exports:
 - `createAwsOacUrlEncodedFormPayload(form, options)` returns the encoded body, content type, fields, and lowercase SHA256 hex digest over those bytes.
 - `sha256HexForAwsOacPayload(body, digest?)` exposes the Web Crypto digest path with a test-injectable digest.
 - `startAwsOacFormTransport(options)` intercepts only forms carrying the marker, resolves action/method/encoding from the form and submitter, enforces same-origin actions, preserves constraint validation, and sends the encoded body through `fetch` with `credentials: "same-origin"`, `redirect: "error"`, `content-type`, and `x-amz-content-sha256`.
-- `onNavigate(context)` lets a host coordinate successful form outcomes with `startFaceNavigation()` or another caller-owned navigation layer. If the hook returns anything other than `false`, FaceTheory treats the outcome as handled.
+- `onNavigate(context)` lets a host coordinate successful form outcomes with `startFaceNavigation()` or another caller-owned navigation layer. If the hook returns anything other than `false`, FaceTheory treats the outcome as handled; for CSP-protected HTML responses, that hook is the caller-owned boundary where the host must choose a full browser navigation or another CSP-safe handling path.
 
 Example client bootstrap:
 
@@ -380,7 +406,7 @@ Default navigation policy after a successful fetch is deliberately full-document
 
 - HTTP redirects fail closed at the fetch boundary so a preserving 307/308 cannot replay the signed body to another origin; hosts that want post-submit navigation should return a direct response and then choose a safe same-origin browser navigation in `onResponse` or `onNavigate`
 - non-redirect HTML responses, including server-rendered validation/error pages, replace the current document through `document.open()` / `document.write()` / `document.close()` and update history to the response URL when needed, unless the response carries `Content-Security-Policy` or `Content-Security-Policy-Report-Only`
-- CSP-protected HTML responses fail closed by default because fetch cannot install response CSP headers as the active document policy during `document.write()` replacement
+- CSP-protected HTML responses fail closed for fetched document replacement and explicit `navigationPolicy: "spa"` because fetch cannot install response CSP headers as the active document policy during `document.write()` replacement or SPA DOM mutation; use `navigationPolicy: "full-page"` or handle the response with `onNavigate` / `onResponse` when the host intentionally owns that boundary
 - non-HTML non-OK responses throw to `onError`
 - `onResponse` remains a full override for hosts that want to own response handling themselves
 

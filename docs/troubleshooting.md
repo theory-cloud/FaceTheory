@@ -200,9 +200,9 @@ Navigation behavior:
 
 - the mutating fetch forces `redirect: "error"`, so HTTP redirects fail closed before a 307/308 can replay the URL-encoded body to another origin
 - server-rendered HTML validation/error responses may replace the whole document when they are not protected by response CSP headers
-- HTML responses with `Content-Security-Policy` headers fail closed by default because fetched response headers cannot become the active document policy for `document.write()` replacement
+- HTML responses with `Content-Security-Policy` headers fail closed for fetched document replacement and explicit SPA DOM navigation because fetched response headers cannot become the active document policy
 - marked forms that resolve to `multipart/form-data`, `text/plain`, or another unsupported encoding fail closed through `onError` before sending
-- use `onNavigate(context)` or `onResponse(response, context)` when a host intentionally coordinates CSP-protected responses, post-submit redirects to safe GET URLs, `startFaceNavigation()`, or another caller-owned navigation layer
+- use `navigationPolicy: "full-page"`, `onNavigate(context)`, or `onResponse(response, context)` when a host intentionally coordinates CSP-protected responses, post-submit redirects to safe GET URLs, `startFaceNavigation()`, or another caller-owned navigation layer
 
 Verification:
 

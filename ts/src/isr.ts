@@ -414,24 +414,37 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         input.ctx.request.query,
         runtimeOptions.htmlPointerPrefix,
       );
-      if (hydrationSidecarPointer.present) {
-        return hydrationSidecarPointer.pointer
-          ? cachedHydrationSidecarResponse(
-              runtimeOptions,
-              hydrationSidecarPointer.pointer,
-            )
-          : hydrationSidecarNotFoundResponse();
-      }
 
       const tenant = resolveTenant(runtimeOptions, input.ctx);
+      const query = hydrationSidecarPointer.present
+        ? queryWithoutHydrationSidecar(input.ctx.request.query)
+        : input.ctx.request.query;
       const cacheKey = runtimeOptions.cacheKey({
         tenant,
         routePattern: normalizePath(input.routePattern),
         params: input.ctx.params,
-        query: input.ctx.request.query,
+        query,
         headers: input.ctx.request.headers,
         cookies: input.ctx.request.cookies,
       });
+
+      if (hydrationSidecarPointer.present) {
+        if (
+          !hydrationSidecarPointer.pointer ||
+          !hydrationSidecarPointerMatchesCacheKey(
+            hydrationSidecarPointer.pointer,
+            cacheKey,
+            runtimeOptions.htmlPointerPrefix,
+          )
+        ) {
+          return hydrationSidecarNotFoundResponse();
+        }
+        return cachedHydrationSidecarResponse(
+          runtimeOptions,
+          hydrationSidecarPointer.pointer,
+        );
+      }
+
       const currentNow = runtimeOptions.now();
       const existing = await runtimeOptions.metaStore.get(cacheKey);
 
@@ -655,6 +668,7 @@ async function regenerateAndCommit(
     buildHydrationSidecarPointerFromHtmlPointer(htmlPointer);
   const hydrationDataUrl = buildHydrationSidecarDataUrl(
     input.ctx.request.path,
+    input.ctx.request.query,
     hydrationSidecarPointer,
   );
   const hydrationSidecarRef: { current: IsrHydrationSidecar | null } = {
@@ -906,11 +920,11 @@ function buildHtmlPointer(
   generatedAt: number,
   prefix: string,
 ): string {
-  const digest = createHash('sha256')
-    .update(cacheKey)
-    .digest('hex')
-    .slice(0, 24);
-  return `${prefix}${digest}/${generatedAt}-${randomUUID()}.html`;
+  return `${prefix}${cacheKeyDigest(cacheKey)}/${generatedAt}-${randomUUID()}.html`;
+}
+
+function cacheKeyDigest(cacheKey: string): string {
+  return createHash('sha256').update(cacheKey).digest('hex').slice(0, 24);
 }
 
 function buildHydrationSidecarPointerFromHtmlPointer(
@@ -923,10 +937,19 @@ function buildHydrationSidecarPointerFromHtmlPointer(
 
 function buildHydrationSidecarDataUrl(
   routePath: string,
+  query: Query,
   sidecarPointer: string,
 ): string {
   const token = Buffer.from(sidecarPointer, 'utf8').toString('base64url');
-  return `${normalizePath(routePath)}?${ISR_HYDRATION_QUERY_PARAM}=${encodeURIComponent(token)}`;
+  const params = new URLSearchParams();
+  for (const [key, values] of Object.entries(query)) {
+    if (key === ISR_HYDRATION_QUERY_PARAM) continue;
+    for (const value of values ?? []) {
+      params.append(key, String(value));
+    }
+  }
+  params.append(ISR_HYDRATION_QUERY_PARAM, token);
+  return `${normalizePath(routePath)}?${params.toString()}`;
 }
 
 function hydrationSidecarPointerFromRequest(
@@ -983,6 +1006,27 @@ function isValidHydrationSidecarPointer(
   }
 
   return true;
+}
+
+function hydrationSidecarPointerMatchesCacheKey(
+  pointer: string,
+  cacheKey: string,
+  htmlPointerPrefix: string,
+): boolean {
+  const relative = htmlPointerPrefix
+    ? pointer.slice(htmlPointerPrefix.length)
+    : pointer;
+  const pointerDigest = relative.split('/')[0] ?? '';
+  return pointerDigest.toLowerCase() === cacheKeyDigest(cacheKey);
+}
+
+function queryWithoutHydrationSidecar(query: Query): Query {
+  const out: Query = {};
+  for (const [key, values] of Object.entries(query)) {
+    if (key === ISR_HYDRATION_QUERY_PARAM) continue;
+    out[key] = [...(values ?? [])];
+  }
+  return out;
 }
 
 async function cachedHydrationSidecarResponse(
