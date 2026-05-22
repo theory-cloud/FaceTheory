@@ -124,7 +124,8 @@ OAC and navigation:
 - `startAwsOacFormTransport({ navigationPolicy: "full-page" })` is the strict-CSP default because fetched CSP headers
   cannot become the active document policy during `document.write()` replacement.
 - Choose `navigationPolicy: "spa"` only when the returned HTML is a FaceTheory document, the host accepts the SPA
-  navigation contract, and external hydration data is loaded before DOM mutation.
+  navigation contract, external hydration data is loaded before DOM mutation, and the fetched HTML does not carry
+  `Content-Security-Policy`; use full-page navigation or caller-owned handling for CSP-protected HTML.
 - Route mutating action paths through `ssrPathPatterns`; do not let S3 static behaviors intercept form actions from SSG
   or ISR pages.
 

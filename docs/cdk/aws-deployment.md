@@ -96,7 +96,8 @@ OAC navigation policy:
 - Use `startAwsOacFormTransport()`'s default full-page navigation for strict-CSP form outcomes unless the host has
   explicitly chosen the SPA navigation contract.
 - Use `navigationPolicy: "spa"` only when the response is a FaceTheory document and external hydration can be loaded
-  before DOM mutation.
+  before DOM mutation, and do not use it as an escape hatch for HTML responses carrying `Content-Security-Policy`;
+  choose `navigationPolicy: "full-page"` or a caller-owned `onNavigate` / `onResponse` path for those responses.
 
 ## CloudFront Behavior Options
 

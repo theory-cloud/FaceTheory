@@ -438,14 +438,14 @@ async function applyDefaultNavigationPolicy(
       input.window.location.assign(finalUrl.toString());
       return;
     }
+    if (responseHasCsp) {
+      throw new Error(
+        'FaceTheory OAC form transport refused to apply an HTML response protected by Content-Security-Policy because fetch cannot install response CSP headers during document.write or SPA DOM navigation; use navigationPolicy:"full-page" or handle the response with onNavigate/onResponse instead',
+      );
+    }
     if (policy === 'spa') {
       await applySpaNavigationPolicy(input, context, finalUrl, html);
       return;
-    }
-    if (responseHasCsp) {
-      throw new Error(
-        'FaceTheory OAC form transport refused to replace the current document with an HTML response protected by Content-Security-Policy because fetch cannot install response CSP headers during document.write navigation; use navigationPolicy:"full-page", navigationPolicy:"spa", or handle the response with onNavigate instead',
-      );
     }
     replaceDocument(input.form.ownerDocument, input.window, html, finalUrl);
     return;
@@ -464,11 +464,7 @@ async function applySpaNavigationPolicy(
   finalUrl: URL,
   html: string | null,
 ): Promise<void> {
-  const snapshot = await resolveSpaNavigationSnapshot(
-    input,
-    finalUrl,
-    html,
-  );
+  const snapshot = await resolveSpaNavigationSnapshot(input, finalUrl, html);
   const options = input.options.spaNavigation ?? {};
   const viewSelector = options.viewSelector ?? DEFAULT_FACE_VIEW_SELECTOR;
 
