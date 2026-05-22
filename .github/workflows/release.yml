@@ -18,8 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    outputs:
-      release_id: ${{ steps.source.outputs.release_id }}
     steps:
       - name: Checkout release workflow scripts
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -35,8 +33,6 @@ jobs:
           mkdir -p "${trusted_dir}"
           cp \
             scripts/release-json-by-tag.sh \
-            scripts/checkout-release-source.sh \
-            scripts/resolve-release-source-ref.sh \
             scripts/verify-release-branch.sh \
             scripts/verify-release-draft-target.sh \
             "${trusted_dir}/"
@@ -105,17 +101,6 @@ jobs:
             echo "__FACETHEORY_RELEASE_JSON__"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Resolve release source ref
-        id: source
-        env:
-          RELEASE_JSON: ${{ steps.metadata.outputs.release_json }}
-          TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
-        run: |
-          "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh" "${TAG_NAME}" >> "${GITHUB_OUTPUT}"
-
-      - name: Checkout release source
-        run: |
-          "${RUNNER_TEMP}/facetheory-release-scripts/checkout-release-source.sh" "${{ steps.source.outputs.source_ref }}"
 
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
@@ -129,9 +114,7 @@ jobs:
       - name: Build assets for existing tag release
         env:
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
-          RELEASE_IS_DRAFT: ${{ steps.source.outputs.release_is_draft }}
-          RELEASE_TARGET: ${{ steps.source.outputs.release_target }}
-          RELEASE_SOURCE_COMMIT: ${{ steps.source.outputs.release_source_commit }}
+          RELEASE_JSON: ${{ steps.metadata.outputs.release_json }}
         run: |
           set -euo pipefail
 
@@ -172,15 +155,23 @@ jobs:
           update_manifest(".release-please-manifest.premain.json")
           PY
 
-          if [[ "${RELEASE_IS_DRAFT}" == "true" ]]; then
-            actual_commit="$(git rev-parse HEAD)"
-            if [[ -n "${RELEASE_SOURCE_COMMIT}" && "${actual_commit}" != "${RELEASE_SOURCE_COMMIT}" ]]; then
-              echo "release-assets: FAIL (${TAG_NAME} source resolved to ${RELEASE_SOURCE_COMMIT}, checked out ${actual_commit})"
-              exit 1
-            fi
-            RELEASE_JSON="${{ steps.metadata.outputs.release_json }}" \
+          release_is_draft="false"
+          if [[ -n "${RELEASE_JSON}" ]]; then
+            release_is_draft="$(
+              python3 - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["RELEASE_JSON"])
+          print("true" if data.get("isDraft", data.get("draft")) is True else "false")
+          PY
+            )"
+          fi
+
+          if [[ "${release_is_draft}" == "true" ]]; then
+            RELEASE_JSON="${RELEASE_JSON}" \
               REPO_ROOT="${GITHUB_WORKSPACE}" \
-              "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh" "${TAG_NAME}" HEAD
+              "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh" "${TAG_NAME}" "${{ github.sha }}"
           fi
 
           REPO_ROOT="${GITHUB_WORKSPACE}" \
@@ -575,27 +566,11 @@ jobs:
           trusted_dir="${RUNNER_TEMP}/facetheory-release-scripts"
           mkdir -p "${trusted_dir}"
           cp \
-            scripts/checkout-release-source.sh \
-            scripts/resolve-release-source-ref.sh \
             scripts/verify-release-branch.sh \
             scripts/verify-release-draft-target.sh \
             "${trusted_dir}/"
           chmod +x "${trusted_dir}"/*.sh
 
-      - name: Resolve release source ref
-        id: source
-        env:
-          RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}
-          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-        run: |
-          "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh" "${TAG_NAME}" >> "${GITHUB_OUTPUT}"
-
-      - name: Checkout release source
-        run: |
-          # Draft GitHub Releases do not guarantee a git tag exists until the
-          # release is published. Build from the draft release source ref and
-          # verify the draft's target before uploading immutable assets.
-          "${RUNNER_TEMP}/facetheory-release-scripts/checkout-release-source.sh" "${{ steps.source.outputs.source_ref }}"
 
       - name: Fetch main + premain (release branch verification)
         run: |
@@ -607,7 +582,7 @@ jobs:
           RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}
         run: |
           REPO_ROOT="${GITHUB_WORKSPACE}" \
-            "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" HEAD
+            "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
 
       - name: Verify release source branch
         run: |

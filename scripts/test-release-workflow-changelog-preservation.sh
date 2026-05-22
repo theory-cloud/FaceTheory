@@ -38,19 +38,27 @@ if grep -R -F 'gh release create' .github/workflows scripts | grep -v 'scripts/t
 fi
 
 grep -Fq 'facetheory-release-scripts' .github/workflows/release.yml ||
-  fail "release.yml must stage trusted release provenance scripts before checking out release source code"
+  fail "release.yml must stage trusted release provenance scripts before asset provenance checks"
 
-grep -Fq 'scripts/checkout-release-source.sh' .github/workflows/release.yml ||
-  fail "release.yml must stage the tokenless release source checkout helper"
+if grep -R -Fq 'resolve-release-source-ref.sh' .github/workflows/release.yml .github/workflows/prerelease.yml; then
+  fail "release/prerelease asset workflows must not resolve draft release branches to mutable remote HEADs"
+fi
 
-grep -Fq 'resolve-release-source-ref.sh" "${TAG_NAME}"' .github/workflows/release.yml ||
-  fail "release.yml must resolve existing draft source refs from trusted staged scripts before checkout"
+if grep -R -Fq 'checkout-release-source.sh' .github/workflows/release.yml .github/workflows/prerelease.yml; then
+  fail "release/prerelease asset workflows must not replace github.sha with a resolved draft source ref"
+fi
 
-grep -Fq 'RELEASE_SOURCE_COMMIT' .github/workflows/release.yml ||
-  fail "release.yml must carry immutable release source identity into the build job"
+grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" "${{ github.sha }}"' .github/workflows/release.yml ||
+  fail "release.yml existing-tag path must compare draft target identity to github.sha"
 
-grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" HEAD' .github/workflows/release.yml ||
-  fail "release.yml must revalidate existing draft target identity after checkout and before build"
+if grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" HEAD' .github/workflows/release.yml; then
+  fail "release.yml existing-tag path must not verify draft targets against mutable workspace HEAD"
+fi
+
+for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; do
+  grep -Fq 'verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"' "${workflow}" ||
+    fail "${workflow} build-release-assets must compare draft target identity to github.sha"
+done
 
 if grep -R -Fq 'run: scripts/publish-draft-release-assets.sh' .github/workflows; then
   fail "release-capable publish tokens must not be exposed to mutable repo publish scripts"
@@ -80,6 +88,9 @@ for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; 
     fail "${workflow} must tolerate delayed GitHub draft release visibility"
   if grep -Fq 'ref: ${{ steps.source.outputs.source_ref }}' "${workflow}"; then
     fail "${workflow} must not use actions/checkout with a dynamic release source ref"
+  fi
+  if grep -Fq 'verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" HEAD' "${workflow}"; then
+    fail "${workflow} must not verify draft targets against mutable workspace HEAD"
   fi
 done
 
@@ -210,12 +221,9 @@ for required in (
     "    permissions:\n      contents: read\n",
     "      - name: Checkout release workflow scripts\n",
     "      - name: Stage trusted release provenance scripts\n",
-    "      - name: Resolve release source ref\n",
-    "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh",
-    "      - name: Checkout release source\n",
-    "${RUNNER_TEMP}/facetheory-release-scripts/checkout-release-source.sh",
     "RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}",
     "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh",
+    'verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"',
     "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-branch.sh",
 ):
     if required not in build:
@@ -224,7 +232,11 @@ for forbidden in (
     "GH_TOKEN:",
     "GITHUB_TOKEN:",
     "secrets.RELEASE_PLEASE_TOKEN",
-    'verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"',
+    "      - name: Resolve release source ref\n",
+    "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh",
+    "      - name: Checkout release source\n",
+    "${RUNNER_TEMP}/facetheory-release-scripts/checkout-release-source.sh",
+    'verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" HEAD',
 ):
     if forbidden in build:
         raise SystemExit(f"build-release-assets must not receive {forbidden} in {workflow}")
