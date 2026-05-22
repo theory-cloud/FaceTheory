@@ -103,6 +103,65 @@ grep -Fq 'RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}'
 grep -Fq 'RELEASE_JSON: ${{ steps.metadata.outputs.release_json }}' .github/workflows/release.yml ||
   fail "release.yml existing-tag path must pass resolved release metadata without a token"
 
+python3 - <<'PY' || fail "release_json outputs must enter shell steps only through workflow env mappings"
+import re
+from pathlib import Path
+
+release_json_expression = re.compile(
+    r"\$\{\{"
+    r"[^}]*"
+    r"outputs\s*(?:\.\s*release_json|\[\s*['\"]release_json['\"]\s*\])"
+    r"[^}]*"
+    r"\}\}",
+    re.S,
+)
+
+
+def run_blocks(lines: list[str]):
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.lstrip(" ")
+        indent = len(line) - len(stripped)
+        if stripped.startswith("run:"):
+            run_prefix = "run:"
+        elif stripped.startswith("- run:"):
+            run_prefix = "- run:"
+        else:
+            index += 1
+            continue
+
+        rest = stripped[len(run_prefix):].strip()
+        start_line = index + 1
+        if rest in {"|", "|-", "|+", ">", ">-", ">+"}:
+            block_lines = []
+            block_start_line = index + 2
+            index += 1
+            while index < len(lines):
+                candidate = lines[index]
+                candidate_indent = len(candidate) - len(candidate.lstrip(" "))
+                if candidate.strip() and candidate_indent <= indent:
+                    break
+                block_lines.append(candidate)
+                index += 1
+            yield start_line, block_start_line, "\n".join(block_lines)
+            continue
+
+        index += 1
+        yield start_line, start_line, rest
+
+
+for workflow in (Path(".github/workflows/release.yml"), Path(".github/workflows/prerelease.yml")):
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+    for run_line, block_line, script in run_blocks(lines):
+        match = release_json_expression.search(script)
+        if match is None:
+            continue
+        prefix = script[: match.start()]
+        line_offset = prefix.count("\n")
+        raise SystemExit(f"{workflow}:{block_line + line_offset} raw release_json expression in run block opened at line {run_line}")
+PY
+
 python3 - <<'PY' || fail "release draft verification steps must not receive GitHub tokens"
 from pathlib import Path
 
