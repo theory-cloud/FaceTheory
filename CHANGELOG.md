@@ -1,5 +1,42 @@
 # Changelog
 
+## [3.3.0](https://github.com/theory-cloud/FaceTheory/compare/v3.2.2...v3.3.0) (2026-05-23)
+
+
+### Features
+
+* **stitch-admin:** add AuditTrailPanel + DisclosurePanel with React+Vue+Svelte parity ([9defb7e](https://github.com/theory-cloud/FaceTheory/commit/9defb7ebbe22eaa90ebd86f6d634daae13905059))
+* **stitch-admin:** add PackageSourceInput + CodeDropzone with React+Vue+Svelte parity ([bf6e60a](https://github.com/theory-cloud/FaceTheory/commit/bf6e60a27ce4a80b73bbd17ec339a313e609d6d2))
+* **stitch-admin:** add SelectableCardGrid + ChoiceCard with React+Vue+Svelte parity ([b406e25](https://github.com/theory-cloud/FaceTheory/commit/b406e2578be8fcf307d1920a1446eb5ce0776e52))
+* **stitch-admin:** add Vue + Svelte parity for wizard editable token input ([8f8567b](https://github.com/theory-cloud/FaceTheory/commit/8f8567be7733b4c47ce686bd126732ee0c6e0cfc))
+* **stitch-admin:** add wizard authority/context strip primitive ([7d639ca](https://github.com/theory-cloud/FaceTheory/commit/7d639ca87789f0a089925d83babf6c68b320a068))
+* **stitch-admin:** add wizard editable token input (chip list) primitive ([9837526](https://github.com/theory-cloud/FaceTheory/commit/98375266302259080348e5eb6b6a8f29510bae27))
+* **stitch-admin:** add wizard primitives and dev archive helper ([#215](https://github.com/theory-cloud/FaceTheory/issues/215)) ([77abf74](https://github.com/theory-cloud/FaceTheory/commit/77abf7449b0054d179c827b1e943080479a5041b))
+* **stitch-admin:** add wizard reconciliation plan (diff list) primitive ([cbc7512](https://github.com/theory-cloud/FaceTheory/commit/cbc7512e428b072a8745862c4c1caff9ddfaf417))
+* **stitch-admin:** Vue + Svelte parity backfill for prior wizard primitives ([078a824](https://github.com/theory-cloud/FaceTheory/commit/078a8243f9c34ef346915e2848c8cdc1b150ee68))
+
+
+### Bug Fixes
+
+* **deps:** bump transitive brace-expansion to 5.0.6 in ts/ ([77ed459](https://github.com/theory-cloud/FaceTheory/commit/77ed459a77149e78e74a37219a31d87d730fca58))
+* **examples:** reject malformed strict CSP request targets ([0f27128](https://github.com/theory-cloud/FaceTheory/commit/0f27128f75d05f256bc932e18186b8a1817e33b7))
+* **head:** reject backslash strict CSP URLs ([31569dd](https://github.com/theory-cloud/FaceTheory/commit/31569dd86e5403b8fdcf4dce67143296860e7c14))
+* **isr:** bind hydration sidecars to request variants ([c3b6c09](https://github.com/theory-cloud/FaceTheory/commit/c3b6c090268e309a325951462d0ad4ce6fbfd292))
+* **oac:** block SPA navigation for CSP form HTML ([0a995fd](https://github.com/theory-cloud/FaceTheory/commit/0a995fd8ba8866b8980752811f67cdb00726f513))
+* **react:** preserve strict CSP hydration sidecars ([1661a58](https://github.com/theory-cloud/FaceTheory/commit/1661a5834914795952d4029ec4ba037f373d9f27))
+* **release:** build existing-tag assets from tag source ([eef7297](https://github.com/theory-cloud/FaceTheory/commit/eef7297bfad3833f8d524c3932e050c00086b701))
+* **release:** pin asset provenance to event commit ([4bd71e4](https://github.com/theory-cloud/FaceTheory/commit/4bd71e4de89c8f97db11aabfa4a2931914752cc9))
+* **security:** bound strict csp stream buffering ([79f312d](https://github.com/theory-cloud/FaceTheory/commit/79f312d7720f7102bb6136a8761f16e72da5b23f))
+* **security:** require parser-valid script end tags ([72d1086](https://github.com/theory-cloud/FaceTheory/commit/72d1086f2a44b015d4af86ea33f1d9e25c44a5b1))
+* **security:** scan slash-separated csp attributes ([3e2abd2](https://github.com/theory-cloud/FaceTheory/commit/3e2abd29b518eb1595fbf7e4897a6d8dfccd85bb))
+* **ssg:** preserve external hydration sidecars under strict csp ([f287613](https://github.com/theory-cloud/FaceTheory/commit/f287613ccd1cdeb2c379bbebd4c47adaa31550d1))
+* **stitch-admin:** add stable key to selectable-card status-pills wrapper ([e6c0c84](https://github.com/theory-cloud/FaceTheory/commit/e6c0c8451b18c362c23236a66a3ca412e17501c0))
+* **stitch-admin:** add stable keys inside React renderFileMeta dt/dd pairs ([4218aa9](https://github.com/theory-cloud/FaceTheory/commit/4218aa9ef73ba9ce2f8869d91882dab2dad936ad))
+* **stitch-admin:** only invalid-syntax renders evidence; suppress forbidden/redacted/unsafe/other ([b6ae612](https://github.com/theory-cloud/FaceTheory/commit/b6ae612450286623021fbf0826989465967ee4d7))
+* **stitch-admin:** render metadata in Vue + Svelte wizard primitives ([768d45c](https://github.com/theory-cloud/FaceTheory/commit/768d45ccc96ae30ae99cf89258bac8bdd5f81969))
+* **vite:** reject backslash hydration data urls ([549aa8b](https://github.com/theory-cloud/FaceTheory/commit/549aa8bb423407e182712bc5d76bd3317ce01e63))
+* **vue:** preserve strict CSP hydration sidecars ([0b7dcf3](https://github.com/theory-cloud/FaceTheory/commit/0b7dcf39664460c08ae0d8592cd7d43ca5a2cdc0))
+
 ## [3.3.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.2.2-rc...v3.3.0-rc) (2026-05-23)
 
 
