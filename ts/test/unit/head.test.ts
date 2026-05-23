@@ -242,6 +242,222 @@ test('head: strict CSP rejects cross-origin bootstrap and data URLs', () => {
   );
 });
 
+test('head: strict CSP allows same-origin relative and absolute script src/link href URLs', () => {
+  const csp = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+
+  const relativeHead = renderFaceHead({
+    html: '<div>ok</div>',
+    csp,
+    headTags: [
+      { type: 'script', attrs: { type: 'module', src: '/assets/entry.js' } },
+      { type: 'link', attrs: { rel: 'stylesheet', href: 'assets/app.css' } },
+    ],
+  });
+
+  assert.ok(relativeHead.includes('src="/assets/entry.js"'));
+  assert.ok(relativeHead.includes('href="assets/app.css"'));
+
+  const absoluteHead = renderFaceHead(
+    {
+      html: '<div>ok</div>',
+      csp,
+      headTags: [
+        {
+          type: 'script',
+          attrs: { type: 'module', src: 'https://app.example/assets/entry.js' },
+        },
+        {
+          type: 'link',
+          attrs: { rel: 'stylesheet', href: 'https://app.example/assets/app.css' },
+        },
+      ],
+    },
+    { allowedOrigin: 'https://app.example' },
+  );
+
+  assert.ok(absoluteHead.includes('src="https://app.example/assets/entry.js"'));
+  assert.ok(absoluteHead.includes('href="https://app.example/assets/app.css"'));
+});
+
+test('head: strict CSP rejects unsafe and canonical cross-origin script src/link href URLs', () => {
+  const csp = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp,
+          headTags: [
+            { type: 'script', attrs: { type: 'module', src: 'javascript:alert(1)' } },
+          ],
+        },
+        { allowedOrigin: 'https://app.example' },
+      ),
+    /script src URL must be http\(s\) or same-origin/,
+  );
+
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp,
+          headTags: [
+            { type: 'link', attrs: { rel: 'stylesheet', href: '//evil.example/app.css' } },
+          ],
+        },
+        { allowedOrigin: 'https://app.example' },
+      ),
+    /link href URL resolved cross-origin/,
+  );
+
+  assert.throws(
+    () =>
+      renderFaceHead({
+        html: '<div>ok</div>',
+        csp,
+        headTags: [
+          {
+            type: 'script',
+            attrs: { type: 'module', src: 'https://app.example/assets/entry.js' },
+          },
+        ],
+      }),
+    /script src URL must be same-origin or relative/,
+  );
+});
+
+test('head: strict CSP rejects backslash and control-normalized cross-origin head URLs', () => {
+  const csp = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+
+  for (const src of [
+    '/\\evil.example/entry.js',
+    '/\\\\evil.example/entry.js',
+    '/\t/evil.example/entry.js',
+  ]) {
+    assert.throws(
+      () =>
+        renderFaceHead(
+          {
+            html: '<div>ok</div>',
+            csp,
+            headTags: [{ type: 'script', attrs: { type: 'module', src } }],
+          },
+          { allowedOrigin: 'https://app.example' },
+        ),
+      /script src URL resolved cross-origin/,
+    );
+  }
+
+  for (const href of [
+    '/\\evil.example/app.css',
+    '/\\\\evil.example/app.css',
+    '/\n/evil.example/app.css',
+  ]) {
+    assert.throws(
+      () =>
+        renderFaceHead(
+          {
+            html: '<div>ok</div>',
+            csp,
+            headTags: [{ type: 'link', attrs: { rel: 'stylesheet', href } }],
+          },
+          { allowedOrigin: 'https://app.example' },
+        ),
+      /link href URL resolved cross-origin/,
+    );
+  }
+});
+
+test('head: strict CSP fails closed for browser-cross-origin URLs without allowed origin', () => {
+  const csp = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+
+  assert.throws(
+    () =>
+      renderFaceHead({
+        html: '<div>ok</div>',
+        csp,
+        headTags: [
+          { type: 'script', attrs: { type: 'module', src: '/\\evil.example/entry.js' } },
+        ],
+      }),
+    /script src URL must be same-origin or relative/,
+  );
+
+  assert.throws(
+    () =>
+      renderFaceHead({
+        html: '<div>ok</div>',
+        csp,
+        headTags: [
+          { type: 'link', attrs: { rel: 'stylesheet', href: '/\t/evil.example/app.css' } },
+        ],
+      }),
+    /link href URL must be same-origin or relative/,
+  );
+});
+
+test('head: strict CSP rejects backslash-normalized external hydration URLs', () => {
+  const csp = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp,
+          hydration: {
+            type: 'external',
+            data: { page: 'strict' },
+            dataUrl: '/_facetheory/hydration/strict.json',
+            bootstrapModule: '/\\evil.example/entry.js',
+          },
+        },
+        { allowedOrigin: 'https://app.example' },
+      ),
+    /script src URL resolved cross-origin/,
+  );
+
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp,
+          hydration: {
+            type: 'external',
+            data: { page: 'strict' },
+            dataUrl: '/\t/evil.example/data.json',
+            bootstrapModule: '/assets/entry.js',
+          },
+        },
+        { allowedOrigin: 'https://app.example' },
+      ),
+    /link href URL resolved cross-origin/,
+  );
+});
+
 test('head: escapes legacy head fields and blocks unsafe hydration module URLs', () => {
   const head = renderFaceHead({
     html: '<div>ok</div>',

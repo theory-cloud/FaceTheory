@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { execFile } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { once } from 'node:events';
 import { readFile, rm, stat } from 'node:fs/promises';
+import { createConnection, createServer } from 'node:net';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -36,6 +38,131 @@ async function exists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function reservePort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    await new Promise<void>((resolve, reject) =>
+      server.close((err) => (err ? reject(err) : resolve())),
+    );
+    throw new Error(
+      'Failed to reserve an ephemeral port for the strict CSP Svelte example',
+    );
+  }
+  const { port } = address;
+  await new Promise<void>((resolve, reject) =>
+    server.close((err) => (err ? reject(err) : resolve())),
+  );
+  return port;
+}
+
+async function startExampleServer(
+  cwd: string,
+  entryPoint: string,
+  port: number,
+): Promise<ChildProcess> {
+  const tsxBin = path.resolve(cwd, 'node_modules/.bin/tsx');
+  const child = spawn(tsxBin, [entryPoint], {
+    cwd,
+    env: { ...process.env, PORT: String(port) },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  let logs = '';
+  const appendLogs = (chunk: string | Buffer) => {
+    logs += chunk.toString();
+  };
+
+  child.stdout.on('data', appendLogs);
+  child.stderr.on('data', appendLogs);
+
+  await new Promise<void>((resolve, reject) => {
+    const readyLine = `listening on http://localhost:${port}/`;
+
+    const onData = () => {
+      if (logs.includes(readyLine)) {
+        child.stdout.off('data', onData);
+        child.stderr.off('data', onData);
+        child.off('error', onError);
+        child.off('exit', onExit);
+        resolve();
+      }
+    };
+    const onError = (error: Error) => {
+      child.stdout.off('data', onData);
+      child.stderr.off('data', onData);
+      child.off('exit', onExit);
+      reject(error);
+    };
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      child.stdout.off('data', onData);
+      child.stderr.off('data', onData);
+      child.off('error', onError);
+      reject(
+        new Error(
+          `Strict CSP Svelte example server exited before listening (code=${code}, signal=${signal})\n${logs}`,
+        ),
+      );
+    };
+
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
+    child.once('error', onError);
+    child.once('exit', onExit);
+  });
+
+  return child;
+}
+
+async function stopExampleServer(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null) return;
+
+  child.kill('SIGTERM');
+  await Promise.race([
+    once(child, 'exit').then(() => undefined),
+    new Promise<void>((resolve) => setTimeout(resolve, 2_000)),
+  ]);
+
+  if (child.exitCode === null) {
+    child.kill('SIGKILL');
+    await once(child, 'exit');
+  }
+}
+
+async function sendRawHttpRequest(
+  port: number,
+  request: string,
+): Promise<string> {
+  return await new Promise<string>((resolve, reject) => {
+    const socket = createConnection({ host: '127.0.0.1', port });
+    const chunks: Buffer[] = [];
+    let settled = false;
+
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      reject(error);
+    };
+
+    socket.setTimeout(2_000, () =>
+      fail(new Error('Timed out waiting for raw HTTP response')),
+    );
+    socket.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+    socket.once('error', fail);
+    socket.once('connect', () => socket.end(request));
+    socket.once('close', () => {
+      if (settled) return;
+      settled = true;
+      resolve(Buffer.concat(chunks).toString('utf8'));
+    });
+  });
 }
 
 test(
@@ -111,6 +238,66 @@ test(
         await exists(builtPath),
         `missing built asset: ${injectedPath}`,
       );
+    }
+  },
+);
+
+test(
+  'vite strict CSP svelte example server: malformed request targets return 400 without exiting',
+  { concurrency: false },
+  async () => {
+    const cwd = path.resolve('.');
+    await execFileAsync(
+      'npm',
+      ['run', 'example:vite:svelte:strict-csp:build'],
+      { cwd },
+    );
+
+    const port = await reservePort();
+    const server = await startExampleServer(
+      cwd,
+      'examples/vite-strict-csp-svelte/node-server.ts',
+      port,
+    );
+
+    try {
+      const malformedResp = await sendRawHttpRequest(
+        port,
+        [
+          'GET http://% HTTP/1.1',
+          `Host: 127.0.0.1:${port}`,
+          'Connection: close',
+          '',
+          '',
+        ].join('\r\n'),
+      );
+      assert.match(malformedResp, /^HTTP\/1\.1 400 Bad Request\r\n/);
+      assert.ok(malformedResp.includes('Bad Request'));
+      assert.equal(server.exitCode, null);
+
+      const healthyResp = await fetch(`http://127.0.0.1:${port}/`);
+      assert.equal(healthyResp.status, 200);
+      const healthyBody = await healthyResp.text();
+      assert.match(healthyBody, /FaceTheory Strict CSP Svelte/);
+
+      const dataResp = await fetch(
+        `http://127.0.0.1:${port}/_facetheory/data/strict-csp-svelte-home.json`,
+      );
+      assert.equal(dataResp.status, 200);
+      assert.match(
+        await dataResp.text(),
+        /from strict external hydration home/,
+      );
+
+      const assetPath = healthyBody.match(
+        /<(?:link|script|img)\b[^>]*(?:href|src)="(\/assets\/[^"]+)"/,
+      )?.[1];
+      assert.ok(assetPath);
+      const assetResp = await fetch(`http://127.0.0.1:${port}${assetPath}`);
+      assert.equal(assetResp.status, 200);
+      assert.equal(server.exitCode, null);
+    } finally {
+      await stopExampleServer(server);
     }
   },
 );

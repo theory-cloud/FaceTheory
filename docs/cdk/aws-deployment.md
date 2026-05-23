@@ -83,8 +83,10 @@ ISR:
 - Hydration sidecars are stored in the same `S3HtmlStore` namespace as generated HTML, with `.hydration.json` derived
   from the HTML pointer.
 - The browser URL is the route URL plus `__facetheory_isr_hydration=<opaque-token>`. Route that request to
-  Lambda/FaceTheory so the runtime can validate and serve the sidecar.
+  Lambda/FaceTheory so the runtime can resolve the same tenant/cache-key request variant before serving the sidecar.
 - Do not add a public S3 behavior for arbitrary ISR object keys or expose the raw pointer as a stable client contract.
+  A copied ISR sidecar URL is not a bearer credential; mismatched tenant, authorization-like headers, cookies, or query
+  variants fail closed with `404`.
 
 SSR:
 
@@ -96,7 +98,8 @@ OAC navigation policy:
 - Use `startAwsOacFormTransport()`'s default full-page navigation for strict-CSP form outcomes unless the host has
   explicitly chosen the SPA navigation contract.
 - Use `navigationPolicy: "spa"` only when the response is a FaceTheory document and external hydration can be loaded
-  before DOM mutation.
+  before DOM mutation, and do not use it as an escape hatch for HTML responses carrying `Content-Security-Policy`;
+  choose `navigationPolicy: "full-page"` or a caller-owned `onNavigate` / `onResponse` path for those responses.
 
 ## CloudFront Behavior Options
 
@@ -148,6 +151,7 @@ ISR:
 - observe `x-facetheory-isr` on responses
 - do not treat ISR HTML as immutable static content
 - treat pointer-derived hydration sidecars as part of the ISR HTML generation result, not as independent static assets
+- keep ISR hydration sidecar requests on the same tenant/auth/cookie/query variant boundary as the HTML that emitted them
 
 ## ISR Storage Notes
 

@@ -40,8 +40,13 @@ const STRICT_CSP_DIRECTIVES: Array<[name: string, values: string[]]> = [
   ['form-action', ["'self'"]],
 ];
 
-const START_TAG_RE = /<([a-zA-Z][a-zA-Z0-9:-]*)(\s[^<>]*?)?>/g;
-const SCRIPT_PAIR_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi;
+const SCRIPT_TAG_NAME = 'script';
+
+interface HtmlStartTag {
+  attrs: string;
+  end: number;
+  tagName: string;
+}
 
 /**
  * Builds FaceTheory's canonical strict CSP header value.
@@ -109,22 +114,22 @@ function normalizeCspNonce(nonce: string | null): string | null {
 }
 
 function validateNoInlineScriptElements(html: string): void {
-  START_TAG_RE.lastIndex = 0;
-  let startMatch: RegExpExecArray | null;
-  while ((startMatch = START_TAG_RE.exec(html)) !== null) {
-    const tagName = String(startMatch[1] ?? '').toLowerCase();
-    if (tagName !== 'script') continue;
+  const scriptStartTags: HtmlStartTag[] = [];
 
-    const attrs = String(startMatch[2] ?? '');
-    if (!hasHtmlAttribute(attrs, 'src')) {
+  for (const startTag of scanHtmlStartTags(html)) {
+    const tagName = startTag.tagName.toLowerCase();
+    if (tagName !== SCRIPT_TAG_NAME) continue;
+
+    scriptStartTags.push(startTag);
+
+    if (!hasHtmlAttribute(startTag.attrs, 'src')) {
       throw new Error('FaceTheory strict CSP rejects inline script tags in document');
     }
   }
 
-  SCRIPT_PAIR_RE.lastIndex = 0;
-  let pairMatch: RegExpExecArray | null;
-  while ((pairMatch = SCRIPT_PAIR_RE.exec(html)) !== null) {
-    const body = String(pairMatch[2] ?? '');
+  for (const startTag of scriptStartTags) {
+    const bodyEnd = findScriptEndTagStart(html, startTag.end);
+    const body = html.slice(startTag.end, bodyEnd);
     if (body.trim().length > 0) {
       throw new Error('FaceTheory strict CSP rejects inline script tags in document');
     }
@@ -132,11 +137,8 @@ function validateNoInlineScriptElements(html: string): void {
 }
 
 function validateNoInlineStyleElements(html: string): void {
-  START_TAG_RE.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = START_TAG_RE.exec(html)) !== null) {
-    const tagName = String(match[1] ?? '').toLowerCase();
-    if (tagName === 'style') {
+  for (const startTag of scanHtmlStartTags(html)) {
+    if (startTag.tagName.toLowerCase() === 'style') {
       throw new Error('FaceTheory strict CSP rejects inline style tags in document');
     }
   }
@@ -146,10 +148,8 @@ function validateNoUnsafeAttributes(
   html: string,
   policy: FaceCspPolicy | undefined,
 ): void {
-  START_TAG_RE.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = START_TAG_RE.exec(html)) !== null) {
-    const attrs = String(match[2] ?? '');
+  for (const startTag of scanHtmlStartTags(html)) {
+    const attrs = startTag.attrs;
     if (!attrs) continue;
 
     if (policy?.inlineScripts === false) {
@@ -167,15 +167,197 @@ function validateNoUnsafeAttributes(
   }
 }
 
+function* scanHtmlStartTags(html: string): Generator<HtmlStartTag> {
+  let cursor = 0;
+  while (cursor < html.length) {
+    const tagStart = html.indexOf('<', cursor);
+    if (tagStart === -1) return;
+
+    const nameStart = tagStart + 1;
+    const firstNameChar = html.charCodeAt(nameStart);
+    if (!isAsciiAlpha(firstNameChar)) {
+      cursor = nameStart;
+      continue;
+    }
+
+    let nameEnd = nameStart + 1;
+    while (nameEnd < html.length && isHtmlTagNameChar(html.charCodeAt(nameEnd))) {
+      nameEnd += 1;
+    }
+
+    const tagEnd = html.indexOf('>', nameEnd);
+    if (tagEnd === -1) return;
+
+    yield {
+      attrs: html.slice(nameEnd, tagEnd),
+      end: tagEnd + 1,
+      tagName: html.slice(nameStart, nameEnd),
+    };
+    cursor = tagEnd + 1;
+  }
+}
+
+function findScriptEndTagStart(html: string, bodyStart: number): number {
+  let cursor = bodyStart;
+  while (cursor < html.length) {
+    const closeStart = html.indexOf('</', cursor);
+    if (closeStart === -1) return html.length;
+
+    const nameStart = closeStart + 2;
+    const nameEnd = nameStart + SCRIPT_TAG_NAME.length;
+    if (
+      htmlStartsWithAsciiCaseInsensitive(html, nameStart, SCRIPT_TAG_NAME) &&
+      isScriptEndTagBoundary(html, nameEnd) &&
+      findHtmlTagEnd(html, nameEnd) !== -1
+    ) {
+      return closeStart;
+    }
+
+    cursor = closeStart + 2;
+  }
+  return html.length;
+}
+
+function htmlStartsWithAsciiCaseInsensitive(
+  html: string,
+  start: number,
+  expected: string,
+): boolean {
+  if (start + expected.length > html.length) return false;
+
+  for (let offset = 0; offset < expected.length; offset += 1) {
+    const actualCode = html.charCodeAt(start + offset);
+    const expectedCode = expected.charCodeAt(offset);
+    if (toAsciiLowercaseCode(actualCode) !== expectedCode) return false;
+  }
+  return true;
+}
+
+function isScriptEndTagBoundary(html: string, index: number): boolean {
+  if (index >= html.length) return false;
+
+  const code = html.charCodeAt(index);
+  // Script data only recognizes `</script` as an end tag when the name is
+  // followed by whitespace, `/`, or `>`; `=`/`-` remain script text.
+  return code === 47 || code === 62 || isHtmlWhitespace(code);
+}
+
+function findHtmlTagEnd(html: string, start: number): number {
+  let cursor = start;
+  let quote: '"' | "'" | null = null;
+
+  while (cursor < html.length) {
+    const char = html[cursor];
+    if (quote) {
+      if (char === quote) quote = null;
+      cursor += 1;
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      cursor += 1;
+      continue;
+    }
+
+    if (char === '>') return cursor;
+    cursor += 1;
+  }
+
+  return -1;
+}
+
 function hasHtmlAttribute(attrs: string, name: string): boolean {
-  return new RegExp(`(?:^|\\s)${escapeRegExp(name)}(?:\\s*=|\\s|$)`, 'i').test(attrs);
+  const expectedName = name.toLowerCase();
+  for (const attributeName of scanHtmlAttributeNames(attrs)) {
+    if (attributeName.toLowerCase() === expectedName) return true;
+  }
+  return false;
 }
 
 function findInlineEventAttribute(attrs: string): string | null {
-  const match = /(?:^|\s)(on[a-z][\w:-]*)(?:\s*=|\s|$)/i.exec(attrs);
-  return match?.[1] ?? null;
+  for (const attributeName of scanHtmlAttributeNames(attrs)) {
+    if (/^on[a-z][\w:-]*$/i.test(attributeName)) return attributeName;
+  }
+  return null;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function* scanHtmlAttributeNames(attrs: string): Generator<string> {
+  let cursor = 0;
+  while (cursor < attrs.length) {
+    cursor = skipHtmlAttributeDelimiters(attrs, cursor);
+    if (cursor >= attrs.length) return;
+
+    const nameStart = cursor;
+    while (cursor < attrs.length && !isHtmlAttributeNameDelimiter(attrs.charCodeAt(cursor))) {
+      cursor += 1;
+    }
+
+    const attributeName = attrs.slice(nameStart, cursor);
+    if (attributeName) yield attributeName;
+
+    cursor = skipHtmlWhitespace(attrs, cursor);
+    if (attrs[cursor] !== '=') continue;
+
+    cursor = skipHtmlWhitespace(attrs, cursor + 1);
+    if (attrs[cursor] === '"' || attrs[cursor] === "'") {
+      const quote = attrs[cursor] ?? '';
+      cursor += 1;
+      while (cursor < attrs.length && attrs[cursor] !== quote) cursor += 1;
+      if (cursor < attrs.length) cursor += 1;
+      continue;
+    }
+
+    while (cursor < attrs.length && !isHtmlWhitespace(attrs.charCodeAt(cursor))) {
+      cursor += 1;
+    }
+  }
+}
+
+function skipHtmlAttributeDelimiters(value: string, start: number): number {
+  let cursor = start;
+  while (cursor < value.length) {
+    const next = skipHtmlWhitespace(value, cursor);
+    // Browser parsers treat an unexpected solidus before an attribute name as
+    // a parse error, then continue in the before-attribute-name state. Mirror
+    // that boundary so `<button/onclick=...>` is scanned as an onclick attr
+    // without making `/` unsafe inside unquoted attribute values.
+    if (value[next] !== '/') return next;
+    cursor = next + 1;
+  }
+  return cursor;
+}
+
+function skipHtmlWhitespace(value: string, start: number): number {
+  let cursor = start;
+  while (cursor < value.length && isHtmlWhitespace(value.charCodeAt(cursor))) {
+    cursor += 1;
+  }
+  return cursor;
+}
+
+function toAsciiLowercaseCode(code: number): number {
+  if (code >= 65 && code <= 90) return code + 32;
+  return code;
+}
+
+function isAsciiAlpha(code: number): boolean {
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+}
+
+function isHtmlTagNameChar(code: number): boolean {
+  return (
+    isAsciiAlpha(code) ||
+    (code >= 48 && code <= 57) ||
+    code === 45 ||
+    code === 58
+  );
+}
+
+function isHtmlAttributeNameDelimiter(code: number): boolean {
+  return isHtmlWhitespace(code) || code === 47 || code === 61 || code === 62;
+}
+
+function isHtmlWhitespace(code: number): boolean {
+  return code === 9 || code === 10 || code === 12 || code === 13 || code === 32;
 }

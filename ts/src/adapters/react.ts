@@ -71,6 +71,19 @@ export async function renderReact(
   node: React.ReactNode,
   options: RenderReactOptions = {},
 ): Promise<FaceRenderResult> {
+  return renderReactInternal(ctx, node, options);
+}
+
+interface ReactRenderValidationOptions {
+  deferStrictCspHydrationValidation?: boolean;
+}
+
+async function renderReactInternal(
+  ctx: FaceContext,
+  node: React.ReactNode,
+  options: RenderReactOptions,
+  validationOptions: ReactRenderValidationOptions = {},
+): Promise<FaceRenderResult> {
   const integrations = await prepareUIIntegrations<
     React.ReactElement,
     UIIntegration<React.ReactElement>
@@ -120,7 +133,11 @@ export async function renderReact(
     }
   }
 
-  enforceAdapterStrictCspResult(out, { adapterName: 'React adapter' });
+  enforceAdapterStrictCspResult(out, {
+    adapterName: 'React adapter',
+    deferHydrationValidation:
+      validationOptions.deferStrictCspHydrationValidation === true,
+  });
 
   return out;
 }
@@ -129,6 +146,15 @@ export async function renderReactStream(
   ctx: FaceContext,
   node: React.ReactNode,
   options: RenderReactStreamOptions = {},
+): Promise<FaceRenderResult> {
+  return renderReactStreamInternal(ctx, node, options);
+}
+
+async function renderReactStreamInternal(
+  ctx: FaceContext,
+  node: React.ReactNode,
+  options: RenderReactStreamOptions,
+  validationOptions: ReactRenderValidationOptions = {},
 ): Promise<FaceRenderResult> {
   const integrations = await prepareUIIntegrations<
     React.ReactElement,
@@ -295,9 +321,17 @@ export async function renderReactStream(
     }
   }
 
-  enforceAdapterStrictCspResult(out, { adapterName: 'React adapter' });
+  enforceAdapterStrictCspResult(out, {
+    adapterName: 'React adapter',
+    deferHydrationValidation:
+      validationOptions.deferStrictCspHydrationValidation === true,
+  });
 
   return out;
+}
+
+function modeUsesRuntimeHydrationSidecars(mode: FaceMode): boolean {
+  return mode === 'isr' || mode === 'ssg';
 }
 
 export interface ReactFaceOptions<Data = unknown> {
@@ -328,7 +362,11 @@ export function createReactFace<Data = unknown>(
         typeof options.renderOptions === 'function'
           ? await options.renderOptions(ctx, data as Data)
           : (options.renderOptions ?? {});
-      return renderReact(ctx, tree, renderOptions);
+      return renderReactInternal(ctx, tree, renderOptions, {
+        deferStrictCspHydrationValidation: modeUsesRuntimeHydrationSidecars(
+          options.mode,
+        ),
+      });
     },
   };
 
@@ -369,7 +407,11 @@ export function createReactStreamFace<Data = unknown>(
         typeof options.renderOptions === 'function'
           ? await options.renderOptions(ctx, data as Data)
           : (options.renderOptions ?? {});
-      return renderReactStream(ctx, tree, renderOptions);
+      return renderReactStreamInternal(ctx, tree, renderOptions, {
+        deferStrictCspHydrationValidation: modeUsesRuntimeHydrationSidecars(
+          options.mode,
+        ),
+      });
     },
   };
 

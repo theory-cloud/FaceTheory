@@ -74,6 +74,31 @@ REPO_ROOT="${work_env}" GH_BIN="${tmpdir}/missing-gh" RELEASE_JSON="${release_js
   bash "${script_path}" "v3.1.2-rc" "HEAD" >/dev/null ||
   fail "environment-provided draft metadata did not pass without gh"
 
+# Existing-tag asset builds must prove the draft target still resolves to the
+# checked-out tag commit. A mutable target such as main must not pass after main
+# advances beyond the requested tag.
+work_tag="$(setup_repo existing-tag "${tmpdir}")"
+tag_head="$(git -C "${work_tag}" rev-parse HEAD)"
+remote_tag="${tmpdir}/existing-tag-remote.git"
+git init --bare "${remote_tag}" >/dev/null 2>&1
+git -C "${work_tag}" remote add origin "${remote_tag}"
+git -C "${work_tag}" -c tag.gpgSign=false tag -a v3.1.2-rc -m "test tag v3.1.2-rc" "${tag_head}"
+git -C "${work_tag}" push origin HEAD:refs/heads/main refs/tags/v3.1.2-rc >/dev/null 2>&1
+printf '%s\n' "main moved after tag" >> "${work_tag}/README.md"
+git -C "${work_tag}" add README.md
+git -C "${work_tag}" commit -m "test: move main after tag" >/dev/null 2>&1
+git -C "${work_tag}" push origin HEAD:refs/heads/main >/dev/null 2>&1
+git -C "${work_tag}" checkout --detach "${tag_head}" >/dev/null 2>&1
+release_json_tag_commit="{\"tagName\":\"v3.1.2-rc\",\"targetCommitish\":\"${tag_head}\",\"isDraft\":true,\"isPrerelease\":true,\"url\":\"https://github.test/releases/existing-tag\"}"
+REPO_ROOT="${work_tag}" GH_BIN="${tmpdir}/missing-gh" RELEASE_JSON="${release_json_tag_commit}" \
+  bash "${script_path}" "v3.1.2-rc" "HEAD" >/dev/null ||
+  fail "existing tag draft with immutable tag target did not pass"
+release_json_moved_main='{"tagName":"v3.1.2-rc","targetCommitish":"main","isDraft":true,"isPrerelease":true,"url":"https://github.test/releases/existing-tag-main"}'
+if REPO_ROOT="${work_tag}" GIT_REMOTE="${remote_tag}" GH_BIN="${tmpdir}/missing-gh" RELEASE_JSON="${release_json_moved_main}" \
+  bash "${script_path}" "v3.1.2-rc" "HEAD" >/dev/null 2>&1; then
+  fail "existing tag draft with moved main target unexpectedly passed"
+fi
+
 # A draft release pointing somewhere other than the checked-out commit must fail
 # closed; otherwise assets can be built from different code than the release.
 work_b="$(setup_repo wrong-target "${tmpdir}")"

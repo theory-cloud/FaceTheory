@@ -84,14 +84,20 @@ pair:
 - SSR: confirm the response carries `content-security-policy` from the Face and the external hydration `dataUrl` is
   same-origin. If the data is request-time, route the sidecar URL to Lambda/AppTheory or another host-owned same-origin
   endpoint that can reproduce the exact render data.
+- Streaming strict-CSP SSR is intentionally buffered for whole-document validation. FaceTheory enforces
+  `createFaceApp({ strictCsp: { maxStreamingBodyBytes } })` while reading raw stream chunks and defaults to 5 MiB. If the
+  limit is exceeded, the route fails closed with a bounded `413 Payload Too Large` response instead of validating or
+  returning a truncated partial document. Non-strict streaming remains streaming and is not collected by this limit.
 - SSG: confirm HTML and `/_facetheory/data/*` sidecars are uploaded together and routed to S3 through CloudFront. Cache
   headers and invalidations should keep the HTML and sidecar from different builds from being mixed.
 - ISR: confirm `x-facetheory-isr` behavior stays normal and hydration sidecar URLs with
-  `__facetheory_isr_hydration=...` route to Lambda/FaceTheory. The runtime validates the opaque pointer token and serves
-  the pointer-derived `.hydration.json` object from the same `S3HtmlStore` used for HTML.
-- SPA navigation: confirm `startFaceNavigation()` or `startAwsOacFormTransport({ navigationPolicy: "spa" })` loads
-  external hydration data before mutating the document. Use `navigationPolicy: "full-page"` when fetched CSP-protected
-  HTML should become a real browser navigation instead of a document-write replacement.
+  `__facetheory_isr_hydration=...` route to Lambda/FaceTheory. The runtime validates the opaque pointer token against
+  the current tenant/cache-key request variant before serving the pointer-derived `.hydration.json` object from the same
+  `S3HtmlStore` used for HTML. Treat copied sidecar URLs as insufficient on their own; mismatched tenant, auth-like
+  headers, cookies, or query variants should fail closed with `404`.
+- SPA navigation: confirm `startFaceNavigation()` or non-CSP `startAwsOacFormTransport({ navigationPolicy: "spa" })`
+  responses load external hydration data before mutating the document. Use `navigationPolicy: "full-page"` when fetched
+  CSP-protected HTML should become a real browser navigation instead of a document-write or SPA DOM replacement.
 
 Evidence boundary:
 - A local strict-CSP test or example build proves repository behavior only.

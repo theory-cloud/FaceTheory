@@ -21,7 +21,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=3.2.2 # x-release-please-version
+export FACETHEORY_VERSION=3.3.0-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -39,7 +39,7 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.7.0/theory-cloud-apptheory-1.7.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.7.1/theory-cloud-apptheory-1.7.1.tgz
 
 npm install --save-exact \
   https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz
@@ -259,8 +259,9 @@ runtime.post("/control/items/new", actionFace);
 The helper sends the exact URL-encoded bytes that it hashes, sets `x-amz-content-sha256`, and includes same-origin
 credentials. Marked forms that resolve to `multipart/form-data`, `text/plain`, or another unsupported encoding fail
 closed before a request is sent; file uploads need a separately scoped transport. If the HTML response carries a
-`Content-Security-Policy` header, handle the result explicitly through `onResponse` or `onNavigate` because fetched CSP
-headers cannot become the active document policy during default document replacement.
+`Content-Security-Policy` header, use `navigationPolicy: "full-page"` or handle the result explicitly through
+`onResponse` / `onNavigate` because fetched CSP headers cannot become the active document policy during document-write
+replacement or explicit SPA DOM navigation.
 
 ## Add Stitch Control-Plane Primitives
 
@@ -400,7 +401,7 @@ Important ISR default:
 
 ## Reference Bundle
 
-The `v3.2.2` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v3.3.0-rc` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples

@@ -2,6 +2,13 @@ import type { FaceCspPolicy, FaceHeadTag, FaceRenderResult } from './types.js';
 
 export interface AdapterStrictCspValidationOptions {
   adapterName: string;
+  /**
+   * Some Face-level render modes externalize legacy/inline hydration after the
+   * adapter returns, before final head emission. Keep all other strict-CSP
+   * adapter checks active, but let those runtime sidecar paths validate the
+   * final external hydration shape after conversion.
+   */
+  deferHydrationValidation?: boolean;
 }
 
 export function enforceAdapterStrictCspResult(
@@ -14,7 +21,11 @@ export function enforceAdapterStrictCspResult(
   const adapterName = normalizeAdapterName(options.adapterName);
 
   if (policy.inlineScripts === false) {
-    if (out.hydration && out.hydration.type !== 'external') {
+    if (
+      out.hydration &&
+      out.hydration.type !== 'external' &&
+      options.deferHydrationValidation !== true
+    ) {
       throw new Error(
         `FaceTheory ${adapterName} strict CSP requires external hydration data`,
       );
