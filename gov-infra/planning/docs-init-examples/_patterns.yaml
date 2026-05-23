@@ -37,7 +37,7 @@ patterns:
     correct_example: |
       # CORRECT: install pinned release assets
       npm install --save-exact \
-        https://github.com/theory-cloud/AppTheory/releases/download/v1.7.0/theory-cloud-apptheory-1.7.0.tgz
+        https://github.com/theory-cloud/AppTheory/releases/download/v1.7.1/theory-cloud-apptheory-1.7.1.tgz
       npm install --save-exact \
         https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz
     anti_patterns:
