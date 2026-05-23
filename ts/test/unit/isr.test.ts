@@ -28,7 +28,7 @@ function externalHydrationHref(html: string): string {
   assert.ok(tag, 'expected external hydration link tag');
   const href = /\bhref="([^"]+)"/i.exec(tag)?.[1];
   assert.ok(href, 'expected external hydration href');
-  return href;
+  return href.replace(/&amp;/g, '&');
 }
 
 function delay(ms: number): Promise<void> {
@@ -398,8 +398,7 @@ for (const variant of [
           revalidateSeconds: 60,
           render: async (ctx) => {
             const seq = ++renderCount;
-            const tenant =
-              ctx.request.headers['x-tenant-id']?.[0] ?? 'missing';
+            const tenant = ctx.request.headers['x-tenant-id']?.[0] ?? 'missing';
             return { html: `<main>${tenant}-${seq}</main>` };
           },
         },
@@ -427,15 +426,11 @@ for (const variant of [
     assert.equal(renderCount, 0);
     assert.deepEqual(metaStore.debugSnapshot(), []);
     assert.equal(
-      decodeBody(tenantAHeader.body as Uint8Array).includes(
-        'TENANT_SECRET_A',
-      ),
+      decodeBody(tenantAHeader.body as Uint8Array).includes('TENANT_SECRET_A'),
       false,
     );
     assert.equal(
-      decodeBody(tenantBHeader.body as Uint8Array).includes(
-        'TENANT_SECRET_B',
-      ),
+      decodeBody(tenantBHeader.body as Uint8Array).includes('TENANT_SECRET_B'),
       false,
     );
   });
@@ -748,7 +743,10 @@ test('isr: strict CSP hydration writes and serves pointer-derived sidecars', asy
 
   const sidecar = await app.handle({ method: 'GET', path: sidecarHref });
   assert.equal(sidecar.status, 200);
-  assert.equal(sidecar.headers['content-type']?.[0], 'application/json; charset=utf-8');
+  assert.equal(
+    sidecar.headers['content-type']?.[0],
+    'application/json; charset=utf-8',
+  );
   assert.equal(renderCount, 1);
 
   const sidecarJson = decodeBody(sidecar.body as Uint8Array);
@@ -769,6 +767,119 @@ test('isr: strict CSP hydration writes and serves pointer-derived sidecars', asy
   const serializedMeta = JSON.stringify(metaStore.debugSnapshot());
   assert.equal(serializedMeta.includes(secret), false);
   assert.equal(serializedMeta.includes('terminator'), false);
+});
+
+test('isr: strict CSP hydration sidecars are bound to tenant and auth variants', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/accounts/{id}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: (ctx) => {
+          const seq = ++renderCount;
+          return {
+            csp: {
+              inlineScripts: false,
+              inlineStyles: false,
+              rawHead: false,
+            },
+            html: `<main>${ctx.params.id}-${seq}</main>`,
+            hydration: {
+              data: {
+                id: ctx.params.id,
+                seq,
+                tenant: ctx.request.headers['x-tenant-id']?.[0] ?? 'missing',
+                view: ctx.request.query.view?.[0] ?? 'missing',
+              },
+              bootstrapModule: '/assets/account-entry.js',
+            },
+          };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => 1_000,
+      tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+    },
+  });
+
+  const matchingHeaders = {
+    'x-tenant-id': ['tenant-a'],
+    authorization: ['Bearer SECRET_TOKEN_A'],
+    cookie: ['session=COOKIE_SECRET_A; theme=light'],
+  };
+  const miss = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=summary',
+    headers: matchingHeaders,
+  });
+  const missHtml = decodeBody(miss.body as Uint8Array);
+  const sidecarHref = externalHydrationHref(missHtml);
+
+  assert.equal(miss.status, 200);
+  assert.equal(miss.headers['x-facetheory-isr']?.[0], 'miss');
+  assert.match(
+    sidecarHref,
+    /^\/accounts\/42\?view=summary&__facetheory_isr_hydration=/,
+  );
+
+  const matchingSidecar = await app.handle({
+    method: 'GET',
+    path: sidecarHref,
+    headers: matchingHeaders,
+  });
+  assert.equal(matchingSidecar.status, 200);
+  assert.deepEqual(JSON.parse(decodeBody(matchingSidecar.body as Uint8Array)), {
+    id: '42',
+    seq: 1,
+    tenant: 'tenant-a',
+    view: 'summary',
+  });
+
+  const leakedWithoutOriginalContext = await app.handle({
+    method: 'GET',
+    path: sidecarHref,
+  });
+  const leakedMissingAuthCookie = await app.handle({
+    method: 'GET',
+    path: sidecarHref,
+    headers: { 'x-tenant-id': ['tenant-a'] },
+  });
+  const leakedDifferentTenant = await app.handle({
+    method: 'GET',
+    path: sidecarHref,
+    headers: {
+      ...matchingHeaders,
+      'x-tenant-id': ['tenant-b'],
+    },
+  });
+  const leakedDifferentCookie = await app.handle({
+    method: 'GET',
+    path: sidecarHref,
+    headers: {
+      ...matchingHeaders,
+      cookie: ['session=COOKIE_SECRET_B; theme=light'],
+    },
+  });
+  const leakedWithoutQueryVariant = await app.handle({
+    method: 'GET',
+    path: sidecarHref.replace('view=summary&', ''),
+    headers: matchingHeaders,
+  });
+
+  assert.equal(leakedWithoutOriginalContext.status, 404);
+  assert.equal(leakedMissingAuthCookie.status, 404);
+  assert.equal(leakedDifferentTenant.status, 404);
+  assert.equal(leakedDifferentCookie.status, 404);
+  assert.equal(leakedWithoutQueryVariant.status, 404);
+  assert.equal(renderCount, 1);
 });
 
 class FailingSidecarHtmlStore extends InMemoryHtmlStore {

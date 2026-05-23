@@ -61,6 +61,8 @@ function isAbsoluteOrProtocolRelativeUrl(value: string): boolean {
   return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value) || value.startsWith('//');
 }
 
+const STRICT_CSP_SAME_ORIGIN_SENTINEL = 'https://facetheory.invalid';
+
 function assertStrictSameOriginUrl(
   value: string,
   label: string,
@@ -73,7 +75,10 @@ function assertStrictSameOriginUrl(
 
   let parsed: URL;
   try {
-    parsed = new URL(trimmed, 'https://facetheory.invalid');
+    // Resolve against the real allowed origin when present so WHATWG/browser
+    // network-path forms such as `/\host` or control-stripped `//host` values
+    // cannot bypass strict CSP through the raw relative-url classifier.
+    parsed = new URL(trimmed, allowedOrigin ?? STRICT_CSP_SAME_ORIGIN_SENTINEL);
   } catch {
     throw new Error(`FaceTheory strict CSP ${label} URL is invalid: ${trimmed}`);
   }
@@ -84,9 +89,14 @@ function assertStrictSameOriginUrl(
     );
   }
 
-  if (!isAbsoluteOrProtocolRelativeUrl(trimmed)) return;
-
   if (!allowedOrigin) {
+    if (
+      !isAbsoluteOrProtocolRelativeUrl(trimmed) &&
+      parsed.origin === STRICT_CSP_SAME_ORIGIN_SENTINEL
+    ) {
+      return;
+    }
+
     throw new Error(
       `FaceTheory strict CSP ${label} URL must be same-origin or relative: ${trimmed}`,
     );

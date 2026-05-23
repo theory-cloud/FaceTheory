@@ -227,27 +227,11 @@ jobs:
           trusted_dir="${RUNNER_TEMP}/facetheory-release-scripts"
           mkdir -p "${trusted_dir}"
           cp \
-            scripts/checkout-release-source.sh \
-            scripts/resolve-release-source-ref.sh \
             scripts/verify-release-branch.sh \
             scripts/verify-release-draft-target.sh \
             "${trusted_dir}/"
           chmod +x "${trusted_dir}"/*.sh
 
-      - name: Resolve release source ref
-        id: source
-        env:
-          RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}
-          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-        run: |
-          "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh" "${TAG_NAME}" >> "${GITHUB_OUTPUT}"
-
-      - name: Checkout release source
-        run: |
-          # Draft GitHub Releases do not guarantee a git tag exists until the
-          # release is published. Build from the draft release source ref and
-          # verify the draft's target before uploading immutable assets.
-          "${RUNNER_TEMP}/facetheory-release-scripts/checkout-release-source.sh" "${{ steps.source.outputs.source_ref }}"
 
       - name: Fetch main + premain (release branch verification)
         run: git fetch origin main premain --force
@@ -257,7 +241,7 @@ jobs:
           RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}
         run: |
           REPO_ROOT="${GITHUB_WORKSPACE}" \
-            "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" HEAD
+            "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"
 
       - name: Verify release source branch
         run: |

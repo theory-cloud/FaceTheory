@@ -428,7 +428,7 @@ Why this is correct:
 - FaceTheory proceeds only when the resolved form encoding is `application/x-www-form-urlencoded`, computes the SHA256 hash over the exact URL-encoded bytes it sends, and sets `x-amz-content-sha256` for CloudFront's Lambda URL OAC signing path.
 - The action must stay same-origin, and FaceTheory forces `redirect: "error"` on the mutating fetch so a 307/308 open redirect cannot replay the signed form body to another origin.
 - Cookies and same-origin credentials remain on the CloudFront/AppTheory path, while AppTheory's `AWS_IAM` Lambda URL hardening stays intact.
-- Same-origin HTML validation/error responses may replace the whole document instead of inventing a partial DOM patching contract, but the default replacement fails closed when the response carries a `Content-Security-Policy` header because fetch cannot install response CSP headers into a `document.write()` navigation. Use `onNavigate` or `onResponse` for CSP-protected HTML responses and for intentional post-submit redirects to safe GET URLs.
+- Same-origin HTML validation/error responses may replace the whole document instead of inventing a partial DOM patching contract, but fetched document replacement and explicit SPA DOM navigation fail closed when the response carries a `Content-Security-Policy` header because fetch cannot install response CSP headers into the active document policy. Use `navigationPolicy: "full-page"`, `onNavigate`, or `onResponse` for CSP-protected HTML responses and for intentional post-submit redirects to safe GET URLs.
 
 **INCORRECT**
 

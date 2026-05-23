@@ -6,6 +6,7 @@ import { renderHTMLDocument, safeJson } from './html.js';
 import type {
   FaceBody,
   FaceHydration,
+  FaceInlineHydration,
   FaceModule,
   FaceRenderResult,
   Headers,
@@ -308,12 +309,16 @@ function withSsgStrictHydrationSidecars(
 
 function requiresSsgStrictHydrationSidecar(
   out: FaceRenderResult,
-): out is FaceRenderResult & { hydration: FaceHydration } {
-  return out.csp?.inlineScripts === false && out.hydration !== undefined;
+): out is FaceRenderResult & { hydration: FaceInlineHydration } {
+  return (
+    out.csp?.inlineScripts === false &&
+    out.hydration !== undefined &&
+    out.hydration.type !== 'external'
+  );
 }
 
 function externalizeSsgHydration(
-  hydration: FaceHydration,
+  hydration: FaceInlineHydration,
   dataUrl: string,
 ): FaceHydration {
   return {

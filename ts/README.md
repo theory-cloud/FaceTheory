@@ -19,8 +19,8 @@ Install the peers that match your adapter surface:
 
 Optional companion packages:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.7.0/theory-cloud-apptheory-1.7.0.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v1.7.0/theory-cloud-apptheory-cdk-1.7.0.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.7.1/theory-cloud-apptheory-1.7.1.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v1.7.1/theory-cloud-apptheory-cdk-1.7.1.tgz`
 - TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz`
 
 ## Minimal App

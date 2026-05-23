@@ -38,19 +38,35 @@ if grep -R -F 'gh release create' .github/workflows scripts | grep -v 'scripts/t
 fi
 
 grep -Fq 'facetheory-release-scripts' .github/workflows/release.yml ||
-  fail "release.yml must stage trusted release provenance scripts before checking out release source code"
+  fail "release.yml must stage trusted release provenance scripts before asset provenance checks"
+
+grep -Fq 'scripts/resolve-release-source-ref.sh' .github/workflows/release.yml ||
+  fail "release.yml existing-tag path must resolve requested tags through trusted provenance scripts"
 
 grep -Fq 'scripts/checkout-release-source.sh' .github/workflows/release.yml ||
-  fail "release.yml must stage the tokenless release source checkout helper"
+  fail "release.yml existing-tag path must checkout the requested tag source through trusted provenance scripts"
 
-grep -Fq 'resolve-release-source-ref.sh" "${TAG_NAME}"' .github/workflows/release.yml ||
-  fail "release.yml must resolve existing draft source refs from trusted staged scripts before checkout"
+grep -Fq 'GH_BIN="${RUNNER_TEMP}/facetheory-gh-disabled"' .github/workflows/release.yml ||
+  fail "release.yml existing-tag source resolver must not perform repo-script GitHub API lookups"
 
-grep -Fq 'RELEASE_SOURCE_COMMIT' .github/workflows/release.yml ||
-  fail "release.yml must carry immutable release source identity into the build job"
+grep -Fq 'checkout-release-source.sh" "${source_ref}" "${source_commit}"' .github/workflows/release.yml ||
+  fail "release.yml existing-tag path must checkout the resolved immutable tag source"
 
-grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" HEAD' .github/workflows/release.yml ||
-  fail "release.yml must revalidate existing draft target identity after checkout and before build"
+grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" "${RELEASE_SOURCE_COMMIT}"' .github/workflows/release.yml ||
+  fail "release.yml existing-tag path must compare draft target identity to the checked-out source commit"
+
+if grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" "${{ github.sha }}"' .github/workflows/release.yml; then
+  fail "release.yml existing-tag path must not compare draft target identity to workflow github.sha"
+fi
+
+if grep -Fq 'verify-release-draft-target.sh" "${TAG_NAME}" HEAD' .github/workflows/release.yml; then
+  fail "release.yml existing-tag path must not verify draft targets against mutable workspace HEAD"
+fi
+
+for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; do
+  grep -Fq 'verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"' "${workflow}" ||
+    fail "${workflow} build-release-assets must compare draft target identity to github.sha"
+done
 
 if grep -R -Fq 'run: scripts/publish-draft-release-assets.sh' .github/workflows; then
   fail "release-capable publish tokens must not be exposed to mutable repo publish scripts"
@@ -81,6 +97,9 @@ for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; 
   if grep -Fq 'ref: ${{ steps.source.outputs.source_ref }}' "${workflow}"; then
     fail "${workflow} must not use actions/checkout with a dynamic release source ref"
   fi
+  if grep -Fq 'verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" HEAD' "${workflow}"; then
+    fail "${workflow} must not verify draft targets against mutable workspace HEAD"
+  fi
 done
 
 grep -Fq 'RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}' .github/workflows/prerelease.yml ||
@@ -91,6 +110,72 @@ grep -Fq 'RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}'
 
 grep -Fq 'RELEASE_JSON: ${{ steps.metadata.outputs.release_json }}' .github/workflows/release.yml ||
   fail "release.yml existing-tag path must pass resolved release metadata without a token"
+
+python3 - <<'PY' || fail "release metadata outputs must not be interpolated directly into workflow run blocks"
+import re
+from pathlib import Path
+
+guarded_output_expressions = {
+    output_name: re.compile(
+        r"\$\{\{"
+        r"[^}]*"
+        rf"outputs\s*(?:\.\s*{output_name}|\[\s*['\"]{output_name}['\"]\s*\])"
+        r"[^}]*"
+        r"\}\}",
+        re.S,
+    )
+    for output_name in ("release_json", "source_ref")
+}
+
+
+def run_blocks(lines: list[str]):
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.lstrip(" ")
+        indent = len(line) - len(stripped)
+        if stripped.startswith("run:"):
+            run_prefix = "run:"
+        elif stripped.startswith("- run:"):
+            run_prefix = "- run:"
+        else:
+            index += 1
+            continue
+
+        rest = stripped[len(run_prefix):].strip()
+        start_line = index + 1
+        if rest in {"|", "|-", "|+", ">", ">-", ">+"}:
+            block_lines = []
+            block_start_line = index + 2
+            index += 1
+            while index < len(lines):
+                candidate = lines[index]
+                candidate_indent = len(candidate) - len(candidate.lstrip(" "))
+                if candidate.strip() and candidate_indent <= indent:
+                    break
+                block_lines.append(candidate)
+                index += 1
+            yield start_line, block_start_line, "\n".join(block_lines)
+            continue
+
+        index += 1
+        yield start_line, start_line, rest
+
+
+for workflow in (Path(".github/workflows/release.yml"), Path(".github/workflows/prerelease.yml")):
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+    for run_line, block_line, script in run_blocks(lines):
+        for output_name, expression in guarded_output_expressions.items():
+            match = expression.search(script)
+            if match is None:
+                continue
+            prefix = script[: match.start()]
+            line_offset = prefix.count("\n")
+            raise SystemExit(
+                f"{workflow}:{block_line + line_offset} raw {output_name} expression "
+                f"in run block opened at line {run_line}; pass it through env or action inputs"
+            )
+PY
 
 python3 - <<'PY' || fail "release draft verification steps must not receive GitHub tokens"
 from pathlib import Path
@@ -210,12 +295,9 @@ for required in (
     "    permissions:\n      contents: read\n",
     "      - name: Checkout release workflow scripts\n",
     "      - name: Stage trusted release provenance scripts\n",
-    "      - name: Resolve release source ref\n",
-    "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh",
-    "      - name: Checkout release source\n",
-    "${RUNNER_TEMP}/facetheory-release-scripts/checkout-release-source.sh",
     "RELEASE_JSON: ${{ needs.resolve-draft-release.outputs.release_json }}",
     "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-draft-target.sh",
+    'verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"',
     "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-branch.sh",
 ):
     if required not in build:
@@ -224,7 +306,11 @@ for forbidden in (
     "GH_TOKEN:",
     "GITHUB_TOKEN:",
     "secrets.RELEASE_PLEASE_TOKEN",
-    'verify-release-draft-target.sh "${{ needs.release-please.outputs.tag_name }}" "${{ github.sha }}"',
+    "      - name: Resolve release source ref\n",
+    "${RUNNER_TEMP}/facetheory-release-scripts/resolve-release-source-ref.sh",
+    "      - name: Checkout release source\n",
+    "${RUNNER_TEMP}/facetheory-release-scripts/checkout-release-source.sh",
+    'verify-release-draft-target.sh" "${{ needs.release-please.outputs.tag_name }}" HEAD',
 ):
     if forbidden in build:
         raise SystemExit(f"build-release-assets must not receive {forbidden} in {workflow}")

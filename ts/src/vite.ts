@@ -128,11 +128,13 @@ function isAbsoluteOrProtocolRelativeUrl(value: string): boolean {
   return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value) || value.startsWith('//');
 }
 
+const SAME_ORIGIN_DATA_URL_SENTINEL = 'https://facetheory.invalid';
+
 function originFromAbsoluteHttpUrl(value: string | URL | undefined): string | null {
   if (value === undefined) return null;
   const normalized = String(value);
   if (!isAbsoluteOrProtocolRelativeUrl(normalized)) return null;
-  const parsed = new URL(normalized, 'https://facetheory.invalid');
+  const parsed = new URL(normalized, SAME_ORIGIN_DATA_URL_SENTINEL);
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
   return parsed.origin;
 }
@@ -146,9 +148,13 @@ function assertSameOriginDataUrl(
     throw new Error('external hydration dataUrl must not be empty');
   }
 
+  // Resolve against the real allowed origin when available so WHATWG/browser
+  // network-path forms such as `/\host` and `\\host` cannot hide behind a
+  // string-prefix relative-url classifier.
+  const parseBase = allowedOrigin ?? SAME_ORIGIN_DATA_URL_SENTINEL;
   let parsed: URL;
   try {
-    parsed = new URL(trimmed, 'https://facetheory.invalid');
+    parsed = new URL(trimmed, parseBase);
   } catch {
     throw new Error(`external hydration dataUrl is invalid: ${trimmed}`);
   }
@@ -159,9 +165,13 @@ function assertSameOriginDataUrl(
     );
   }
 
-  if (!isAbsoluteOrProtocolRelativeUrl(trimmed)) return trimmed;
-
   if (!allowedOrigin) {
+    if (
+      !isAbsoluteOrProtocolRelativeUrl(trimmed) &&
+      parsed.origin === SAME_ORIGIN_DATA_URL_SENTINEL
+    ) {
+      return trimmed;
+    }
     throw new Error(
       `external hydration dataUrl must be same-origin or relative: ${trimmed}`,
     );
