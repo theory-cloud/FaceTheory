@@ -425,10 +425,20 @@ startAwsOacFormTransport();
 Why this is correct:
 
 - The form opts in explicitly with `data-facetheory-oac-form`; unmarked forms keep native browser behavior.
+- The helper is marker-scoped, not CloudFront path-scoped. It does not monkeypatch `fetch`, and it does not inspect
+  your distribution behaviors to infer which same-origin paths route to the OAC-protected SSR origin.
 - FaceTheory proceeds only when the resolved form encoding is `application/x-www-form-urlencoded`, computes the SHA256 hash over the exact URL-encoded bytes it sends, and sets `x-amz-content-sha256` for CloudFront's Lambda URL OAC signing path.
 - The action must stay same-origin, and FaceTheory forces `redirect: "error"` on the mutating fetch so a 307/308 open redirect cannot replay the signed form body to another origin.
 - Cookies and same-origin credentials remain on the CloudFront/AppTheory path, while AppTheory's `AWS_IAM` Lambda URL hardening stays intact.
 - Same-origin HTML validation/error responses may replace the whole document instead of inventing a partial DOM patching contract, but fetched document replacement and explicit SPA DOM navigation fail closed when the response carries a `Content-Security-Policy` header because fetch cannot install response CSP headers into the active document policy. Use `navigationPolicy: "full-page"`, `onNavigate`, or `onResponse` for CSP-protected HTML responses and for intentional post-submit redirects to safe GET URLs.
+
+Mixed-origin note:
+
+- If the same CloudFront distribution also serves bearer-auth or otherwise non-OAC Lambda Function URL origins such as
+  `/api/*`, `/auth/*`, `/.well-known/*`, or `/attestations/*`, do not mark those forms with
+  `data-facetheory-oac-form`. Unmarked forms and ordinary same-origin API `fetch()` calls stay untouched, but any
+  marked same-origin mutating form is treated as an OAC form regardless of path. Add a host-side CI check when marker
+  hygiene is security-relevant.
 
 **INCORRECT**
 

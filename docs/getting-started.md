@@ -21,7 +21,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=3.2.1 # x-release-please-version
+export FACETHEORY_VERSION=3.3.0 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -140,6 +140,10 @@ Client bootstrap modules should fetch the `<link rel="facetheory-hydration">` UR
 cross-origin data URLs or redirects. The repository example at `ts/examples/vite-strict-csp-svelte/` demonstrates the
 full Svelte/Vite shape: external CSS/assets, same-origin module bootstrap, external hydration JSON, no `<svelte:head>`
 raw output, and SPA navigation that loads external data before `hydrateFaceNavigation(context)`.
+
+Svelte strict no-inline support is first-class through `@theory-cloud/facetheory/svelte` when the route uses external
+hydration data. Keep Svelte component CSS in the Vite client entry instead of relying on inline SSR style fallback
+output, and use FaceTheory structured `headTags` instead of `<svelte:head>` raw SSR head output on strict routes.
 
 Validation:
 
@@ -401,7 +405,7 @@ Important ISR default:
 
 ## Reference Bundle
 
-The `v3.2.1` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v3.3.0` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples
