@@ -141,6 +141,10 @@ cross-origin data URLs or redirects. The repository example at `ts/examples/vite
 full Svelte/Vite shape: external CSS/assets, same-origin module bootstrap, external hydration JSON, no `<svelte:head>`
 raw output, and SPA navigation that loads external data before `hydrateFaceNavigation(context)`.
 
+Svelte strict no-inline support is first-class through `@theory-cloud/facetheory/svelte` when the route uses external
+hydration data. Keep Svelte component CSS in the Vite client entry instead of relying on inline SSR style fallback
+output, and use FaceTheory structured `headTags` instead of `<svelte:head>` raw SSR head output on strict routes.
+
 Validation:
 
 ```bash

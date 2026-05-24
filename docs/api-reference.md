@@ -239,6 +239,10 @@ Default ISR partitioning:
 - The default tenant resolver intentionally ignores request tenant headers and uses `default`. For authenticated tenant boundaries, supply `tenantKey` explicitly (for example `tenantKeyFromTrustedHeader('x-tenant-id')` after trusted middleware strips client-supplied copies).
 - If a request includes a known tenant boundary header (`x-tenant-id` or `x-facetheory-tenant`) and the app has not configured an explicit `tenantKey` or custom `cacheKey`, ISR fails closed before cache lookup or HTML writes. Remove tenant-like headers for tenant-invariant ISR, provide a trusted `tenantKey`, provide a custom `cacheKey`, or keep the route on SSR.
 - If HTML varies by other request headers or identity inputs, supply an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
+- For tenant-scoped rotation workflows, keep the route on SSR unless the owner can pair rotation with cache identity or
+  invalidation. The usual ISR shape is to include a trusted rotation/version dimension in a custom `cacheKey` so newly
+  rotated material does not reuse old cached HTML; direct metadata/object invalidation remains a host-owned
+  TableTheory/S3 operation rather than a generic FaceTheory browser-rendering primitive.
 
 Important deployment note:
 
@@ -353,8 +357,10 @@ Adapter notes:
 - React strict no-inline routes cannot use shell streaming because bytes would flush before whole-document validation.
   Use `styleStrategy: "all-ready"` and avoid inline CSS-in-JS extraction on routes with `inlineStyles:false`.
 - Vue strict no-inline routes must use external hydration data and external stylesheet assets.
-- Svelte strict no-inline routes must avoid `<svelte:head>` raw SSR output and Svelte component `<style>` fallback
-  output. Import CSS from the Vite client entry and emit head through FaceTheory's structured `headTags`.
+- Svelte strict no-inline routes are supported through `renderSvelte()` / `createSvelteFace()` when they use
+  `FaceExternalHydration`. They must avoid `<svelte:head>` raw SSR output and Svelte component `<style>` fallback
+  output. Import CSS from the Vite client entry, emit head through FaceTheory's structured `headTags`, and use the
+  strict-CSP Svelte example as the reference browser-hydration shape.
 
 Client navigation:
 
@@ -400,7 +406,15 @@ Form markup stays explicit:
 </form>
 ```
 
-The helper intentionally leaves unmarked, `GET`, and `dialog` forms on native browser behavior. `PUT`, `PATCH`, and `DELETE` require explicit `allowedMethods` opt-in so the helper, not the browser, owns the actual fetch method and body bytes. Marked mutating forms must resolve to `application/x-www-form-urlencoded`: submitter `formenctype` overrides form `enctype`, and `multipart/form-data`, `text/plain`, or any other unsupported marked encoding fails closed through `onError` before a request is sent. Browser-generated multipart file uploads are out of scope for this URL-encoded transport.
+The helper intentionally leaves unmarked, `GET`, and `dialog` forms on native browser behavior. It is marker-scoped, not
+path-scoped: it does not monkeypatch `fetch`, and it does not know which same-origin CloudFront behaviors route to the
+OAC-protected SSR Lambda. In a distribution that also has bearer-auth Function URL origins, do not mark non-OAC forms
+such as `/api/*`, `/auth/*`, `/.well-known/*`, or `/attestations/*`; any marked same-origin mutating form is handled by
+the OAC transport regardless of action path. `PUT`, `PATCH`, and `DELETE` require explicit `allowedMethods` opt-in so
+the helper, not the browser, owns the actual fetch method and body bytes. Marked mutating forms must resolve to
+`application/x-www-form-urlencoded`: submitter `formenctype` overrides form `enctype`, and `multipart/form-data`,
+`text/plain`, or any other unsupported marked encoding fails closed through `onError` before a request is sent.
+Browser-generated multipart file uploads are out of scope for this URL-encoded transport.
 
 Default navigation policy after a successful fetch is deliberately full-document instead of partial DOM patching:
 
