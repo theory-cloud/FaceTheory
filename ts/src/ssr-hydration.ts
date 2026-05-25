@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { utf8 } from './bytes.js';
 import type { HtmlStore } from './isr.js';
+import { trimOuterSlashes, trimTrailingSlashes } from './types.js';
 
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 const HYDRATION_SIDECAR_CACHE_CONTROL = 'no-store';
@@ -537,7 +538,7 @@ function normalizeNow(now: () => number): number {
 
 function normalizeObjectPrefix(prefix: string): string {
   const trimmed = String(prefix ?? '').trim();
-  const withoutOuterSlashes = trimmed.replace(/^\/+/, '').replace(/\/+$/, '');
+  const withoutOuterSlashes = trimOuterSlashes(trimmed);
   if (!withoutOuterSlashes) return '';
   if (
     withoutOuterSlashes.includes('\\') ||
@@ -576,7 +577,7 @@ function normalizeDataUrlPrefix(prefix: string): string {
     );
   }
   const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-  const withoutTrailingSlash = withLeadingSlash.replace(/\/+$/, '');
+  const withoutTrailingSlash = trimTrailingSlashes(withLeadingSlash);
   return withoutTrailingSlash || '/';
 }
 

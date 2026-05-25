@@ -382,6 +382,35 @@ test('SSR hydration sidecar helpers: expose stable public core primitives', () =
   );
 });
 
+test('SSR hydration sidecar helpers: normalize slash-heavy prefixes linearly', async () => {
+  const slashRun = '/'.repeat(4096);
+  assert.equal(
+    normalizeSsrHydrationSidecarDataUrlPrefix(
+      `/_facetheory/ssr-data${slashRun}`,
+    ),
+    '/_facetheory/ssr-data',
+  );
+
+  const htmlStore = new RecordingHtmlStore();
+  const store = createSsrHydrationSidecarStore({
+    htmlStore,
+    signingSecret: SIGNING_SECRET,
+    now: () => 1_000,
+    keyPrefix: `${slashRun}tenant${slashRun}`,
+    dataUrlPrefix: `/_facetheory/ssr-data${slashRun}`,
+  });
+
+  const written = await store.write({
+    data: { route: '/slash-heavy' },
+    variant: { path: '/slash-heavy' },
+  });
+
+  assert.ok(written.key.startsWith('tenant/'));
+  assert.equal(written.key.includes('//'), false);
+  assert.ok(written.dataUrl.startsWith('/_facetheory/ssr-data/'));
+  assert.equal(written.dataUrl.includes('/_facetheory/ssr-data//'), false);
+});
+
 test('SSR hydration sidecar helpers: reject network-path data URL prefixes', () => {
   for (const dataUrlPrefix of [
     '//evil.example/ssr-data',
