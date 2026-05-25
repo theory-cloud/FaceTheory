@@ -12,6 +12,9 @@ SSR/SSG/ISR.
   - immutable client assets (Vite output)
   - optional SSG HTML output and strict-CSP hydration JSON sidecars under `/_facetheory/data/*`
   - optional ISR HTML object storage plus pointer-paired strict-CSP hydration sidecars (via `S3HtmlStore`; AWS SDK v3 client adapter: `@theory-cloud/facetheory/aws-s3`)
+- **Lambda-routed FaceTheory resource paths**
+  - SSR runtime hydration sidecars under `/_facetheory/ssr-data/*`, handled by the same FaceApp/Lambda path that
+    rendered the SSR HTML
 - **DynamoDB table**
   - ISR metadata + lease/lock state (via TableTheory `FaceTheoryIsrMetaStore` and FaceTheory adapter `@theory-cloud/facetheory/tabletheory`)
 
@@ -23,7 +26,8 @@ your SSR Lambda function.
 When using `AppTheorySsrSite` in `ssg-isr` mode:
 - use `staticPathPatterns` for cacheable extensionless HTML sections that should stay on S3
 - use `directS3PathPatterns` for raw object/data paths such as `/.vite/*` and `/_facetheory/data/*`
-- use `ssrPathPatterns` for same-origin dynamic routes that must bypass the S3-primary origin group and go straight to Lambda
+- use `ssrPathPatterns` for same-origin dynamic routes that must bypass the S3-primary origin group and go straight to
+  Lambda, including the reserved SSR hydration sidecar prefix `/_facetheory/ssr-data/*`
 - prefer an `AWS_IAM` Function URL origin for read-only SSR traffic rather than a public direct URL
 - do not forward viewer-supplied tenant headers by default; derive tenancy from trusted request context when possible
 - attach route-owned CSP headers from the Face response when strict no-inline CSP is required; CloudFront baseline
@@ -85,6 +89,11 @@ This is the deployment contract FaceTheory assumes for typical Vite SSR apps:
     `/about` -> `/_facetheory/data/about.json` and `/` -> `/_facetheory/data/index.json`
   - upload and invalidate SSG HTML and its matching hydration JSON together; a stale HTML document should not point to a
     data sidecar from a different build
+- **Optional SSR hydration JSON**:
+  - signed framework-owned URLs under `/_facetheory/ssr-data/*` when SSR Faces use
+    `createFaceApp({ ssrHydrationSidecars })`
+  - route the reserved prefix to the same Lambda/FaceApp handler that rendered the SSR HTML
+  - do not upload SSR sidecars to S3 and do not reuse `/_facetheory/data/*` for SSR runtime data
 
 See:
 - `infra/apptheory-ssr-site/` for SSR + assets via AppTheory `AppTheorySsrSite`
@@ -118,9 +127,13 @@ ISR sidecars:
 
 SSR sidecars:
 
-- Per-request strict SSR data sidecars are host-defined. If a Face emits external hydration data for SSR, the `dataUrl`
-  must be same-origin and routed to Lambda/AppTheory or another host-owned same-origin JSON endpoint that can reproduce
-  the exact server-render data for that request.
+- Per-request strict SSR data sidecars are framework-owned when the app is configured with
+  `createFaceApp({ ssrHydrationSidecars })`.
+- FaceTheory emits signed same-origin URLs under `/_facetheory/ssr-data/*`.
+- Route `/_facetheory/ssr-data/*` to the same Lambda/FaceApp handler that rendered the SSR HTML so the runtime can
+  return the exact hydration payload produced during that render without rerunning the Face.
+- Keep this prefix distinct from `/_facetheory/data/*`; the latter is the SSG/static sidecar namespace and should remain
+  S3-routed.
 
 OAC and navigation:
 
@@ -142,7 +155,8 @@ Behaviors:
 
 1. `/assets/*` + `/.vite/*` -> **S3 origin**
 2. `/_facetheory/data/*` -> **S3 origin** (if SSG hydration JSON files are emitted)
-3. Default `/*` -> **Origin group**
+3. `/_facetheory/ssr-data/*` -> **Lambda URL origin** (SSR runtime hydration sidecars)
+4. Default `/*` -> **Origin group**
   - primary: **S3 origin** (SSG HTML keys)
   - failover: **Lambda URL origin** (SSR + ISR) on 403/404 misses
 
@@ -166,8 +180,9 @@ Behaviors (top to bottom):
 
 1. `/assets/*` + `/.vite/*` -> **S3 origin**
 2. `/_facetheory/data/*` -> **S3 origin**
-3. Known static routes (SSG-first pages) -> **S3 origin**
-4. Default `/*` -> **Lambda URL origin**
+3. `/_facetheory/ssr-data/*` -> **Lambda URL origin**
+4. Known static routes (SSG-first pages) -> **S3 origin**
+5. Default `/*` -> **Lambda URL origin**
 
 Notes:
 - Keep static and dynamic origins separate so static hits do not traverse Lambda.
@@ -181,6 +196,8 @@ Notes:
 
 - Default response header recommendation:
   - `cache-control: private, no-store`
+- Strict-CSP hydration sidecars under `/_facetheory/ssr-data/*` should reach Lambda and return no-store JSON from the
+  same FaceApp runtime that rendered the HTML.
 - If SSR output is anonymous and intentionally cacheable, use a bounded shared TTL (for example):
   - `cache-control: public, max-age=0, s-maxage=60, stale-while-revalidate=30, stale-if-error=300`
 - If response includes `set-cookie`, do not cache at CloudFront.
@@ -234,6 +251,7 @@ Default tenant note:
 - For strict-CSP routes, confirm:
   - every strict response carries the intended `content-security-policy` header
   - SSG sidecars under `/_facetheory/data/*` are reachable from CloudFront and same-origin
+  - SSR sidecars under `/_facetheory/ssr-data/*` route to Lambda/FaceTheory and return the render-produced JSON payload
   - ISR hydration sidecar query URLs route to Lambda/FaceTheory and do not expose raw object keys
   - OAC form navigation policy is explicit when CSP-protected HTML responses are expected
 - Runbook should include:

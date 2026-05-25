@@ -2,10 +2,83 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
+import type {
+  HtmlStore,
+  HtmlStoreReadResult,
+  HtmlStoreWriteInput,
+  HtmlStoreWriteResult,
+} from '../../src/isr.js';
+import type { FaceResourceRoute } from '../../src/types.js';
 import { parseCookiesFromHeaders, parseQueryString } from '../../src/types.js';
+import { viteHydrationForEntry } from '../../src/vite.js';
+
+const SIDECAR_SIGNING_SECRET =
+  'synthetic app sidecar signing secret with enough entropy';
+
+class RecordingHtmlStore implements HtmlStore {
+  readonly writes: HtmlStoreWriteInput[] = [];
+  readonly objects = new Map<string, Uint8Array>();
+
+  async read(key: string): Promise<HtmlStoreReadResult | null> {
+    const body = this.objects.get(key);
+    if (!body) return null;
+    return { body: Uint8Array.from(body) };
+  }
+
+  async write(input: HtmlStoreWriteInput): Promise<HtmlStoreWriteResult> {
+    this.writes.push({
+      ...input,
+      body: Uint8Array.from(input.body),
+      ...(input.metadata ? { metadata: { ...input.metadata } } : {}),
+    });
+    this.objects.set(input.key, Uint8Array.from(input.body));
+    return { etag: `app-test-etag-${String(this.writes.length)}` };
+  }
+}
 
 function decodeBody(body: Uint8Array): string {
   return new TextDecoder().decode(body);
+}
+
+function callerResource(
+  route: string,
+  body = 'caller resource',
+): FaceResourceRoute {
+  return {
+    route,
+    handle: () => ({
+      status: 200,
+      headers: { 'content-type': ['text/plain; charset=utf-8'] },
+      cookies: [],
+      body: new TextEncoder().encode(body),
+      isBase64: false,
+    }),
+  };
+}
+
+function extractHydrationHref(html: string): string {
+  const tag = /<link\b[^>]*rel="facetheory-hydration"[^>]*>/i.exec(html)?.[0];
+  assert.ok(tag, 'expected FaceTheory hydration link');
+  const href = /\bhref="([^"]+)"/i.exec(tag)?.[1];
+  assert.ok(href, 'expected FaceTheory hydration href');
+  return href;
+}
+
+function tokenFromHydrationHref(href: string): string {
+  const encoded = href.slice(href.lastIndexOf('/') + 1);
+  return decodeURIComponent(encoded);
+}
+
+function decodeTokenPayload(token: string): Record<string, unknown> {
+  const [payload] = token.split('.');
+  assert.ok(payload);
+  return JSON.parse(
+    Buffer.from(payload, 'base64url').toString('utf8'),
+  ) as Record<string, unknown>;
+}
+
+function parseJsonBody(responseBody: Uint8Array): unknown {
+  return JSON.parse(decodeBody(responseBody));
 }
 
 test('FaceApp: renders HTML with title', async () => {
@@ -251,6 +324,360 @@ test('FaceApp: strict CSP validates body HTML before returning a response', asyn
   assert.ok(body.includes('<h1>Internal Server Error</h1>'));
   assert.equal(body.includes('onclick'), false);
   assert.equal(body.includes('Unsafe'), false);
+});
+
+test('FaceApp: strict SSR inline hydration is served from framework sidecars', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  let loadCount = 0;
+  let renderCount = 0;
+  const hydrationData = {
+    route: '/account',
+    profile: { displayName: 'A. Example' },
+  };
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/account',
+        mode: 'ssr',
+        load: async () => {
+          loadCount += 1;
+          return hydrationData;
+        },
+        render: (_ctx, data) => {
+          renderCount += 1;
+          return {
+            csp: {
+              inlineScripts: false,
+              inlineStyles: true,
+              rawHead: false,
+            },
+            hydration: {
+              data,
+              bootstrapModule: '/assets/account.js',
+            },
+            html: '<main>account</main>',
+          };
+        },
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore,
+      signingSecret: SIDECAR_SIGNING_SECRET,
+      now: () => 1_000,
+    },
+  });
+
+  const page = await app.handle({ method: 'GET', path: '/account' });
+  assert.equal(page.status, 200);
+  assert.equal(loadCount, 1);
+  assert.equal(renderCount, 1);
+  assert.equal(htmlStore.writes.length, 1);
+
+  const html = decodeBody(page.body as Uint8Array);
+  const dataUrl = extractHydrationHref(html);
+  assert.ok(dataUrl.startsWith('/_facetheory/ssr-data/'));
+  assert.ok(html.includes('rel="facetheory-hydration"'));
+  assert.equal(html.includes('__FACETHEORY_DATA__'), false);
+
+  const sidecar = await app.handle({ method: 'GET', path: dataUrl });
+  assert.equal(sidecar.status, 200);
+  assert.equal(sidecar.headers['cache-control']?.[0], 'no-store');
+  assert.equal(
+    sidecar.headers['content-type']?.[0],
+    'application/json; charset=utf-8',
+  );
+  assert.deepEqual(parseJsonBody(sidecar.body as Uint8Array), hydrationData);
+  assert.equal(loadCount, 1);
+  assert.equal(renderCount, 1);
+});
+
+test('FaceApp: strict SSR Vite hydration uses the same framework sidecar path', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const manifest = {
+    'src/entry-client.ts': { file: 'assets/entry.aaa.js' },
+  };
+  const hydrationData = { page: 'vite-strict' };
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/vite',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: true,
+            rawHead: false,
+          },
+          hydration: viteHydrationForEntry(
+            manifest,
+            'src/entry-client.ts',
+            hydrationData,
+          ),
+          html: '<main>vite</main>',
+        }),
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore,
+      signingSecret: SIDECAR_SIGNING_SECRET,
+      now: () => 2_000,
+    },
+  });
+
+  const page = await app.handle({ method: 'GET', path: '/vite' });
+  assert.equal(page.status, 200);
+  assert.equal(htmlStore.writes.length, 1);
+
+  const html = decodeBody(page.body as Uint8Array);
+  const dataUrl = extractHydrationHref(html);
+  assert.ok(html.includes('<script src="/assets/entry.aaa.js" type="module">'));
+  assert.equal(html.includes('__FACETHEORY_DATA__'), false);
+
+  const sidecar = await app.handle({ method: 'GET', path: dataUrl });
+  assert.equal(sidecar.status, 200);
+  assert.deepEqual(parseJsonBody(sidecar.body as Uint8Array), hydrationData);
+});
+
+test('FaceApp: caller-managed strict external hydration is preserved', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/external',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: true,
+            rawHead: false,
+          },
+          hydration: {
+            type: 'external',
+            data: { page: 'external' },
+            dataUrl: '/caller/hydration.json',
+            bootstrapModule: '/assets/external.js',
+          },
+          html: '<main>external</main>',
+        }),
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore,
+      signingSecret: SIDECAR_SIGNING_SECRET,
+      now: () => 3_000,
+    },
+  });
+
+  const page = await app.handle({ method: 'GET', path: '/external' });
+  assert.equal(page.status, 200);
+  assert.equal(htmlStore.writes.length, 0);
+
+  const html = decodeBody(page.body as Uint8Array);
+  assert.equal(extractHydrationHref(html), '/caller/hydration.json');
+  assert.equal(html.includes('__FACETHEORY_DATA__'), false);
+});
+
+test('FaceApp: sidecar reads fail closed for mismatched cookie variants', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const cookieName = ['ft', 'variant'].join('_');
+  const firstCookieValue = ['alpha', 'partition'].join('-');
+  const secondCookieValue = ['beta', 'partition'].join('-');
+  const bodyMarker = ['body', 'marker'].join('-');
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/variant',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: true,
+            rawHead: false,
+          },
+          hydration: {
+            data: { bodyMarker },
+            bootstrapModule: '/assets/variant.js',
+          },
+          html: '<main>variant</main>',
+        }),
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore,
+      signingSecret: SIDECAR_SIGNING_SECRET,
+      now: () => 4_000,
+    },
+  });
+
+  const page = await app.handle({
+    method: 'GET',
+    path: '/variant',
+    headers: { cookie: [`${cookieName}=${firstCookieValue}`] },
+  });
+  const dataUrl = extractHydrationHref(decodeBody(page.body as Uint8Array));
+  const token = tokenFromHydrationHref(dataUrl);
+  const write = htmlStore.writes[0];
+  assert.ok(write);
+
+  const persistedControlPlane = JSON.stringify({
+    key: write.key,
+    metadata: write.metadata,
+    tokenPayload: decodeTokenPayload(token),
+  });
+  assert.equal(persistedControlPlane.includes(firstCookieValue), false);
+  assert.equal(persistedControlPlane.includes(secondCookieValue), false);
+  assert.equal(persistedControlPlane.includes(SIDECAR_SIGNING_SECRET), false);
+  assert.equal(persistedControlPlane.includes(bodyMarker), false);
+
+  const ok = await app.handle({
+    method: 'GET',
+    path: dataUrl,
+    headers: { cookie: [`${cookieName}=${firstCookieValue}`] },
+  });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(parseJsonBody(ok.body as Uint8Array), { bodyMarker });
+
+  const rejected = await app.handle({
+    method: 'GET',
+    path: dataUrl,
+    headers: { cookie: [`${cookieName}=${secondCookieValue}`] },
+  });
+  assert.equal(rejected.status, 404);
+  assert.equal(rejected.headers['cache-control']?.[0], 'no-store');
+  const rejectionBody = decodeBody(rejected.body as Uint8Array);
+  assert.equal(rejectionBody, 'Not Found');
+  assert.equal(rejectionBody.includes(token), false);
+  assert.equal(rejectionBody.includes(firstCookieValue), false);
+  assert.equal(rejectionBody.includes(SIDECAR_SIGNING_SECRET), false);
+});
+
+test('FaceApp: framework sidecar resource keeps precedence over broad faces', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/{proxy+}',
+        mode: 'ssr',
+        render: (ctx) => ({ html: `<main>face:${ctx.proxy}</main>` }),
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore: new RecordingHtmlStore(),
+      signingSecret: SIDECAR_SIGNING_SECRET,
+      now: () => 5_000,
+    },
+  });
+
+  for (const path of [
+    '/_facetheory/ssr-data',
+    '/_facetheory/ssr-data/not-a-valid-token',
+    '/_facetheory/ssr-data/not/a/valid/token',
+  ]) {
+    const sidecar = await app.handle({ method: 'GET', path });
+    assert.equal(sidecar.status, 404);
+    assert.equal(sidecar.headers['cache-control']?.[0], 'no-store');
+    assert.equal(
+      sidecar.headers['content-type']?.[0],
+      'text/plain; charset=utf-8',
+    );
+    assert.equal(decodeBody(sidecar.body as Uint8Array), 'Not Found');
+  }
+
+  const face = await app.handle({ method: 'GET', path: '/dashboard' });
+  assert.equal(face.status, 200);
+  assert.ok(
+    decodeBody(face.body as Uint8Array).includes(
+      '<main>face:dashboard</main>',
+    ),
+  );
+});
+
+test('FaceApp: framework sidecar resources reject structural caller route conflicts', () => {
+  const cases: Array<{ route: string; message: RegExp }> = [
+    {
+      route: '/_facetheory/ssr-data',
+      message: /duplicate resource route: \/_facetheory\/ssr-data/,
+    },
+    {
+      route: '/_facetheory/ssr-data/{token}',
+      message:
+        /duplicate resource route: \/_facetheory\/ssr-data\/\{token\}/,
+    },
+    {
+      route: '/_facetheory/ssr-data/{id}',
+      message:
+        /ambiguous resource routes: \/_facetheory\/ssr-data\/\{token\} and \/_facetheory\/ssr-data\/\{id\}/,
+    },
+    {
+      route: '/_facetheory/ssr-data/{id+}',
+      message:
+        /ambiguous resource routes: \/_facetheory\/ssr-data\/\{token\+\} and \/_facetheory\/ssr-data\/\{id\+\}/,
+    },
+    {
+      route: '/_facetheory/ssr-data/{proxy+}',
+      message:
+        /ambiguous resource routes: \/_facetheory\/ssr-data\/\{token\+\} and \/_facetheory\/ssr-data\/\{proxy\+\}/,
+    },
+  ];
+
+  for (const { route, message } of cases) {
+    assert.throws(
+      () =>
+        createFaceApp({
+          faces: [],
+          resources: [callerResource(route)],
+          ssrHydrationSidecars: {
+            htmlStore: new RecordingHtmlStore(),
+            signingSecret: SIDECAR_SIGNING_SECRET,
+          },
+        }),
+      message,
+      route,
+    );
+  }
+});
+
+test('FaceApp: framework sidecar resource keeps precedence over broad caller resources', async () => {
+  let callerResourceHits = 0;
+  const app = createFaceApp({
+    faces: [],
+    resources: [
+      {
+        ...callerResource('/{proxy+}'),
+        handle: (ctx) => {
+          callerResourceHits += 1;
+          return {
+            status: 200,
+            headers: { 'content-type': ['text/plain; charset=utf-8'] },
+            cookies: [],
+            body: new TextEncoder().encode(`resource:${ctx.proxy}`),
+            isBase64: false,
+          };
+        },
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore: new RecordingHtmlStore(),
+      signingSecret: SIDECAR_SIGNING_SECRET,
+      now: () => 5_500,
+    },
+  });
+
+  const sidecar = await app.handle({
+    method: 'GET',
+    path: '/_facetheory/ssr-data/not-a-valid-token',
+  });
+  assert.equal(sidecar.status, 404);
+  assert.equal(sidecar.headers['cache-control']?.[0], 'no-store');
+  assert.equal(decodeBody(sidecar.body as Uint8Array), 'Not Found');
+  assert.equal(callerResourceHits, 0);
+
+  const fallback = await app.handle({ method: 'GET', path: '/dashboard' });
+  assert.equal(fallback.status, 200);
+  assert.equal(decodeBody(fallback.body as Uint8Array), 'resource:dashboard');
+  assert.equal(callerResourceHits, 1);
 });
 
 test('FaceApp: non-strict routes preserve legacy inline body output', async () => {

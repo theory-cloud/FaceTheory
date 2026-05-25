@@ -63,6 +63,44 @@ const faces: FaceModule[] = [
 const app = createFaceApp({ faces });
 ```
 
+## Add A Raw Resource Route
+
+Resource routes live beside Faces when the app needs a raw response such as
+JSON, text, an empty response, or a method guard. They do not declare a render
+mode and FaceTheory does not wrap their body in an HTML document.
+
+```ts
+import {
+  createFaceApp,
+  jsonResourceResponse,
+  methodNotAllowedResourceResponse,
+  type FaceResourceRoute,
+} from "@theory-cloud/facetheory";
+
+const resources: FaceResourceRoute[] = [
+  {
+    route: "/api/status",
+    handle: (ctx) => {
+      if (ctx.request.method !== "GET") {
+        return methodNotAllowedResourceResponse(["GET"]);
+      }
+
+      return jsonResourceResponse({ ok: true });
+    },
+  },
+];
+
+const app = createFaceApp({ faces, resources });
+```
+
+Use `jsonResourceResponse()`, `textResourceResponse()`,
+`emptyResourceResponse()`, and `methodNotAllowedResourceResponse()` instead of
+hand-rolling common raw responses. The helpers emit deterministic lower-case
+headers, default to `cache-control: no-store`, and keep JSON escaping aligned
+with FaceTheory's HTML-safe serializer. Avoid registering caller resource
+routes under framework-owned prefixes such as `/_facetheory/ssr-data/*`; that
+namespace is reserved when SSR hydration sidecars are enabled.
+
 Next, expose `app.handle()` through either:
 
 - `createLambdaUrlStreamingHandler({ app })` from `@theory-cloud/facetheory`, or
@@ -105,8 +143,10 @@ the first paint, but hydration data moves to a same-origin JSON sidecar instead 
 ```ts
 import {
   buildStrictCspHeader,
-  externalHydrationForEntry,
+  createFaceApp,
+  InMemoryHtmlStore,
   viteAssetsForEntry,
+  viteHydrationForEntry,
 } from "@theory-cloud/facetheory";
 
 const strictCsp = {
@@ -114,6 +154,15 @@ const strictCsp = {
   inlineStyles: false,
   rawHead: false,
 } as const;
+
+const app = createFaceApp({
+  ssrHydrationSidecars: {
+    // Local example store; use a durable HtmlStore for a real deployment.
+    htmlStore: new InMemoryHtmlStore(),
+    signingSecret: process.env.FACETHEORY_SSR_HYDRATION_SECRET!,
+  },
+  faces,
+});
 
 renderOptions: async (_ctx, data) => {
   const { headTags } = viteAssetsForEntry(manifest, "src/entry-client.ts", {
@@ -126,20 +175,40 @@ renderOptions: async (_ctx, data) => {
       "content-security-policy": buildStrictCspHeader(),
     },
     headTags,
-    hydration: externalHydrationForEntry(
-      manifest,
-      "src/entry-client.ts",
-      data,
-      { dataUrl: "/_facetheory/data/home.json" },
-    ),
+    hydration: viteHydrationForEntry(manifest, "src/entry-client.ts", data),
   };
 };
 ```
 
-Client bootstrap modules should fetch the `<link rel="facetheory-hydration">` URL before hydrating and should reject
-cross-origin data URLs or redirects. The repository example at `ts/examples/vite-strict-csp-svelte/` demonstrates the
-full Svelte/Vite shape: external CSS/assets, same-origin module bootstrap, external hydration JSON, no `<svelte:head>`
-raw output, and SPA navigation that loads external data before `hydrateFaceNavigation(context)`.
+When `ssrHydrationSidecars` is configured, strict SSR writes the render-time
+hydration payload once and emits a framework-owned `/_facetheory/ssr-data/...`
+URL. Route that prefix to the same FaceTheory app handler; do not add a
+caller-owned `/_facetheory/data/*` pre-router for SSR. Client bootstrap modules
+should call `loadFaceHydrationData()` from `@theory-cloud/facetheory/client`
+before hydrating; the loader reads the `<link rel="facetheory-hydration">`
+URL, expects raw JSON from the no-store framework route, and rejects
+cross-origin data URLs or redirects. The repository example at
+`ts/examples/vite-strict-csp-svelte/` demonstrates the full Svelte/Vite shape:
+external CSS/assets, same-origin module bootstrap, framework-owned SSR
+hydration sidecar JSON, no `<svelte:head>` raw output, and SPA navigation that
+loads external data before `hydrateFaceNavigation(context)`.
+
+```ts
+import { loadFaceHydrationData } from "@theory-cloud/facetheory/client";
+
+const hydrationData = await loadFaceHydrationData({
+  allowedOrigin: window.location.origin,
+});
+```
+
+Caller-managed external hydration is still available when the application owns
+the JSON URL: return `externalHydrationForEntry(..., { dataUrl })` and serve the
+exact render payload from that same-origin URL. Keep the mode-specific prefixes
+distinct: SSG build output writes static sidecars under `/_facetheory/data/*`
+for S3/CloudFront delivery, while SSR runtime sidecars use
+`/_facetheory/ssr-data/*` on the Lambda/FaceApp handler. ISR keeps strict
+hydration data paired with the cached HTML through the ISR runtime rather than
+using the SSR sidecar prefix.
 
 Svelte strict no-inline support is first-class through `@theory-cloud/facetheory/svelte` when the route uses external
 hydration data. Keep Svelte component CSS in the Vite client entry instead of relying on inline SSR style fallback

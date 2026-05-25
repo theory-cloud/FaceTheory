@@ -54,6 +54,19 @@ export async function renderSvelte<Props extends Record<string, unknown>>(
   input: SvelteRenderInput<Props>,
   options: RenderSvelteOptions = {},
 ): Promise<FaceRenderResult> {
+  return renderSvelteInternal(ctx, input, options);
+}
+
+interface SvelteRenderValidationOptions {
+  deferStrictCspHydrationValidation?: boolean;
+}
+
+async function renderSvelteInternal<Props extends Record<string, unknown>>(
+  ctx: FaceContext,
+  input: SvelteRenderInput<Props>,
+  options: RenderSvelteOptions,
+  validationOptions: SvelteRenderValidationOptions = {},
+): Promise<FaceRenderResult> {
   const integrations = await prepareUIIntegrations<
     SvelteRenderInput<Props>,
     SvelteUIIntegration<Props>
@@ -133,9 +146,17 @@ export async function renderSvelte<Props extends Record<string, unknown>>(
     out = await integration.finalize(out, ctx, state);
   }
 
-  enforceAdapterStrictCspResult(out, { adapterName: 'Svelte adapter' });
+  enforceAdapterStrictCspResult(out, {
+    adapterName: 'Svelte adapter',
+    deferHydrationValidation:
+      validationOptions.deferStrictCspHydrationValidation === true,
+  });
 
   return out;
+}
+
+function modeUsesRuntimeHydrationSidecars(mode: FaceMode): boolean {
+  return mode === 'ssr' || mode === 'isr' || mode === 'ssg';
 }
 
 function isSvelte5DeprecatedRenderError(err: unknown): boolean {
@@ -207,7 +228,11 @@ export function createSvelteFace<
         typeof options.renderOptions === 'function'
           ? await options.renderOptions(ctx, data as Data)
           : (options.renderOptions ?? {});
-      return renderSvelte(ctx, input, renderOptions);
+      return renderSvelteInternal(ctx, input, renderOptions, {
+        deferStrictCspHydrationValidation: modeUsesRuntimeHydrationSidecars(
+          options.mode,
+        ),
+      });
     },
   };
 

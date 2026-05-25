@@ -165,8 +165,27 @@ async function sendRawHttpRequest(
   });
 }
 
+function extractHydrationHref(html: string): string {
+  const dom = new JSDOM(html, { url: 'http://localhost/' });
+  try {
+    const marker = dom.window.document.getElementById(
+      '__FACETHEORY_DATA_URL__',
+    );
+    assert.equal(marker?.tagName.toLowerCase(), 'link');
+    const href = marker?.getAttribute('href');
+    assert.ok(href, 'expected FaceTheory hydration link href');
+    return href;
+  } finally {
+    dom.window.close();
+  }
+}
+
+function decodeBody(body: Uint8Array): string {
+  return new TextDecoder().decode(body);
+}
+
 test(
-  'vite strict CSP svelte example: renders external assets and hydration sidecar metadata',
+  'vite strict CSP svelte example: renders external assets and framework SSR hydration sidecars',
   { concurrency: false },
   async () => {
     const cwd = path.resolve('.');
@@ -202,22 +221,34 @@ test(
     assert.equal(resp.status, 200);
     assert.equal(resp.headers['content-security-policy']?.length, 1);
 
-    const body = new TextDecoder().decode(resp.body as Uint8Array);
+    const body = decodeBody(resp.body as Uint8Array);
     assert.ok(body.includes('FaceTheory Strict CSP Svelte'));
     assert.ok(body.includes('Svelte + Vite without inline output'));
     assert.ok(body.includes('Hello from strict external hydration home'));
     assert.ok(body.includes('data-facetheory-view'));
     assert.ok(body.includes('id="__FACETHEORY_DATA_URL__"'));
-    assert.ok(
-      body.includes('href="/_facetheory/data/strict-csp-svelte-home.json"'),
-    );
+    assert.equal(body.includes('/_facetheory/data/'), false);
     assert.ok(body.includes('type="module"'));
     assertStrictCspDocument(body, { url: 'http://localhost/' });
 
+    const dataUrl = extractHydrationHref(body);
+    assert.match(dataUrl, /^\/_facetheory\/ssr-data\//);
+
+    const sidecarResp = await app.handle({ method: 'GET', path: dataUrl });
+    assert.equal(sidecarResp.status, 200);
     assert.equal(
-      serverMod.strictCspSvelteHydrationJsonForPath('/'),
-      JSON.stringify(serverMod.strictCspSvelteDataForPath('/')),
+      sidecarResp.headers['content-type']?.[0],
+      'application/json; charset=utf-8',
     );
+    assert.equal(sidecarResp.headers['cache-control']?.[0], 'no-store');
+    const sidecarBody = decodeBody(sidecarResp.body as Uint8Array);
+    assert.equal(sidecarBody.includes('<!doctype html>'), false);
+    assert.deepEqual(
+      JSON.parse(sidecarBody),
+      serverMod.strictCspSvelteDataForPath('/'),
+    );
+    assert.equal(serverMod.strictCspSvelteHydrationJsonForPath, undefined);
+    assert.equal(serverMod.strictCspSvelteHydrationDataUrl, undefined);
 
     const injectedPaths = new Set<string>();
     for (const match of body.matchAll(
@@ -252,6 +283,10 @@ test(
       ['run', 'example:vite:svelte:strict-csp:build'],
       { cwd },
     );
+    const serverEntryPath = path.resolve(
+      'examples/vite-strict-csp-svelte/dist/server/entry-server.js',
+    );
+    const serverMod = await import(pathToFileURL(serverEntryPath).href);
 
     const port = await reservePort();
     const server = await startExampleServer(
@@ -279,15 +314,28 @@ test(
       assert.equal(healthyResp.status, 200);
       const healthyBody = await healthyResp.text();
       assert.match(healthyBody, /FaceTheory Strict CSP Svelte/);
+      assert.equal(healthyBody.includes('/_facetheory/data/'), false);
 
-      const dataResp = await fetch(
+      const dataUrl = extractHydrationHref(healthyBody);
+      assert.match(dataUrl, /^\/_facetheory\/ssr-data\//);
+      const dataResp = await fetch(`http://127.0.0.1:${port}${dataUrl}`);
+      assert.equal(dataResp.status, 200);
+      assert.equal(
+        dataResp.headers.get('content-type'),
+        'application/json; charset=utf-8',
+      );
+      assert.equal(dataResp.headers.get('cache-control'), 'no-store');
+      const dataText = await dataResp.text();
+      assert.equal(dataText.includes('<!doctype html>'), false);
+      assert.deepEqual(
+        JSON.parse(dataText),
+        serverMod.strictCspSvelteDataForPath('/'),
+      );
+
+      const oldDataResp = await fetch(
         `http://127.0.0.1:${port}/_facetheory/data/strict-csp-svelte-home.json`,
       );
-      assert.equal(dataResp.status, 200);
-      assert.match(
-        await dataResp.text(),
-        /from strict external hydration home/,
-      );
+      assert.equal(oldDataResp.status, 404);
 
       const assetPath = healthyBody.match(
         /<(?:link|script|img)\b[^>]*(?:href|src)="(\/assets\/[^"]+)"/,
@@ -333,11 +381,18 @@ test(
     assertStrictCspDocument(homeHtml, { url: 'http://localhost/' });
     assertStrictCspDocument(nextHtml, { url: 'http://localhost/next' });
 
+    assert.equal(homeHtml.includes('/_facetheory/data/'), false);
+    assert.equal(nextHtml.includes('/_facetheory/data/'), false);
+    const homeDataUrl = extractHydrationHref(homeHtml);
+    const nextDataUrl = extractHydrationHref(nextHtml);
+    assert.match(homeDataUrl, /^\/_facetheory\/ssr-data\//);
+    assert.match(nextDataUrl, /^\/_facetheory\/ssr-data\//);
+
     const homeData = serverMod.strictCspSvelteDataForPath('/');
     const nextData = serverMod.strictCspSvelteDataForPath('/next');
     const { fetcher, requests } = createStrictCspFixtureFetch(
       {
-        '/_facetheory/data/strict-csp-svelte-home.json': homeData,
+        [homeDataUrl]: homeData,
       },
       { baseUrl: 'http://localhost/' },
     );
@@ -366,7 +421,7 @@ test(
       await flushStrictCspBrowserTasks();
 
       assert.deepEqual(requests, [
-        'http://localhost/_facetheory/data/strict-csp-svelte-home.json',
+        new URL(homeDataUrl, 'http://localhost/').toString(),
       ]);
       assert.deepEqual(
         dom.window.__FACETHEORY_STRICT_CSP_SVELTE_DATA__,
@@ -388,7 +443,7 @@ test(
       nextHtml,
       nextUrl: 'http://localhost/next',
       dataByUrl: {
-        '/_facetheory/data/strict-csp-svelte-next.json': nextData,
+        [nextDataUrl]: nextData,
       },
       importModule: async () => {
         assert.ok(clientModule);
@@ -399,7 +454,7 @@ test(
     try {
       assert.deepEqual(navigation.fetched, [
         'http://localhost/next',
-        'http://localhost/_facetheory/data/strict-csp-svelte-next.json',
+        new URL(nextDataUrl, 'http://localhost/').toString(),
       ]);
       assert.deepEqual(
         navigation.dom.window.__FACETHEORY_STRICT_CSP_SVELTE_DATA__,
