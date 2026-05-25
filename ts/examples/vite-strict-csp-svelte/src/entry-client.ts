@@ -1,5 +1,6 @@
 import { hydrate } from 'svelte';
 
+import { loadFaceHydrationData } from '../../../src/client/index.js';
 import type { FaceNavigationBootstrapContext } from '../../../src/spa.js';
 
 import App from './App.svelte';
@@ -20,44 +21,20 @@ declare global {
   }
 }
 
-function dataUrlFromDocument(doc: Document): string {
-  const marker = doc.getElementById('__FACETHEORY_DATA_URL__');
-  if (marker?.tagName.toLowerCase() === 'link') {
-    const href = marker.getAttribute('href');
-    if (href) return href;
-  }
-
-  const relMarker = doc.querySelector('link[rel="facetheory-hydration"]');
-  const href = relMarker?.getAttribute('href');
-  if (href) return href;
-
-  throw new Error('missing FaceTheory strict CSP hydration data link');
-}
-
 async function loadExternalHydrationData(
   doc: Document,
   fetcher: typeof fetch,
 ): Promise<StrictCspSvelteExampleData> {
-  const win = doc.defaultView ?? window;
-  const dataUrl = new URL(dataUrlFromDocument(doc), win.location.href);
-  if (dataUrl.origin !== win.location.origin) {
-    throw new Error('strict CSP hydration data must be same-origin');
-  }
-
-  const response = await fetcher(dataUrl.toString(), {
-    headers: { accept: 'application/json' },
+  const data = await loadFaceHydrationData<StrictCspSvelteExampleData>({
+    document: doc,
+    fetcher,
   });
-  const responseUrl = response.url
-    ? new URL(response.url, win.location.href)
-    : dataUrl;
-  if (responseUrl.origin !== win.location.origin) {
-    throw new Error('strict CSP hydration data response must stay same-origin');
-  }
-  if (!response.ok) {
-    throw new Error(`strict CSP hydration data failed (${response.status})`);
+
+  if (data === null) {
+    throw new Error('missing FaceTheory strict CSP hydration data link');
   }
 
-  return (await response.json()) as StrictCspSvelteExampleData;
+  return data;
 }
 
 function propsFromData(data: StrictCspSvelteExampleData) {

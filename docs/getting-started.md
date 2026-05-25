@@ -105,8 +105,10 @@ the first paint, but hydration data moves to a same-origin JSON sidecar instead 
 ```ts
 import {
   buildStrictCspHeader,
-  externalHydrationForEntry,
+  createFaceApp,
+  InMemoryHtmlStore,
   viteAssetsForEntry,
+  viteHydrationForEntry,
 } from "@theory-cloud/facetheory";
 
 const strictCsp = {
@@ -114,6 +116,15 @@ const strictCsp = {
   inlineStyles: false,
   rawHead: false,
 } as const;
+
+const app = createFaceApp({
+  ssrHydrationSidecars: {
+    // Local example store; use a durable HtmlStore for a real deployment.
+    htmlStore: new InMemoryHtmlStore(),
+    signingSecret: process.env.FACETHEORY_SSR_HYDRATION_SECRET!,
+  },
+  faces,
+});
 
 renderOptions: async (_ctx, data) => {
   const { headTags } = viteAssetsForEntry(manifest, "src/entry-client.ts", {
@@ -126,20 +137,19 @@ renderOptions: async (_ctx, data) => {
       "content-security-policy": buildStrictCspHeader(),
     },
     headTags,
-    hydration: externalHydrationForEntry(
-      manifest,
-      "src/entry-client.ts",
-      data,
-      { dataUrl: "/_facetheory/data/home.json" },
-    ),
+    hydration: viteHydrationForEntry(manifest, "src/entry-client.ts", data),
   };
 };
 ```
 
-Client bootstrap modules should fetch the `<link rel="facetheory-hydration">` URL before hydrating and should reject
-cross-origin data URLs or redirects. The repository example at `ts/examples/vite-strict-csp-svelte/` demonstrates the
-full Svelte/Vite shape: external CSS/assets, same-origin module bootstrap, external hydration JSON, no `<svelte:head>`
-raw output, and SPA navigation that loads external data before `hydrateFaceNavigation(context)`.
+When `ssrHydrationSidecars` is configured, strict SSR writes the render-time hydration payload once and emits a
+framework-owned `/_facetheory/ssr-data/...` URL. Route that prefix to the same FaceTheory app handler; do not add an
+example-owned `/_facetheory/data/*` pre-router. Client bootstrap modules should call
+`loadFaceHydrationData()` from `@theory-cloud/facetheory/client` before hydrating; the loader reads the
+`<link rel="facetheory-hydration">` URL, expects raw JSON from the no-store framework route, and rejects cross-origin
+data URLs or redirects. The repository example at `ts/examples/vite-strict-csp-svelte/` demonstrates the full Svelte/Vite
+shape: external CSS/assets, same-origin module bootstrap, framework-owned SSR hydration sidecar JSON, no
+`<svelte:head>` raw output, and SPA navigation that loads external data before `hydrateFaceNavigation(context)`.
 
 Svelte strict no-inline support is first-class through `@theory-cloud/facetheory/svelte` when the route uses external
 hydration data. Keep Svelte component CSS in the Vite client entry instead of relying on inline SSR style fallback
