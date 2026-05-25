@@ -111,7 +111,10 @@ exports.handler = awslambda.streamifyResponse(async (event, responseStream, cont
       assetsManifestKey: '.vite/manifest.json',
       // Raw object/data paths stay on direct S3 behaviors; `staticPathPatterns` is now for
       // extensionless HTML sections in AppTheorySsrSite.
+      // Keep SSG hydration sidecars on S3, but reserve SSR runtime hydration sidecars for
+      // the same Lambda/FaceApp handler that rendered the SSR HTML.
       directS3PathPatterns: ['/.vite/*', '/_facetheory/data/*'],
+      ssrPathPatterns: ['/_facetheory/ssr-data/*'],
       enableLogging: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,

@@ -142,6 +142,7 @@ function handler(event) {
   if (uri === '/assets' || uri.startsWith('/assets/')) return req;
   if (uri === '/.vite' || uri.startsWith('/.vite/')) return req;
   if (uri === '/_facetheory/data' || uri.startsWith('/_facetheory/data/')) return req;
+  if (uri === '/_facetheory/ssr-data' || uri.startsWith('/_facetheory/ssr-data/')) return req;
 
   // If the final segment contains a dot, treat it as a file request.
   var idx = uri.lastIndexOf('/');
@@ -292,6 +293,27 @@ function handler(event) {
           cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
           responseHeadersPolicy,
           functionAssociations: [
+            {
+              function: requestIdResponseHeader,
+              eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
+            },
+          ],
+        },
+        '/_facetheory/ssr-data/*': {
+          // SSR runtime hydration sidecars are framework-owned resource routes on the
+          // same Lambda/FaceApp handler that rendered the HTML. Keep them distinct from
+          // SSG sidecars under /_facetheory/data/*, which remain S3/static objects.
+          origin: ssrOrigin,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          originRequestPolicy,
+          responseHeadersPolicy,
+          functionAssociations: [
+            {
+              function: ssgRewrite,
+              eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+            },
             {
               function: requestIdResponseHeader,
               eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,

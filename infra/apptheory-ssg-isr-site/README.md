@@ -8,6 +8,7 @@ Canonical operator guidance lives under [`../../docs/cdk/README.md`](../../docs/
 
 - SSG hits served from S3 through CloudFront
 - signed Lambda Function URL fallback for SSR and ISR
+- distinct strict-CSP sidecar routing: SSG data on S3, SSR runtime sidecars on Lambda
 - request correlation headers
 - baseline security headers
 - escaped reflected request context on the SSR 404 example page
@@ -37,6 +38,9 @@ npm run synth
 ## Deployment Notes
 
 - Use the canonical AWS deployment and operations docs for routing, cache, and smoke-test expectations.
+- Keep SSG strict-CSP sidecars (`/_facetheory/data/*`) on S3/static behaviors.
+- Route SSR runtime hydration sidecars (`/_facetheory/ssr-data/*`) directly to the same Lambda/FaceApp handler that
+  rendered the SSR HTML; do not let the SSG rewrite or S3 origin group claim that reserved prefix.
 - SSG or ISR pages may render forms, but same-origin mutating form action paths must route to Lambda/AppTheory through
   `ssrPathPatterns`; do not let those paths resolve to S3 static objects or direct Function URLs.
 - Keep `AWS_IAM` + CloudFront OAC enabled for the Lambda Function URL and use FaceTheory's
