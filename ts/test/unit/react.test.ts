@@ -182,63 +182,53 @@ test('react adapter: strict SSR sidecars serve the exact React hydration payload
   let renderCount = 0;
   let reactRenderPayload: unknown = null;
 
-  const reactFace = createReactFace<{
-    hydrationPayload: {
-      profile: { displayName: string };
-      requestId: string;
-      payloadSecret: string;
-      terminator: string;
-    };
-  }>({
-    route: '/react-ssr-sidecar',
-    mode: 'ssr',
-    load: async (ctx) => {
-      loadCount += 1;
-      return {
-        hydrationPayload: {
-          profile: { displayName: 'React Sidecar' },
-          requestId: ctx.request.headers['x-request-id']?.[0] ?? '',
-          payloadSecret,
-          terminator: '</script><script>alert("react")</script>',
-        },
-      };
-    },
-    render: (_ctx, data) => {
-      renderCount += 1;
-      return React.createElement(
-        'main',
-        { 'data-request-id': data.hydrationPayload.requestId },
-        data.hydrationPayload.profile.displayName,
-      );
-    },
-    renderOptions: (_ctx, data) => {
-      reactRenderPayload = data.hydrationPayload;
-      return {
-        hydration: viteHydrationForEntry(
-          manifest,
-          'src/react-client.tsx',
-          data.hydrationPayload,
-        ),
-      };
-    },
-  });
-
   const app = createFaceApp({
     faces: [
-      {
-        ...reactFace,
-        render: async (ctx, data) => {
-          const out = await reactFace.render(ctx, data);
+      createReactFace<{
+        hydrationPayload: {
+          profile: { displayName: string };
+          requestId: string;
+          payloadSecret: string;
+          terminator: string;
+        };
+      }>({
+        route: '/react-ssr-sidecar',
+        mode: 'ssr',
+        load: async (ctx) => {
+          loadCount += 1;
           return {
-            ...out,
+            hydrationPayload: {
+              profile: { displayName: 'React Sidecar' },
+              requestId: ctx.request.headers['x-request-id']?.[0] ?? '',
+              payloadSecret,
+              terminator: '</script><script>alert("react")</script>',
+            },
+          };
+        },
+        render: (_ctx, data) => {
+          renderCount += 1;
+          return React.createElement(
+            'main',
+            { 'data-request-id': data.hydrationPayload.requestId },
+            data.hydrationPayload.profile.displayName,
+          );
+        },
+        renderOptions: (_ctx, data) => {
+          reactRenderPayload = data.hydrationPayload;
+          return {
             csp: {
               inlineScripts: false,
               inlineStyles: false,
               rawHead: false,
             },
+            hydration: viteHydrationForEntry(
+              manifest,
+              'src/react-client.tsx',
+              data.hydrationPayload,
+            ),
           };
         },
-      },
+      }),
     ],
     ssrHydrationSidecars: {
       htmlStore,
@@ -296,6 +286,44 @@ test('react adapter: strict SSR sidecars serve the exact React hydration payload
   );
   assert.equal(loadCount, 1);
   assert.equal(renderCount, 1);
+});
+
+test('react adapter: strict SSR without sidecar runtime fails closed before inline hydration succeeds', async () => {
+  const app = createFaceApp({
+    faces: [
+      createReactFace({
+        route: '/react-ssr-without-sidecars',
+        mode: 'ssr',
+        render: () => React.createElement('main', null, 'React strict SSR'),
+        renderOptions: {
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          hydration: {
+            data: {
+              secret: 'react strict SSR inline payload',
+              terminator: '</script>',
+            },
+            bootstrapModule: '/assets/react-entry.js',
+          },
+        },
+      }),
+    ],
+  });
+
+  const response = await app.handle({
+    method: 'GET',
+    path: '/react-ssr-without-sidecars',
+  });
+  assert.equal(response.status, 500);
+
+  const html = decodeBody(response.body as Uint8Array);
+  assert.ok(html.includes('Internal Server Error'));
+  assert.equal(html.includes('React strict SSR'), false);
+  assert.equal(html.includes('__FACETHEORY_DATA__'), false);
+  assert.equal(html.includes('react strict SSR inline payload'), false);
 });
 
 test('react adapter: ISR strict CSP lets runtime externalize legacy hydration sidecars', async () => {
