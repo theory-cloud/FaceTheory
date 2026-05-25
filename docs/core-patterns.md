@@ -108,21 +108,31 @@ or unsafe ad hoc serialization.
 ```ts
 import {
   createFaceApp,
+  emptyResourceResponse,
   jsonResourceResponse,
   methodNotAllowedResourceResponse,
+  textResourceResponse,
   type FaceResourceRoute,
 } from "@theory-cloud/facetheory";
 
 const resources: FaceResourceRoute[] = [
   {
-    route: "/_facetheory/ssr-data/{key+}",
+    route: "/api/status",
     handle: (ctx) => {
       if (ctx.request.method !== "GET") {
         return methodNotAllowedResourceResponse(["GET"]);
       }
 
-      return jsonResourceResponse({ key: ctx.params.key ?? "" });
+      return jsonResourceResponse({ ok: true, path: ctx.request.path });
     },
+  },
+  {
+    route: "/robots.txt",
+    handle: () => textResourceResponse("User-agent: *\nDisallow:\n"),
+  },
+  {
+    route: "/api/no-content",
+    handle: () => emptyResourceResponse(),
   },
 ];
 
@@ -131,8 +141,7 @@ const app = createFaceApp({ faces, resources });
 
 Why this is correct:
 
-- Resource routes are routing-adjacent raw responses, not a fourth-and-a-half
-  render mode such as `mode: "json"`.
+- Resource routes are routing-adjacent raw responses, not another render mode.
 - `jsonResourceResponse()` mirrors FaceTheory's safe JSON escaping for
   HTML-significant characters, which keeps hydration-sidecar-adjacent payloads
   safe for web delivery.
@@ -140,6 +149,9 @@ Why this is correct:
   helpers set content type, all helpers default `cache-control` to `no-store`,
   and `methodNotAllowedResourceResponse()` builds a sorted `allow` header from
   caller-supplied methods.
+- Caller resource routes should avoid FaceTheory-owned prefixes. The
+  `/_facetheory/ssr-data/*` namespace belongs to framework-owned SSR hydration
+  sidecars when `ssrHydrationSidecars` is configured.
 
 **INCORRECT**
 
@@ -260,6 +272,8 @@ Why this is correct:
   deterministic generic failure response rather than exposing token details.
 - The default variant binding is reconstructable from the page request and sidecar request by using cookies, while only
   HMAC-derived digests are written to token claims, object keys, and metadata.
+- React, Vue, and Svelte strict SSR flows use the same app-level sidecar option; the public adapter factories do not
+  need an adapter-specific sidecar API.
 
 Optional controls:
 
@@ -287,6 +301,9 @@ Why this is incorrect:
 - Re-running `load()` or `render()` for the sidecar can diverge from the HTML the browser is hydrating.
 - A caller-owned route at FaceTheory's SSR sidecar prefix can conflict with the framework-owned route.
 - Handwritten sidecar responses can accidentally leak reject reasons or drift from the required `no-store` policy.
+- If a host intentionally owns an external sidecar, it should use `externalHydrationForEntry(...)` with a distinct
+  same-origin `dataUrl` and serve the exact render payload from that route; it should not reuse the framework-owned
+  prefix.
 
 ## Pattern: Default React streaming to `all-ready`
 
@@ -505,7 +522,7 @@ renderOptions: async (_ctx, data) => {
       manifest,
       "src/entry-client.ts",
       data,
-      { dataUrl: "/_facetheory/data/example.json" },
+      { dataUrl: "/app-hydration/example.json" },
     ),
   };
 };
@@ -518,6 +535,17 @@ Why this is correct:
 - Vite owns the client module and CSS/asset graph, so scripts and styles remain external and deterministic.
 - The CSP header is attached explicitly by the Face; FaceTheory validates output, but it does not silently choose a
   response policy for the host.
+
+Sidecar ownership differs by delivery mode:
+
+- SSG strict hydration sidecars are static build artifacts under `/_facetheory/data/*` and should route to S3 beside the
+  generated HTML.
+- ISR strict hydration sidecars are paired with the cached HTML through the ISR runtime and TableTheory/S3-backed cache
+  state; the sidecar URL is pointer-derived from the page route rather than the SSR runtime prefix.
+- SSR strict hydration sidecars are framework-owned when `createFaceApp({ ssrHydrationSidecars })` is configured and
+  default to `/_facetheory/ssr-data/*` on the same Lambda/FaceApp handler.
+- Caller-managed external sidecars remain valid when the host supplies `externalHydrationForEntry(...)`; the host owns
+  storing and serving the exact payload and should keep the URL outside FaceTheory-owned prefixes.
 
 Framework notes:
 
