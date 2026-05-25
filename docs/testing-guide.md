@@ -52,6 +52,35 @@ Use this when changing:
 - hydration data output
 - static file layout
 
+### Resource Routes
+
+```bash
+cd ts
+node --import tsx test/unit/resource.test.ts
+node --import tsx test/unit/app.test.ts
+```
+
+Use this when changing:
+
+- `createFaceApp({ resources })`
+- `FaceResourceRoute` routing, route-precedence, or conflict detection
+- `jsonResourceResponse()`, `textResourceResponse()`,
+  `emptyResourceResponse()`, or `methodNotAllowedResourceResponse()`
+- docs that show raw JSON/text/empty/method-not-allowed responses
+
+Local expected result:
+
+- resource responses return raw `FaceResponse` bodies rather than HTML
+  documents
+- helper-owned headers are lower-case, sorted, deterministic, and default to
+  `cache-control: no-store`
+- JSON helpers apply the same HTML-significant escaping used by FaceTheory
+  document serialization
+- `methodNotAllowedResourceResponse()` emits a stable `405` with a sorted
+  `allow` header
+- exact duplicate and same-precedence ambiguous Face/resource routes fail closed
+  during app construction
+
 ### OAC Mutating Form Transport
 
 ```bash
@@ -102,7 +131,11 @@ node --import tsx test/unit/vite-strict-csp-svelte-example.test.ts
 Use this when changing:
 
 - `FaceCspPolicy`, `buildStrictCspHeader()`, or `validateStrictCspDocument()`
-- `externalHydrationForEntry()` or sidecar URL/data handling
+- `viteHydrationForEntry()`, `externalHydrationForEntry()`, or sidecar URL/data
+  handling
+- `createFaceApp({ ssrHydrationSidecars })` or
+  `createSsrHydrationSidecarStore(...)`
+- `@theory-cloud/facetheory/client` hydration loading
 - adapter strict-CSP enforcement for React, Vue, or Svelte
 - `startFaceNavigation()` external hydration loading or same-origin validation
 - docs that describe strict no-inline CSP, external hydration, or Svelte/Vite strict examples
@@ -115,6 +148,18 @@ Local expected result:
 - strict Svelte/Vite output uses external CSS/assets and a same-origin module bootstrap
 - the browser harness loads external hydration JSON before initial hydration and before `hydrateFaceNavigation(context)`
 - same-origin navigation to the strict example's `/next` route preserves deterministic server/client hydration data
+- framework-owned SSR sidecars emit `/_facetheory/ssr-data/...`, return raw
+  no-store JSON from the same FaceApp handler, and do not increment Face
+  `load()`/`render()` counts when fetched
+- caller-managed `externalHydrationForEntry(...)` URLs are preserved and do not
+  trigger framework sidecar writes
+- SSG strict hydration sidecars use `/_facetheory/data/*` build artifacts, while
+  ISR strict hydration sidecars stay paired with the cached HTML through the ISR
+  runtime instead of using the SSR sidecar prefix
+- `loadFaceHydrationData()` from `@theory-cloud/facetheory/client` reads inline
+  hydration first, fetches same-origin external hydration when linked, and
+  rejects unsafe schemes, cross-origin URLs, cross-origin redirects, and
+  non-JSON sidecar responses
 
 For documentation reviews, explicitly check the unsafe-claim boundary: these tests prove local runtime behavior and
 example wiring, not that a release has been published, a Simulacrum RC has been validated, or an AWS/customer deployment
