@@ -101,6 +101,15 @@ export interface FaceContext {
   proxy: string | null;
 }
 
+export type FaceResourceHandler = (
+  ctx: FaceContext,
+) => Promise<FaceResponse> | FaceResponse;
+
+export interface FaceResourceRoute {
+  route: string;
+  handle: FaceResourceHandler;
+}
+
 export interface FaceHead {
   title?: string;
   /**

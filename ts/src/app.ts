@@ -20,13 +20,14 @@ import {
   requiresStrictCspDocumentValidation,
   validateStrictCspDocument,
 } from './security.js';
-import { Router } from './router.js';
+import { routePatternConflict, Router } from './router.js';
 import type {
   FaceContext,
   FaceExternalHydration,
   FaceHydration,
   FaceMode,
   FaceModule,
+  FaceResourceRoute,
   FaceRenderResult,
   FaceRequest,
   FaceResponse,
@@ -43,6 +44,7 @@ import {
 
 export interface FaceAppOptions {
   faces: FaceModule[];
+  resources?: FaceResourceRoute[];
   isr?: FaceIsrOptions;
   observability?: FaceObservabilityHooks;
   strictCsp?: FaceStrictCspOptions;
@@ -93,6 +95,7 @@ class StrictCspStreamBodyTooLargeError extends Error {
 export class FaceApp {
   private readonly router: Router;
   private readonly faceByPattern: Map<string, FaceModule>;
+  private readonly resourceByPattern: Map<string, FaceResourceRoute>;
   private readonly isrRuntime: IsrRuntime | null;
   private readonly observability: FaceObservabilityHooks | null;
   private readonly strictCspMaxStreamingBodyBytes: number;
@@ -100,6 +103,7 @@ export class FaceApp {
   constructor(options: FaceAppOptions) {
     this.router = new Router();
     this.faceByPattern = new Map();
+    this.resourceByPattern = new Map();
     this.observability = options.observability ?? null;
     this.strictCspMaxStreamingBodyBytes =
       normalizeStrictCspMaxStreamingBodyBytes(
@@ -113,6 +117,28 @@ export class FaceApp {
       }
       this.router.add(pattern);
       this.faceByPattern.set(pattern, face);
+    }
+
+    for (const resource of options.resources ?? []) {
+      const pattern = normalizePath(resource.route);
+      if (this.resourceByPattern.has(pattern)) {
+        throw new Error(`duplicate resource route: ${pattern}`);
+      }
+
+      for (const facePattern of this.faceByPattern.keys()) {
+        const conflict = routePatternConflict(facePattern, pattern);
+        if (conflict === 'duplicate') {
+          throw new Error(`duplicate face/resource route: ${pattern}`);
+        }
+        if (conflict === 'ambiguous') {
+          throw new Error(
+            `ambiguous face/resource routes: ${facePattern} and ${pattern}`,
+          );
+        }
+      }
+
+      this.router.add(pattern);
+      this.resourceByPattern.set(pattern, resource);
     }
 
     const hasIsrFace = options.faces.some((face) => face.mode === 'isr');
@@ -145,34 +171,78 @@ export class FaceApp {
     const match = this.router.match(normalizedReq.path);
 
     if (!match) {
-      response = textResponse(404, 'Not Found', { 'content-type': ['text/plain; charset=utf-8'] });
-      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
-        routePattern,
-        mode,
-        renderMs,
-      });
-    }
-
-    const face = this.faceByPattern.get(match.pattern);
-    if (!face) {
-      response = textResponse(500, 'Internal Error', {
+      response = textResponse(404, 'Not Found', {
         'content-type': ['text/plain; charset=utf-8'],
       });
-      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
-        routePattern,
-        mode,
-        renderMs,
-      });
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        response,
+        {
+          routePattern,
+          mode,
+          renderMs,
+        },
+      );
     }
 
-    routePattern = match.pattern;
-    mode = face.mode;
+    const routePatternForMatch = match.pattern;
+    const resource = this.resourceByPattern.get(routePatternForMatch);
 
     const ctx: FaceContext = {
       request: normalizedReq,
       params: match.params,
       proxy: match.proxy ?? null,
     };
+
+    if (resource) {
+      routePattern = routePatternForMatch;
+      try {
+        response = await resource.handle(ctx);
+      } catch {
+        response = internalErrorResponse();
+      }
+
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        response,
+        {
+          routePattern,
+          mode,
+          renderMs,
+        },
+      );
+    }
+
+    const face = this.faceByPattern.get(routePatternForMatch);
+    if (!face) {
+      response = textResponse(500, 'Internal Error', {
+        'content-type': ['text/plain; charset=utf-8'],
+      });
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        response,
+        {
+          routePattern,
+          mode,
+          renderMs,
+        },
+      );
+    }
+
+    routePattern = routePatternForMatch;
+    mode = face.mode;
 
     try {
       const renderFresh = async (
@@ -197,7 +267,9 @@ export class FaceApp {
 
       if (face.mode === 'isr') {
         if (!this.isrRuntime) {
-          throw new Error(`ISR runtime is not configured for route "${match.pattern}"`);
+          throw new Error(
+            `ISR runtime is not configured for route "${match.pattern}"`,
+          );
         }
         response = await this.isrRuntime.handleFace({
           face,
@@ -205,29 +277,53 @@ export class FaceApp {
           routePattern: match.pattern,
           renderFresh,
         });
-        return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
-          routePattern,
-          mode,
-          renderMs,
-        });
+        return finishResponse(
+          hooks,
+          now,
+          startedAt,
+          requestId,
+          normalizedReq,
+          response,
+          {
+            routePattern,
+            mode,
+            renderMs,
+          },
+        );
       }
 
       response = await renderFresh();
-      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
-        routePattern,
-        mode,
-        renderMs,
-      });
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        response,
+        {
+          routePattern,
+          mode,
+          renderMs,
+        },
+      );
     } catch (err) {
       response =
         err instanceof StrictCspStreamBodyTooLargeError
           ? strictCspStreamBodyTooLargeResponse()
           : internalErrorResponse();
-      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
-        routePattern,
-        mode,
-        renderMs,
-      });
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        response,
+        {
+          routePattern,
+          mode,
+          renderMs,
+        },
+      );
     }
   }
 }
@@ -242,11 +338,16 @@ function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
   ensureRequestId(headers);
 
   return {
-    method: String(req.method ?? '').trim().toUpperCase() || 'GET',
+    method:
+      String(req.method ?? '')
+        .trim()
+        .toUpperCase() || 'GET',
     path: normalizePath(rawPath),
     headers,
     query: req.query ? cloneQuery(req.query) : queryFromPath(rawPath),
-    cookies: req.cookies ? cloneCookies(req.cookies) : parseCookiesFromHeaders(headers),
+    cookies: req.cookies
+      ? cloneCookies(req.cookies)
+      : parseCookiesFromHeaders(headers),
     body: req.body ?? new Uint8Array(),
     isBase64: Boolean(req.isBase64),
     cspNonce: req.cspNonce ?? null,
@@ -283,7 +384,8 @@ function finishResponse(
   const out: FaceResponse = { ...response, headers: sorted };
 
   const durationMs = Math.max(0, now() - startedAt);
-  const isrState = String(out.headers['x-facetheory-isr']?.[0] ?? '').trim() || null;
+  const isrState =
+    String(out.headers['x-facetheory-isr']?.[0] ?? '').trim() || null;
   const isStream = !(out.body instanceof Uint8Array);
 
   const level = logLevelForStatus(out.status);
@@ -337,7 +439,10 @@ function queryFromPath(path: string): Record<string, string[]> {
   return parseQueryString(path.slice(idx + 1));
 }
 
-function toHeaders(input: FaceRenderResult['headers'], cookies: string[] | undefined): Headers {
+function toHeaders(
+  input: FaceRenderResult['headers'],
+  cookies: string[] | undefined,
+): Headers {
   const headers: Headers = {};
   const setCookieValues: string[] = [];
 
@@ -345,7 +450,9 @@ function toHeaders(input: FaceRenderResult['headers'], cookies: string[] | undef
     const lower = String(key).trim().toLowerCase();
     if (!lower) continue;
 
-    const normalizedValues = (Array.isArray(value) ? value : [value]).map(String);
+    const normalizedValues = (Array.isArray(value) ? value : [value]).map(
+      String,
+    );
     if (lower === 'set-cookie') {
       setCookieValues.push(...normalizedValues);
       continue;
@@ -536,8 +643,18 @@ async function preflightStream(
   })();
 }
 
-function textResponse(status: number, body: string, headers: Headers): FaceResponse {
-  return { status, headers, cookies: headers['set-cookie'] ?? [], body: utf8(body), isBase64: false };
+function textResponse(
+  status: number,
+  body: string,
+  headers: Headers,
+): FaceResponse {
+  return {
+    status,
+    headers,
+    cookies: headers['set-cookie'] ?? [],
+    body: utf8(body),
+    isBase64: false,
+  };
 }
 
 function internalErrorResponse(): FaceResponse {
