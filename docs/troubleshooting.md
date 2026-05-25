@@ -14,6 +14,7 @@ Use this guide for recurring setup, build, and runtime failures that already hav
 | ISR object keys look duplicated                                       | `S3HtmlStore.keyPrefix` and `htmlPointerPrefix` repeat the same prefix                        | `docs/core-patterns.md` and `docs/cdk/aws-deployment.md`            |
 | React streaming misses late styles                                    | `styleStrategy: shell` was used where `all-ready` was needed                                  | `docs/core-patterns.md`                                             |
 | Strict-CSP route fails before returning HTML                          | The route emitted inline hydration, inline styles/scripts, raw head, or unsafe body attrs     | `FaceRenderResult.csp` and `docs/core-patterns.md`                  |
+| Browser receives 404 or HTML for an SSR hydration sidecar             | `/_facetheory/ssr-data/...` was not routed to the same FaceApp/Lambda handler as the SSR page | `ssrHydrationSidecars` and Lambda URL routing                       |
 | Form POST behind AppTheorySsrSite OAC returns 403 before Lambda       | Native browser form cannot provide `x-amz-content-sha256` for the Lambda URL OAC signing path | `startAwsOacFormTransport()` and `docs/core-patterns.md`            |
 
 ## Issue: Node.js Version Mismatch
@@ -43,6 +44,31 @@ Verification:
 
 - `npm run typecheck` passes
 - `npm test` passes
+
+## Issue: SSR Hydration Sidecar URL Returns 404 or HTML
+
+Symptoms:
+
+- SSR HTML contains `<link rel="facetheory-hydration" href="/_facetheory/ssr-data/...">`
+- the browser fetch for that exact URL returns `404`
+- or the fetch returns an HTML document instead of `application/json`
+
+Cause:
+
+- FaceTheory SSR runtime sidecars use the reserved `/_facetheory/ssr-data/...` prefix.
+- That prefix must reach the same Lambda/FaceApp handler that rendered the SSR HTML so the framework-owned resource route can read the stored render-time hydration payload.
+- Do not route this prefix to S3/static SSG sidecar handling such as `/_facetheory/data/...`.
+
+Solution:
+
+- Keep SSR page requests and `/_facetheory/ssr-data/...` requests on the same Lambda URL / FaceApp handling path.
+- Reserve S3/static handling for build-time SSG assets and sidecars.
+
+Verification:
+
+- a request for the emitted sidecar URL returns `content-type: application/json; charset=utf-8`
+- the response includes `cache-control: no-store`
+- the response body is raw JSON and not a rendered HTML document
 
 ## Issue: `npm run ssg` Fails With Argument Errors
 
