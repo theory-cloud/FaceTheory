@@ -21,6 +21,14 @@ import {
   validateStrictCspDocument,
 } from './security.js';
 import { routePatternConflict, Router } from './router.js';
+import { jsonResourceResponse, textResourceResponse } from './resource.js';
+import {
+  createSsrHydrationSidecarStore,
+  normalizeSsrHydrationSidecarDataUrlPrefix,
+  type SsrHydrationSidecarStore,
+  type SsrHydrationSidecarStoreOptions,
+  type SsrHydrationSidecarVariantInput,
+} from './ssr-hydration.js';
 import type {
   FaceContext,
   FaceExternalHydration,
@@ -46,9 +54,37 @@ export interface FaceAppOptions {
   faces: FaceModule[];
   resources?: FaceResourceRoute[];
   isr?: FaceIsrOptions;
+  ssrHydrationSidecars?: FaceSsrHydrationSidecarOptions;
   observability?: FaceObservabilityHooks;
   strictCsp?: FaceStrictCspOptions;
 }
+
+export interface FaceSsrHydrationSidecarOptions
+  extends Pick<
+    SsrHydrationSidecarStoreOptions,
+    | 'htmlStore'
+    | 'signingSecret'
+    | 'now'
+    | 'ttlSeconds'
+    | 'keyPrefix'
+    | 'dataUrlPrefix'
+    | 'scope'
+  > {
+  /**
+   * Request-derived variant binding used when writing a sidecar during the
+   * HTML render and when reading it through the framework-owned resource
+   * route. The callback must only use request fields that the sidecar fetch can
+   * reproduce; the default binds to cookies and stores only HMAC-derived
+   * digests in tokens and metadata.
+   */
+  requestVariant?: FaceSsrHydrationSidecarVariantCallback;
+}
+
+export type FaceSsrHydrationSidecarVariantCallback = (
+  request: Readonly<Required<FaceRequest>>,
+) =>
+  | SsrHydrationSidecarVariantInput
+  | Promise<SsrHydrationSidecarVariantInput>;
 
 export interface FaceStrictCspOptions {
   /**
@@ -92,11 +128,18 @@ class StrictCspStreamBodyTooLargeError extends Error {
   }
 }
 
+interface FaceAppSsrHydrationSidecarRuntime {
+  routes: FaceResourceRoute[];
+  store: SsrHydrationSidecarStore;
+  requestVariant: FaceSsrHydrationSidecarVariantCallback;
+}
+
 export class FaceApp {
   private readonly router: Router;
   private readonly faceByPattern: Map<string, FaceModule>;
   private readonly resourceByPattern: Map<string, FaceResourceRoute>;
   private readonly isrRuntime: IsrRuntime | null;
+  private readonly ssrHydrationSidecarRuntime: FaceAppSsrHydrationSidecarRuntime | null;
   private readonly observability: FaceObservabilityHooks | null;
   private readonly strictCspMaxStreamingBodyBytes: number;
 
@@ -109,6 +152,11 @@ export class FaceApp {
       normalizeStrictCspMaxStreamingBodyBytes(
         options.strictCsp?.maxStreamingBodyBytes,
       );
+    this.ssrHydrationSidecarRuntime = options.ssrHydrationSidecars
+      ? createFaceAppSsrHydrationSidecarRuntime(
+          options.ssrHydrationSidecars,
+        )
+      : null;
 
     for (const face of options.faces) {
       const pattern = normalizePath(face.route);
@@ -119,7 +167,11 @@ export class FaceApp {
       this.faceByPattern.set(pattern, face);
     }
 
-    for (const resource of options.resources ?? []) {
+    const resources = this.ssrHydrationSidecarRuntime
+      ? [...this.ssrHydrationSidecarRuntime.routes, ...(options.resources ?? [])]
+      : (options.resources ?? []);
+
+    for (const resource of resources) {
       const pattern = normalizePath(resource.route);
       if (this.resourceByPattern.has(pattern)) {
         throw new Error(`duplicate resource route: ${pattern}`);
@@ -255,8 +307,16 @@ export class FaceApp {
             await face.render(ctx, data),
             isrOptions,
           );
+          const preparedOut =
+            face.mode === 'ssr'
+              ? await prepareRenderResultForSsrHydrationSidecar(
+                  out,
+                  this.ssrHydrationSidecarRuntime,
+                  normalizedReq,
+                )
+              : out;
           return await toHTTPResponse(
-            out,
+            preparedOut,
             normalizedReq,
             this.strictCspMaxStreamingBodyBytes,
           );
@@ -330,6 +390,90 @@ export class FaceApp {
 
 export function createFaceApp(options: FaceAppOptions): FaceApp {
   return new FaceApp(options);
+}
+
+function createFaceAppSsrHydrationSidecarRuntime(
+  options: FaceSsrHydrationSidecarOptions,
+): FaceAppSsrHydrationSidecarRuntime {
+  const dataUrlPrefix = normalizeSsrHydrationSidecarDataUrlPrefix(
+    options.dataUrlPrefix,
+  );
+  const routePatterns =
+    routePatternsFromSsrHydrationSidecarDataUrlPrefix(dataUrlPrefix);
+
+  const runtime: Omit<FaceAppSsrHydrationSidecarRuntime, 'routes'> = {
+    store: createSsrHydrationSidecarStore({
+      ...options,
+      dataUrlPrefix,
+    }),
+    requestVariant:
+      options.requestVariant ?? defaultSsrHydrationSidecarRequestVariant,
+  };
+
+  return {
+    ...runtime,
+    routes: routePatterns.map((route) => ({
+      route,
+      handle: (ctx) => handleSsrHydrationSidecarResource(runtime, ctx),
+    })),
+  };
+}
+
+function routePatternsFromSsrHydrationSidecarDataUrlPrefix(
+  prefix: string,
+): string[] {
+  if (prefix === '/') {
+    throw new TypeError(
+      'SSR hydration sidecar dataUrlPrefix must include a static path segment',
+    );
+  }
+
+  if (prefix.includes('{') || prefix.includes('}')) {
+    throw new TypeError(
+      'SSR hydration sidecar dataUrlPrefix must be a static path prefix',
+    );
+  }
+
+  if (prefix !== '/') {
+    const segments = prefix.slice(1).split('/');
+    if (segments.some((segment) => segment.length === 0)) {
+      throw new TypeError(
+        'SSR hydration sidecar dataUrlPrefix must not contain empty path segments',
+      );
+    }
+  }
+
+  return [prefix, `${prefix}/{token}`, `${prefix}/{token+}`];
+}
+
+async function handleSsrHydrationSidecarResource(
+  runtime: Omit<FaceAppSsrHydrationSidecarRuntime, 'routes'>,
+  ctx: FaceContext,
+): Promise<FaceResponse> {
+  if (ctx.request.method !== 'GET') return ssrHydrationSidecarFailureResponse();
+
+  const token = ctx.proxy ?? ctx.params.token ?? '';
+  try {
+    const variant = await runtime.requestVariant(ctx.request);
+    const sidecar = await runtime.store.read({ token, variant });
+    return jsonResourceResponse(sidecar.data);
+  } catch {
+    return ssrHydrationSidecarFailureResponse();
+  }
+}
+
+function ssrHydrationSidecarFailureResponse(): FaceResponse {
+  return textResourceResponse('Not Found', { status: 404 });
+}
+
+function defaultSsrHydrationSidecarRequestVariant(
+  request: Readonly<Required<FaceRequest>>,
+): SsrHydrationSidecarVariantInput {
+  const cookies: Record<string, string> = {};
+  for (const name of Object.keys(request.cookies).sort()) {
+    cookies[name] = request.cookies[name] ?? '';
+  }
+  return { cookies };
 }
 
 function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
@@ -506,7 +650,41 @@ function prepareRenderResultForIsr(
   };
 }
 
+async function prepareRenderResultForSsrHydrationSidecar(
+  out: FaceRenderResult,
+  runtime: FaceAppSsrHydrationSidecarRuntime | null,
+  req: Readonly<Required<FaceRequest>>,
+): Promise<FaceRenderResult> {
+  if (
+    runtime === null ||
+    out.csp?.inlineScripts !== false ||
+    out.hydration === undefined ||
+    isExternalHydration(out.hydration)
+  ) {
+    return out;
+  }
+
+  const hydration = out.hydration;
+  const variant = await runtime.requestVariant(req);
+  const sidecar = await runtime.store.write({
+    data: hydration.data,
+    variant,
+  });
+
+  return {
+    ...out,
+    hydration: externalizeHydration(hydration, sidecar.dataUrl),
+  };
+}
+
 function externalizeHydrationForIsr(
+  hydration: FaceHydration,
+  dataUrl: string,
+): FaceExternalHydration {
+  return externalizeHydration(hydration, dataUrl);
+}
+
+function externalizeHydration(
   hydration: FaceHydration,
   dataUrl: string,
 ): FaceExternalHydration {
@@ -516,6 +694,12 @@ function externalizeHydrationForIsr(
     dataUrl,
     bootstrapModule: hydration.bootstrapModule,
   };
+}
+
+function isExternalHydration(
+  hydration: FaceHydration,
+): hydration is FaceExternalHydration {
+  return hydration.type === 'external';
 }
 
 async function toHTTPResponse(

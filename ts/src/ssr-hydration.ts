@@ -188,6 +188,12 @@ export function buildSsrHydrationSidecarDataUrl(
   return prefix === '/' ? `/${encodedToken}` : `${prefix}/${encodedToken}`;
 }
 
+export function normalizeSsrHydrationSidecarDataUrlPrefix(
+  dataUrlPrefix?: string,
+): string {
+  return normalizeDataUrlPrefix(dataUrlPrefix ?? DEFAULT_DATA_URL_PREFIX);
+}
+
 async function writeSsrHydrationSidecar(
   options: NormalizedSsrHydrationSidecarStoreOptions,
   input: WriteSsrHydrationSidecarInput,

@@ -203,6 +203,91 @@ Why this is incorrect:
 
 - It can produce duplicated key segments such as `isr/isr/...`.
 
+## Pattern: Let FaceTheory own strict SSR hydration sidecars
+
+Problem:
+You need an SSR Face to use the exact hydration data produced during the HTML render while also passing
+`inlineScripts:false`.
+
+**CORRECT**
+
+```ts
+import {
+  createFaceApp,
+  viteHydrationForEntry,
+  type HtmlStore,
+} from "@theory-cloud/facetheory";
+
+declare const htmlStore: HtmlStore;
+declare const signingSecret: string;
+
+const app = createFaceApp({
+  faces: [
+    {
+      route: "/account",
+      mode: "ssr",
+      load: async () => loadAccountData(),
+      render: (_ctx, data) => ({
+        csp: {
+          inlineScripts: false,
+          inlineStyles: true,
+          rawHead: false,
+        },
+        hydration: viteHydrationForEntry(
+          manifest,
+          "src/entry-client.ts",
+          data,
+        ),
+        html: renderAccountHtml(data),
+      }),
+    },
+  ],
+  ssrHydrationSidecars: {
+    htmlStore,
+    signingSecret,
+  },
+});
+```
+
+Why this is correct:
+
+- FaceTheory writes the exact hydration data from the SSR render once, then replaces inline/Vite hydration with a
+  same-origin `rel="facetheory-hydration"` link under `/_facetheory/ssr-data/...` before head rendering and strict CSP
+  validation.
+- The framework-owned resource route is registered automatically; consumers should not add a second resource route for
+  the same prefix.
+- Sidecar reads verify a signed, expiring token and return JSON with `cache-control: no-store`. Rejected reads use a
+  deterministic generic failure response rather than exposing token details.
+- The default variant binding is reconstructable from the page request and sidecar request by using cookies, while only
+  HMAC-derived digests are written to token claims, object keys, and metadata.
+
+Optional controls:
+
+- Use `ttlSeconds`, `keyPrefix`, `dataUrlPrefix`, `scope`, and `now` when the deployment needs a different lifetime,
+  store prefix, route prefix, token audience, or deterministic test clock.
+- Use `requestVariant` only for stable request inputs that the sidecar fetch can reproduce. Do not include hydration
+  body data, signing material, or values that are present during the page request but absent during the sidecar fetch.
+
+**INCORRECT**
+
+```ts
+const app = createFaceApp({
+  faces,
+  resources: [
+    {
+      route: "/_facetheory/ssr-data/{token+}",
+      handle: async () => renderTheFaceAgainAndReturnJson(),
+    },
+  ],
+});
+```
+
+Why this is incorrect:
+
+- Re-running `load()` or `render()` for the sidecar can diverge from the HTML the browser is hydrating.
+- A caller-owned route at FaceTheory's SSR sidecar prefix can conflict with the framework-owned route.
+- Handwritten sidecar responses can accidentally leak reject reasons or drift from the required `no-store` policy.
+
 ## Pattern: Default React streaming to `all-ready`
 
 Problem:
@@ -444,6 +529,8 @@ Framework notes:
   the client entry and emit titles/meta/links through FaceTheory `headTags`.
 - `startFaceNavigation()` loads the external hydration sidecar before applying a same-origin navigation snapshot and
   calling `hydrateFaceNavigation(context)`.
+- SSR Faces can alternatively return inline or `viteHydrationForEntry()` hydration when `createFaceApp()` is configured
+  with `ssrHydrationSidecars`; FaceTheory externalizes that SSR hydration before strict CSP validation.
 
 Reference example:
 
@@ -462,7 +549,8 @@ return {
 
 Why this is incorrect:
 
-- `viteHydrationForEntry()` emits legacy inline hydration JSON; strict no-inline routes need `FaceExternalHydration`.
+- `viteHydrationForEntry()` emits legacy inline hydration JSON; strict no-inline routes need either caller-managed
+  `FaceExternalHydration` or framework-owned SSR sidecars configured on `createFaceApp()`.
 - Raw head HTML, inline event handlers, inline style attributes, inline style tags, and inline scripts all fail closed
   under the strict policy.
 - Warning-only documentation is not enough: strict routes should let FaceTheory fail before returning invalid HTML.
