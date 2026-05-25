@@ -1,5 +1,51 @@
 # Changelog
 
+## [3.4.0](https://github.com/theory-cloud/FaceTheory/compare/v3.3.0...v3.4.0) (2026-05-25)
+
+
+### Features
+
+* **client:** add browser-safe hydration loader ([#255](https://github.com/theory-cloud/FaceTheory/issues/255)) ([64961f5](https://github.com/theory-cloud/FaceTheory/commit/64961f50dc37dfb9d12e1eed738c4aee24e9fa9b))
+* **example:** use ssr hydration sidecars ([#262](https://github.com/theory-cloud/FaceTheory/issues/262)) ([11ce366](https://github.com/theory-cloud/FaceTheory/commit/11ce36607eacc7873409594b3014950d8ce38b55))
+* **resource:** add raw resource route primitives ([#253](https://github.com/theory-cloud/FaceTheory/issues/253)) ([dde41cc](https://github.com/theory-cloud/FaceTheory/commit/dde41cce9b4f144ba5ea5cd4ce9f8a3ab9ad17fd)), closes [#250](https://github.com/theory-cloud/FaceTheory/issues/250)
+* **resource:** add resource response helpers ([#254](https://github.com/theory-cloud/FaceTheory/issues/254)) ([ed456d3](https://github.com/theory-cloud/FaceTheory/commit/ed456d3a541d76c11acd9731e0ba0adc6a1e9585))
+* **ssr:** add resource routes and hydration sidecars ([b96c2d8](https://github.com/theory-cloud/FaceTheory/commit/b96c2d8af9742f0715c96df55695c625b9849cb3))
+* **ssr:** add signed hydration sidecar store ([#256](https://github.com/theory-cloud/FaceTheory/issues/256)) ([7d3ee98](https://github.com/theory-cloud/FaceTheory/commit/7d3ee98f995c4c40036f40b5cdd1c5d611367f1c))
+* **ssr:** serve strict hydration sidecars ([#257](https://github.com/theory-cloud/FaceTheory/issues/257)) ([50f1a67](https://github.com/theory-cloud/FaceTheory/commit/50f1a6758e199ab22396325ecd20ba27396a03bd))
+
+
+### Bug Fixes
+
+* **apptheory:** update AppTheory to v1.9.0 ([426d9f0](https://github.com/theory-cloud/FaceTheory/commit/426d9f0d453779a7f7ccc3ffbc6badcaf2599fa2))
+* **apptheory:** update AppTheory to v1.9.0 ([ba867f5](https://github.com/theory-cloud/FaceTheory/commit/ba867f5468a6f3fe4533c52bbf8c3bd35d4e911e))
+* **react:** prove SSR hydration sidecars ([#258](https://github.com/theory-cloud/FaceTheory/issues/258)) ([2de66a4](https://github.com/theory-cloud/FaceTheory/commit/2de66a48629ba1ff4093eed9247071956fd60942))
+* **security:** normalize sidecar prefixes without regex ([51758b8](https://github.com/theory-cloud/FaceTheory/commit/51758b896737abca0261f8e487de7b2862b2dfcc))
+* **svelte:** prove SSR hydration sidecars ([#260](https://github.com/theory-cloud/FaceTheory/issues/260)) ([ae254ff](https://github.com/theory-cloud/FaceTheory/commit/ae254ffc7bc8ebae2c2292255a153a3cefa13f1e))
+* **vue:** prove SSR hydration sidecars ([#259](https://github.com/theory-cloud/FaceTheory/issues/259)) ([d7fcff8](https://github.com/theory-cloud/FaceTheory/commit/d7fcff82ed7143d0c9e3b08bebf43b97d4d4d3e4))
+
+## [3.4.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.3.0...v3.4.0-rc) (2026-05-25)
+
+
+### Features
+
+* **client:** add browser-safe hydration loader ([#255](https://github.com/theory-cloud/FaceTheory/issues/255)) ([64961f5](https://github.com/theory-cloud/FaceTheory/commit/64961f50dc37dfb9d12e1eed738c4aee24e9fa9b))
+* **example:** use ssr hydration sidecars ([#262](https://github.com/theory-cloud/FaceTheory/issues/262)) ([11ce366](https://github.com/theory-cloud/FaceTheory/commit/11ce36607eacc7873409594b3014950d8ce38b55))
+* **resource:** add raw resource route primitives ([#253](https://github.com/theory-cloud/FaceTheory/issues/253)) ([dde41cc](https://github.com/theory-cloud/FaceTheory/commit/dde41cce9b4f144ba5ea5cd4ce9f8a3ab9ad17fd)), closes [#250](https://github.com/theory-cloud/FaceTheory/issues/250)
+* **resource:** add resource response helpers ([#254](https://github.com/theory-cloud/FaceTheory/issues/254)) ([ed456d3](https://github.com/theory-cloud/FaceTheory/commit/ed456d3a541d76c11acd9731e0ba0adc6a1e9585))
+* **ssr:** add resource routes and hydration sidecars ([b96c2d8](https://github.com/theory-cloud/FaceTheory/commit/b96c2d8af9742f0715c96df55695c625b9849cb3))
+* **ssr:** add signed hydration sidecar store ([#256](https://github.com/theory-cloud/FaceTheory/issues/256)) ([7d3ee98](https://github.com/theory-cloud/FaceTheory/commit/7d3ee98f995c4c40036f40b5cdd1c5d611367f1c))
+* **ssr:** serve strict hydration sidecars ([#257](https://github.com/theory-cloud/FaceTheory/issues/257)) ([50f1a67](https://github.com/theory-cloud/FaceTheory/commit/50f1a6758e199ab22396325ecd20ba27396a03bd))
+
+
+### Bug Fixes
+
+* **apptheory:** update AppTheory to v1.9.0 ([426d9f0](https://github.com/theory-cloud/FaceTheory/commit/426d9f0d453779a7f7ccc3ffbc6badcaf2599fa2))
+* **apptheory:** update AppTheory to v1.9.0 ([ba867f5](https://github.com/theory-cloud/FaceTheory/commit/ba867f5468a6f3fe4533c52bbf8c3bd35d4e911e))
+* **react:** prove SSR hydration sidecars ([#258](https://github.com/theory-cloud/FaceTheory/issues/258)) ([2de66a4](https://github.com/theory-cloud/FaceTheory/commit/2de66a48629ba1ff4093eed9247071956fd60942))
+* **security:** normalize sidecar prefixes without regex ([51758b8](https://github.com/theory-cloud/FaceTheory/commit/51758b896737abca0261f8e487de7b2862b2dfcc))
+* **svelte:** prove SSR hydration sidecars ([#260](https://github.com/theory-cloud/FaceTheory/issues/260)) ([ae254ff](https://github.com/theory-cloud/FaceTheory/commit/ae254ffc7bc8ebae2c2292255a153a3cefa13f1e))
+* **vue:** prove SSR hydration sidecars ([#259](https://github.com/theory-cloud/FaceTheory/issues/259)) ([d7fcff8](https://github.com/theory-cloud/FaceTheory/commit/d7fcff82ed7143d0c9e3b08bebf43b97d4d4d3e4))
+
 ## [3.3.0](https://github.com/theory-cloud/FaceTheory/compare/v3.2.2...v3.3.0) (2026-05-23)
 
 
