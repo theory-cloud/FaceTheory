@@ -11,6 +11,7 @@ import * as core from '../../src/index.js';
 import {
   buildSsrHydrationSidecarDataUrl,
   createSsrHydrationSidecarStore,
+  normalizeSsrHydrationSidecarDataUrlPrefix,
   serializeSsrHydrationSidecarJson,
   SsrHydrationSidecarError,
 } from '../../src/ssr-hydration.js';
@@ -275,6 +276,10 @@ test('SSR hydration sidecar helpers: expose stable public core primitives', () =
   assert.equal(core.DEFAULT_SSR_HYDRATION_SIDECAR_TTL_SECONDS, 60);
   assert.equal(typeof core.createSsrHydrationSidecarStore, 'function');
   assert.equal(
+    core.normalizeSsrHydrationSidecarDataUrlPrefix('_facetheory/ssr-data/'),
+    '/_facetheory/ssr-data',
+  );
+  assert.equal(
     serializeSsrHydrationSidecarJson({
       html: '<x>&</x>',
       line: '\u2028\u2029',
@@ -299,6 +304,10 @@ test('SSR hydration sidecar helpers: reject network-path data URL prefixes', () 
         buildSsrHydrationSidecarDataUrl('payload.signature', {
           dataUrlPrefix,
         }),
+      /same-origin path prefix/,
+    );
+    assert.throws(
+      () => normalizeSsrHydrationSidecarDataUrlPrefix(dataUrlPrefix),
       /same-origin path prefix/,
     );
   }
