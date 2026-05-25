@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
+import * as core from '../../src/index.js';
+import {
+  emptyResourceResponse,
+  jsonResourceResponse,
+  methodNotAllowedResourceResponse,
+  textResourceResponse,
+} from '../../src/resource.js';
 import type { FaceResourceRoute } from '../../src/types.js';
 
 function utf8(text: string): Uint8Array {
@@ -195,4 +202,146 @@ test('FaceApp resources: ambiguous face/resource routes fail closed', () => {
       }),
     /ambiguous face\/resource routes: \/api\/\{id\} and \/api\/\{name\}/,
   );
+});
+
+test('resource helpers: are exported from the public core surface', () => {
+  assert.equal(core.jsonResourceResponse({ ok: true }).status, 200);
+  assert.equal(core.textResourceResponse('ok').status, 200);
+  assert.equal(core.emptyResourceResponse().status, 204);
+  assert.equal(core.methodNotAllowedResourceResponse(['GET']).status, 405);
+});
+
+test('resource helpers: JSON responses use safe serialization and stable headers', () => {
+  const response = jsonResourceResponse(
+    { html: '<script>&</script>', line: '\u2028\u2029' },
+    {
+      status: 201,
+      headers: {
+        'X-FaceTheory-Resource': 'yes',
+        'Content-Type': 'text/html',
+        'Set-Cookie': ['from-header=1'],
+      },
+      cookies: ['from-option=1'],
+      cacheControl: 'private, max-age=0',
+    },
+  );
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(Object.keys(response.headers), [
+    'cache-control',
+    'content-type',
+    'set-cookie',
+    'x-facetheory-resource',
+  ]);
+  assert.deepEqual(response.headers['content-type'], [
+    'application/json; charset=utf-8',
+  ]);
+  assert.deepEqual(response.headers['cache-control'], ['private, max-age=0']);
+  assert.deepEqual(response.headers['set-cookie'], [
+    'from-header=1',
+    'from-option=1',
+  ]);
+  assert.deepEqual(response.cookies, ['from-header=1', 'from-option=1']);
+  assert.equal(response.isBase64, false);
+  assert.equal(
+    decodeBody(response.body as Uint8Array),
+    '{"html":"\\u003cscript\\u003e\\u0026\\u003c/script\\u003e","line":"\\u2028\\u2029"}',
+  );
+});
+
+test('resource helpers: text and empty responses set deterministic cache and content headers', () => {
+  const text = textResourceResponse('hello', {
+    headers: { 'X-Trace': ['abc'] },
+  });
+
+  assert.equal(text.status, 200);
+  assert.deepEqual(text.headers, {
+    'cache-control': ['no-store'],
+    'content-type': ['text/plain; charset=utf-8'],
+    'x-trace': ['abc'],
+  });
+  assert.equal(decodeBody(text.body as Uint8Array), 'hello');
+
+  const empty = emptyResourceResponse({
+    headers: { 'content-type': 'text/plain', 'x-empty': '1' },
+  });
+
+  assert.equal(empty.status, 204);
+  assert.deepEqual(empty.headers, {
+    'cache-control': ['no-store'],
+    'x-empty': ['1'],
+  });
+  assert.equal((empty.body as Uint8Array).byteLength, 0);
+});
+
+test('resource helpers: method-not-allowed responses canonicalize the Allow header', () => {
+  const response = methodNotAllowedResourceResponse(
+    ['post', 'GET', 'get', 'PATCH'],
+    {
+      headers: {
+        allow: 'DELETE',
+        'cache-control': 'public, max-age=60',
+      },
+    },
+  );
+
+  assert.equal(response.status, 405);
+  assert.deepEqual(response.headers, {
+    allow: ['GET, PATCH, POST'],
+    'cache-control': ['no-store'],
+    'content-type': ['text/plain; charset=utf-8'],
+  });
+  assert.equal(decodeBody(response.body as Uint8Array), 'Method Not Allowed');
+});
+
+test('resource helpers: reject unsafe JSON and header inputs', () => {
+  assert.throws(
+    () => jsonResourceResponse(undefined),
+    /JSON-serializable at the top level/,
+  );
+  assert.throws(
+    () => textResourceResponse('bad', { headers: { 'x-bad\r\nname': '1' } }),
+    /invalid resource response header name/,
+  );
+  assert.throws(
+    () => textResourceResponse('bad', { headers: { 'x-bad': '1\n2' } }),
+    /must not contain CR or LF/,
+  );
+  assert.throws(
+    () => methodNotAllowedResourceResponse(['GET', 'bad method']),
+    /invalid allowed resource method/,
+  );
+});
+
+test('FaceApp resources: helpers return raw method-not-allowed responses', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({ html: '<main>home</main>' }),
+      },
+    ],
+    resources: [
+      {
+        route: '/api/status',
+        handle: (ctx) =>
+          ctx.request.method === 'GET'
+            ? jsonResourceResponse({ ok: true })
+            : methodNotAllowedResourceResponse(['GET']),
+      },
+    ],
+  });
+
+  const response = await app.handle({ method: 'POST', path: '/api/status' });
+  const body = decodeBody(response.body as Uint8Array);
+
+  assert.equal(response.status, 405);
+  assert.equal(response.headers.allow?.[0], 'GET');
+  assert.equal(
+    response.headers['content-type']?.[0],
+    'text/plain; charset=utf-8',
+  );
+  assert.equal(body, 'Method Not Allowed');
+  assert.equal(body.includes('<!doctype html>'), false);
 });
