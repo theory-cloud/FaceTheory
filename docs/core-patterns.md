@@ -96,6 +96,83 @@ Why this is incorrect:
 - It omits the coordinated HTML and metadata stores that blocking ISR expects in production.
 - If the page renders tenant-specific HTML, it also omits the explicit `tenantKey` or custom `cacheKey` required to partition that cache. FaceTheory fails closed when known tenant boundary headers reach ISR without such a partition.
 
+## Pattern: Use resource response helpers for raw routes
+
+Problem:
+You need a FaceTheory resource route to return JSON, text, an intentionally empty
+response, or a `405 Method Not Allowed` without drifting into document rendering
+or unsafe ad hoc serialization.
+
+**CORRECT**
+
+```ts
+import {
+  createFaceApp,
+  emptyResourceResponse,
+  jsonResourceResponse,
+  methodNotAllowedResourceResponse,
+  textResourceResponse,
+  type FaceResourceRoute,
+} from "@theory-cloud/facetheory";
+
+const resources: FaceResourceRoute[] = [
+  {
+    route: "/api/status",
+    handle: (ctx) => {
+      if (ctx.request.method !== "GET") {
+        return methodNotAllowedResourceResponse(["GET"]);
+      }
+
+      return jsonResourceResponse({ ok: true, path: ctx.request.path });
+    },
+  },
+  {
+    route: "/robots.txt",
+    handle: () => textResourceResponse("User-agent: *\nDisallow:\n"),
+  },
+  {
+    route: "/api/no-content",
+    handle: () => emptyResourceResponse(),
+  },
+];
+
+const app = createFaceApp({ faces, resources });
+```
+
+Why this is correct:
+
+- Resource routes are routing-adjacent raw responses, not another render mode.
+- `jsonResourceResponse()` mirrors FaceTheory's safe JSON escaping for
+  HTML-significant characters, which keeps hydration-sidecar-adjacent payloads
+  safe for web delivery.
+- Helper-owned headers are lower-case, sorted, and deterministic. JSON/text
+  helpers set content type, all helpers default `cache-control` to `no-store`,
+  and `methodNotAllowedResourceResponse()` builds a sorted `allow` header from
+  caller-supplied methods.
+- Caller resource routes should avoid FaceTheory-owned prefixes. The
+  `/_facetheory/ssr-data/*` namespace belongs to framework-owned SSR hydration
+  sidecars when `ssrHydrationSidecars` is configured.
+
+**INCORRECT**
+
+```ts
+handle: async () => ({
+  status: 200,
+  headers: { "Content-Type": ["application/json"] },
+  cookies: [],
+  body: new TextEncoder().encode(JSON.stringify({ html: "</script>" })),
+  isBase64: false,
+});
+```
+
+Why this is incorrect:
+
+- Raw `JSON.stringify()` does not apply FaceTheory's HTML-significant escaping.
+- Mixed-case handwritten headers can drift from the runtime's lower-case stable
+  header style.
+- Repeating the raw `FaceResponse` shape at every route makes method and cache
+  behavior easy to forget or vary by handler.
+
 ## Pattern: Keep ISR storage prefixes intentional
 
 Problem:
@@ -137,6 +214,96 @@ htmlPointerPrefix: "isr";
 Why this is incorrect:
 
 - It can produce duplicated key segments such as `isr/isr/...`.
+
+## Pattern: Let FaceTheory own strict SSR hydration sidecars
+
+Problem:
+You need an SSR Face to use the exact hydration data produced during the HTML render while also passing
+`inlineScripts:false`.
+
+**CORRECT**
+
+```ts
+import {
+  createFaceApp,
+  viteHydrationForEntry,
+  type HtmlStore,
+} from "@theory-cloud/facetheory";
+
+declare const htmlStore: HtmlStore;
+declare const signingSecret: string;
+
+const app = createFaceApp({
+  faces: [
+    {
+      route: "/account",
+      mode: "ssr",
+      load: async () => loadAccountData(),
+      render: (_ctx, data) => ({
+        csp: {
+          inlineScripts: false,
+          inlineStyles: true,
+          rawHead: false,
+        },
+        hydration: viteHydrationForEntry(
+          manifest,
+          "src/entry-client.ts",
+          data,
+        ),
+        html: renderAccountHtml(data),
+      }),
+    },
+  ],
+  ssrHydrationSidecars: {
+    htmlStore,
+    signingSecret,
+  },
+});
+```
+
+Why this is correct:
+
+- FaceTheory writes the exact hydration data from the SSR render once, then replaces inline/Vite hydration with a
+  same-origin `rel="facetheory-hydration"` link under `/_facetheory/ssr-data/...` before head rendering and strict CSP
+  validation.
+- The framework-owned resource route is registered automatically; consumers should not add a second resource route for
+  the same prefix.
+- Sidecar reads verify a signed, expiring token and return JSON with `cache-control: no-store`. Rejected reads use a
+  deterministic generic failure response rather than exposing token details.
+- The default variant binding is reconstructable from the page request and sidecar request by using cookies, while only
+  HMAC-derived digests are written to token claims, object keys, and metadata.
+- React, Vue, and Svelte strict SSR flows use the same app-level sidecar option; the public adapter factories do not
+  need an adapter-specific sidecar API.
+
+Optional controls:
+
+- Use `ttlSeconds`, `keyPrefix`, `dataUrlPrefix`, `scope`, and `now` when the deployment needs a different lifetime,
+  store prefix, route prefix, token audience, or deterministic test clock.
+- Use `requestVariant` only for stable request inputs that the sidecar fetch can reproduce. Do not include hydration
+  body data, signing material, or values that are present during the page request but absent during the sidecar fetch.
+
+**INCORRECT**
+
+```ts
+const app = createFaceApp({
+  faces,
+  resources: [
+    {
+      route: "/_facetheory/ssr-data/{token+}",
+      handle: async () => renderTheFaceAgainAndReturnJson(),
+    },
+  ],
+});
+```
+
+Why this is incorrect:
+
+- Re-running `load()` or `render()` for the sidecar can diverge from the HTML the browser is hydrating.
+- A caller-owned route at FaceTheory's SSR sidecar prefix can conflict with the framework-owned route.
+- Handwritten sidecar responses can accidentally leak reject reasons or drift from the required `no-store` policy.
+- If a host intentionally owns an external sidecar, it should use `externalHydrationForEntry(...)` with a distinct
+  same-origin `dataUrl` and serve the exact render payload from that route; it should not reuse the framework-owned
+  prefix.
 
 ## Pattern: Default React streaming to `all-ready`
 
@@ -355,7 +522,7 @@ renderOptions: async (_ctx, data) => {
       manifest,
       "src/entry-client.ts",
       data,
-      { dataUrl: "/_facetheory/data/example.json" },
+      { dataUrl: "/app-hydration/example.json" },
     ),
   };
 };
@@ -369,6 +536,17 @@ Why this is correct:
 - The CSP header is attached explicitly by the Face; FaceTheory validates output, but it does not silently choose a
   response policy for the host.
 
+Sidecar ownership differs by delivery mode:
+
+- SSG strict hydration sidecars are static build artifacts under `/_facetheory/data/*` and should route to S3 beside the
+  generated HTML.
+- ISR strict hydration sidecars are paired with the cached HTML through the ISR runtime and TableTheory/S3-backed cache
+  state; the sidecar URL is pointer-derived from the page route rather than the SSR runtime prefix.
+- SSR strict hydration sidecars are framework-owned when `createFaceApp({ ssrHydrationSidecars })` is configured and
+  default to `/_facetheory/ssr-data/*` on the same Lambda/FaceApp handler.
+- Caller-managed external sidecars remain valid when the host supplies `externalHydrationForEntry(...)`; the host owns
+  storing and serving the exact payload and should keep the URL outside FaceTheory-owned prefixes.
+
 Framework notes:
 
 - React routes that set `inlineScripts:false` must not use shell streaming. Use `styleStrategy: "all-ready"` so
@@ -379,6 +557,8 @@ Framework notes:
   the client entry and emit titles/meta/links through FaceTheory `headTags`.
 - `startFaceNavigation()` loads the external hydration sidecar before applying a same-origin navigation snapshot and
   calling `hydrateFaceNavigation(context)`.
+- SSR Faces can alternatively return inline or `viteHydrationForEntry()` hydration when `createFaceApp()` is configured
+  with `ssrHydrationSidecars`; FaceTheory externalizes that SSR hydration before strict CSP validation.
 
 Reference example:
 
@@ -397,7 +577,8 @@ return {
 
 Why this is incorrect:
 
-- `viteHydrationForEntry()` emits legacy inline hydration JSON; strict no-inline routes need `FaceExternalHydration`.
+- `viteHydrationForEntry()` emits legacy inline hydration JSON; strict no-inline routes need either caller-managed
+  `FaceExternalHydration` or framework-owned SSR sidecars configured on `createFaceApp()`.
 - Raw head HTML, inline event handlers, inline style attributes, inline style tags, and inline scripts all fail closed
   under the strict policy.
 - Warning-only documentation is not enough: strict routes should let FaceTheory fail before returning invalid HTML.
@@ -425,10 +606,20 @@ startAwsOacFormTransport();
 Why this is correct:
 
 - The form opts in explicitly with `data-facetheory-oac-form`; unmarked forms keep native browser behavior.
+- The helper is marker-scoped, not CloudFront path-scoped. It does not monkeypatch `fetch`, and it does not inspect
+  your distribution behaviors to infer which same-origin paths route to the OAC-protected SSR origin.
 - FaceTheory proceeds only when the resolved form encoding is `application/x-www-form-urlencoded`, computes the SHA256 hash over the exact URL-encoded bytes it sends, and sets `x-amz-content-sha256` for CloudFront's Lambda URL OAC signing path.
 - The action must stay same-origin, and FaceTheory forces `redirect: "error"` on the mutating fetch so a 307/308 open redirect cannot replay the signed form body to another origin.
 - Cookies and same-origin credentials remain on the CloudFront/AppTheory path, while AppTheory's `AWS_IAM` Lambda URL hardening stays intact.
 - Same-origin HTML validation/error responses may replace the whole document instead of inventing a partial DOM patching contract, but fetched document replacement and explicit SPA DOM navigation fail closed when the response carries a `Content-Security-Policy` header because fetch cannot install response CSP headers into the active document policy. Use `navigationPolicy: "full-page"`, `onNavigate`, or `onResponse` for CSP-protected HTML responses and for intentional post-submit redirects to safe GET URLs.
+
+Mixed-origin note:
+
+- If the same CloudFront distribution also serves bearer-auth or otherwise non-OAC Lambda Function URL origins such as
+  `/api/*`, `/auth/*`, `/.well-known/*`, or `/attestations/*`, do not mark those forms with
+  `data-facetheory-oac-form`. Unmarked forms and ordinary same-origin API `fetch()` calls stay untouched, but any
+  marked same-origin mutating form is treated as an OAC form regardless of path. Add a host-side CI check when marker
+  hygiene is security-relevant.
 
 **INCORRECT**
 

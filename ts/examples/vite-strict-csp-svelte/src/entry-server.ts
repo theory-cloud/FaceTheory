@@ -1,10 +1,11 @@
 import { createFaceApp } from '../../../src/app.js';
+import { InMemoryHtmlStore } from '../../../src/isr.js';
 import { buildStrictCspHeader } from '../../../src/security.js';
 import { createSvelteFace } from '../../../src/svelte/index.js';
 import type { ViteManifest } from '../../../src/vite.js';
 import {
-  externalHydrationForEntry,
   viteAssetsForEntry,
+  viteHydrationForEntry,
 } from '../../../src/vite.js';
 
 import App from './App.svelte';
@@ -47,18 +48,13 @@ export function strictCspSvelteDataForPath(
   };
 }
 
-export function strictCspSvelteHydrationDataUrl(pathname: string): string {
-  return pathname === '/next'
-    ? '/_facetheory/data/strict-csp-svelte-next.json'
-    : '/_facetheory/data/strict-csp-svelte-home.json';
-}
-
-export function strictCspSvelteHydrationJsonForPath(pathname: string): string {
-  return JSON.stringify(strictCspSvelteDataForPath(pathname));
-}
-
 export function createViteStrictCspSvelteExampleApp(manifest: ViteManifest) {
   return createFaceApp({
+    ssrHydrationSidecars: {
+      htmlStore: new InMemoryHtmlStore(),
+      signingSecret:
+        'vite-strict-csp-svelte-example-local-ssr-sidecar-signing-secret',
+    },
     faces: [
       createSvelteFace({
         route: '/',
@@ -68,7 +64,7 @@ export function createViteStrictCspSvelteExampleApp(manifest: ViteManifest) {
           component: App,
           props: { ...(data as StrictCspSvelteExampleData), logoUrl },
         }),
-        renderOptions: strictRenderOptions(manifest, '/'),
+        renderOptions: strictRenderOptions(manifest),
       }),
       createSvelteFace({
         route: '/next',
@@ -78,21 +74,19 @@ export function createViteStrictCspSvelteExampleApp(manifest: ViteManifest) {
           component: App,
           props: { ...(data as StrictCspSvelteExampleData), logoUrl },
         }),
-        renderOptions: strictRenderOptions(manifest, '/next'),
+        renderOptions: strictRenderOptions(manifest),
       }),
     ],
   });
 }
 
-function strictRenderOptions(manifest: ViteManifest, pathname: string) {
+function strictRenderOptions(manifest: ViteManifest) {
   return async (_ctx: unknown, data: unknown) => {
     const exampleData = data as StrictCspSvelteExampleData;
     const { headTags } = viteAssetsForEntry(manifest, ENTRY, {
       includeAssets: true,
     });
-    const hydration = externalHydrationForEntry(manifest, ENTRY, exampleData, {
-      dataUrl: strictCspSvelteHydrationDataUrl(pathname),
-    });
+    const hydration = viteHydrationForEntry(manifest, ENTRY, exampleData);
 
     return {
       csp: STRICT_CSP,

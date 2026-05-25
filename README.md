@@ -21,12 +21,12 @@ The single-path philosophy extends to client delivery: one way to render, one wa
 FaceTheory's ISR implementation uses TableTheory for cache metadata and regeneration leases, ensuring the same
 deterministic patterns that govern the backend also govern the frontend.
 
-## Install v3.3.0 <!-- x-release-please-version -->
+## Install v3.4.0-rc <!-- x-release-please-version -->
 
 Install the exact GitHub release tarball:
 
 ```bash
-export FACETHEORY_VERSION=3.3.0 # x-release-please-version
+export FACETHEORY_VERSION=3.4.0-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -40,8 +40,8 @@ Add the framework peers that match your adapter surface:
 
 Optional companion packages from pinned GitHub releases:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.7.1/theory-cloud-apptheory-1.7.1.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v1.7.1/theory-cloud-apptheory-cdk-1.7.1.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.9.0/theory-cloud-apptheory-1.9.0.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v1.9.0/theory-cloud-apptheory-cdk-1.9.0.tgz`
 - TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz`
 
 ## Quickstart
@@ -73,7 +73,32 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
-The `v3.3.0` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+The `v3.4.0-rc` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+
+## Resource Routes And Hydration Sidecars
+
+`createFaceApp({ resources })` registers raw resource routes beside HTML Faces
+for JSON/text/empty/method-guard responses. Resource routes return
+`FaceResponse` directly; they do not declare a render mode and FaceTheory does
+not wrap them in an HTML document. Prefer the helper exports
+`jsonResourceResponse()`, `textResourceResponse()`,
+`emptyResourceResponse()`, and `methodNotAllowedResourceResponse()` for common
+raw responses.
+
+Strict SSR hydration can be framework-owned: configure
+`createFaceApp({ ssrHydrationSidecars })`, return normal
+`viteHydrationForEntry()` data from the SSR Face, and FaceTheory writes the
+exact render-time payload once before emitting a same-origin
+`/_facetheory/ssr-data/...` link. Route that prefix to the same Lambda/FaceApp
+handler as the HTML. Static SSG sidecars stay under `/_facetheory/data/*` for
+S3/CloudFront delivery, and caller-managed `externalHydrationForEntry(...)`
+sidecars remain available when the host owns the same-origin JSON URL.
+
+Browser bootstraps should import `loadFaceHydrationData()` from
+`@theory-cloud/facetheory/client` so inline, SSG, ISR, framework-owned SSR, and
+caller-managed external hydration all flow through the same same-origin loader.
+See [Getting Started](./docs/getting-started.md#add-a-raw-resource-route) and
+[Core Patterns](./docs/core-patterns.md#pattern-let-facetheory-own-strict-ssr-hydration-sidecars).
 
 ## OAC Mutating Forms
 
@@ -107,8 +132,9 @@ steps and verification.
 ## Strict CSP Hydration
 
 Routes that need a no-inline CSP can set `FaceRenderResult.csp` to disable inline scripts, inline styles, and raw head
-HTML, emit `buildStrictCspHeader()`, and use `externalHydrationForEntry()` so hydration data is served from a
-same-origin JSON sidecar instead of inline `__FACETHEORY_DATA__`. See
+HTML, emit `buildStrictCspHeader()`, and move hydration data to a same-origin sidecar instead of inline
+`__FACETHEORY_DATA__`. For SSR, prefer framework-owned `ssrHydrationSidecars`; use
+`externalHydrationForEntry()` when the host intentionally owns the sidecar URL. See
 [Getting Started](./docs/getting-started.md#add-strict-no-inline-csp-hydration) and
 [Core Patterns](./docs/core-patterns.md#pattern-render-strict-no-inline-csp-pages-with-external-hydration).
 

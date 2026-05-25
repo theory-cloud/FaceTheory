@@ -6,6 +6,7 @@ import { streamFromString, utf8 } from '../../src/bytes.js';
 import {
   createLambdaUrlStreamingHandler,
   faceResponseToLambdaUrlResult,
+  handleLambdaUrlEvent,
   lambdaUrlEventToFaceRequest,
   writeFaceResponseToLambdaWriter,
   type AwsLambdaGlobalLike,
@@ -14,7 +15,45 @@ import {
   type LambdaUrlResponseMetadata,
   type LambdaWritableStream,
 } from '../../src/lambda-url.js';
+import type {
+  HtmlStore,
+  HtmlStoreReadResult,
+  HtmlStoreWriteInput,
+  HtmlStoreWriteResult,
+} from '../../src/isr.js';
 import type { FaceResponse } from '../../src/types.js';
+
+const SIDECAR_SIGNING_SECRET =
+  'synthetic lambda sidecar signing secret with enough entropy';
+
+class RecordingHtmlStore implements HtmlStore {
+  readonly writes: HtmlStoreWriteInput[] = [];
+  readonly objects = new Map<string, Uint8Array>();
+
+  async read(key: string): Promise<HtmlStoreReadResult | null> {
+    const body = this.objects.get(key);
+    if (!body) return null;
+    return { body: Uint8Array.from(body) };
+  }
+
+  async write(input: HtmlStoreWriteInput): Promise<HtmlStoreWriteResult> {
+    this.writes.push({
+      ...input,
+      body: Uint8Array.from(input.body),
+      ...(input.metadata ? { metadata: { ...input.metadata } } : {}),
+    });
+    this.objects.set(input.key, Uint8Array.from(input.body));
+    return { etag: `lambda-test-etag-${String(this.writes.length)}` };
+  }
+}
+
+function extractHydrationHref(html: string): string {
+  const tag = /<link\b[^>]*rel="facetheory-hydration"[^>]*>/i.exec(html)?.[0];
+  assert.ok(tag, 'expected FaceTheory hydration link');
+  const href = /\bhref="([^"]+)"/i.exec(tag)?.[1];
+  assert.ok(href, 'expected FaceTheory hydration href');
+  return href;
+}
 
 test('lambdaUrlEventToFaceRequest: maps Lambda URL event shape deterministically', () => {
   const event: LambdaUrlEvent = {
@@ -155,6 +194,86 @@ test('writeFaceResponseToLambdaWriter: writes head once before first body bytes'
   const firstChunk = new TextDecoder().decode(chunks[0]);
   assert.ok(firstChunk.startsWith('<!doctype html>'));
   assert.ok(firstChunk.includes('</head><body>'));
+});
+
+test('handleLambdaUrlEvent: serves emitted SSR hydration sidecar URL as raw JSON without rerendering', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  let loadCount = 0;
+  let renderCount = 0;
+  const hydrationPayload = {
+    page: 'issue-250-lambda',
+    requestScoped: {
+      token: 'render-time-only',
+      html: '<span>escaped</span>&safe',
+    },
+  };
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/lambda-sidecar',
+        mode: 'ssr',
+        load: async () => {
+          loadCount += 1;
+          return hydrationPayload;
+        },
+        render: (_ctx, data) => {
+          renderCount += 1;
+          return {
+            csp: {
+              inlineScripts: false,
+              inlineStyles: true,
+              rawHead: false,
+            },
+            hydration: {
+              data,
+              bootstrapModule: '/assets/lambda-sidecar.js',
+            },
+            html: '<main>lambda sidecar</main>',
+          };
+        },
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore,
+      signingSecret: SIDECAR_SIGNING_SECRET,
+      now: () => 20_000,
+    },
+  });
+
+  const page = await handleLambdaUrlEvent(app, {
+    rawPath: '/lambda-sidecar',
+    requestContext: { http: { method: 'GET' }, requestId: 'req-page' },
+  });
+  assert.equal(page.statusCode, 200);
+  assert.equal(page.headers?.['content-type'], 'text/html; charset=utf-8');
+  assert.equal(loadCount, 1);
+  assert.equal(renderCount, 1);
+  assert.equal(htmlStore.writes.length, 1);
+
+  const dataUrl = extractHydrationHref(page.body);
+  assert.match(dataUrl, /^\/_facetheory\/ssr-data\//);
+  assert.equal(page.body.includes('__FACETHEORY_DATA__'), false);
+
+  const sidecar = await handleLambdaUrlEvent(app, {
+    rawPath: dataUrl,
+    requestContext: { http: { method: 'GET' }, requestId: 'req-sidecar' },
+  });
+
+  assert.equal(sidecar.statusCode, 200);
+  assert.equal(
+    sidecar.headers?.['content-type'],
+    'application/json; charset=utf-8',
+  );
+  assert.equal(sidecar.headers?.['cache-control'], 'no-store');
+  assert.equal(sidecar.isBase64Encoded, false);
+  assert.deepEqual(JSON.parse(sidecar.body), hydrationPayload);
+  assert.equal(sidecar.body.includes('<!doctype html>'), false);
+  assert.equal(sidecar.body.includes('<html'), false);
+  assert.equal(sidecar.body.includes('<body'), false);
+  assert.equal(sidecar.body.includes('<main>lambda sidecar</main>'), false);
+  assert.equal(loadCount, 1);
+  assert.equal(renderCount, 1);
 });
 
 test('createLambdaUrlStreamingHandler: applies headers once before streaming bytes', async () => {

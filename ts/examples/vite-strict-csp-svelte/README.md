@@ -6,9 +6,11 @@ It demonstrates:
 
 - external Vite CSS and asset injection via manifest head tags;
 - same-origin module bootstrap;
-- external FaceTheory hydration JSON via `<link rel="facetheory-hydration">`;
+- framework-owned SSR hydration sidecar JSON via `<link rel="facetheory-hydration">`
+  under `/_facetheory/ssr-data/...`;
 - strict no-inline CSP render validation (`inlineScripts:false`, `inlineStyles:false`, `rawHead:false`);
-- deterministic server/client hydration data equivalence.
+- deterministic server/client hydration data equivalence without an example-owned
+  `/_facetheory/data/*` router.
 
 ## Build
 
@@ -30,4 +32,6 @@ Outputs:
 npm run example:vite:svelte:strict-csp:serve
 ```
 
-Then open `http://localhost:4178/`.
+Then open `http://localhost:4178/`. The local server forwards
+`/_facetheory/ssr-data/...` requests to the same FaceTheory app that rendered
+the page so the sidecar returns raw no-store JSON from the render-time payload.

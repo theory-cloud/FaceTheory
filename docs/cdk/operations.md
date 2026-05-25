@@ -45,7 +45,8 @@ Use these checks when a deployment includes routes with
 - SSG: `/_facetheory/data/*` reaches the S3 origin and returns JSON sidecars with cache headers coordinated with the
   referencing HTML.
 - ISR: hydration sidecar URLs with `__facetheory_isr_hydration=...` reach Lambda/FaceTheory, not direct S3 object keys.
-- SSR: dynamic external hydration endpoints are same-origin and routed to the runtime that produced the server render.
+- SSR: `/_facetheory/ssr-data/*` reaches the same Lambda/FaceApp handler that produced the server render and returns
+  the render-produced JSON sidecar with no shared cache.
 - CSP header: the HTML response includes the intended `content-security-policy`; baseline CloudFront headers alone are
   not enough.
 - OAC forms: choose full-page navigation for CSP-protected HTML outcomes unless the host deliberately uses the SPA
