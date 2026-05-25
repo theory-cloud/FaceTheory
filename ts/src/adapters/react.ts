@@ -331,7 +331,7 @@ async function renderReactStreamInternal(
 }
 
 function modeUsesRuntimeHydrationSidecars(mode: FaceMode): boolean {
-  return mode === 'isr' || mode === 'ssg';
+  return mode === 'ssr' || mode === 'isr' || mode === 'ssg';
 }
 
 export interface ReactFaceOptions<Data = unknown> {
