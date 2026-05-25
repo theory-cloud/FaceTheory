@@ -5,6 +5,7 @@ await import('./unit/app.test.js');
 await import('./unit/resource.test.js');
 await import('./unit/spa.test.js');
 await import('./unit/client-hydration.test.js');
+await import('./unit/ssr-hydration.test.js');
 await import('./unit/ops.test.js');
 await import('./unit/oac-form.test.js');
 await import('./unit/strict-csp-harness.test.js');

@@ -9,6 +9,7 @@ export * from './oac-form.js';
 export * from './resource.js';
 export * from './router.js';
 export * from './security.js';
+export * from './ssr-hydration.js';
 export * from './spa.js';
 export * from './ssg.js';
 export * from './types.js';
