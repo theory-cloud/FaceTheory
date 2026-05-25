@@ -38,6 +38,7 @@ Use this table as the public entrypoint map for package consumers. It reflects t
 | Export                                               | Surface                              | Primary interfaces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ---------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@theory-cloud/facetheory`                           | Core runtime                         | `createFaceApp`, `FaceApp`, `FaceModule`, `FaceResourceRoute`, `FaceResourceHandler`, `jsonResourceResponse`, `textResourceResponse`, `emptyResourceResponse`, `methodNotAllowedResourceResponse`, `FaceMode`, `FaceRequest`, `FaceResponse`, `FaceRenderResult`, `buildSsgSite`, `createLambdaUrlStreamingHandler`, `S3HtmlStore`, `InMemoryHtmlStore`, `InMemoryIsrMetaStore`, `blockingIsrCacheControl`, `viteAssetsForEntry`, `viteHydrationForEntry`, `externalHydrationForEntry`, `createCspNonce`, `buildStrictCspHeader`, `validateStrictCspDocument`, `readFaceHydrationData`, `parseFaceNavigationSnapshot`, `fetchFaceNavigationSnapshot`, `applyFaceNavigationSnapshot`, `loadFaceNavigationModule`, `startFaceNavigation`, `startAwsOacFormTransport`, `createAwsOacUrlEncodedFormPayload` |
+| `@theory-cloud/facetheory/client`                     | Browser hydration helpers             | `loadFaceHydrationData`, `fetchExternalFaceHydrationData`, `readFaceInlineHydrationData`, `readFaceExternalHydrationDataUrl`, `resolveSameOriginFaceHydrationUrl`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `@theory-cloud/facetheory/apptheory`                 | AppTheory adapter                    | `createAppTheoryFaceHandler`, `appTheoryContextToFaceRequest`, `faceResponseToAppTheoryResponse`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `@theory-cloud/facetheory/aws-s3`                    | AWS SDK S3 adapter                   | `createAwsSdkS3HtmlStoreClient`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `@theory-cloud/facetheory/stitch-tokens`             | Shared Stitch token utilities        | `StitchTokenSet` (with optional `surface` classification), `StitchCssVarOptions` (supports `prefix` and `additionalPrefixes`), `stitchToCssVars`, `stitchCssVarsToRootBlock`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -491,6 +492,37 @@ Default navigation policy after a successful fetch is deliberately full-document
 - CSP-protected HTML responses fail closed for fetched document replacement and explicit `navigationPolicy: "spa"` because fetch cannot install response CSP headers as the active document policy during `document.write()` replacement or SPA DOM mutation; use `navigationPolicy: "full-page"` or handle the response with `onNavigate` / `onResponse` when the host intentionally owns that boundary
 - non-HTML non-OK responses throw to `onError`
 - `onResponse` remains a full override for hosts that want to own response handling themselves
+
+## Browser Hydration Loader
+
+`@theory-cloud/facetheory/client` is the browser-safe subpath for reading the exact hydration data that FaceTheory emitted for the current document. Use it from client bootstrap code when a route may render either inline hydration (`__FACETHEORY_DATA__`) or strict-CSP external hydration (`<link rel="facetheory-hydration" ...>`).
+
+Core helpers:
+
+- `loadFaceHydrationData({ document?, allowedOrigin?, baseUrl?, fetcher?, requestInit? })` returns inline hydration first when `__FACETHEORY_DATA__` is present; otherwise it fetches the external hydration URL and returns the parsed JSON payload. It returns `null` when the document has no FaceTheory hydration marker.
+- `fetchExternalFaceHydrationData(dataUrl, options)` is the lower-level external sidecar fetcher used when the caller already has a data URL. It resolves relative URLs against the document/base URL, requires an `http:` or `https:` URL on the allowed origin, sends `Accept: application/json`, and parses the JSON response.
+- `readFaceInlineHydrationData(document?)` and `readFaceExternalHydrationDataUrl(document?)` expose the marker readers for callers that need to inspect the document before choosing their own bootstrap path.
+- `resolveSameOriginFaceHydrationUrl(dataUrl, options)` validates and resolves a hydration URL without fetching it.
+
+Security behavior:
+
+- Inline hydration wins when both inline and external markers exist, so the client starts from the data serialized into the HTML and does not fetch a second payload.
+- External hydration is same-origin only. Cross-origin URLs, redirected cross-origin responses, malformed URLs, `data:` / `javascript:` / other non-http schemes, invalid fetch response objects, non-JSON responses, and invalid JSON all fail closed.
+- The helpers throw sanitized errors and do not log or include hydration payload contents in error messages. Use synthetic values in tests and docs rather than production-like payloads.
+
+Example client bootstrap:
+
+```ts
+import { loadFaceHydrationData } from "@theory-cloud/facetheory/client";
+
+const hydration = await loadFaceHydrationData({
+  allowedOrigin: window.location.origin,
+});
+
+if (hydration !== null) {
+  hydrateApp(hydration);
+}
+```
 
 ## Client Navigation
 
