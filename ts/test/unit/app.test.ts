@@ -8,6 +8,7 @@ import type {
   HtmlStoreWriteInput,
   HtmlStoreWriteResult,
 } from '../../src/isr.js';
+import type { FaceResourceRoute } from '../../src/types.js';
 import { parseCookiesFromHeaders, parseQueryString } from '../../src/types.js';
 import { viteHydrationForEntry } from '../../src/vite.js';
 
@@ -37,6 +38,22 @@ class RecordingHtmlStore implements HtmlStore {
 
 function decodeBody(body: Uint8Array): string {
   return new TextDecoder().decode(body);
+}
+
+function callerResource(
+  route: string,
+  body = 'caller resource',
+): FaceResourceRoute {
+  return {
+    route,
+    handle: () => ({
+      status: 200,
+      headers: { 'content-type': ['text/plain; charset=utf-8'] },
+      cookies: [],
+      body: new TextEncoder().encode(body),
+      isBase64: false,
+    }),
+  };
 }
 
 function extractHydrationHref(html: string): string {
@@ -575,6 +592,92 @@ test('FaceApp: framework sidecar resource keeps precedence over broad faces', as
       '<main>face:dashboard</main>',
     ),
   );
+});
+
+test('FaceApp: framework sidecar resources reject structural caller route conflicts', () => {
+  const cases: Array<{ route: string; message: RegExp }> = [
+    {
+      route: '/_facetheory/ssr-data',
+      message: /duplicate resource route: \/_facetheory\/ssr-data/,
+    },
+    {
+      route: '/_facetheory/ssr-data/{token}',
+      message:
+        /duplicate resource route: \/_facetheory\/ssr-data\/\{token\}/,
+    },
+    {
+      route: '/_facetheory/ssr-data/{id}',
+      message:
+        /ambiguous resource routes: \/_facetheory\/ssr-data\/\{token\} and \/_facetheory\/ssr-data\/\{id\}/,
+    },
+    {
+      route: '/_facetheory/ssr-data/{id+}',
+      message:
+        /ambiguous resource routes: \/_facetheory\/ssr-data\/\{token\+\} and \/_facetheory\/ssr-data\/\{id\+\}/,
+    },
+    {
+      route: '/_facetheory/ssr-data/{proxy+}',
+      message:
+        /ambiguous resource routes: \/_facetheory\/ssr-data\/\{token\+\} and \/_facetheory\/ssr-data\/\{proxy\+\}/,
+    },
+  ];
+
+  for (const { route, message } of cases) {
+    assert.throws(
+      () =>
+        createFaceApp({
+          faces: [],
+          resources: [callerResource(route)],
+          ssrHydrationSidecars: {
+            htmlStore: new RecordingHtmlStore(),
+            signingSecret: SIDECAR_SIGNING_SECRET,
+          },
+        }),
+      message,
+      route,
+    );
+  }
+});
+
+test('FaceApp: framework sidecar resource keeps precedence over broad caller resources', async () => {
+  let callerResourceHits = 0;
+  const app = createFaceApp({
+    faces: [],
+    resources: [
+      {
+        ...callerResource('/{proxy+}'),
+        handle: (ctx) => {
+          callerResourceHits += 1;
+          return {
+            status: 200,
+            headers: { 'content-type': ['text/plain; charset=utf-8'] },
+            cookies: [],
+            body: new TextEncoder().encode(`resource:${ctx.proxy}`),
+            isBase64: false,
+          };
+        },
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore: new RecordingHtmlStore(),
+      signingSecret: SIDECAR_SIGNING_SECRET,
+      now: () => 5_500,
+    },
+  });
+
+  const sidecar = await app.handle({
+    method: 'GET',
+    path: '/_facetheory/ssr-data/not-a-valid-token',
+  });
+  assert.equal(sidecar.status, 404);
+  assert.equal(sidecar.headers['cache-control']?.[0], 'no-store');
+  assert.equal(decodeBody(sidecar.body as Uint8Array), 'Not Found');
+  assert.equal(callerResourceHits, 0);
+
+  const fallback = await app.handle({ method: 'GET', path: '/dashboard' });
+  assert.equal(fallback.status, 200);
+  assert.equal(decodeBody(fallback.body as Uint8Array), 'resource:dashboard');
+  assert.equal(callerResourceHits, 1);
 });
 
 test('FaceApp: non-strict routes preserve legacy inline body output', async () => {

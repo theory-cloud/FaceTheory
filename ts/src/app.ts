@@ -177,6 +177,18 @@ export class FaceApp {
         throw new Error(`duplicate resource route: ${pattern}`);
       }
 
+      for (const resourcePattern of this.resourceByPattern.keys()) {
+        const conflict = routePatternConflict(resourcePattern, pattern);
+        if (conflict === 'duplicate') {
+          throw new Error(`duplicate resource route: ${pattern}`);
+        }
+        if (conflict === 'ambiguous') {
+          throw new Error(
+            `ambiguous resource routes: ${resourcePattern} and ${pattern}`,
+          );
+        }
+      }
+
       for (const facePattern of this.faceByPattern.keys()) {
         const conflict = routePatternConflict(facePattern, pattern);
         if (conflict === 'duplicate') {
