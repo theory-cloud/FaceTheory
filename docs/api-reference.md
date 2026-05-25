@@ -37,7 +37,7 @@ Use this table as the public entrypoint map for package consumers. It reflects t
 
 | Export                                               | Surface                              | Primary interfaces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ---------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@theory-cloud/facetheory`                           | Core runtime                         | `createFaceApp`, `FaceApp`, `FaceModule`, `FaceResourceRoute`, `FaceResourceHandler`, `jsonResourceResponse`, `textResourceResponse`, `emptyResourceResponse`, `methodNotAllowedResourceResponse`, `FaceMode`, `FaceRequest`, `FaceResponse`, `FaceRenderResult`, `buildSsgSite`, `createLambdaUrlStreamingHandler`, `S3HtmlStore`, `InMemoryHtmlStore`, `InMemoryIsrMetaStore`, `blockingIsrCacheControl`, `viteAssetsForEntry`, `viteHydrationForEntry`, `externalHydrationForEntry`, `createCspNonce`, `buildStrictCspHeader`, `validateStrictCspDocument`, `readFaceHydrationData`, `parseFaceNavigationSnapshot`, `fetchFaceNavigationSnapshot`, `applyFaceNavigationSnapshot`, `loadFaceNavigationModule`, `startFaceNavigation`, `startAwsOacFormTransport`, `createAwsOacUrlEncodedFormPayload` |
+| `@theory-cloud/facetheory`                           | Core runtime                         | `createFaceApp`, `FaceApp`, `FaceModule`, `FaceResourceRoute`, `FaceResourceHandler`, `jsonResourceResponse`, `textResourceResponse`, `emptyResourceResponse`, `methodNotAllowedResourceResponse`, `createSsrHydrationSidecarStore`, `buildSsrHydrationSidecarDataUrl`, `serializeSsrHydrationSidecarJson`, `SsrHydrationSidecarError`, `DEFAULT_SSR_HYDRATION_SIDECAR_TTL_SECONDS`, `FaceMode`, `FaceRequest`, `FaceResponse`, `FaceRenderResult`, `buildSsgSite`, `createLambdaUrlStreamingHandler`, `S3HtmlStore`, `InMemoryHtmlStore`, `InMemoryIsrMetaStore`, `blockingIsrCacheControl`, `viteAssetsForEntry`, `viteHydrationForEntry`, `externalHydrationForEntry`, `createCspNonce`, `buildStrictCspHeader`, `validateStrictCspDocument`, `readFaceHydrationData`, `parseFaceNavigationSnapshot`, `fetchFaceNavigationSnapshot`, `applyFaceNavigationSnapshot`, `loadFaceNavigationModule`, `startFaceNavigation`, `startAwsOacFormTransport`, `createAwsOacUrlEncodedFormPayload` |
 | `@theory-cloud/facetheory/client`                     | Browser hydration helpers             | `loadFaceHydrationData`, `fetchExternalFaceHydrationData`, `readFaceInlineHydrationData`, `readFaceExternalHydrationDataUrl`, `resolveSameOriginFaceHydrationUrl`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `@theory-cloud/facetheory/apptheory`                 | AppTheory adapter                    | `createAppTheoryFaceHandler`, `appTheoryContextToFaceRequest`, `faceResponseToAppTheoryResponse`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `@theory-cloud/facetheory/aws-s3`                    | AWS SDK S3 adapter                   | `createAwsSdkS3HtmlStoreClient`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -214,6 +214,53 @@ accept caller extensions through `headers`, `cookies`, and `cacheControl`.
 Protected helper-owned headers such as `content-type`, `cache-control`, and
 `allow` stay deterministic; use the explicit helper options rather than relying
 on mixed-case header overrides.
+
+### Store SSR hydration sidecars
+
+`createSsrHydrationSidecarStore({ htmlStore, signingSecret, ... })` is an SSR-side server primitive for strict external hydration. It does not wire new FaceApp behavior by itself; THE-1600 owns framework route wiring. Existing inline hydration and caller-managed external hydration URLs remain valid.
+
+The store writes the exact server-render hydration payload to the configured `HtmlStore` as `application/json; charset=utf-8` with `cache-control: no-store`, using the same FaceTheory-safe JSON escaping as document/resource helpers for `<`, `>`, `&`, U+2028, and U+2029. Top-level non-serializable payloads (`undefined`, functions, symbols) are rejected before storage.
+
+```ts
+import {
+  createSsrHydrationSidecarStore,
+  externalHydrationForEntry,
+  type HtmlStore,
+} from "@theory-cloud/facetheory";
+
+const sidecars = createSsrHydrationSidecarStore({
+  htmlStore,
+  signingSecret: process.env.FACETHEORY_SSR_HYDRATION_SECRET!,
+  dataUrlPrefix: "/_facetheory/ssr-data",
+  ttlSeconds: 60,
+});
+
+const sidecar = await sidecars.write({
+  data: hydrationData,
+  variant: {
+    path: ctx.request.path,
+    query: ctx.request.query,
+    // Use stable derived partitions, not raw Authorization/Cookie/header values.
+    identityPartition: userPartitionHash,
+  },
+});
+
+const hydration = externalHydrationForEntry(
+  manifest,
+  "src/entry-client.ts",
+  hydrationData,
+  {
+    dataUrl: sidecar.dataUrl,
+  },
+);
+```
+
+Security behavior:
+
+- Tokens are HMAC-signed, scoped, expiring, and include `nbf`/`exp` checks; malformed, tampered, expired, future/not-yet-valid, wrong-variant, missing, and body-mismatched reads fail closed with `SsrHydrationSidecarError`.
+- Token claims and stored metadata contain only object keys, timestamps, and HMAC-derived scope/variant/body digests. They do not contain the signing secret or raw auth/cookie/header values.
+- Variant binding is caller-supplied but hashed before storage. Pass stable derived dimensions such as route path, sorted query values, locale, tenant partition, or an already-derived user/session partition hash; do not pass raw bearer tokens, cookies, API keys, or other auth secrets.
+- `DEFAULT_SSR_HYDRATION_SIDECAR_TTL_SECONDS` is `60`. Use short lifetimes because SSR hydration sidecars are intended to be fetched immediately by the page that received the matching HTML.
 
 ### Expose Lambda Function URL handling directly
 
