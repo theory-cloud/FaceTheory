@@ -288,3 +288,18 @@ test('SSR hydration sidecar helpers: expose stable public core primitives', () =
     '/_facetheory/ssr-data/payload.signature',
   );
 });
+
+test('SSR hydration sidecar helpers: reject network-path data URL prefixes', () => {
+  for (const dataUrlPrefix of [
+    '//evil.example/ssr-data',
+    '///evil.example/ssr-data',
+  ]) {
+    assert.throws(
+      () =>
+        buildSsrHydrationSidecarDataUrl('payload.signature', {
+          dataUrlPrefix,
+        }),
+      /same-origin path prefix/,
+    );
+  }
+});

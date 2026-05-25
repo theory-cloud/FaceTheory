@@ -555,13 +555,18 @@ function normalizeObjectPrefix(prefix: string): string {
 function normalizeDataUrlPrefix(prefix: string): string {
   const trimmed = String(prefix ?? '').trim();
   if (!trimmed) return DEFAULT_DATA_URL_PREFIX;
+  if (trimmed.startsWith('//')) {
+    throw new TypeError(
+      'SSR hydration sidecar dataUrlPrefix must be a same-origin path prefix',
+    );
+  }
   if (
     trimmed.includes('\\') ||
     trimmed.includes('?') ||
     trimmed.includes('#')
   ) {
     throw new TypeError(
-      'SSR hydration sidecar dataUrlPrefix must be a path prefix',
+      'SSR hydration sidecar dataUrlPrefix must be a same-origin path prefix',
     );
   }
   const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
