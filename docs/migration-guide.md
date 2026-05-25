@@ -178,7 +178,7 @@ Rollback:
 Do not make `ssrUrlAuthType: NONE` a durable rollback. If an operator explicitly authorizes it to recover a broken
 deployment, record an owner, expiration date, and restoration plan back to `AWS_IAM` + OAC.
 
-## Migration 7: Move Legacy Inline Hydration To Strict CSP External Hydration
+## Migration 7: Move Legacy Inline Hydration To Strict CSP Hydration Sidecars
 
 Use this path when a route currently relies on inline `__FACETHEORY_DATA__`, inline style output, or raw head HTML and
 now needs to satisfy a strict no-inline CSP.
@@ -188,20 +188,32 @@ now needs to satisfy a strict no-inline CSP.
      unique `FaceRequest.cspNonce` and the response CSP header carries the matching nonce.
    - **Strict no-inline** must set `csp: { inlineScripts: false, inlineStyles: false, rawHead: false }` and move scripts,
      CSS, and hydration data to same-origin external resources.
-2. Replace `viteHydrationForEntry(manifest, entry, data)` with
-   `externalHydrationForEntry(manifest, entry, data, { dataUrl })`.
-3. Serve the `dataUrl` JSON sidecar from the same origin as the page:
-   - SSG sidecars should be uploaded under the static `/_facetheory/data/*` output and routed to S3.
-   - ISR sidecars should be stored with the HTML pointer-derived sidecar object so stale HTML and stale data remain
-     paired.
-   - SSR sidecars can be served by the same Lambda route family when the data is request-time and not static.
+2. Pick the sidecar owner by delivery mode:
+   - **SSR framework-owned sidecars**: keep `viteHydrationForEntry(manifest, entry, data)` in the Face and configure
+     `createFaceApp({ ssrHydrationSidecars: { htmlStore, signingSecret } })`. FaceTheory stores the exact render-time
+     payload once, emits a `/_facetheory/ssr-data/...` URL, and serves it through the same FaceApp handler without
+     re-running `load()` or `render()`.
+   - **Caller-managed external sidecars**: replace the inline hydration with
+     `externalHydrationForEntry(manifest, entry, data, { dataUrl })` only when the application owns that same-origin
+     JSON route or object and can serve the exact payload used for the HTML render.
+   - **SSG sidecars**: let the SSG build write static strict hydration JSON under `/_facetheory/data/*` and route that
+     prefix to S3 beside the generated HTML.
+   - **ISR sidecars**: rely on the ISR runtime to pair strict hydration data with the cached HTML and metadata. Do not
+     route ISR hydration through the SSR `/_facetheory/ssr-data/*` prefix.
+3. Route the sidecar URL from the same origin as the page:
+   - `/_facetheory/data/*` is the static SSG sidecar namespace and should route to S3/CloudFront static delivery.
+   - `/_facetheory/ssr-data/*` is the framework-owned SSR runtime sidecar namespace and must route to the same
+     Lambda/FaceApp handler as the SSR HTML.
+   - Caller-managed URLs should use a distinct application-owned prefix and must not recompute request-dependent
+     hydration on a later sidecar request.
 4. Move CSS into the Vite client entry and emit assets with `viteAssetsForEntry(...)` instead of inline `<style>` tags.
 5. Replace raw head HTML and framework-specific head shortcuts with FaceTheory structured `headTags`.
 6. For Svelte strict pages, avoid `<svelte:head>` raw SSR output and component `<style>` fallback output; use external
    CSS imported by the client entry.
 7. For React streaming strict pages, use `styleStrategy: "all-ready"` and avoid Emotion/AntD inline style extraction on
    routes with `inlineStyles:false`.
-8. If the route uses SPA-style navigation, export `hydrateFaceNavigation(context)` and confirm
+8. In the client bootstrap, import `loadFaceHydrationData()` from `@theory-cloud/facetheory/client` and call it before
+   hydrating. If the route uses SPA-style navigation, export `hydrateFaceNavigation(context)` and confirm
    `startFaceNavigation()` loads external hydration data before it mutates the current document.
 
 Validation:
@@ -217,7 +229,9 @@ Deployed verification:
 
 - request the HTML document and confirm the CSP header is attached explicitly
 - confirm the HTML contains `<link rel="facetheory-hydration" ...>` rather than `__FACETHEORY_DATA__`
-- fetch the referenced hydration sidecar through the same CloudFront origin and confirm it is same-origin JSON
+- fetch the referenced hydration sidecar through the same CloudFront origin and confirm it is same-origin JSON:
+  `/_facetheory/data/*` should reach S3 for SSG output, and `/_facetheory/ssr-data/*` should reach the same
+  Lambda/FaceApp handler for SSR runtime sidecars
 - confirm external module, CSS, and asset URLs are routed through the documented S3/Lambda behavior split
 - run a browser hydration smoke and check for hydration warnings or strict-CSP console errors
 

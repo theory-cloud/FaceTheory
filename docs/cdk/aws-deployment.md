@@ -23,6 +23,9 @@ Recommended static paths:
 - `/.vite/*`
 - `/_facetheory/data/*`
 
+Recommended Lambda-reserved paths:
+- `/_facetheory/ssr-data/*`
+
 ## AppTheory CDK Wiring
 
 The reference stacks use AppTheory CDK and wire these runtime conventions:
@@ -44,7 +47,9 @@ Reference-stack stance:
 - do not model viewer-supplied tenant-header passthrough as the default copy-paste shape
 - keep same-origin mutating form action paths on Lambda/AppTheory behaviors, usually through `ssrPathPatterns`
 - use FaceTheory's marked URL-encoded OAC form helper for browser forms that submit through Lambda Function URL OAC
-- keep `/_facetheory/data/*` on S3 for SSG hydration sidecars, but keep ISR hydration query URLs on Lambda/FaceTheory
+- keep `/_facetheory/data/*` on S3 for SSG hydration sidecars
+- keep `/_facetheory/ssr-data/*` on Lambda/FaceTheory for SSR runtime hydration sidecars
+- keep ISR hydration query URLs on Lambda/FaceTheory
 - attach strict CSP headers from the Face response; baseline CloudFront response headers do not substitute for a
   route-owned `content-security-policy`
 
@@ -90,8 +95,12 @@ ISR:
 
 SSR:
 
-- If a strict SSR Face uses a dynamic external hydration endpoint, route that same-origin JSON endpoint to
-  Lambda/AppTheory and make sure it returns the exact data used by the server render.
+- If a strict SSR Face uses `createFaceApp({ ssrHydrationSidecars })`, FaceTheory emits signed same-origin hydration
+  URLs under `/_facetheory/ssr-data/*`.
+- Route `/_facetheory/ssr-data/*` to the same Lambda/FaceApp handler that rendered the SSR HTML so the runtime returns
+  the exact payload produced during that render without rerunning the Face.
+- Do not route SSR hydration sidecars through `/_facetheory/data/*`; that prefix remains reserved for SSG/static JSON on
+  S3.
 
 OAC navigation policy:
 
@@ -117,6 +126,8 @@ This is useful when:
 Requirements:
 - rewrite extensionless paths to S3 HTML keys
 - preserve the original viewer path for Lambda failover routing
+- reserve `/_facetheory/data/*` as a direct S3 behavior for SSG/static sidecars
+- reserve `/_facetheory/ssr-data/*` as a direct Lambda behavior for SSR runtime sidecars
 - keep SSR cache headers explicit and conservative
 - when using `AppTheorySsrSite`, treat `staticPathPatterns` as HTML sections, `directS3PathPatterns` as raw data/object paths, and `ssrPathPatterns` as Lambda-only dynamic routes
 - if tenant identity matters, derive it from trusted context instead of forwarding raw viewer tenant headers by default
@@ -139,6 +150,7 @@ Notes:
 
 SSR:
 - default to `cache-control: private, no-store`
+- route strict-CSP SSR hydration sidecars under `/_facetheory/ssr-data/*` to Lambda/FaceTheory with no shared cache
 - do not cache responses that set cookies
 
 SSG:

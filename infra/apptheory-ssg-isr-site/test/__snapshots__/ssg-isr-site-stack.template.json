@@ -509,7 +509,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "4f59e27d9b81ad80234408da0258c3e98192d2387c2c8dd1342ef3ffc67b72bc.zip"
+          "S3Key": "65e5901fb82219e757d12f2947a7bcd9942d4f695d068a247c99f766f55e1f37.zip"
         },
         "Environment": {
           "Variables": {
@@ -896,7 +896,7 @@
       "Type": "AWS::CloudFront::Function",
       "Properties": {
         "AutoPublish": true,
-        "FunctionCode": "function handler(event) {\n  var req = event.request;\n  var uri = req.uri || '/';\n\n  // Request correlation:\n  // - Always set/propagate x-request-id so SSR logs and viewer responses can correlate with CloudFront.\n  // - Prefer an inbound x-request-id if present, otherwise use the CloudFront request ID.\n  if (!req.headers['x-request-id']) {\n    req.headers['x-request-id'] = { value: event.context.requestId };\n  }\n\n  // Preserve the original path so SSR can route correctly when S3 misses.\n  req.headers['x-facetheory-original-uri'] = { value: uri };\n\n  if (uri === '/assets' || uri.startsWith('/assets/')) return req;\n  if (uri === '/.vite' || uri.startsWith('/.vite/')) return req;\n  if (uri === '/_facetheory/data' || uri.startsWith('/_facetheory/data/')) return req;\n\n  // If the final segment contains a dot, treat it as a file request.\n  var idx = uri.lastIndexOf('/');\n  var last = uri.substring(idx + 1);\n  if (last.indexOf('.') !== -1) return req;\n\n  if (uri.endsWith('/')) {\n    req.uri = uri + 'index.html';\n    return req;\n  }\n\n  req.uri = uri + '/index.html';\n  return req;\n}",
+        "FunctionCode": "function handler(event) {\n  var req = event.request;\n  var uri = req.uri || '/';\n\n  // Request correlation:\n  // - Always set/propagate x-request-id so SSR logs and viewer responses can correlate with CloudFront.\n  // - Prefer an inbound x-request-id if present, otherwise use the CloudFront request ID.\n  if (!req.headers['x-request-id']) {\n    req.headers['x-request-id'] = { value: event.context.requestId };\n  }\n\n  // Preserve the original path so SSR can route correctly when S3 misses.\n  req.headers['x-facetheory-original-uri'] = { value: uri };\n\n  if (uri === '/assets' || uri.startsWith('/assets/')) return req;\n  if (uri === '/.vite' || uri.startsWith('/.vite/')) return req;\n  if (uri === '/_facetheory/data' || uri.startsWith('/_facetheory/data/')) return req;\n  if (uri === '/_facetheory/ssr-data' || uri.startsWith('/_facetheory/ssr-data/')) return req;\n\n  // If the final segment contains a dot, treat it as a file request.\n  var idx = uri.lastIndexOf('/');\n  var last = uri.substring(idx + 1);\n  if (last.indexOf('.') !== -1) return req;\n\n  if (uri.endsWith('/')) {\n    req.uri = uri + 'index.html';\n    return req;\n  }\n\n  req.uri = uri + '/index.html';\n  return req;\n}",
         "FunctionConfig": {
           "Comment": {
             "Fn::Join": [
@@ -1285,6 +1285,43 @@
                 "Ref": "ResponseHeadersPolicy13DBF9E0"
               },
               "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30301D709",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD"
+              ],
+              "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SsgRewrite0C735A0F",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "RequestIdResponseHeaderA32D1D61",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "OriginRequestPolicyId": {
+                "Ref": "OriginRequestPolicy3EFDB4FA"
+              },
+              "PathPattern": "/_facetheory/ssr-data/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "ResponseHeadersPolicy13DBF9E0"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin29693F69F",
               "ViewerProtocolPolicy": "redirect-to-https"
             }
           ],

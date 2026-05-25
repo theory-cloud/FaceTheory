@@ -8,7 +8,7 @@ Canonical operator guidance lives under [`../../docs/cdk/README.md`](../../docs/
 
 - private S3 storage for assets
 - Lambda Function URL origin with response streaming and explicit `AWS_IAM` auth
-- CloudFront behaviors for assets, Vite manifests, optional hydration data, and SSR HTML
+- CloudFront behaviors for assets, Vite manifests, SSG hydration data, SSR hydration sidecars, and SSR HTML
 
 ## Local Commands
 
@@ -33,6 +33,9 @@ npm run synth
 ## Deployment Notes
 
 - Deploy and smoke-test instructions should follow the canonical AWS docs first.
+- Keep SSG strict-CSP sidecars (`/_facetheory/data/*`) on S3/static behaviors.
+- Route SSR runtime hydration sidecars (`/_facetheory/ssr-data/*`) to the same Lambda/FaceApp handler that rendered the
+  SSR HTML; do not point that prefix at S3.
 - This reference stack intentionally does **not** forward viewer-supplied tenant headers such as `x-facetheory-tenant`.
 - Same-origin mutating form actions belong on the Lambda/AppTheory path with `AWS_IAM` + CloudFront OAC intact. Mark
   URL-encoded forms with `data-facetheory-oac-form` and install `startAwsOacFormTransport()` rather than posting

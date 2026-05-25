@@ -121,6 +121,21 @@ async function flushEventLoop(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+async function waitForAssertion(assertion: () => void): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      await flushEventLoop();
+    }
+  }
+  if (lastError) throw lastError;
+  assertion();
+}
+
 test('oac form transport: intercepts marked same-origin POST forms with OAC headers', async () => {
   const dom = new JSDOM(
     `<!doctype html>
@@ -1145,12 +1160,13 @@ test('oac form transport: strict CSP defaults to full same-origin browser naviga
       cancelable: true,
     });
     form.dispatchEvent(event);
-    await flushEventLoop();
+    await waitForAssertion(() => {
+      assert.deepEqual(assigned, ['https://example.test/save']);
+    });
 
     assert.equal(event.defaultPrevented, true);
     assert.equal(dom.window.document.title, 'Edit');
     assert.equal(writeCount, 0);
-    assert.deepEqual(assigned, ['https://example.test/save']);
     assert.deepEqual(replaced, []);
   } finally {
     dom.window.close();
@@ -1207,12 +1223,13 @@ test('oac form transport: explicit full-page policy navigates CSP-protected HTML
       cancelable: true,
     });
     form.dispatchEvent(event);
-    await flushEventLoop();
+    await waitForAssertion(() => {
+      assert.deepEqual(assigned, ['https://example.test/save']);
+    });
 
     assert.equal(event.defaultPrevented, true);
     assert.equal(dom.window.document.title, 'Edit');
     assert.equal(writeCount, 0);
-    assert.deepEqual(assigned, ['https://example.test/save']);
     assert.deepEqual(replaced, []);
   } finally {
     dom.window.close();

@@ -20,13 +20,22 @@ import {
   requiresStrictCspDocumentValidation,
   validateStrictCspDocument,
 } from './security.js';
-import { Router } from './router.js';
+import { routePatternConflict, Router } from './router.js';
+import { jsonResourceResponse, textResourceResponse } from './resource.js';
+import {
+  createSsrHydrationSidecarStore,
+  normalizeSsrHydrationSidecarDataUrlPrefix,
+  type SsrHydrationSidecarStore,
+  type SsrHydrationSidecarStoreOptions,
+  type SsrHydrationSidecarVariantInput,
+} from './ssr-hydration.js';
 import type {
   FaceContext,
   FaceExternalHydration,
   FaceHydration,
   FaceMode,
   FaceModule,
+  FaceResourceRoute,
   FaceRenderResult,
   FaceRequest,
   FaceResponse,
@@ -43,10 +52,39 @@ import {
 
 export interface FaceAppOptions {
   faces: FaceModule[];
+  resources?: FaceResourceRoute[];
   isr?: FaceIsrOptions;
+  ssrHydrationSidecars?: FaceSsrHydrationSidecarOptions;
   observability?: FaceObservabilityHooks;
   strictCsp?: FaceStrictCspOptions;
 }
+
+export interface FaceSsrHydrationSidecarOptions
+  extends Pick<
+    SsrHydrationSidecarStoreOptions,
+    | 'htmlStore'
+    | 'signingSecret'
+    | 'now'
+    | 'ttlSeconds'
+    | 'keyPrefix'
+    | 'dataUrlPrefix'
+    | 'scope'
+  > {
+  /**
+   * Request-derived variant binding used when writing a sidecar during the
+   * HTML render and when reading it through the framework-owned resource
+   * route. The callback must only use request fields that the sidecar fetch can
+   * reproduce; the default binds to cookies and stores only HMAC-derived
+   * digests in tokens and metadata.
+   */
+  requestVariant?: FaceSsrHydrationSidecarVariantCallback;
+}
+
+export type FaceSsrHydrationSidecarVariantCallback = (
+  request: Readonly<Required<FaceRequest>>,
+) =>
+  | SsrHydrationSidecarVariantInput
+  | Promise<SsrHydrationSidecarVariantInput>;
 
 export interface FaceStrictCspOptions {
   /**
@@ -90,21 +128,35 @@ class StrictCspStreamBodyTooLargeError extends Error {
   }
 }
 
+interface FaceAppSsrHydrationSidecarRuntime {
+  routes: FaceResourceRoute[];
+  store: SsrHydrationSidecarStore;
+  requestVariant: FaceSsrHydrationSidecarVariantCallback;
+}
+
 export class FaceApp {
   private readonly router: Router;
   private readonly faceByPattern: Map<string, FaceModule>;
+  private readonly resourceByPattern: Map<string, FaceResourceRoute>;
   private readonly isrRuntime: IsrRuntime | null;
+  private readonly ssrHydrationSidecarRuntime: FaceAppSsrHydrationSidecarRuntime | null;
   private readonly observability: FaceObservabilityHooks | null;
   private readonly strictCspMaxStreamingBodyBytes: number;
 
   constructor(options: FaceAppOptions) {
     this.router = new Router();
     this.faceByPattern = new Map();
+    this.resourceByPattern = new Map();
     this.observability = options.observability ?? null;
     this.strictCspMaxStreamingBodyBytes =
       normalizeStrictCspMaxStreamingBodyBytes(
         options.strictCsp?.maxStreamingBodyBytes,
       );
+    this.ssrHydrationSidecarRuntime = options.ssrHydrationSidecars
+      ? createFaceAppSsrHydrationSidecarRuntime(
+          options.ssrHydrationSidecars,
+        )
+      : null;
 
     for (const face of options.faces) {
       const pattern = normalizePath(face.route);
@@ -113,6 +165,44 @@ export class FaceApp {
       }
       this.router.add(pattern);
       this.faceByPattern.set(pattern, face);
+    }
+
+    const resources = this.ssrHydrationSidecarRuntime
+      ? [...this.ssrHydrationSidecarRuntime.routes, ...(options.resources ?? [])]
+      : (options.resources ?? []);
+
+    for (const resource of resources) {
+      const pattern = normalizePath(resource.route);
+      if (this.resourceByPattern.has(pattern)) {
+        throw new Error(`duplicate resource route: ${pattern}`);
+      }
+
+      for (const resourcePattern of this.resourceByPattern.keys()) {
+        const conflict = routePatternConflict(resourcePattern, pattern);
+        if (conflict === 'duplicate') {
+          throw new Error(`duplicate resource route: ${pattern}`);
+        }
+        if (conflict === 'ambiguous') {
+          throw new Error(
+            `ambiguous resource routes: ${resourcePattern} and ${pattern}`,
+          );
+        }
+      }
+
+      for (const facePattern of this.faceByPattern.keys()) {
+        const conflict = routePatternConflict(facePattern, pattern);
+        if (conflict === 'duplicate') {
+          throw new Error(`duplicate face/resource route: ${pattern}`);
+        }
+        if (conflict === 'ambiguous') {
+          throw new Error(
+            `ambiguous face/resource routes: ${facePattern} and ${pattern}`,
+          );
+        }
+      }
+
+      this.router.add(pattern);
+      this.resourceByPattern.set(pattern, resource);
     }
 
     const hasIsrFace = options.faces.some((face) => face.mode === 'isr');
@@ -145,34 +235,78 @@ export class FaceApp {
     const match = this.router.match(normalizedReq.path);
 
     if (!match) {
-      response = textResponse(404, 'Not Found', { 'content-type': ['text/plain; charset=utf-8'] });
-      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
-        routePattern,
-        mode,
-        renderMs,
-      });
-    }
-
-    const face = this.faceByPattern.get(match.pattern);
-    if (!face) {
-      response = textResponse(500, 'Internal Error', {
+      response = textResponse(404, 'Not Found', {
         'content-type': ['text/plain; charset=utf-8'],
       });
-      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
-        routePattern,
-        mode,
-        renderMs,
-      });
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        response,
+        {
+          routePattern,
+          mode,
+          renderMs,
+        },
+      );
     }
 
-    routePattern = match.pattern;
-    mode = face.mode;
+    const routePatternForMatch = match.pattern;
+    const resource = this.resourceByPattern.get(routePatternForMatch);
 
     const ctx: FaceContext = {
       request: normalizedReq,
       params: match.params,
       proxy: match.proxy ?? null,
     };
+
+    if (resource) {
+      routePattern = routePatternForMatch;
+      try {
+        response = await resource.handle(ctx);
+      } catch {
+        response = internalErrorResponse();
+      }
+
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        response,
+        {
+          routePattern,
+          mode,
+          renderMs,
+        },
+      );
+    }
+
+    const face = this.faceByPattern.get(routePatternForMatch);
+    if (!face) {
+      response = textResponse(500, 'Internal Error', {
+        'content-type': ['text/plain; charset=utf-8'],
+      });
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        response,
+        {
+          routePattern,
+          mode,
+          renderMs,
+        },
+      );
+    }
+
+    routePattern = routePatternForMatch;
+    mode = face.mode;
 
     try {
       const renderFresh = async (
@@ -185,8 +319,16 @@ export class FaceApp {
             await face.render(ctx, data),
             isrOptions,
           );
+          const preparedOut =
+            face.mode === 'ssr'
+              ? await prepareRenderResultForSsrHydrationSidecar(
+                  out,
+                  this.ssrHydrationSidecarRuntime,
+                  normalizedReq,
+                )
+              : out;
           return await toHTTPResponse(
-            out,
+            preparedOut,
             normalizedReq,
             this.strictCspMaxStreamingBodyBytes,
           );
@@ -197,7 +339,9 @@ export class FaceApp {
 
       if (face.mode === 'isr') {
         if (!this.isrRuntime) {
-          throw new Error(`ISR runtime is not configured for route "${match.pattern}"`);
+          throw new Error(
+            `ISR runtime is not configured for route "${match.pattern}"`,
+          );
         }
         response = await this.isrRuntime.handleFace({
           face,
@@ -205,29 +349,53 @@ export class FaceApp {
           routePattern: match.pattern,
           renderFresh,
         });
-        return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
-          routePattern,
-          mode,
-          renderMs,
-        });
+        return finishResponse(
+          hooks,
+          now,
+          startedAt,
+          requestId,
+          normalizedReq,
+          response,
+          {
+            routePattern,
+            mode,
+            renderMs,
+          },
+        );
       }
 
       response = await renderFresh();
-      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
-        routePattern,
-        mode,
-        renderMs,
-      });
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        response,
+        {
+          routePattern,
+          mode,
+          renderMs,
+        },
+      );
     } catch (err) {
       response =
         err instanceof StrictCspStreamBodyTooLargeError
           ? strictCspStreamBodyTooLargeResponse()
           : internalErrorResponse();
-      return finishResponse(hooks, now, startedAt, requestId, normalizedReq, response, {
-        routePattern,
-        mode,
-        renderMs,
-      });
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        response,
+        {
+          routePattern,
+          mode,
+          renderMs,
+        },
+      );
     }
   }
 }
@@ -236,17 +404,106 @@ export function createFaceApp(options: FaceAppOptions): FaceApp {
   return new FaceApp(options);
 }
 
+function createFaceAppSsrHydrationSidecarRuntime(
+  options: FaceSsrHydrationSidecarOptions,
+): FaceAppSsrHydrationSidecarRuntime {
+  const dataUrlPrefix = normalizeSsrHydrationSidecarDataUrlPrefix(
+    options.dataUrlPrefix,
+  );
+  const routePatterns =
+    routePatternsFromSsrHydrationSidecarDataUrlPrefix(dataUrlPrefix);
+
+  const runtime: Omit<FaceAppSsrHydrationSidecarRuntime, 'routes'> = {
+    store: createSsrHydrationSidecarStore({
+      ...options,
+      dataUrlPrefix,
+    }),
+    requestVariant:
+      options.requestVariant ?? defaultSsrHydrationSidecarRequestVariant,
+  };
+
+  return {
+    ...runtime,
+    routes: routePatterns.map((route) => ({
+      route,
+      handle: (ctx) => handleSsrHydrationSidecarResource(runtime, ctx),
+    })),
+  };
+}
+
+function routePatternsFromSsrHydrationSidecarDataUrlPrefix(
+  prefix: string,
+): string[] {
+  if (prefix === '/') {
+    throw new TypeError(
+      'SSR hydration sidecar dataUrlPrefix must include a static path segment',
+    );
+  }
+
+  if (prefix.includes('{') || prefix.includes('}')) {
+    throw new TypeError(
+      'SSR hydration sidecar dataUrlPrefix must be a static path prefix',
+    );
+  }
+
+  if (prefix !== '/') {
+    const segments = prefix.slice(1).split('/');
+    if (segments.some((segment) => segment.length === 0)) {
+      throw new TypeError(
+        'SSR hydration sidecar dataUrlPrefix must not contain empty path segments',
+      );
+    }
+  }
+
+  return [prefix, `${prefix}/{token}`, `${prefix}/{token+}`];
+}
+
+async function handleSsrHydrationSidecarResource(
+  runtime: Omit<FaceAppSsrHydrationSidecarRuntime, 'routes'>,
+  ctx: FaceContext,
+): Promise<FaceResponse> {
+  if (ctx.request.method !== 'GET') return ssrHydrationSidecarFailureResponse();
+
+  const token = ctx.proxy ?? ctx.params.token ?? '';
+  try {
+    const variant = await runtime.requestVariant(ctx.request);
+    const sidecar = await runtime.store.read({ token, variant });
+    return jsonResourceResponse(sidecar.data);
+  } catch {
+    return ssrHydrationSidecarFailureResponse();
+  }
+}
+
+function ssrHydrationSidecarFailureResponse(): FaceResponse {
+  return textResourceResponse('Not Found', { status: 404 });
+}
+
+function defaultSsrHydrationSidecarRequestVariant(
+  request: Readonly<Required<FaceRequest>>,
+): SsrHydrationSidecarVariantInput {
+  const cookies: Record<string, string> = {};
+  for (const name of Object.keys(request.cookies).sort()) {
+    cookies[name] = request.cookies[name] ?? '';
+  }
+  return { cookies };
+}
+
 function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
   const rawPath = String(req.path ?? '').trim();
   const headers = canonicalizeHeaders(req.headers);
   ensureRequestId(headers);
 
   return {
-    method: String(req.method ?? '').trim().toUpperCase() || 'GET',
+    method:
+      String(req.method ?? '')
+        .trim()
+        .toUpperCase() || 'GET',
     path: normalizePath(rawPath),
     headers,
     query: req.query ? cloneQuery(req.query) : queryFromPath(rawPath),
-    cookies: req.cookies ? cloneCookies(req.cookies) : parseCookiesFromHeaders(headers),
+    cookies: req.cookies
+      ? cloneCookies(req.cookies)
+      : parseCookiesFromHeaders(headers),
     body: req.body ?? new Uint8Array(),
     isBase64: Boolean(req.isBase64),
     cspNonce: req.cspNonce ?? null,
@@ -283,7 +540,8 @@ function finishResponse(
   const out: FaceResponse = { ...response, headers: sorted };
 
   const durationMs = Math.max(0, now() - startedAt);
-  const isrState = String(out.headers['x-facetheory-isr']?.[0] ?? '').trim() || null;
+  const isrState =
+    String(out.headers['x-facetheory-isr']?.[0] ?? '').trim() || null;
   const isStream = !(out.body instanceof Uint8Array);
 
   const level = logLevelForStatus(out.status);
@@ -337,7 +595,10 @@ function queryFromPath(path: string): Record<string, string[]> {
   return parseQueryString(path.slice(idx + 1));
 }
 
-function toHeaders(input: FaceRenderResult['headers'], cookies: string[] | undefined): Headers {
+function toHeaders(
+  input: FaceRenderResult['headers'],
+  cookies: string[] | undefined,
+): Headers {
   const headers: Headers = {};
   const setCookieValues: string[] = [];
 
@@ -345,7 +606,9 @@ function toHeaders(input: FaceRenderResult['headers'], cookies: string[] | undef
     const lower = String(key).trim().toLowerCase();
     if (!lower) continue;
 
-    const normalizedValues = (Array.isArray(value) ? value : [value]).map(String);
+    const normalizedValues = (Array.isArray(value) ? value : [value]).map(
+      String,
+    );
     if (lower === 'set-cookie') {
       setCookieValues.push(...normalizedValues);
       continue;
@@ -399,7 +662,41 @@ function prepareRenderResultForIsr(
   };
 }
 
+async function prepareRenderResultForSsrHydrationSidecar(
+  out: FaceRenderResult,
+  runtime: FaceAppSsrHydrationSidecarRuntime | null,
+  req: Readonly<Required<FaceRequest>>,
+): Promise<FaceRenderResult> {
+  if (
+    runtime === null ||
+    out.csp?.inlineScripts !== false ||
+    out.hydration === undefined ||
+    isExternalHydration(out.hydration)
+  ) {
+    return out;
+  }
+
+  const hydration = out.hydration;
+  const variant = await runtime.requestVariant(req);
+  const sidecar = await runtime.store.write({
+    data: hydration.data,
+    variant,
+  });
+
+  return {
+    ...out,
+    hydration: externalizeHydration(hydration, sidecar.dataUrl),
+  };
+}
+
 function externalizeHydrationForIsr(
+  hydration: FaceHydration,
+  dataUrl: string,
+): FaceExternalHydration {
+  return externalizeHydration(hydration, dataUrl);
+}
+
+function externalizeHydration(
   hydration: FaceHydration,
   dataUrl: string,
 ): FaceExternalHydration {
@@ -409,6 +706,12 @@ function externalizeHydrationForIsr(
     dataUrl,
     bootstrapModule: hydration.bootstrapModule,
   };
+}
+
+function isExternalHydration(
+  hydration: FaceHydration,
+): hydration is FaceExternalHydration {
+  return hydration.type === 'external';
 }
 
 async function toHTTPResponse(
@@ -536,8 +839,18 @@ async function preflightStream(
   })();
 }
 
-function textResponse(status: number, body: string, headers: Headers): FaceResponse {
-  return { status, headers, cookies: headers['set-cookie'] ?? [], body: utf8(body), isBase64: false };
+function textResponse(
+  status: number,
+  body: string,
+  headers: Headers,
+): FaceResponse {
+  return {
+    status,
+    headers,
+    cookies: headers['set-cookie'] ?? [],
+    body: utf8(body),
+    isBase64: false,
+  };
 }
 
 function internalErrorResponse(): FaceResponse {
