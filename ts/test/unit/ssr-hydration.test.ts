@@ -8,6 +8,7 @@ import type {
   HtmlStoreWriteResult,
 } from '../../src/isr.js';
 import * as core from '../../src/index.js';
+import { createFaceApp } from '../../src/app.js';
 import {
   buildSsrHydrationSidecarDataUrl,
   createSsrHydrationSidecarStore,
@@ -65,6 +66,18 @@ function decodeTokenPayload(token: string): Record<string, unknown> {
 function assertSidecarError(reason: string): (error: unknown) => boolean {
   return (error: unknown): boolean =>
     error instanceof SsrHydrationSidecarError && error.reason === reason;
+}
+
+function extractHydrationHref(html: string): string {
+  const tag = /<link\b[^>]*rel="facetheory-hydration"[^>]*>/i.exec(html)?.[0];
+  assert.ok(tag, 'expected FaceTheory hydration link');
+  const href = /\bhref="([^"]+)"/i.exec(tag)?.[1];
+  assert.ok(href, 'expected FaceTheory hydration href');
+  return href;
+}
+
+function parseJsonBody(responseBody: Uint8Array): unknown {
+  return JSON.parse(decodeUtf8(responseBody));
 }
 
 test('SSR hydration sidecar store: writes safe JSON and returns a signed expiring URL token', async () => {
@@ -141,6 +154,81 @@ test('SSR hydration sidecar store: writes safe JSON and returns a signed expirin
   assert.equal(read.key, written.key);
   assert.equal(read.variantHash, written.variantHash);
   assert.equal(read.etag, 'test-etag-1');
+});
+
+test('SSR hydration sidecars: emitted framework URL is reachable from the same FaceApp without rerendering', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  let loadCount = 0;
+  let renderCount = 0;
+  const hydrationPayload = {
+    page: 'issue-250',
+    profile: {
+      displayName: 'Sidecar User',
+      bio: '<script>escaped</script>&safe',
+    },
+    line: '\u2028\u2029',
+  };
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/issue-250',
+        mode: 'ssr',
+        load: async () => {
+          loadCount += 1;
+          return hydrationPayload;
+        },
+        render: (_ctx, data) => {
+          renderCount += 1;
+          return {
+            csp: {
+              inlineScripts: false,
+              inlineStyles: true,
+              rawHead: false,
+            },
+            hydration: {
+              data,
+              bootstrapModule: '/assets/issue-250.js',
+            },
+            html: '<main>issue 250</main>',
+          };
+        },
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore,
+      signingSecret: SIGNING_SECRET,
+      now: () => 10_000,
+    },
+  });
+
+  const page = await app.handle({ method: 'GET', path: '/issue-250' });
+  assert.equal(page.status, 200);
+  assert.equal(loadCount, 1);
+  assert.equal(renderCount, 1);
+  assert.equal(htmlStore.writes.length, 1);
+
+  const html = decodeUtf8(page.body as Uint8Array);
+  const dataUrl = extractHydrationHref(html);
+  assert.match(dataUrl, /^\/_facetheory\/ssr-data\//);
+  assert.equal(html.includes('__FACETHEORY_DATA__'), false);
+
+  const sidecar = await app.handle({ method: 'GET', path: dataUrl });
+  assert.equal(sidecar.status, 200);
+  assert.equal(
+    sidecar.headers['content-type']?.[0],
+    'application/json; charset=utf-8',
+  );
+  assert.equal(sidecar.headers['cache-control']?.[0], 'no-store');
+
+  const body = decodeUtf8(sidecar.body as Uint8Array);
+  assert.equal(body, serializeSsrHydrationSidecarJson(hydrationPayload));
+  assert.deepEqual(parseJsonBody(sidecar.body as Uint8Array), hydrationPayload);
+  assert.equal(body.includes('<!doctype html>'), false);
+  assert.equal(body.includes('<html'), false);
+  assert.equal(body.includes('<body'), false);
+  assert.equal(loadCount, 1);
+  assert.equal(renderCount, 1);
 });
 
 test('SSR hydration sidecar store: rejects tampered tokens', async () => {
