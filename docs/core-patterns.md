@@ -96,6 +96,71 @@ Why this is incorrect:
 - It omits the coordinated HTML and metadata stores that blocking ISR expects in production.
 - If the page renders tenant-specific HTML, it also omits the explicit `tenantKey` or custom `cacheKey` required to partition that cache. FaceTheory fails closed when known tenant boundary headers reach ISR without such a partition.
 
+## Pattern: Use resource response helpers for raw routes
+
+Problem:
+You need a FaceTheory resource route to return JSON, text, an intentionally empty
+response, or a `405 Method Not Allowed` without drifting into document rendering
+or unsafe ad hoc serialization.
+
+**CORRECT**
+
+```ts
+import {
+  createFaceApp,
+  jsonResourceResponse,
+  methodNotAllowedResourceResponse,
+  type FaceResourceRoute,
+} from "@theory-cloud/facetheory";
+
+const resources: FaceResourceRoute[] = [
+  {
+    route: "/_facetheory/ssr-data/{key+}",
+    handle: (ctx) => {
+      if (ctx.request.method !== "GET") {
+        return methodNotAllowedResourceResponse(["GET"]);
+      }
+
+      return jsonResourceResponse({ key: ctx.params.key ?? "" });
+    },
+  },
+];
+
+const app = createFaceApp({ faces, resources });
+```
+
+Why this is correct:
+
+- Resource routes are routing-adjacent raw responses, not a fourth-and-a-half
+  render mode such as `mode: "json"`.
+- `jsonResourceResponse()` mirrors FaceTheory's safe JSON escaping for
+  HTML-significant characters, which keeps hydration-sidecar-adjacent payloads
+  safe for web delivery.
+- Helper-owned headers are lower-case, sorted, and deterministic. JSON/text
+  helpers set content type, all helpers default `cache-control` to `no-store`,
+  and `methodNotAllowedResourceResponse()` builds a sorted `allow` header from
+  caller-supplied methods.
+
+**INCORRECT**
+
+```ts
+handle: async () => ({
+  status: 200,
+  headers: { "Content-Type": ["application/json"] },
+  cookies: [],
+  body: new TextEncoder().encode(JSON.stringify({ html: "</script>" })),
+  isBase64: false,
+});
+```
+
+Why this is incorrect:
+
+- Raw `JSON.stringify()` does not apply FaceTheory's HTML-significant escaping.
+- Mixed-case handwritten headers can drift from the runtime's lower-case stable
+  header style.
+- Repeating the raw `FaceResponse` shape at every route makes method and cache
+  behavior easy to forget or vary by handler.
+
 ## Pattern: Keep ISR storage prefixes intentional
 
 Problem:

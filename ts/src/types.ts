@@ -1,4 +1,6 @@
 export type Headers = Record<string, string[]>;
+export type FaceResponseHeaderValue = string | readonly string[];
+export type FaceResponseHeaders = Record<string, FaceResponseHeaderValue>;
 export type Query = Record<string, string[]>;
 export type CookieMap = Record<string, string>;
 
@@ -125,7 +127,7 @@ export type FaceHydration = FaceInlineHydration | FaceExternalHydration;
 
 export interface FaceRenderResult {
   status?: number;
-  headers?: Record<string, string | string[]>;
+  headers?: FaceResponseHeaders;
   cookies?: string[];
   lang?: string;
   htmlAttrs?: FaceAttributes;
