@@ -98,15 +98,6 @@ async function main() {
     }
 
     const requestPath = requestTarget.path;
-    if (requestPath.startsWith('/_facetheory/data/')) {
-      const pathname = requestPath.endsWith('next.json') ? '/next' : '/';
-      res.writeHead(200, {
-        'content-type': 'application/json; charset=utf-8',
-        'cache-control': 'no-store',
-      });
-      res.end(serverMod.strictCspSvelteHydrationJsonForPath(pathname));
-      return;
-    }
 
     const clientRoot = path.resolve(
       'examples/vite-strict-csp-svelte/dist/client',
