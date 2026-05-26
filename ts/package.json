@@ -1,6 +1,6 @@
 {
   "name": "@theory-cloud/facetheory",
-  "version": "3.4.0-rc",
+  "version": "3.4.0",
   "description": "AWS-first SSR, SSG, and blocking ISR runtime for Node.js with React, Vue, and Svelte adapters.",
   "license": "Apache-2.0",
   "type": "module",
@@ -192,37 +192,37 @@
     "example:vite:svelte:strict-csp:serve": "tsx examples/vite-strict-csp-svelte/node-server.ts"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1005.0",
+    "@aws-sdk/client-s3": "^3.1053.0",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/server": "^11.11.0",
     "@eslint/js": "^10.0.1",
-    "@sveltejs/vite-plugin-svelte": "^7.0.0",
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.9.0/theory-cloud-apptheory-1.9.0.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz",
-    "@types/jsdom": "^28.0.0",
-    "@types/node": "^24.12.0",
-    "@types/react": "^19.2.14",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.10.0/theory-cloud-apptheory-1.10.0.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.4/theory-cloud-tabletheory-ts-1.8.4.tgz",
+    "@types/jsdom": "^28.0.3",
+    "@types/node": "^24.12.4",
+    "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/eslint-plugin": "^8.57.0",
-    "@typescript-eslint/parser": "^8.57.0",
-    "@vue/server-renderer": "^3.5.30",
-    "antd": "^6.3.2",
-    "eslint": "^10.0.3",
-    "globals": "^17.4.0",
+    "@typescript-eslint/eslint-plugin": "^8.60.0",
+    "@typescript-eslint/parser": "^8.60.0",
+    "@vue/server-renderer": "^3.5.34",
+    "antd": "^6.4.3",
+    "eslint": "^10.4.0",
+    "globals": "^17.6.0",
     "jsdom": "^28.1.0",
-    "prettier": "^3.8.1",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "svelte": "^5.55.7",
-    "tsx": "^4.21.0",
+    "prettier": "^3.8.3",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "svelte": "^5.55.9",
+    "tsx": "^4.22.3",
     "typescript": "^5.9.3",
-    "vite": "^8.0.8",
-    "vue": "^3.5.30"
+    "vite": "^8.0.14",
+    "vue": "^3.5.34"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.4/theory-cloud-tabletheory-ts-1.8.4.tgz"
     }
   }
 }
