@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.1](https://github.com/theory-cloud/FaceTheory/compare/v3.4.0...v3.4.1) (2026-05-26)
+
+
+### Bug Fixes
+
+* **deps:** refresh dependency security pins ([59dfffd](https://github.com/theory-cloud/FaceTheory/commit/59dfffdf05b3f86ace19368e8aefa8c27d30d718))
+* **deps:** refresh dependency security pins ([618a827](https://github.com/theory-cloud/FaceTheory/commit/618a827c0bb90b78bee3d4cf0c20561d910fcd63))
+
 ## [3.4.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.4.0...v3.4.1-rc) (2026-05-26)
 
 
