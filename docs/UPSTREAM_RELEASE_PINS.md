@@ -7,9 +7,9 @@ This file records the currently pinned versions and the exact install strings we
 
 ## Pins
 
-- AppTheory (TypeScript): `v1.9.0`
-- AppTheory (CDK): `v1.9.0`
-- TableTheory (TypeScript): `v1.8.3`
+- AppTheory (TypeScript): `v1.10.0`
+- AppTheory (CDK): `v1.10.0`
+- TableTheory (TypeScript): `v1.8.4`
 
 ## Known Audit Exceptions
 
@@ -35,7 +35,7 @@ the `infra/apptheory-*` workspaces only. Anything outside those gates is still t
 
 ### Recently cleared
 
-- **`fast-uri`** — AppTheory CDK `v1.9.0` requires `aws-cdk-lib@2.254.0`, and the infra example
+- **`fast-uri`** — AppTheory CDK `v1.10.0` requires `aws-cdk-lib@2.254.0`, and the infra example
   lockfiles now resolve the previous nested `fast-uri` audit finding to the patched AWS CDK
   dependency set. The `fast-uri` allowlist in `scripts/verify-npm-audit.sh` is kept as a
   belt-and-suspenders guard against future regressions; remove it when `aws-cdk-lib` no
@@ -52,15 +52,15 @@ locks so `npm ci` can validate the AWS CDK package tree under npm 11.
 ```bash
   # AppTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.9.0/theory-cloud-apptheory-1.9.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.10.0/theory-cloud-apptheory-1.10.0.tgz
 
   # TableTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.8.4/theory-cloud-tabletheory-ts-1.8.4.tgz
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.9.0/theory-cloud-apptheory-cdk-1.9.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.10.0/theory-cloud-apptheory-cdk-1.10.0.tgz
 ```
 
 ## package.json Snippet (Pinned)
@@ -71,12 +71,12 @@ registry installs:
 ```json
 {
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.9.0/theory-cloud-apptheory-1.9.0.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz"
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.10.0/theory-cloud-apptheory-1.10.0.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.4/theory-cloud-tabletheory-ts-1.8.4.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.3/theory-cloud-tabletheory-ts-1.8.3.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.4/theory-cloud-tabletheory-ts-1.8.4.tgz"
     }
   }
 }
