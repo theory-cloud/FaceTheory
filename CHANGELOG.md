@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.2-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.4.1...v3.4.2-rc) (2026-05-27)
+
+
+### Bug Fixes
+
+* **apptheory:** update pins to v1.11.0 ([e8a8f3d](https://github.com/theory-cloud/FaceTheory/commit/e8a8f3d3c18f8197e9fff531fea4c025ebab6657))
+* **apptheory:** update pins to v1.11.0 ([2f1d393](https://github.com/theory-cloud/FaceTheory/commit/2f1d393905ba4ea660c473fd3207bfcfaaa5c7a9))
+
 ## [3.4.1](https://github.com/theory-cloud/FaceTheory/compare/v3.4.0...v3.4.1) (2026-05-26)
 
 
