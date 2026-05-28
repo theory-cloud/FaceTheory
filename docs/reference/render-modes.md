@@ -35,5 +35,5 @@ Pick **SPA navigation** on top of any of the above when the application is inter
 ## Related docs
 
 - [FaceModule API reference](face-module.md)
-- [Architecture](../architecture.md)
-- [AWS Deployment Shape](../aws-deployment-shape.md)
+- [Architecture]({{ '/architecture/' | relative_url }})
+- [AWS Deployment Shape]({{ '/aws-deployment-shape/' | relative_url }})

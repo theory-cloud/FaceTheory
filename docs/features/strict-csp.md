@@ -25,7 +25,7 @@ return {
 };
 ```
 
-When `csp.inlineScripts === false`, FaceTheory refuses to emit inline `<script>` bodies and routes hydration through an external sidecar.
+When `csp.inlineScripts === false`, FaceTheory refuses to emit inline `<script>` bodies. Hydration must be external already or be externalized through a configured framework-owned path (SSR hydration sidecars, SSG build sidecars, or ISR sidecars); otherwise inline or Vite hydration fails closed.
 
 ## Building the CSP header
 

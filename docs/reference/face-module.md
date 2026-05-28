@@ -111,7 +111,7 @@ interface FaceRenderResult {
 ```typescript
 interface FaceHead {
   title?: string;
-  html?: string;  // legacy raw head text
+  html?: string;  // legacy escaped head text, not raw HTML
 }
 
 type FaceHeadTag =

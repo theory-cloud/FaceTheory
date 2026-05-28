@@ -71,6 +71,6 @@ The CLI form is `npm run ssg` (defined in `ts/package.json` as `tsx src/ssg-cli.
 
 ## Related docs
 
-- [AWS Deployment Shape](../aws-deployment-shape.md)
-- [CDK Integration Guide](../cdk/)
+- [AWS Deployment Shape]({{ '/aws-deployment-shape/' | relative_url }})
+- [CDK Integration Guide]({{ '/cdk/' | relative_url }})
 - [FaceModule API reference](../reference/face-module.md)

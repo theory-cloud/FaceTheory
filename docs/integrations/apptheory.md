@@ -61,7 +61,7 @@ Use `createLambdaUrlStreamingHandler` directly when:
 
 ## Related docs
 
-- [AWS Deployment Shape](../aws-deployment-shape.md)
-- [CDK Integration Guide](../cdk/)
+- [AWS Deployment Shape]({{ '/aws-deployment-shape/' | relative_url }})
+- [CDK Integration Guide]({{ '/cdk/' | relative_url }})
 - [OAC mutating forms](../features/oac-forms.md)
 - [Core Patterns → Use AppTheory for Lambda Function URL streaming](../core-patterns.md#pattern-use-apptheory-for-lambda-function-url-streaming)

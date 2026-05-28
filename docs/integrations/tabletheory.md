@@ -57,4 +57,4 @@ A FaceTheory change that needs a new TableTheory model attribute, tag, or transa
 
 - [Blocking ISR](../modes/isr.md)
 - [ISR tenant safety](../features/isr-tenant-safety.md)
-- [AWS Deployment Shape](../aws-deployment-shape.md)
+- [AWS Deployment Shape]({{ '/aws-deployment-shape/' | relative_url }})

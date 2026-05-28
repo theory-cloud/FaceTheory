@@ -51,4 +51,4 @@ Route the action path to Lambda / AppTheory, keep OAC enabled on the distributio
 
 - [Getting Started → Add an OAC-safe mutating SSR form](../getting-started.md#add-an-oac-safe-mutating-ssr-form)
 - [Core Patterns → Mark same-origin mutating forms for OAC transport](../core-patterns.md#pattern-mark-same-origin-mutating-forms-for-oac-transport)
-- [AWS Deployment Shape](../aws-deployment-shape.md)
+- [AWS Deployment Shape]({{ '/aws-deployment-shape/' | relative_url }})
