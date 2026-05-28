@@ -18,9 +18,17 @@ ts/*.tgz
 .idea/
 .vscode/
 
-reference/
+/reference/
 .theory/
 
 .codex/
 .mcp.json
 .claude
+
+# Jekyll docs build artifacts (GitHub Pages site under docs/)
+docs/_site/
+docs/.jekyll-cache/
+docs/.jekyll-metadata
+docs/vendor/
+docs/.bundle/
+docs/Gemfile.lock

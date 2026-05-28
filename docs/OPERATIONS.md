@@ -1,3 +1,8 @@
+---
+title: Operations
+permalink: /operations/
+---
+
 # FaceTheory Operations (H4)
 
 This document describes production hardening guidance for FaceTheory apps and the AWS example stacks in `infra/`.

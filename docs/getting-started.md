@@ -1,3 +1,7 @@
+---
+title: Getting Started
+---
+
 # Getting Started with FaceTheory
 
 FaceTheory is a TypeScript runtime for SSR, SSG, and blocking ISR on Node.js `>=24`, with published adapters for React, Vue, and Svelte.
@@ -39,7 +43,7 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.11.0/theory-cloud-apptheory-1.11.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.12.0/theory-cloud-apptheory-1.12.0.tgz
 
 npm install --save-exact \
   https://github.com/theory-cloud/TableTheory/releases/download/v1.8.4/theory-cloud-tabletheory-ts-1.8.4.tgz

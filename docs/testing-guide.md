@@ -1,3 +1,7 @@
+---
+title: Testing Guide
+---
+
 # FaceTheory Testing Guide
 
 This guide covers the verification commands that back the public contract and the evidence expected before a push or release.
