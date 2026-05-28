@@ -18,7 +18,7 @@ ts/*.tgz
 .idea/
 .vscode/
 
-reference/
+/reference/
 .theory/
 
 .codex/

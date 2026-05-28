@@ -5,7 +5,7 @@ title: React adapter
 The React adapter renders Faces using React 18+ APIs. FaceTheory exposes two helpers:
 
 - **`createReactFace`** — buffered SSR. The full HTML body is rendered to a string before the response is flushed.
-- **`createReactStreamFace`** — streaming SSR via `renderToReadableStream`, with explicit control over how Suspense and style readiness interact with first-byte flushing.
+- **`createReactStreamFace`** — streaming SSR via React DOM Server's Node `renderToPipeableStream`, with explicit control over how Suspense and style readiness interact with first-byte flushing.
 
 Both return a `FaceModule` you pass directly to `createFaceApp`.
 

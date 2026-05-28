@@ -16,7 +16,12 @@ return {
     inlineStyles: false,
     rawHead: false,
   },
-  hydration: externalHydrationForEntry(manifest, 'src/entry-client.ts', data),
+  hydration: externalHydrationForEntry(
+    manifest,
+    'src/entry-client.ts',
+    data,
+    { dataUrl: '/hydration/hello.json' },
+  ),
 };
 ```
 

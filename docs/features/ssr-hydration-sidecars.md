@@ -52,11 +52,12 @@ When the host owns the URL:
 import { externalHydrationForEntry } from '@theory-cloud/facetheory';
 
 renderOptions: async (_ctx, data) => ({
-  hydration: externalHydrationForEntry({
+  hydration: externalHydrationForEntry(
+    manifest,
+    'src/entry-client.ts',
     data,
-    dataUrl: '/my/sidecar.json',
-    bootstrapModule: '/entry-client.js',
-  }),
+    { dataUrl: '/my/sidecar.json' },
+  ),
 }),
 ```
 

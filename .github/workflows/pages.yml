@@ -37,9 +37,12 @@ permissions:
   pages: write
   id-token: write
 
-# Coalesce in-flight deploys: if a second `staging` push lands before
-# the previous deploy finishes, queue it (don't cancel) so we never
-# skip a commit's publish.
+# Coalesce in-flight deploys: GitHub Actions keeps at most one running
+# and one pending run per concurrency group by default. With
+# `cancel-in-progress: false`, the running deploy finishes, but a newer
+# queued staging deploy replaces any older pending deploy. The site
+# therefore converges on the latest staging commit instead of publishing
+# every intermediate commit.
 concurrency:
   group: pages
   cancel-in-progress: false

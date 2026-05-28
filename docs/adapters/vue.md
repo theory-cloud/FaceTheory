@@ -75,7 +75,8 @@ export function createApp(manifest) {
 
 ## Sub-entry points
 
-- `@theory-cloud/facetheory/vue/stitch-tokens`, `/vue/stitch-shell`, `/vue/stitch-hosted-auth`, `/vue/stitch-admin` — Stitch primitives for Vue.
+- `@theory-cloud/facetheory/stitch-tokens` — shared Stitch token utilities used by all adapters.
+- `@theory-cloud/facetheory/vue/stitch-shell`, `/vue/stitch-hosted-auth`, `/vue/stitch-admin` — Stitch primitives for Vue.
 
 ## Examples in the repo
 
