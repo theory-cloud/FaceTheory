@@ -72,7 +72,7 @@ The validator throws on inline `<script>` bodies, inline `style` attributes, and
 
 ## Sidecar hydration
 
-Strict CSP requires external hydration data. Use one of:
+Strict CSP requires hydration data, when present, to be external. Use one of:
 
 - **Framework-owned same-origin sidecars** — configure `createFaceApp({ ssrHydrationSidecars })` and return normal `viteHydrationForEntry()` data from the SSR Face. FaceTheory writes the exact render-time payload once before emitting a same-origin `/_facetheory/ssr-data/...` link.
 - **Caller-managed external sidecars** — use `externalHydrationForEntry()` when the host owns the same-origin JSON URL.

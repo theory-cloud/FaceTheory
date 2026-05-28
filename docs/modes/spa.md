@@ -12,8 +12,8 @@ SPA is FaceTheory's client-side navigation runtime. A server-rendered shell ship
 import { startFaceNavigation } from '@theory-cloud/facetheory';
 
 const controller = startFaceNavigation({
-  // Defaults to '#facetheory-view' if omitted.
-  viewSelector: '#facetheory-view',
+  // Optional override; omit to use the default '[data-facetheory-view]'.
+  viewSelector: '[data-facetheory-view]',
 });
 
 // Programmatic navigation:
