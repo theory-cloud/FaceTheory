@@ -1,3 +1,7 @@
+---
+title: Troubleshooting
+---
+
 # FaceTheory Troubleshooting
 
 Use this guide for recurring setup, build, and runtime failures that already have a verified diagnosis path.

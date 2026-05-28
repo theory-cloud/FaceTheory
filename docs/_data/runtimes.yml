@@ -1,0 +1,109 @@
+# =============================================================
+# Landing-page adapter tabs — React / Vue / Svelte.
+#
+# FaceTheory is TypeScript-only. The `runtimes` key here is the
+# load-bearing name expected by the portable chrome includes; for
+# FaceTheory it lists the three adapter surfaces, not languages.
+#
+# Each snippet uses FaceTheory's actual exported public API. Install
+# lines use the canonical GitHub Releases tarball form — never bare
+# npm package names.
+# =============================================================
+
+- id: react
+  label: React
+  icon: layers
+  install: "npm install --save-exact https://github.com/theory-cloud/FaceTheory/releases/download/vX.Y.Z/theory-cloud-facetheory-X.Y.Z.tgz react react-dom"
+  lang: typescript
+  snippet: |
+    import * as React from 'react';
+    import {
+      createFaceApp,
+      createLambdaUrlStreamingHandler,
+    } from '@theory-cloud/facetheory';
+    import { createReactStreamFace } from '@theory-cloud/facetheory/react';
+
+    function Home() {
+      return React.createElement('h1', null, 'FaceTheory + React (streaming SSR)');
+    }
+
+    export const app = createFaceApp({
+      faces: [
+        createReactStreamFace({
+          route: '/',
+          mode: 'ssr',
+          render: () => React.createElement(Home),
+          renderOptions: {
+            headTags: [{ type: 'title', text: 'Home' }],
+            styleStrategy: 'all-ready',
+          },
+        }),
+      ],
+    });
+
+    export const handler = createLambdaUrlStreamingHandler({ app });
+
+- id: vue
+  label: Vue
+  icon: layers
+  install: "npm install --save-exact https://github.com/theory-cloud/FaceTheory/releases/download/vX.Y.Z/theory-cloud-facetheory-X.Y.Z.tgz vue @vue/server-renderer"
+  lang: typescript
+  snippet: |
+    import {
+      createFaceApp,
+      createLambdaUrlStreamingHandler,
+    } from '@theory-cloud/facetheory';
+    import { createVueFace, h } from '@theory-cloud/facetheory/vue';
+
+    // createVueFace.render returns a Vue VNode. Use `h(Component)` (or
+    // `h('div', {...}, [...])`) — not a component object.
+    const Home = {
+      setup() {
+        return () => h('h1', 'FaceTheory + Vue (SSR)');
+      },
+    };
+
+    export const app = createFaceApp({
+      faces: [
+        createVueFace({
+          route: '/',
+          mode: 'ssr',
+          render: () => h(Home),
+          renderOptions: {
+            headTags: [{ type: 'title', text: 'Home' }],
+          },
+        }),
+      ],
+    });
+
+    export const handler = createLambdaUrlStreamingHandler({ app });
+
+- id: svelte
+  label: Svelte
+  icon: layers
+  install: "npm install --save-exact https://github.com/theory-cloud/FaceTheory/releases/download/vX.Y.Z/theory-cloud-facetheory-X.Y.Z.tgz svelte"
+  lang: typescript
+  snippet: |
+    import {
+      createFaceApp,
+      createLambdaUrlStreamingHandler,
+    } from '@theory-cloud/facetheory';
+    import { createSvelteFace } from '@theory-cloud/facetheory/svelte';
+
+    // Svelte components compile to an SSR module exporting `.render()`.
+    import Home from './Home.svelte';
+
+    export const app = createFaceApp({
+      faces: [
+        createSvelteFace({
+          route: '/',
+          mode: 'ssr',
+          render: () => ({ component: Home, props: {} }),
+          renderOptions: {
+            headTags: [{ type: 'title', text: 'Home' }],
+          },
+        }),
+      ],
+    });
+
+    export const handler = createLambdaUrlStreamingHandler({ app });

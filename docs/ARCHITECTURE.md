@@ -1,3 +1,8 @@
+---
+title: Architecture
+permalink: /architecture/
+---
+
 # FaceTheory Architecture (planning)
 
 This document describes the intended FaceTheory architecture for **AWS Lambda Function URL + response streaming** and

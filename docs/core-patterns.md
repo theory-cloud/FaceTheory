@@ -1,3 +1,7 @@
+---
+title: Core Patterns
+---
+
 # FaceTheory Core Patterns
 
 These patterns describe the supported integration choices that show up repeatedly across the runtime, the framework adapters, and the AWS deployment path.

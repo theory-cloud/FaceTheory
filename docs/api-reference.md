@@ -1,3 +1,7 @@
+---
+title: API Reference
+---
+
 # FaceTheory API Reference
 
 This reference summarizes the supported package exports, runtime contracts, and deployment-facing conventions that back the canonical FaceTheory docs set.

@@ -1,0 +1,79 @@
+---
+title: Blocking ISR
+---
+
+Blocking ISR is FaceTheory's incremental static regeneration model. Requests serve cached HTML if fresh; if stale (or missing), the request blocks on a regenerate-and-return, coordinated by a regeneration lease so only one Lambda regenerates a given cache entry at a time. Cache state lives in TableTheory; HTML payloads live in an `HtmlStore` (S3 in production).
+
+## Declaring an ISR Face
+
+```typescript
+import { createFaceApp, type FaceModule } from '@theory-cloud/facetheory';
+
+const faces: FaceModule[] = [
+  {
+    route: '/news/{slug}',
+    mode: 'isr',
+    revalidateSeconds: 30,
+    load: async (ctx) => ({ slug: ctx.params.slug, latest: await fetchLatest(ctx.params.slug) }),
+    render: (_ctx, data) => {
+      const { slug, latest } = data as { slug: string; latest: { title: string; body: string } };
+      return { html: `<article><h1>${latest.title}</h1><p>${latest.body}</p></article>` };
+    },
+  },
+];
+```
+
+`revalidateSeconds` is the freshness TTL. The cached entry is served until it ages past this; the next request after expiry triggers a regeneration.
+
+## Wiring the runtime
+
+Configure the ISR runtime when constructing the app:
+
+```typescript
+import { createFaceApp, InMemoryHtmlStore, InMemoryIsrMetaStore } from '@theory-cloud/facetheory';
+
+const htmlStore = new InMemoryHtmlStore();
+const metaStore = new InMemoryIsrMetaStore();
+
+export const app = createFaceApp({
+  faces,
+  isr: { htmlStore, metaStore },
+});
+```
+
+The in-memory stores are for local development and tests. The runnable shape lives in `ts/examples/isr-blocking/handler.ts`.
+
+## Production stores
+
+In production, swap the in-memory stores for:
+
+- **`S3HtmlStore`** — persists rendered HTML to S3.
+- **A TableTheory-backed `IsrMetaStore`** — uses TableTheory's `FaceTheoryIsrMetaStore` (importable from `@theory-cloud/facetheory/tabletheory`) for cache metadata and regeneration leases backed by DynamoDB.
+
+The cache record shape, lifecycle tags, and regen-lease semantics are documented on TableTheory's docs site:
+
+- <https://theory-cloud.github.io/tabletheory/facetheory/isr-cache-schema/>
+- <https://theory-cloud.github.io/tabletheory/facetheory/isr-transaction-recipes/>
+- <https://theory-cloud.github.io/tabletheory/facetheory/isr-idempotency/>
+
+See [TableTheory integration](../integrations/tabletheory.md) for the import boundary.
+
+## Tenant safety (fail-closed)
+
+Blocking ISR is **fail-closed** when known tenant-boundary headers (e.g. `x-tenant-id`, `x-facetheory-tenant`) reach FaceTheory without an explicit `tenantKey` or custom `cacheKey`. Tenant-invariant ISR must strip viewer-supplied tenant-like headers at the CloudFront / AppTheory boundary; tenant-varying pages must use SSR or an explicit trusted partition that includes every request-varying dimension affecting the cached HTML.
+
+See [ISR tenant safety](../features/isr-tenant-safety.md) and [Migration Guide → Adopt ISR tenant fail-closed defaults](../migration-guide.md).
+
+## What ISR guarantees
+
+- Fresh entries serve from cache without invoking `render` or `load`.
+- Stale entries serve only after regeneration completes (blocking model — no stale-while-revalidate by default).
+- Regeneration is serialized per cache key by a lease: concurrent requests for the same stale entry wait for the lease holder rather than thundering the origin.
+- TTL controls freshness; failure policy (`'serve-stale'` vs `'error'`) and lock-contention policy (`'wait'` vs `'serve-stale'`) are configurable via `FaceIsrOptions`.
+
+## Related docs
+
+- [TableTheory integration](../integrations/tabletheory.md)
+- [ISR tenant safety](../features/isr-tenant-safety.md)
+- [Core Patterns → Keep ISR storage prefixes intentional](../core-patterns.md#pattern-keep-isr-storage-prefixes-intentional)
+- [FaceModule API reference](../reference/face-module.md)
