@@ -11,11 +11,12 @@
 #
 # Pages publish reflects what's on `staging` so docs iteration does not
 # have to walk the full staging -> premain -> main release flow before
-# users see updates. The site is documentation, not a released artifact;
-# treating it as integration-branch output keeps the docs feedback loop
-# tight. Defensive `if: github.ref == 'refs/heads/staging'` guards on
-# every job make accidental non-staging runs (e.g. via a manual
-# workflow_dispatch from a feature branch) a no-op.
+# users see updates. The GitHub Pages environment should be protected to
+# allow deployments from `staging` only, and the custom docs domain is
+# mounted at the domain root. Defensive `if:
+# github.ref == 'refs/heads/staging'` guards on every job make accidental
+# non-staging runs (e.g. via a manual workflow_dispatch from a feature
+# branch) a no-op.
 #
 # This workflow is independent of release.yml / prerelease.yml /
 # ci.yml — it never publishes packages, never mutates tags,
@@ -77,7 +78,15 @@ jobs:
           bundle exec jekyll build \
             --source . \
             --destination ./_site \
-            --baseurl "${{ steps.pages.outputs.base_path }}"
+            --baseurl ""
+
+      - name: Verify custom-domain root paths
+        working-directory: docs
+        run: |
+          if grep -R -nE --include='*.html' '(href|src)="/(FaceTheory|facetheory)/' ./_site; then
+            echo "Found root-relative links with the repository path; custom-domain assets must resolve from /." >&2
+            exit 1
+          fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
@@ -91,7 +100,7 @@ jobs:
     if: github.ref == 'refs/heads/staging'
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: https://facetheory.theorycloud.ai/
     steps:
       - name: Deploy
         id: deployment

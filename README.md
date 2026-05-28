@@ -14,7 +14,7 @@
 <p align="center">
   <a href="https://github.com/theory-cloud/FaceTheory/releases"><img alt="Release" src="https://img.shields.io/github/v/release/theory-cloud/FaceTheory?color=2EA7FF&label=release" /></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-46D397" /></a>
-  <a href="https://theory-cloud.github.io/facetheory/"><img alt="Docs" src="https://img.shields.io/badge/docs-theory--cloud.github.io-2EA7FF" /></a>
+  <a href="https://facetheory.theorycloud.ai/"><img alt="Docs" src="https://img.shields.io/badge/docs-facetheory.theorycloud.ai-2EA7FF" /></a>
   <a href="https://github.com/theory-cloud/FaceTheory/actions"><img alt="CI" src="https://img.shields.io/badge/CI-passing-46D397" /></a>
   <a href="https://github.com/theory-cloud/FaceTheory/security/code-scanning"><img alt="CodeQL" src="https://img.shields.io/badge/CodeQL-enabled-7A5CFF" /></a>
 </p>
@@ -27,10 +27,10 @@
 </p>
 
 <p align="center">
-  <a href="https://theory-cloud.github.io/facetheory/getting-started/">Get started</a> ·
-  <a href="https://theory-cloud.github.io/facetheory/api-reference/">API reference</a> ·
-  <a href="https://theory-cloud.github.io/facetheory/reference/face-module/">FaceModule</a> ·
-  <a href="https://theory-cloud.github.io/facetheory/reference/render-modes/">Render modes</a>
+  <a href="https://facetheory.theorycloud.ai/getting-started/">Get started</a> ·
+  <a href="https://facetheory.theorycloud.ai/api-reference/">API reference</a> ·
+  <a href="https://facetheory.theorycloud.ai/reference/face-module/">FaceModule</a> ·
+  <a href="https://facetheory.theorycloud.ai/reference/render-modes/">Render modes</a>
 </p>
 
 ---
@@ -122,7 +122,7 @@ The `v3.4.2` GitHub release also ships the matching `facetheory-reference-${FACE
 
 Strict SSR hydration can be framework-owned: configure `createFaceApp({ ssrHydrationSidecars })`, return normal `viteHydrationForEntry()` data from the SSR Face, and FaceTheory writes the exact render-time payload once before emitting a same-origin `/_facetheory/ssr-data/...` link. Route that prefix to the same Lambda/FaceApp handler as the HTML. Static SSG sidecars stay under `/_facetheory/data/*` for S3/CloudFront delivery, and caller-managed `externalHydrationForEntry(...)` sidecars remain available when the host owns the same-origin JSON URL.
 
-Browser bootstraps should import `loadFaceHydrationData()` from `@theory-cloud/facetheory/client` so inline, SSG, ISR, framework-owned SSR, and caller-managed external hydration all flow through the same same-origin loader. See [Getting Started](https://theory-cloud.github.io/facetheory/getting-started/) and [SSR hydration sidecars](https://theory-cloud.github.io/facetheory/features/ssr-hydration-sidecars/).
+Browser bootstraps should import `loadFaceHydrationData()` from `@theory-cloud/facetheory/client` so inline, SSG, ISR, framework-owned SSR, and caller-managed external hydration all flow through the same same-origin loader. See [Getting Started](https://facetheory.theorycloud.ai/getting-started/) and [SSR hydration sidecars](https://facetheory.theorycloud.ai/features/ssr-hydration-sidecars/).
 
 ## OAC Mutating Forms
 
@@ -135,17 +135,17 @@ AppTheorySsrSite deployments keep the Lambda Function URL origin protected with 
 </form>
 ```
 
-Route the action path to Lambda/AppTheory, keep OAC enabled, and install the helper from a client bootstrap module. The payload hash is AWS signing plumbing only; app authentication, CSRF, idempotency, and business validation remain application responsibilities. See [OAC mutating forms](https://theory-cloud.github.io/facetheory/features/oac-forms/).
+Route the action path to Lambda/AppTheory, keep OAC enabled, and install the helper from a client bootstrap module. The payload hash is AWS signing plumbing only; app authentication, CSRF, idempotency, and business validation remain application responsibilities. See [OAC mutating forms](https://facetheory.theorycloud.ai/features/oac-forms/).
 
 ## ISR Tenant Partition Safety
 
 Blocking ISR is fail-closed when known tenant boundary headers such as `x-tenant-id` or `x-facetheory-tenant` reach FaceTheory without an explicit `tenantKey` or custom `cacheKey`. Tenant-invariant ISR deployments should strip viewer-supplied tenant-like headers at the CloudFront/AppTheory boundary; tenant-varying pages should use SSR or an explicit trusted partition that includes every request-varying dimension that affects the cached HTML.
 
-See [ISR tenant safety](https://theory-cloud.github.io/facetheory/features/isr-tenant-safety/) and [Migration Guide](https://theory-cloud.github.io/facetheory/migration-guide/) for upgrade steps and verification.
+See [ISR tenant safety](https://facetheory.theorycloud.ai/features/isr-tenant-safety/) and [Migration Guide](https://facetheory.theorycloud.ai/migration-guide/) for upgrade steps and verification.
 
 ## Strict CSP Hydration
 
-Routes that need a no-inline CSP can set `FaceRenderResult.csp` to disable inline scripts, inline styles, and raw head HTML, emit `buildStrictCspHeader()`, and move hydration data to a same-origin sidecar instead of inline `__FACETHEORY_DATA__`. For SSR, prefer framework-owned `ssrHydrationSidecars`; use `externalHydrationForEntry()` when the host intentionally owns the sidecar URL. See [Strict CSP](https://theory-cloud.github.io/facetheory/features/strict-csp/).
+Routes that need a no-inline CSP can set `FaceRenderResult.csp` to disable inline scripts, inline styles, and raw head HTML, emit `buildStrictCspHeader()`, and move hydration data to a same-origin sidecar instead of inline `__FACETHEORY_DATA__`. For SSR, prefer framework-owned `ssrHydrationSidecars`; use `externalHydrationForEntry()` when the host intentionally owns the sidecar URL. See [Strict CSP](https://facetheory.theorycloud.ai/features/strict-csp/).
 
 ## Operator Visibility Dashboards
 
@@ -153,7 +153,7 @@ Stitch admin includes operator visibility contracts and React, Vue, and Svelte p
 
 For auth-varying dashboards, prefer SSR or a deterministic SPA shell. Avoid SSG for live authorized visibility data, and use ISR only when the cache key and tenant partitioning fully separate every request-varying dimension. Empty and placeholder states must use explicit no-data copy instead of production-like partner, tenant, release, or version mock values.
 
-See [Operator visibility dashboards](https://theory-cloud.github.io/facetheory/features/operator-visibility/) for the integration boundary.
+See [Operator visibility dashboards](https://facetheory.theorycloud.ai/features/operator-visibility/) for the integration boundary.
 
 ## Repository Development
 
@@ -188,16 +188,16 @@ FaceTheory builds on [TableTheory](https://github.com/theory-cloud/TableTheory) 
 
 ## Documentation
 
-The full documentation site lives at <https://theory-cloud.github.io/facetheory/>:
+The full documentation site lives at <https://facetheory.theorycloud.ai/>:
 
-- [Getting Started](https://theory-cloud.github.io/facetheory/getting-started/)
-- [API Reference](https://theory-cloud.github.io/facetheory/api-reference/)
-- [Render modes compared](https://theory-cloud.github.io/facetheory/reference/render-modes/)
-- [FaceModule API](https://theory-cloud.github.io/facetheory/reference/face-module/)
-- [Adapters: React, Vue, Svelte](https://theory-cloud.github.io/facetheory/adapters/react/)
-- [Strict CSP](https://theory-cloud.github.io/facetheory/features/strict-csp/)
-- [ISR tenant safety](https://theory-cloud.github.io/facetheory/features/isr-tenant-safety/)
-- [TableTheory integration](https://theory-cloud.github.io/facetheory/integrations/tabletheory/)
-- [Core Patterns](https://theory-cloud.github.io/facetheory/core-patterns/)
-- [CDK And AWS Notes](https://theory-cloud.github.io/facetheory/cdk/)
+- [Getting Started](https://facetheory.theorycloud.ai/getting-started/)
+- [API Reference](https://facetheory.theorycloud.ai/api-reference/)
+- [Render modes compared](https://facetheory.theorycloud.ai/reference/render-modes/)
+- [FaceModule API](https://facetheory.theorycloud.ai/reference/face-module/)
+- [Adapters: React, Vue, Svelte](https://facetheory.theorycloud.ai/adapters/react/)
+- [Strict CSP](https://facetheory.theorycloud.ai/features/strict-csp/)
+- [ISR tenant safety](https://facetheory.theorycloud.ai/features/isr-tenant-safety/)
+- [TableTheory integration](https://facetheory.theorycloud.ai/integrations/tabletheory/)
+- [Core Patterns](https://facetheory.theorycloud.ai/core-patterns/)
+- [CDK And AWS Notes](https://facetheory.theorycloud.ai/cdk/)
 - [Changelog](CHANGELOG.md)

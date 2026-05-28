@@ -48,7 +48,7 @@ Breaking an example without fixing the example in the same commit is a regressio
 
 ### Authoring documentation
 
-Documentation lives under `docs/` and is published through GitHub Pages at <https://theory-cloud.github.io/facetheory/>. The site is a Jekyll build configured in `docs/_config.yml`; the framework-agnostic chrome (layouts, includes, CSS, JS) is shared across Theory Cloud frameworks.
+Documentation lives under `docs/` and is published through GitHub Pages at <https://facetheory.theorycloud.ai/>. The site is a Jekyll build configured in `docs/_config.yml`; the framework-agnostic chrome (layouts, includes, CSS, JS) is shared across Theory Cloud frameworks.
 
 #### Front matter convention
 

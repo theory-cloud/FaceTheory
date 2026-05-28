@@ -11,10 +11,11 @@ description: >-
   deterministic head/style emission so server-rendered HTML matches the
   client-hydrated DOM exactly.
 
-# When deployed via the canonical org repo, the site lives at
-# https://theory-cloud.github.io/facetheory/
-url: "https://theory-cloud.github.io"
-baseurl: "/facetheory"
+# Canonical public docs domain. GitHub still serves the Pages artifact for the
+# project repository, but the custom domain is mounted at the domain root, so
+# generated asset URLs must not carry the repository path as a baseurl.
+url: "https://facetheory.theorycloud.ai"
+baseurl: ""
 
 # Jekyll engine
 markdown: kramdown
