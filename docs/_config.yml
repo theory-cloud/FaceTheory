@@ -1,0 +1,156 @@
+# =============================================================
+# FaceTheory · Theory Cloud Documentation site
+# Jekyll configuration for GitHub Pages.
+# =============================================================
+
+title: FaceTheory
+tagline: Deterministic SSR, SSG, ISR, and SPA for the AWS-first Theory Cloud stack.
+description: >-
+  The AWS-first TypeScript client-delivery framework of the Theory Cloud stack.
+  SSR, SSG, blocking ISR, and SPA — with React, Vue, and Svelte adapters and
+  deterministic head/style emission so server-rendered HTML matches the
+  client-hydrated DOM exactly.
+
+# When deployed via the canonical org repo, the site lives at
+# https://theory-cloud.github.io/facetheory/
+url: "https://theory-cloud.github.io"
+baseurl: "/facetheory"
+
+# Jekyll engine
+markdown: kramdown
+highlighter: rouge
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    css_class: highlight
+    block:
+      line_numbers: false
+  auto_ids: true
+  toc_levels: 2..4
+  hard_wrap: false
+  smart_quotes: lsquo,rsquo,ldquo,rdquo
+
+plugins:
+  - jekyll-relative-links
+  - jekyll-include-cache
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+relative_links:
+  enabled: true
+  collections: true
+
+include:
+  - assets
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - .bundle
+  - .jekyll-cache
+  - .jekyll-metadata
+  - _site
+  - node_modules
+  - "README.md"                  # repo-facing index; site landing is index.html
+  - "_concepts.yaml"
+  - "_contract.yaml"
+  - "_decisions.yaml"
+  - "_patterns.yaml"
+  - "UPSTREAM_RELEASE_PINS.md"   # release-internal pin metadata
+  - "wizard-primitives.md"       # internal authoring guide; not public docs
+  - "planning"
+  - "development"
+
+# Apply the default docs layout to every markdown page automatically,
+# so existing docs/*.md files don't need front matter for layout selection.
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: default
+      surface: core
+      sidebar: true
+      toc: true
+      edit_on_github: true
+  - scope:
+      path: "integrations/autheory.md"
+    values:
+      surface: auth
+  - scope:
+      path: "index.html"
+    values:
+      layout: home
+      sidebar: true
+      toc: false
+      edit_on_github: false
+
+# =============================================================
+# Framework namespace — parameters consumed by layouts/includes.
+#
+# The KEY is `tabletheory` for every Theory Cloud framework (the chrome
+# is portable across TableTheory / FaceTheory / AppTheory / ...). The
+# VALUES below describe FaceTheory's identity.
+# =============================================================
+tabletheory:
+  surface: core                 # core | mcp | auth | journal
+  framework_name: FaceTheory
+  framework_short: facetheory
+  repo: theory-cloud/FaceTheory
+  repo_branch: main
+  docs_root: docs
+  version_pill: "v3.x"
+  version_status: prerelease    # FaceTheory is pre-1.0 contract-wise
+  # `runtimes` is the keyed name the chrome (sidebar groups, landing tabs,
+  # install pills) expects. For FaceTheory it lists ADAPTER surfaces.
+  runtimes:
+    - id: react
+      label: React
+      install: "npm install --save-exact https://github.com/theory-cloud/FaceTheory/releases/download/vX.Y.Z/theory-cloud-facetheory-X.Y.Z.tgz react react-dom"
+      docs_path: adapters/react
+    - id: vue
+      label: Vue
+      install: "npm install --save-exact https://github.com/theory-cloud/FaceTheory/releases/download/vX.Y.Z/theory-cloud-facetheory-X.Y.Z.tgz vue @vue/server-renderer"
+      docs_path: adapters/vue
+    - id: svelte
+      label: Svelte
+      install: "npm install --save-exact https://github.com/theory-cloud/FaceTheory/releases/download/vX.Y.Z/theory-cloud-facetheory-X.Y.Z.tgz svelte"
+      docs_path: adapters/svelte
+  surfaces:
+    - id: core
+      name: Per-request rendering
+      domain: lambda-url-streaming
+      desc: SSR Faces streamed through Lambda Function URLs, with deterministic head emission, strict CSP, and the OAC mutating-form transport.
+      url: /modes/ssr/
+      cta: See the SSR contract
+    - id: core
+      name: Static and ISR delivery
+      domain: s3-cloudfront-tabletheory
+      desc: SSG output to S3 and CloudFront, plus blocking ISR backed by TableTheory cache metadata and regeneration leases.
+      url: /modes/isr/
+      cta: See the ISR contract
+    - id: core
+      name: Stitch operator dashboards
+      domain: react-vue-svelte
+      desc: Stitch tokens, shell, and admin primitives feeding operator-visibility dashboards across all three adapters.
+      url: /features/operator-visibility/
+      cta: See the Stitch boundary
+  stats:
+    - label: Render modes
+      value: "4"
+      sub: SSR · SSG · ISR · SPA
+    - label: Adapters
+      value: "3"
+      sub: React · Vue · Svelte
+    - label: Distribution
+      value: GitHub Releases
+      sub: immutable, pinned
+    - label: License
+      value: Apache-2.0
+      sub: open source
+
+# Sitemap defaults
+permalink: pretty
+timezone: UTC

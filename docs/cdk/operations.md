@@ -1,3 +1,7 @@
+---
+title: CDK Operations
+---
+
 # FaceTheory Operations Guide
 
 This guide summarizes the runtime and edge-level checks that should remain true after a deploy, rollback, or incident response cycle.
