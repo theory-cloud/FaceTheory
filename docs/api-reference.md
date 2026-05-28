@@ -1,3 +1,7 @@
+---
+title: API Reference
+---
+
 # FaceTheory API Reference
 
 This reference summarizes the supported package exports, runtime contracts, and deployment-facing conventions that back the canonical FaceTheory docs set.
@@ -19,7 +23,7 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
 ```bash
-export FACETHEORY_VERSION=3.4.2-rc # x-release-please-version
+export FACETHEORY_VERSION=3.4.2 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```

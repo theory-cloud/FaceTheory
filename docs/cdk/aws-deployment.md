@@ -1,3 +1,7 @@
+---
+title: AWS Deployment
+---
+
 # FaceTheory AWS Deployment Shape
 
 This document captures the supported production topology and the request-routing assumptions behind the canonical AWS guidance.

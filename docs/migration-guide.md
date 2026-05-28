@@ -1,3 +1,7 @@
+---
+title: Migration Guide
+---
+
 # FaceTheory Migration Guide
 
 This guide focuses on the supported migration paths into the current FaceTheory runtime contract and deployment model.

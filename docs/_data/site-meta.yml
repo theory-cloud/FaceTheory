@@ -1,0 +1,27 @@
+# =============================================================
+# Site-wide metadata consumed by layouts/includes.
+# =============================================================
+
+header_nav:
+  - { label: Docs,         url: /,                                active_paths: ["/"] }
+  - { label: API,          url: /api-reference/,                  active_paths: ["/api-reference/"] }
+  - { label: Adapters,     url: /adapters/react/,                 active_paths: ["/adapters/"] }
+  - { label: Modes,        url: /modes/ssr/,                      active_paths: ["/modes/"] }
+  - { label: Features,     url: /features/head/,                  active_paths: ["/features/"] }
+  - { label: Integrations, url: /integrations/apptheory/,         active_paths: ["/integrations/"] }
+
+footer_links:
+  - { label: GitHub,       url: "https://github.com/theory-cloud/FaceTheory" }
+  - { label: Releases,     url: "https://github.com/theory-cloud/FaceTheory/releases" }
+  - { label: Changelog,    url: "https://github.com/theory-cloud/FaceTheory/blob/main/CHANGELOG.md" }
+  - { label: License,      url: "https://github.com/theory-cloud/FaceTheory/blob/main/LICENSE" }
+  - { label: Contributing, url: "https://github.com/theory-cloud/FaceTheory/blob/main/CONTRIBUTING.md" }
+
+# Quick-start cards on the landing page
+quick_start:
+  - { title: "Install & init",          desc: "Pin the GitHub release tarball and wire up Lambda Function URL streaming.", url: /getting-started/,                  icon: play }
+  - { title: "Declare a Face",          desc: "FaceModule shape — route, mode, render. The atomic unit of the framework.", url: /reference/face-module/,            icon: layout }
+  - { title: "Pick a render mode",      desc: "SSR, SSG, blocking ISR, or SPA — when each one fits and what it guarantees.", url: /reference/render-modes/,           icon: compass }
+  - { title: "ISR with TableTheory",    desc: "Production ISR backed by TableTheory cache metadata and regeneration leases.", url: /modes/isr/,                        icon: repeat }
+  - { title: "Strict no-inline CSP",    desc: "buildStrictCspHeader and external hydration sidecars for hardened delivery.", url: /features/strict-csp/,              icon: shield-check }
+  - { title: "Operator dashboards",     desc: "Stitch primitives and caller-supplied OperatorGuardStatus boundaries.",      url: /features/operator-visibility/,     icon: book-open }

@@ -1,3 +1,8 @@
+---
+title: CDK Integration Guide
+permalink: /cdk/
+---
+
 # FaceTheory CDK And AWS Notes
 
 These are sanctioned optional operator-facing docs for deployment and runbook guidance.

@@ -1,3 +1,7 @@
+---
+title: Development Guidelines
+---
+
 # FaceTheory Development Guidelines
 
 This document is contract-only.

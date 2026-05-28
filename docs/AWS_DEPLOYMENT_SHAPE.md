@@ -1,3 +1,8 @@
+---
+title: AWS Deployment Shape
+permalink: /aws-deployment-shape/
+---
+
 # AWS Deployment Shape (CloudFront + S3 + Lambda URL)
 
 This document describes the recommended production topology for FaceTheory apps and the cache behavior split for
