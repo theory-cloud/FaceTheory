@@ -9,7 +9,7 @@ This file records the currently pinned versions and the exact install strings we
 
 - AppTheory (TypeScript): `v1.12.0`
 - AppTheory (CDK): `v1.12.0`
-- TableTheory (TypeScript): `v1.8.4`
+- TableTheory (TypeScript): `v1.9.0`
 
 ## Known Audit Exceptions
 
@@ -56,7 +56,7 @@ npm install --save-exact \
 
   # TableTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.8.4/theory-cloud-tabletheory-ts-1.8.4.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.9.0/theory-cloud-tabletheory-ts-1.9.0.tgz
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
@@ -72,11 +72,11 @@ registry installs:
 {
   "devDependencies": {
     "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.12.0/theory-cloud-apptheory-1.12.0.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.4/theory-cloud-tabletheory-ts-1.8.4.tgz"
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.9.0/theory-cloud-tabletheory-ts-1.9.0.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.8.4/theory-cloud-tabletheory-ts-1.8.4.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.9.0/theory-cloud-tabletheory-ts-1.9.0.tgz"
     }
   }
 }
