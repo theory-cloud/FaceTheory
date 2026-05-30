@@ -1275,7 +1275,8 @@ const SVELTE_SAMPLE_TRAIL: SvelteAuditTrail = {
         {
           id: 'apply-redacted-svelte',
           timestamp: '2026-05-21T17:00:05.000Z',
-          title: 'Mailbox secret rotated',
+          title: 'AKIA-SVELTE-NEVER-SHOWN-IN-TITLE-1234567890',
+          icon: 'AKIA-SVELTE-NEVER-SHOWN-IN-ICON-1234567890',
           status: 'info',
           tone: 'neutral',
           redactedMarker: '[redacted — mailbox secret]',
@@ -1349,13 +1350,21 @@ test('svelte audit-trail: group toggles carry aria-expanded + aria-controls', as
   assert.ok(body.includes('<button type="button"'));
 });
 
-test('svelte audit-trail: redacted event suppresses body/metadata/externalLink', async () => {
+test('svelte audit-trail: redacted event suppresses title/icon/body/metadata/externalLink', async () => {
   const body = await renderComponent(
     path.resolve('src/svelte/stitch-admin/AuditTrailPanel.svelte'),
     { trail: SVELTE_SAMPLE_TRAIL },
   );
   assert.ok(body.includes('[redacted — mailbox secret]'));
   assert.ok(body.includes('data-event-redacted="true"'));
+  assert.equal(
+    body.includes('AKIA-SVELTE-NEVER-SHOWN-IN-TITLE-1234567890'),
+    false,
+  );
+  assert.equal(
+    body.includes('AKIA-SVELTE-NEVER-SHOWN-IN-ICON-1234567890'),
+    false,
+  );
   assert.equal(
     body.includes('AKIA-SVELTE-NEVER-SHOWN-IN-BODY-1234567890'),
     false,
