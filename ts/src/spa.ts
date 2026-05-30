@@ -102,12 +102,22 @@ export interface FaceNavigationController {
 
 export function readFaceHydrationData<T = unknown>(doc: Document = document): T | null {
   const el = doc.getElementById(HYDRATION_DATA_SCRIPT_ID);
-  if (!el?.textContent) return null;
+  if (!isJsonHydrationScriptElement(el) || !el.textContent) return null;
   try {
     return JSON.parse(el.textContent) as T;
   } catch {
     return null;
   }
+}
+
+function isJsonHydrationScriptElement(el: Element | null): el is HTMLScriptElement {
+  if (el?.tagName.toLowerCase() !== 'script') return false;
+  return isJsonScriptType(el.getAttribute('type'));
+}
+
+function isJsonScriptType(type: string | null): boolean {
+  const mediaType = String(type ?? '').split(';', 1)[0]?.trim().toLowerCase();
+  return mediaType === 'application/json' || Boolean(mediaType?.endsWith('+json'));
 }
 
 export function readFaceHydrationDataUrl(doc: Document = document): string | null {

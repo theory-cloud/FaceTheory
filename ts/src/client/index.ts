@@ -191,8 +191,18 @@ function readInlineHydrationScript(doc: Document):
   | { present: false }
   | { present: true; text: string } {
   const el = doc.getElementById(FACE_HYDRATION_DATA_SCRIPT_ID);
-  if (!el) return { present: false };
+  if (!isJsonHydrationScriptElement(el)) return { present: false };
   return { present: true, text: el.textContent ?? '' };
+}
+
+function isJsonHydrationScriptElement(el: Element | null): el is HTMLScriptElement {
+  if (el?.tagName.toLowerCase() !== 'script') return false;
+  return isJsonScriptType(el.getAttribute('type'));
+}
+
+function isJsonScriptType(type: string | null): boolean {
+  const mediaType = String(type ?? '').split(';', 1)[0]?.trim().toLowerCase();
+  return mediaType === 'application/json' || Boolean(mediaType?.endsWith('+json'));
 }
 
 function readExternalHydrationUrl(doc: Document): string | null {

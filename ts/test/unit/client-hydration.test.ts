@@ -56,6 +56,48 @@ test('client hydration loader: reads inline hydration before external links', as
   }
 });
 
+test('client hydration loader: treats spoofed inline markers as absent', async () => {
+  for (const marker of [
+    '<div id="__FACETHEORY_DATA__">{"subject":"spoofed-div"}</div>',
+    '<script id="__FACETHEORY_DATA__" type="text/plain">{"subject":"spoofed-type"}</script>',
+  ]) {
+    const dom = new JSDOM(
+      `<!doctype html>
+        <html>
+          <head>
+            ${marker}
+            <link id="__FACETHEORY_DATA_URL__" rel="facetheory-hydration" href="/_facetheory/ssr-data/home.json" type="application/json">
+          </head>
+          <body></body>
+        </html>`,
+      { url: 'https://app.test/account' },
+    );
+
+    try {
+      const fetched: string[] = [];
+      const data = await loadFaceHydrationData<{ route: string }>({
+        document: dom.window.document,
+        fetcher: async (input) => {
+          fetched.push(String(input));
+          return responseWithUrl(
+            new Response(JSON.stringify({ route: 'external-home' }), {
+              headers: { 'content-type': 'application/json' },
+              status: 200,
+            }),
+            'https://app.test/_facetheory/ssr-data/home.json',
+          );
+        },
+      });
+
+      assert.equal(readFaceInlineHydrationData(dom.window.document), null);
+      assert.deepEqual(data, { route: 'external-home' });
+      assert.deepEqual(fetched, ['https://app.test/_facetheory/ssr-data/home.json']);
+    } finally {
+      dom.window.close();
+    }
+  }
+});
+
 test('client hydration loader: fetches same-origin external hydration data', async () => {
   const dom = new JSDOM(
     `<!doctype html>
