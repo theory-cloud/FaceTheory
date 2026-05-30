@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { JSDOM } from 'jsdom';
 import { compile } from 'svelte/compiler';
 import { mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -8,7 +9,10 @@ import { pathToFileURL } from 'node:url';
 
 import { createFaceApp } from '../../src/app.js';
 import { createSvelteFace } from '../../src/svelte/index.js';
-import type { OperatorCorrelationMetadata } from '../../src/stitch-admin/index.js';
+import type {
+  OperatorCorrelationMetadata,
+  WizardEditableTokenInput,
+} from '../../src/stitch-admin/index.js';
 
 const sampleCorrelation = {
   correlationId: 'corr_release_20260424_001',
@@ -86,6 +90,138 @@ async function renderComponent(
     const resp = await app.handle({ method: 'GET', path: '/' });
     return new TextDecoder().decode(resp.body as Uint8Array);
   } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+interface SvelteBackspaceResult {
+  changes: string[][];
+  prevented: boolean;
+}
+
+type SvelteClientRuntime = {
+  mount: (
+    component: unknown,
+    options: { target: Element; props: Record<string, unknown> },
+  ) => unknown;
+  unmount: (component: unknown) => void;
+};
+
+function installSvelteClientDomGlobals(dom: JSDOM): () => void {
+  const previous = new Map<string, PropertyDescriptor | undefined>();
+  const win = dom.window as unknown as Record<string, unknown>;
+  const setGlobal = (key: string, value: unknown): void => {
+    if (!previous.has(key)) {
+      previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
+    }
+    Object.defineProperty(globalThis, key, {
+      configurable: true,
+      writable: true,
+      value,
+    });
+  };
+
+  for (const key of [
+    'window',
+    'document',
+    'Node',
+    'Text',
+    'Comment',
+    'Element',
+    'HTMLElement',
+    'HTMLInputElement',
+    'HTMLMediaElement',
+    'HTMLTemplateElement',
+    'Document',
+    'DocumentFragment',
+    'Event',
+    'EventTarget',
+    'KeyboardEvent',
+    'MouseEvent',
+    'CustomEvent',
+    'MutationObserver',
+    'SVGElement',
+    'getComputedStyle',
+  ]) {
+    if (win[key] !== undefined) setGlobal(key, win[key]);
+  }
+
+  return () => {
+    for (const [key, descriptor] of previous) {
+      if (descriptor === undefined) {
+        delete (globalThis as Record<string, unknown>)[key];
+      } else {
+        Object.defineProperty(globalThis, key, descriptor);
+      }
+    }
+  };
+}
+
+async function dispatchSvelteBackspace(
+  input: WizardEditableTokenInput,
+): Promise<SvelteBackspaceResult> {
+  const componentPath = path.resolve(
+    'src/svelte/stitch-admin/WizardEditableTokenInputPanel.svelte',
+  );
+  const source = await readFile(componentPath, 'utf8');
+  const compiled = compile(source, {
+    generate: 'client',
+    filename: path.basename(componentPath),
+  } as never);
+
+  const dir = path.resolve('.tmp-facetheory-svelte-stitch-admin-client');
+  await mkdir(dir, { recursive: true });
+  const file = path.join(
+    dir,
+    `${path.basename(componentPath, '.svelte')}-${process.pid}-${Date.now()}.mjs`,
+  );
+  await writeFile(file, compiled.js.code, 'utf8');
+
+  const dom = new JSDOM(
+    '<!doctype html><html><body><div id="root"></div></body></html>',
+    {
+      url: 'http://localhost/',
+    },
+  );
+  const restoreGlobals = installSvelteClientDomGlobals(dom);
+  let runtime: SvelteClientRuntime | undefined;
+  let mounted: unknown;
+
+  try {
+    const mod = await import(pathToFileURL(file).href);
+    runtime = (await import(
+      pathToFileURL(path.resolve('node_modules/svelte/src/index-client.js'))
+        .href,
+    )) as SvelteClientRuntime;
+    const target = dom.window.document.getElementById('root');
+    assert.ok(target !== null, 'Svelte client mount target should exist');
+    const changes: string[][] = [];
+    mounted = runtime.mount(mod.default as unknown, {
+      target,
+      props: {
+        input,
+        onChange: (next: string[]) => {
+          changes.push(next);
+        },
+      },
+    });
+    const inputElement = dom.window.document.querySelector('input');
+    assert.ok(
+      inputElement !== null,
+      'editable token input should render an input',
+    );
+    const event = new dom.window.KeyboardEvent('keydown', {
+      key: 'Backspace',
+      bubbles: true,
+      cancelable: true,
+    });
+    inputElement.dispatchEvent(event);
+    return { changes, prevented: event.defaultPrevented };
+  } finally {
+    if (runtime !== undefined && mounted !== undefined) {
+      runtime.unmount(mounted);
+    }
+    restoreGlobals();
     await rm(dir, { recursive: true, force: true });
   }
 }
@@ -519,6 +655,34 @@ test('svelte stitch-admin: WizardEditableTokenInputPanel renders parity DOM with
   assert.ok(body.includes('aria-label="Remove sender ops@example.com"'));
   assert.ok(body.includes('for="svelte-allowed-senders"'));
   assert.ok(body.includes('Safety policy: no-secret-or-production-like-data'));
+});
+
+test('svelte stitch-admin: WizardEditableTokenInputPanel Backspace honours per-token removability metadata', async () => {
+  const nonRemovable = await dispatchSvelteBackspace({
+    inputId: 'svelte-allowed-senders-non-removable',
+    value: ['qa@example.com', 'system@example.com'],
+    items: [{ value: 'system@example.com', removable: false }],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  });
+  assert.deepEqual(nonRemovable.changes, []);
+  assert.equal(nonRemovable.prevented, false);
+
+  const disabled = await dispatchSvelteBackspace({
+    inputId: 'svelte-allowed-senders-disabled',
+    value: ['qa@example.com', 'frozen@example.com'],
+    items: [{ value: 'frozen@example.com', disabled: true }],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  });
+  assert.deepEqual(disabled.changes, []);
+  assert.equal(disabled.prevented, false);
+
+  const removable = await dispatchSvelteBackspace({
+    inputId: 'svelte-allowed-senders-removable',
+    value: ['qa@example.com', 'ops@example.com'],
+    safetyPolicy: 'no-secret-or-production-like-data',
+  });
+  assert.deepEqual(removable.changes, [['qa@example.com']]);
+  assert.equal(removable.prevented, true);
 });
 
 test('svelte stitch-admin: WizardEditableTokenInputPanel surfaces invalid + duplicate feedback with role=alert', async () => {

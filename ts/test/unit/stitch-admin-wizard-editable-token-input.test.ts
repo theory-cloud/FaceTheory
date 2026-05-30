@@ -47,6 +47,56 @@ const BASE_INPUT: WizardEditableTokenInput = {
   safetyPolicy: 'no-secret-or-production-like-data',
 };
 
+interface KeyboardProbe {
+  key: string;
+  preventDefault: () => void;
+}
+
+interface ReactKeydownProps {
+  onKeyDown?: (event: KeyboardProbe) => void;
+}
+
+function findReactElementByType(
+  node: React.ReactNode,
+  type: string,
+): React.ReactElement<ReactKeydownProps> {
+  if (React.isValidElement(node)) {
+    if (node.type === type) {
+      return node as React.ReactElement<ReactKeydownProps>;
+    }
+    const props = node.props as { children?: React.ReactNode };
+    for (const child of React.Children.toArray(props.children)) {
+      try {
+        return findReactElementByType(child, type);
+      } catch (_err) {
+        // Keep scanning sibling subtrees.
+      }
+    }
+  }
+  throw new Error(`Unable to find React element of type ${type}`);
+}
+
+function dispatchReactBackspace(
+  input: WizardEditableTokenInput,
+): { changes: string[][]; prevented: boolean } {
+  const changes: string[][] = [];
+  let prevented = false;
+  const element = WizardEditableTokenInputPanel({
+    input,
+    onChange: (next: string[]) => {
+      changes.push(next);
+    },
+  });
+  const inputElement = findReactElementByType(element, 'input');
+  inputElement.props.onKeyDown?.({
+    key: 'Backspace',
+    preventDefault: () => {
+      prevented = true;
+    },
+  });
+  return { changes, prevented };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Caller-supplied state passthrough                                          */
 /* -------------------------------------------------------------------------- */
@@ -141,6 +191,28 @@ test('WizardEditableTokenInputPanel honours per-token metadata for tone, removab
 
   // Disabled token: chip class marker is rendered.
   assert.ok(body.includes('facetheory-stitch-wizard-editable-token-input-chip-disabled'));
+});
+
+test('WizardEditableTokenInputPanel Backspace honours per-token removability metadata', () => {
+  const nonRemovable = dispatchReactBackspace({
+    ...BASE_INPUT,
+    value: ['qa@example.com', 'system@example.com'],
+    items: [{ value: 'system@example.com', removable: false }],
+  });
+  assert.deepEqual(nonRemovable.changes, []);
+  assert.equal(nonRemovable.prevented, false);
+
+  const disabled = dispatchReactBackspace({
+    ...BASE_INPUT,
+    value: ['qa@example.com', 'frozen@example.com'],
+    items: [{ value: 'frozen@example.com', disabled: true }],
+  });
+  assert.deepEqual(disabled.changes, []);
+  assert.equal(disabled.prevented, false);
+
+  const removable = dispatchReactBackspace(BASE_INPUT);
+  assert.deepEqual(removable.changes, [['qa@example.com']]);
+  assert.equal(removable.prevented, true);
 });
 
 /* -------------------------------------------------------------------------- */
