@@ -113,11 +113,13 @@ const SAMPLE_TRAIL: AuditTrail = {
       expanded: true,
       events: [
         {
-          // Even though the host supplies body / metadata / externalLink here,
-          // the primitive must render ONLY the redactedMarker.
+          // Even though the host supplies title / icon / body / metadata /
+          // externalLink here, the primitive must render ONLY the marker plus
+          // timestamp / actor / status / tone surfaces.
           id: 'apply-redacted',
           timestamp: '2026-05-21T17:00:05.000Z',
-          title: 'Mailbox secret rotated',
+          title: 'AKIA-NEVER-SHOWN-IN-TITLE-1234567890',
+          icon: 'AKIA-NEVER-SHOWN-IN-ICON-1234567890',
           status: 'info',
           tone: 'neutral',
           redactedMarker: '[redacted — mailbox secret]',
@@ -233,12 +235,14 @@ test('AuditTrailPanel renders error event with role=alert', async () => {
   assert.ok(body.includes('data-group-error-count="1"'));
 });
 
-test('AuditTrailPanel suppresses body/metadata/externalLink for redacted events', async () => {
+test('AuditTrailPanel suppresses title/icon/body/metadata/externalLink for redacted events', async () => {
   const body = await renderSSR(h(AuditTrailPanel, { trail: SAMPLE_TRAIL }));
   // Marker text is rendered.
   assert.ok(body.includes('[redacted — mailbox secret]'));
   assert.ok(body.includes('data-event-redacted="true"'));
   // No part of the caller-supplied AKIA-shaped fake-secret strings is present.
+  assert.equal(body.includes('AKIA-NEVER-SHOWN-IN-TITLE-1234567890'), false);
+  assert.equal(body.includes('AKIA-NEVER-SHOWN-IN-ICON-1234567890'), false);
   assert.equal(body.includes('AKIA-NEVER-SHOWN-IN-BODY-1234567890'), false);
   assert.equal(body.includes('AKIA-NEVER-SHOWN-IN-META-1234567890'), false);
   assert.equal(body.includes('AKIA-NEVER-SHOWN-IN-LINK-1234567890'), false);
@@ -340,6 +344,8 @@ test('AuditTrail / DisclosurePanel fixtures do not leak production-like secrets 
   // The intentional fake-secret strings used inside redacted events to prove
   // suppression must never appear in the rendered output.
   for (const needle of [
+    'AKIA-NEVER-SHOWN-IN-TITLE-1234567890',
+    'AKIA-NEVER-SHOWN-IN-ICON-1234567890',
     'AKIA-NEVER-SHOWN-IN-BODY-1234567890',
     'AKIA-NEVER-SHOWN-IN-META-1234567890',
     'AKIA-NEVER-SHOWN-IN-LINK-1234567890',

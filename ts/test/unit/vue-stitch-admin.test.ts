@@ -1424,7 +1424,8 @@ const VUE_SAMPLE_TRAIL: VueAuditTrail = {
         {
           id: 'apply-redacted-vue',
           timestamp: '2026-05-21T17:00:05.000Z',
-          title: 'Mailbox secret rotated',
+          title: 'AKIA-VUE-NEVER-SHOWN-IN-TITLE-1234567890',
+          icon: 'AKIA-VUE-NEVER-SHOWN-IN-ICON-1234567890',
           status: 'info',
           tone: 'neutral',
           redactedMarker: '[redacted — mailbox secret]',
@@ -1496,12 +1497,20 @@ test('vue audit-trail: group toggles carry aria-expanded + aria-controls', async
   assert.ok(body.includes('<button type="button"'));
 });
 
-test('vue audit-trail: redacted event suppresses body/metadata/externalLink', async () => {
+test('vue audit-trail: redacted event suppresses title/icon/body/metadata/externalLink', async () => {
   const body = await renderSSR(
     h(VueAuditTrailPanel, { trail: VUE_SAMPLE_TRAIL }),
   );
   assert.ok(body.includes('[redacted — mailbox secret]'));
   assert.ok(body.includes('data-event-redacted="true"'));
+  assert.equal(
+    body.includes('AKIA-VUE-NEVER-SHOWN-IN-TITLE-1234567890'),
+    false,
+  );
+  assert.equal(
+    body.includes('AKIA-VUE-NEVER-SHOWN-IN-ICON-1234567890'),
+    false,
+  );
   assert.equal(body.includes('AKIA-VUE-NEVER-SHOWN-IN-BODY-1234567890'), false);
   assert.equal(body.includes('AKIA-VUE-NEVER-SHOWN-IN-META-1234567890'), false);
   assert.equal(body.includes('AKIA-VUE-NEVER-SHOWN-IN-LINK-1234567890'), false);

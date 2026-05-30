@@ -251,7 +251,7 @@ function renderEvent(
           },
           event.timestamp,
         ),
-        event.icon !== undefined
+        !redacted && event.icon !== undefined
           ? h(
               'span',
               {
@@ -261,11 +261,13 @@ function renderEvent(
               renderPropContent(event.icon as VNodeChild),
             )
           : null,
-        h(
-          'strong',
-          { class: 'facetheory-stitch-audit-event-title' },
-          renderPropContent(event.title as VNodeChild),
-        ),
+        !redacted
+          ? h(
+              'strong',
+              { class: 'facetheory-stitch-audit-event-title' },
+              renderPropContent(event.title as VNodeChild),
+            )
+          : null,
         renderStatusPill(event),
         renderTonePill(event),
       ]),

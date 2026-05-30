@@ -381,7 +381,7 @@ function renderEvent(
         },
         event.timestamp,
       ),
-      event.icon !== undefined
+      !redacted && event.icon !== undefined
         ? h(
             'span',
             {
@@ -392,15 +392,17 @@ function renderEvent(
             event.icon as React.ReactNode,
           )
         : null,
-      h(
-        'strong',
-        {
-          key: 'title',
-          className: 'facetheory-stitch-audit-event-title',
-          style: { fontSize: '13px' },
-        },
-        event.title as React.ReactNode,
-      ),
+      !redacted
+        ? h(
+            'strong',
+            {
+              key: 'title',
+              className: 'facetheory-stitch-audit-event-title',
+              style: { fontSize: '13px' },
+            },
+            event.title as React.ReactNode,
+          )
+        : null,
       renderStatusPill(event),
       renderTonePill(event),
     ),
