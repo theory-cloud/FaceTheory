@@ -429,3 +429,90 @@ test('SSR hydration sidecar helpers: reject network-path data URL prefixes', () 
     );
   }
 });
+
+test('SSR hydration sidecar helpers: reject control characters in data URL prefixes', () => {
+  for (const dataUrlPrefix of [
+    '/\t//evil.example/ssr-data',
+    '/\t/evil.example/ssr-data',
+    '/_facetheory/\nssr-data',
+    '/_facetheory/\rssr-data',
+    '/_facetheory/\u0000ssr-data',
+    '/_facetheory/\u001fssr-data',
+    '/_facetheory/\u007fssr-data',
+  ]) {
+    assert.throws(
+      () =>
+        buildSsrHydrationSidecarDataUrl('payload.signature', {
+          dataUrlPrefix,
+        }),
+      /same-origin path prefix/,
+    );
+    assert.throws(
+      () => normalizeSsrHydrationSidecarDataUrlPrefix(dataUrlPrefix),
+      /same-origin path prefix/,
+    );
+    assert.throws(
+      () =>
+        createFaceApp({
+          faces: [],
+          ssrHydrationSidecars: {
+            htmlStore: new RecordingHtmlStore(),
+            signingSecret: SIGNING_SECRET,
+            dataUrlPrefix,
+          },
+        }),
+      /same-origin path prefix/,
+    );
+  }
+});
+
+test('SSR hydration sidecar helpers: reject control characters in object prefixes', () => {
+  for (const keyPrefix of [
+    'tenant/\tdata',
+    'tenant/\ndata',
+    'tenant/\rdata',
+    'tenant/\u0000data',
+    'tenant/\u001fdata',
+    'tenant/\u007fdata',
+  ]) {
+    assert.throws(
+      () =>
+        createSsrHydrationSidecarStore({
+          htmlStore: new RecordingHtmlStore(),
+          signingSecret: SIGNING_SECRET,
+          keyPrefix,
+        }),
+      /object prefix/,
+    );
+  }
+});
+
+test('SSR hydration sidecar helpers: accept valid same-origin and object prefixes', async () => {
+  assert.equal(
+    normalizeSsrHydrationSidecarDataUrlPrefix('tenant/ssr-data/'),
+    '/tenant/ssr-data',
+  );
+  assert.equal(
+    buildSsrHydrationSidecarDataUrl('payload.signature', {
+      dataUrlPrefix: 'tenant/ssr-data/',
+    }),
+    '/tenant/ssr-data/payload.signature',
+  );
+
+  const htmlStore = new RecordingHtmlStore();
+  const store = createSsrHydrationSidecarStore({
+    htmlStore,
+    signingSecret: SIGNING_SECRET,
+    now: () => 1_000,
+    keyPrefix: 'tenant/sidecars',
+    dataUrlPrefix: 'tenant/ssr-data/',
+  });
+
+  const written = await store.write({
+    data: { route: '/valid-prefixes' },
+    variant: { path: '/valid-prefixes' },
+  });
+
+  assert.ok(written.key.startsWith('tenant/sidecars/'));
+  assert.ok(written.dataUrl.startsWith('/tenant/ssr-data/'));
+});

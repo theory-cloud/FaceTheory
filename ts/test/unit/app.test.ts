@@ -479,7 +479,77 @@ test('FaceApp: caller-managed strict external hydration is preserved', async () 
   assert.equal(html.includes('__FACETHEORY_DATA__'), false);
 });
 
-test('FaceApp: sidecar reads fail closed for mismatched cookie variants', async () => {
+test('FaceApp: default sidecar variant ignores arbitrary cookie drift', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const pageOnlyCookieValue = ['page', 'path', 'cookie'].join('-');
+  const sidecarOnlyCookieValue = ['sidecar', 'path', 'toss'].join('-');
+  const sharedCookieValue = ['shared', 'root', 'cookie'].join('-');
+  const hydrationData = { page: 'cookie-drift' };
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/cookie-drift',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: true,
+            rawHead: false,
+          },
+          hydration: {
+            data: hydrationData,
+            bootstrapModule: '/assets/cookie-drift.js',
+          },
+          html: '<main>cookie drift</main>',
+        }),
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore,
+      signingSecret: SIDECAR_SIGNING_SECRET,
+      now: () => 3_500,
+    },
+  });
+
+  const page = await app.handle({
+    method: 'GET',
+    path: '/cookie-drift',
+    headers: {
+      cookie: [
+        `shared=${sharedCookieValue}; account_path=${pageOnlyCookieValue}`,
+      ],
+    },
+  });
+  assert.equal(page.status, 200);
+  const dataUrl = extractHydrationHref(decodeBody(page.body as Uint8Array));
+  const token = tokenFromHydrationHref(dataUrl);
+  const write = htmlStore.writes[0];
+  assert.ok(write);
+
+  const persistedControlPlane = JSON.stringify({
+    key: write.key,
+    metadata: write.metadata,
+    tokenPayload: decodeTokenPayload(token),
+  });
+  assert.equal(persistedControlPlane.includes(sharedCookieValue), false);
+  assert.equal(persistedControlPlane.includes(pageOnlyCookieValue), false);
+  assert.equal(persistedControlPlane.includes(sidecarOnlyCookieValue), false);
+
+  const sidecar = await app.handle({
+    method: 'GET',
+    path: dataUrl,
+    headers: {
+      cookie: [
+        `shared=${sharedCookieValue}; tossed=${sidecarOnlyCookieValue}`,
+      ],
+    },
+  });
+  assert.equal(sidecar.status, 200);
+  assert.deepEqual(parseJsonBody(sidecar.body as Uint8Array), hydrationData);
+});
+
+test('FaceApp: custom sidecar requestVariant fails closed for mismatched cookie variants', async () => {
   const htmlStore = new RecordingHtmlStore();
   const cookieName = ['ft', 'variant'].join('_');
   const firstCookieValue = ['alpha', 'partition'].join('-');
@@ -509,6 +579,11 @@ test('FaceApp: sidecar reads fail closed for mismatched cookie variants', async 
       htmlStore,
       signingSecret: SIDECAR_SIGNING_SECRET,
       now: () => 4_000,
+      requestVariant: (request) => ({
+        cookies: {
+          [cookieName]: request.cookies[cookieName] ?? '',
+        },
+      }),
     },
   });
 

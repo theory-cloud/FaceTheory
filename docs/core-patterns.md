@@ -274,7 +274,9 @@ Why this is correct:
   the same prefix.
 - Sidecar reads verify a signed, expiring token and return JSON with `cache-control: no-store`. Rejected reads use a
   deterministic generic failure response rather than exposing token details.
-- The default variant binding is reconstructable from the page request and sidecar request by using cookies, while only
+- The default variant binding ignores arbitrary cookies, so path-scoped cookies or sibling-domain cookie tosses that
+  appear on only the HTML request or only the sidecar request do not break strict hydration availability. If the host
+  needs tenant/session binding, use `requestVariant` to allowlist only stable fields both requests reproduce. Only
   HMAC-derived digests are written to token claims, object keys, and metadata.
 - React, Vue, and Svelte strict SSR flows use the same app-level sidecar option; the public adapter factories do not
   need an adapter-specific sidecar API.
@@ -284,7 +286,8 @@ Optional controls:
 - Use `ttlSeconds`, `keyPrefix`, `dataUrlPrefix`, `scope`, and `now` when the deployment needs a different lifetime,
   store prefix, route prefix, token audience, or deterministic test clock.
 - Use `requestVariant` only for stable request inputs that the sidecar fetch can reproduce. Do not include hydration
-  body data, signing material, or values that are present during the page request but absent during the sidecar fetch.
+  body data, signing material, arbitrary cookie bags, or values that are present during the page request but absent
+  during the sidecar fetch.
 
 **INCORRECT**
 

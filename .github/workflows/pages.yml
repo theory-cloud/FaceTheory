@@ -7,16 +7,15 @@
 #   - release.yml / release-pr.yml ......... trigger on `main`
 #   - prerelease.yml / prerelease-pr.yml ... trigger on `premain`
 #   - theorycloud-facetheory-subtree-publish.yml .. triggers on `premain` AND `main`
-#   - pages.yml (this file) ................ triggers on `staging` ONLY
+#   - pages.yml (this file) ................ triggers on `main` ONLY
 #
-# Pages publish reflects what's on `staging` so docs iteration does not
-# have to walk the full staging -> premain -> main release flow before
-# users see updates. The GitHub Pages environment should be protected to
-# allow deployments from `staging` only, and the custom docs domain is
-# mounted at the domain root. Defensive `if:
-# github.ref == 'refs/heads/staging'` guards on every job make accidental
-# non-staging runs (e.g. via a manual workflow_dispatch from a feature
-# branch) a no-op.
+# Production Pages publication follows FaceTheory's documented release
+# funnel. Docs may iterate on `staging`, but the public custom-domain site
+# updates only after changes reach the release-gated `main` branch. The
+# custom docs domain is mounted at the domain root. Defensive `if:
+# github.ref == 'refs/heads/main'` guards on every job make accidental
+# non-main runs (e.g. via a manual workflow_dispatch from a feature branch)
+# a no-op.
 #
 # This workflow is independent of release.yml / prerelease.yml /
 # ci.yml — it never publishes packages, never mutates tags,
@@ -25,24 +24,22 @@
 name: pages
 
 on:
-  # Staging is the only branch that publishes the Pages site.
+  # Main is the only branch that publishes the production Pages site.
   push:
-    branches: [staging]
+    branches: [main]
   # Manual re-deploy (e.g. after rotating the Pages environment, or to
-  # republish after a docs-only fix that doesn't justify a new commit).
-  # Defensive `if:` guards still enforce staging-only at the job level.
+  # republish the current main docs after an infrastructure-only event).
+  # Defensive `if:` guards still enforce main-only at the job level.
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # Coalesce in-flight deploys: GitHub Actions keeps at most one running
 # and one pending run per concurrency group by default. With
 # `cancel-in-progress: false`, the running deploy finishes, but a newer
-# queued staging deploy replaces any older pending deploy. The site
-# therefore converges on the latest staging commit instead of publishing
+# queued main deploy replaces any older pending deploy. The site
+# therefore converges on the latest main commit instead of publishing
 # every intermediate commit.
 concurrency:
   group: pages
@@ -52,9 +49,11 @@ jobs:
   build:
     name: Build Jekyll site
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     # Belt-and-suspenders: even if someone invokes workflow_dispatch from
-    # a non-staging ref, the job no-ops rather than building stale content.
-    if: github.ref == 'refs/heads/staging'
+    # a non-main ref, the job no-ops rather than building stale content.
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -97,7 +96,11 @@ jobs:
     name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/staging'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: https://facetheory.theorycloud.ai/
