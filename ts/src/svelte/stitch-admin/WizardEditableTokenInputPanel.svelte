@@ -108,6 +108,27 @@
     return `Remove ${kind} ${token}`;
   }
 
+  function isReadOnly(current: WizardEditableTokenInput): boolean {
+    return current.readOnly === true || current.disabled === true;
+  }
+
+  function isTokenRemovable(
+    current: WizardEditableTokenInput,
+    index: number,
+  ): boolean {
+    if (
+      isReadOnly(current) ||
+      index < 0 ||
+      index >= current.value.length
+    ) {
+      return false;
+    }
+    const token = current.value[index];
+    if (token === undefined) return false;
+    const meta = metadataForToken(current, token);
+    return meta?.removable !== false && meta?.disabled !== true;
+  }
+
   function commitDraft(
     current: WizardEditableTokenInput,
     raw: string,
@@ -141,7 +162,7 @@
     index: number,
     change: (next: string[]) => void,
   ): void {
-    if (index < 0 || index >= current.value.length) return;
+    if (!isTokenRemovable(current, index)) return;
     change(current.value.slice(0, index).concat(current.value.slice(index + 1)));
   }
 
@@ -166,8 +187,11 @@
       draftValue === '' &&
       input.value.length > 0
     ) {
-      event.preventDefault();
-      removeAt(input, input.value.length - 1, onChange);
+      const lastTokenIndex = input.value.length - 1;
+      if (isTokenRemovable(input, lastTokenIndex)) {
+        event.preventDefault();
+        removeAt(input, lastTokenIndex, onChange);
+      }
     }
   }
 
@@ -177,7 +201,7 @@
     }
   }
 
-  $: readOnly = input.readOnly === true || input.disabled === true;
+  $: readOnly = isReadOnly(input);
   $: disabled = input.disabled === true;
   $: feedback = resolveFeedback(input);
   $: feedbackId = `${input.inputId}-feedback`;
@@ -252,7 +276,7 @@
       {#each input.value as token, index (token + '::' + index)}
         {@const meta = metadataForToken(input, token)}
         {@const tone = meta?.tone ?? 'neutral'}
-        {@const removable = !readOnly && meta?.removable !== false && meta?.disabled !== true}
+        {@const removable = isTokenRemovable(input, index)}
         <li
           class={`facetheory-stitch-wizard-editable-token-input-chip facetheory-stitch-wizard-editable-token-input-chip-tone-${tone}${meta?.disabled === true ? ' facetheory-stitch-wizard-editable-token-input-chip-disabled' : ''}`}
           data-token-value={token}

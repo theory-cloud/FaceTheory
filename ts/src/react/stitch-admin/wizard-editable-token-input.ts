@@ -158,6 +158,18 @@ function isReadOnly(input: WizardEditableTokenInput): boolean {
   return input.readOnly === true || input.disabled === true;
 }
 
+function isTokenRemovable(
+  input: WizardEditableTokenInput,
+  index: number,
+  readOnly = isReadOnly(input),
+): boolean {
+  if (readOnly || index < 0 || index >= input.value.length) return false;
+  const token = input.value[index];
+  if (token === undefined) return false;
+  const meta = metadataForToken(input, token);
+  return meta?.removable !== false && meta?.disabled !== true;
+}
+
 function commitDraft(
   input: WizardEditableTokenInput,
   raw: string,
@@ -195,7 +207,7 @@ function removeAt(
   index: number,
   onChange: WizardEditableTokenInputPanelProps['onChange'],
 ): void {
-  if (index < 0 || index >= input.value.length) return;
+  if (!isTokenRemovable(input, index)) return;
   const next = input.value.slice(0, index).concat(input.value.slice(index + 1));
   onChange(next);
 }
@@ -382,8 +394,7 @@ function renderChip(
   const meta = metadataForToken(input, token);
   const tone: WizardEditableTokenInputTone = meta?.tone ?? 'neutral';
   const palette = CHIP_PALETTE[tone];
-  const isRemovable =
-    !readOnly && meta?.removable !== false && meta?.disabled !== true;
+  const isRemovable = isTokenRemovable(input, index, readOnly);
   const removeLabel = deriveRemoveLabel(input, token);
 
   return h(
@@ -497,8 +508,11 @@ function renderInputRow(
           draftValue === '' &&
           input.value.length > 0
         ) {
-          event.preventDefault();
-          removeAt(input, input.value.length - 1, onChange);
+          const lastTokenIndex = input.value.length - 1;
+          if (isTokenRemovable(input, lastTokenIndex)) {
+            event.preventDefault();
+            removeAt(input, lastTokenIndex, onChange);
+          }
         }
       },
       className: 'facetheory-stitch-wizard-editable-token-input-input',

@@ -660,6 +660,73 @@ const VUE_BASE_INPUT: VueWizardInput = {
   safetyPolicy: 'no-secret-or-production-like-data',
 };
 
+interface VueKeyboardProbe {
+  key: string;
+  preventDefault: () => void;
+}
+
+interface VueKeydownProps {
+  onKeydown?: (event: VueKeyboardProbe) => void;
+}
+
+interface MinimalVueVNode {
+  type?: unknown;
+  props?: VueKeydownProps | Record<string, unknown> | null;
+  children?: unknown;
+}
+
+function renderVueWizardEditableTokenInputVNode(
+  input: VueWizardInput,
+  onChange: (next: string[]) => void,
+): MinimalVueVNode {
+  const component = VueWizardEditableTokenInputPanel as unknown as {
+    setup: (props: {
+      input: VueWizardInput;
+      onChange: (next: string[]) => void;
+    }) => () => MinimalVueVNode;
+  };
+  return component.setup({ input, onChange })();
+}
+
+function findVueElementByType(
+  node: unknown,
+  type: string,
+): MinimalVueVNode {
+  if (node !== null && typeof node === 'object') {
+    const vnode = node as MinimalVueVNode;
+    if (vnode.type === type) return vnode;
+    if (Array.isArray(vnode.children)) {
+      for (const child of vnode.children) {
+        try {
+          return findVueElementByType(child, type);
+        } catch (_err) {
+          // Keep scanning sibling subtrees.
+        }
+      }
+    }
+  }
+  throw new Error(`Unable to find Vue element of type ${type}`);
+}
+
+function dispatchVueBackspace(
+  input: VueWizardInput,
+): { changes: string[][]; prevented: boolean } {
+  const changes: string[][] = [];
+  let prevented = false;
+  const vnode = renderVueWizardEditableTokenInputVNode(input, (next) => {
+    changes.push(next);
+  });
+  const inputVNode = findVueElementByType(vnode, 'input');
+  const props = inputVNode.props as VueKeydownProps | undefined;
+  props?.onKeydown?.({
+    key: 'Backspace',
+    preventDefault: () => {
+      prevented = true;
+    },
+  });
+  return { changes, prevented };
+}
+
 test('vue stitch-admin: WizardEditableTokenInputPanel renders parity DOM with React adapter', async () => {
   const body = await renderSSR(
     h(VueWizardEditableTokenInputPanel, {
@@ -681,6 +748,28 @@ test('vue stitch-admin: WizardEditableTokenInputPanel renders parity DOM with Re
   // Label wired to input id and safety-policy footnote rendered.
   assert.ok(body.includes('for="vue-allowed-senders"'));
   assert.ok(body.includes('Safety policy: no-secret-or-production-like-data'));
+});
+
+test('vue stitch-admin: WizardEditableTokenInputPanel Backspace honours per-token removability metadata', () => {
+  const nonRemovable = dispatchVueBackspace({
+    ...VUE_BASE_INPUT,
+    value: ['qa@example.com', 'system@example.com'],
+    items: [{ value: 'system@example.com', removable: false }],
+  });
+  assert.deepEqual(nonRemovable.changes, []);
+  assert.equal(nonRemovable.prevented, false);
+
+  const disabled = dispatchVueBackspace({
+    ...VUE_BASE_INPUT,
+    value: ['qa@example.com', 'frozen@example.com'],
+    items: [{ value: 'frozen@example.com', disabled: true }],
+  });
+  assert.deepEqual(disabled.changes, []);
+  assert.equal(disabled.prevented, false);
+
+  const removable = dispatchVueBackspace(VUE_BASE_INPUT);
+  assert.deepEqual(removable.changes, [['qa@example.com']]);
+  assert.equal(removable.prevented, true);
 });
 
 test('vue stitch-admin: WizardEditableTokenInputPanel surfaces invalid+duplicate feedback with role=alert', async () => {

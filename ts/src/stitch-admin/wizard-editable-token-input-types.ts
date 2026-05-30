@@ -35,9 +35,10 @@ export type WizardEditableTokenInputTone =
 /**
  * Optional per-token metadata. Hosts supply this for tokens that need
  * non-default presentation (e.g. a different tone, a tooltip, a
- * non-removable system-defined entry). Tokens without an entry render
- * with default `neutral` tone and remain removable unless the wider input
- * is disabled or read-only.
+ * non-removable system-defined entry). Mouse and keyboard removal
+ * proposals both honor `removable: false` and `disabled: true`. Tokens
+ * without an entry render with default `neutral` tone and remain removable
+ * unless the wider input is disabled or read-only.
  */
 export interface WizardEditableTokenInputItem {
   /** Stable token string. Matches an entry in `value`. */
