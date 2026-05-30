@@ -74,8 +74,12 @@ export interface FaceSsrHydrationSidecarOptions
    * Request-derived variant binding used when writing a sidecar during the
    * HTML render and when reading it through the framework-owned resource
    * route. The callback must only use request fields that the sidecar fetch can
-   * reproduce; the default binds to cookies and stores only HMAC-derived
-   * digests in tokens and metadata.
+   * reproduce. The default ignores arbitrary cookies so path-scoped or
+   * attacker-tossed cookies that appear on only one of the HTML or sidecar
+   * requests cannot perturb strict hydration availability. If a deployment
+   * needs tenant/session binding, provide a custom callback that allowlists
+   * stable fields present on both requests. Only HMAC-derived digests are
+   * stored in tokens and metadata.
    */
   requestVariant?: FaceSsrHydrationSidecarVariantCallback;
 }
@@ -479,13 +483,9 @@ function ssrHydrationSidecarFailureResponse(): FaceResponse {
 }
 
 function defaultSsrHydrationSidecarRequestVariant(
-  request: Readonly<Required<FaceRequest>>,
+  _request: Readonly<Required<FaceRequest>>,
 ): SsrHydrationSidecarVariantInput {
-  const cookies: Record<string, string> = {};
-  for (const name of Object.keys(request.cookies).sort()) {
-    cookies[name] = request.cookies[name] ?? '';
-  }
-  return { cookies };
+  return { stableCookies: {} };
 }
 
 function normalizeRequest(req: FaceRequest): Required<FaceRequest> {

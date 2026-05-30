@@ -13,10 +13,10 @@
  *     and metadata. FaceTheory only renders the audit trail and the
  *     disclosure behavior.
  *   - Redaction marker rule: when an event carries `redactedMarker`, the
- *     primitive renders the marker as text and suppresses the event's
- *     `body`, `metadata`, and `externalLink`. The host must pre-redact
- *     anything else; the primitive does NOT inspect or transform raw
- *     secret values.
+ *     primitive renders only the timestamp, actor, marker text, and
+ *     status/tone pills. Event `title`, `icon`, `body`, `metadata`, and
+ *     `externalLink` are suppressed so raw secret-like caller values do
+ *     not enter the DOM.
  *   - External link rule: `externalLink.href` is filtered through the
  *     Stitch admin safe-href guard (`safeMetadataHref`). Only `http:` and
  *     `https:` URLs survive; everything else (e.g. `javascript:`) is
@@ -67,8 +67,8 @@ export interface AuditTrailEventExternalLink {
  *
  * When `redactedMarker` is set, the primitive renders ONLY the timestamp,
  * actor (if present), the marker text, and the status/tone pills.
- * `body`, `metadata`, and `externalLink` are suppressed regardless of
- * caller value to keep raw secret-like data out of the DOM.
+ * `title`, `icon`, `body`, `metadata`, and `externalLink` are suppressed
+ * regardless of caller value to keep raw secret-like data out of the DOM.
  */
 export interface AuditTrailEvent {
   /** Stable identifier used for keying. */
@@ -97,7 +97,8 @@ export interface AuditTrailEvent {
   status?: AuditTrailEventStatus;
   /**
    * When set, the primitive renders this marker text instead of the
-   * event body and suppresses `body`, `metadata`, and `externalLink`.
+   * event title/icon/body and suppresses `title`, `icon`, `body`,
+   * `metadata`, and `externalLink`.
    * The host owns the marker copy ("[redacted by policy]", "[redacted —
    * mailbox secret]", etc.). The primitive renders it verbatim.
    */

@@ -173,10 +173,12 @@
                         data-event-timestamp={event.timestamp}
                         datetime={event.timestamp}
                       >{event.timestamp}</time>
-                      {#if event.icon !== undefined}
+                      {#if !redacted && event.icon !== undefined}
                         <span class="facetheory-stitch-audit-event-icon" aria-hidden="true">{event.icon}</span>
                       {/if}
-                      <strong class="facetheory-stitch-audit-event-title">{event.title}</strong>
+                      {#if !redacted}
+                        <strong class="facetheory-stitch-audit-event-title">{event.title}</strong>
+                      {/if}
                       {#if event.status !== undefined}
                         <span
                           class={`facetheory-stitch-audit-event-status facetheory-stitch-audit-event-status-${event.status}`}

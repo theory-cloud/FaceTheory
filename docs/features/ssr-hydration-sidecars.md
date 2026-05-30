@@ -40,6 +40,15 @@ renderOptions: async (_ctx, data) => ({
 
 FaceTheory writes the exact render-time payload once before emitting a same-origin `/_facetheory/ssr-data/...` link. Route that prefix to the same Lambda / FaceApp handler as the HTML.
 
+The default sidecar request variant ignores arbitrary cookies. Browser Cookie
+`Path` scoping can legitimately make the HTML page request and the
+`/_facetheory/ssr-data/...` sidecar request carry different cookie sets, and a
+sibling-domain cookie toss can add cookies only to the sidecar path. The signed,
+expiring token still protects the stored payload. If a host needs additional
+tenant or session binding, configure `requestVariant` and allowlist only stable
+request fields that both requests can reproduce; do not hash the entire cookie
+bag by default.
+
 ## Static SSG sidecars
 
 For strict no-inline SSG, sidecars live under `/_facetheory/data/*` for S3 / CloudFront delivery. The SSG build writes the JSON sidecar when a strict-CSP SSG Face returns inline or Vite hydration that FaceTheory can externalize. If the Face already returns caller-managed external hydration, FaceTheory preserves that `dataUrl` and the host owns serving the matching JSON.

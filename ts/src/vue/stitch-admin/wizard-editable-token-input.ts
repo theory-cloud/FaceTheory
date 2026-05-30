@@ -117,6 +117,22 @@ function deriveRemoveLabel(
   return `Remove ${kind} ${token}`;
 }
 
+function isReadOnly(input: WizardEditableTokenInput): boolean {
+  return input.readOnly === true || input.disabled === true;
+}
+
+function isTokenRemovable(
+  input: WizardEditableTokenInput,
+  index: number,
+  readOnly = isReadOnly(input),
+): boolean {
+  if (readOnly || index < 0 || index >= input.value.length) return false;
+  const token = input.value[index];
+  if (token === undefined) return false;
+  const meta = metadataForToken(input, token);
+  return meta?.removable !== false && meta?.disabled !== true;
+}
+
 function commitDraft(
   input: WizardEditableTokenInput,
   raw: string,
@@ -147,7 +163,7 @@ function removeAt(
   index: number,
   onChange: (next: string[]) => void,
 ): void {
-  if (index < 0 || index >= input.value.length) return;
+  if (!isTokenRemovable(input, index)) return;
   onChange(input.value.slice(0, index).concat(input.value.slice(index + 1)));
 }
 
@@ -185,7 +201,7 @@ export const WizardEditableTokenInputPanel = defineComponent({
       const input = props.input;
       const onChange = props.onChange;
       const onDraftChange = props.onDraftChange;
-      const readOnly = input.readOnly === true || input.disabled === true;
+      const readOnly = isReadOnly(input);
       const disabled = input.disabled === true;
       const feedback = resolveFeedback(input);
       const feedbackId = `${input.inputId}-feedback`;
@@ -383,8 +399,7 @@ function renderChip(
   const meta = metadataForToken(input, token);
   const tone: WizardEditableTokenInputTone = meta?.tone ?? 'neutral';
   const palette = chipPalette[tone];
-  const isRemovable =
-    !readOnly && meta?.removable !== false && meta?.disabled !== true;
+  const isRemovable = isTokenRemovable(input, index, readOnly);
   const removeLabel = deriveRemoveLabel(input, token);
   return h(
     'li',
@@ -498,8 +513,11 @@ function renderInputRow(
           draftValue === '' &&
           input.value.length > 0
         ) {
-          event.preventDefault();
-          removeAt(input, input.value.length - 1, onChange);
+          const lastTokenIndex = input.value.length - 1;
+          if (isTokenRemovable(input, lastTokenIndex)) {
+            event.preventDefault();
+            removeAt(input, lastTokenIndex, onChange);
+          }
         }
       },
       class: 'facetheory-stitch-wizard-editable-token-input-input',

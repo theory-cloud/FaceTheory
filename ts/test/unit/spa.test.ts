@@ -98,6 +98,66 @@ test('spa helpers: parse external hydration metadata without inline data', () =>
   }
 });
 
+test('spa helpers: treats spoofed inline hydration markers as absent', async () => {
+  for (const marker of [
+    '<div id="__FACETHEORY_DATA__">{"page":"spoofed-div"}</div>',
+    '<script id="__FACETHEORY_DATA__" type="text/plain">{"page":"spoofed-type"}</script>',
+  ]) {
+    const html = `<!doctype html>
+      <html lang="en">
+        <head>
+          <title>External</title>
+          ${marker}
+          <link id="__FACETHEORY_DATA_URL__" rel="facetheory-hydration" href="/_facetheory/hydration/next.json" type="application/json">
+          <script src="/assets/entry-client.js" type="module"></script>
+        </head>
+        <body>
+          <main data-facetheory-view><h1>External Page</h1></main>
+        </body>
+      </html>`;
+    const dom = new JSDOM(html, { url: 'http://localhost/next' });
+
+    try {
+      assert.equal(readFaceHydrationData(dom.window.document), null);
+
+      const snapshot = parseFaceNavigationSnapshot(html, {
+        parser: new dom.window.DOMParser(),
+        url: 'http://localhost/next',
+        viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
+      });
+
+      assert.deepEqual(snapshot.hydration, {
+        type: 'external',
+        data: undefined,
+        dataUrl: '/_facetheory/hydration/next.json',
+        bootstrapModule: '/assets/entry-client.js',
+      });
+
+      const fetched: string[] = [];
+      const loaded = await loadFaceNavigationHydrationData(snapshot, {
+        allowedOrigin: 'http://localhost',
+        fetcher: async (input) => {
+          fetched.push(String(input));
+          return new Response(JSON.stringify({ page: 'external-next' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        },
+      });
+
+      assert.deepEqual(fetched, ['http://localhost/_facetheory/hydration/next.json']);
+      assert.deepEqual(loaded.hydration, {
+        type: 'external',
+        data: { page: 'external-next' },
+        dataUrl: '/_facetheory/hydration/next.json',
+        bootstrapModule: '/assets/entry-client.js',
+      });
+    } finally {
+      dom.window.close();
+    }
+  }
+});
+
 test('spa helpers: load external hydration data before module hydration', async () => {
   const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>', {
     url: 'http://localhost/',

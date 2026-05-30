@@ -537,7 +537,13 @@ function normalizeNow(now: () => number): number {
 }
 
 function normalizeObjectPrefix(prefix: string): string {
-  const trimmed = String(prefix ?? '').trim();
+  const raw = String(prefix ?? '');
+  if (containsAsciiControlCharacter(raw)) {
+    throw new TypeError(
+      'SSR hydration sidecar keyPrefix must be an object prefix',
+    );
+  }
+  const trimmed = raw.trim();
   const withoutOuterSlashes = trimOuterSlashes(trimmed);
   if (!withoutOuterSlashes) return '';
   if (
@@ -560,7 +566,13 @@ function normalizeObjectPrefix(prefix: string): string {
 }
 
 function normalizeDataUrlPrefix(prefix: string): string {
-  const trimmed = String(prefix ?? '').trim();
+  const raw = String(prefix ?? '');
+  if (containsAsciiControlCharacter(raw)) {
+    throw new TypeError(
+      'SSR hydration sidecar dataUrlPrefix must be a same-origin path prefix',
+    );
+  }
+  const trimmed = raw.trim();
   if (!trimmed) return DEFAULT_DATA_URL_PREFIX;
   if (trimmed.startsWith('//')) {
     throw new TypeError(
@@ -579,6 +591,14 @@ function normalizeDataUrlPrefix(prefix: string): string {
   const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
   const withoutTrailingSlash = trimTrailingSlashes(withLeadingSlash);
   return withoutTrailingSlash || '/';
+}
+
+function containsAsciiControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const charCode = value.charCodeAt(index);
+    if (charCode <= 0x1f || charCode === 0x7f) return true;
+  }
+  return false;
 }
 
 function normalizeToken(token: string): string {

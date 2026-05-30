@@ -23,7 +23,7 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
 ```bash
-export FACETHEORY_VERSION=3.4.3 # x-release-please-version
+export FACETHEORY_VERSION=3.4.4-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -243,7 +243,7 @@ low-level sidecar store:
 - `htmlStore`
 - `signingSecret`
 - optional `ttlSeconds`, `keyPrefix`, `dataUrlPrefix`, `scope`, and `now`
-- optional `requestVariant`
+- optional `requestVariant` for explicit stable tenant/session binding
 
 When an SSR Face returns `csp.inlineScripts === false` with inline/Vite
 hydration, FaceTheory writes the exact render-time hydration payload once,
@@ -252,6 +252,14 @@ replaces the document hydration marker with an external
 framework-owned resource route. The default data URL prefix is
 `/_facetheory/ssr-data`. That prefix must route to the same Lambda/FaceApp
 handler that returned the HTML.
+
+The default sidecar variant ignores arbitrary cookies. This keeps strict SSR
+hydration available when browser Cookie `Path` scoping or sibling-domain cookie
+tossing makes the HTML request and `/_facetheory/ssr-data/...` request carry
+different cookie sets. If a deployment needs tenant/session binding beyond the
+signed, expiring token, provide `requestVariant` and allowlist only request
+fields that the page request and sidecar request both reproduce; do not hash the
+entire cookie bag by default.
 
 ```ts
 import {
@@ -323,6 +331,8 @@ Reserved-prefix behavior:
   `cache-control: no-store`; invalid methods, malformed tokens, expired tokens,
   missing objects, wrong variants, and tampered bodies return a generic
   no-store failure response.
+- Wrong-variant rejection still applies for explicit `requestVariant` callbacks;
+  only the default no longer hashes every cookie.
 
 ### Store caller-managed SSR hydration sidecars
 
