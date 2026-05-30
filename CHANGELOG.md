@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.4.4](https://github.com/theory-cloud/FaceTheory/compare/v3.4.3...v3.4.4) (2026-05-30)
+
+
+### Bug Fixes
+
+* **client:** require JSON hydration script markers ([05b99b2](https://github.com/theory-cloud/FaceTheory/commit/05b99b2c5f7596618843a3f91c3b5a0db7406279))
+* **client:** require JSON hydration script markers for THE-1705 ([8437daf](https://github.com/theory-cloud/FaceTheory/commit/8437daf38323682ac41ef64cdb58590593b0b30e))
+* **deps:** align TableTheory v1.9.0 ([535c4ed](https://github.com/theory-cloud/FaceTheory/commit/535c4ed0545c89f18d763bd2f0251df4fbc111d3))
+* **deps:** align TableTheory v1.9.0 ([6a5a0ec](https://github.com/theory-cloud/FaceTheory/commit/6a5a0ec3a969231a7b817f954bb4928edf2f1771))
+* **pages:** gate production docs deploys on main ([0221de9](https://github.com/theory-cloud/FaceTheory/commit/0221de93ad36d0df9ebfbead73cb1040928fe900))
+* **pages:** gate production docs deploys on main ([1ed5c54](https://github.com/theory-cloud/FaceTheory/commit/1ed5c541349ef6a17399562024ddd73363034e38))
+* **pages:** pin Jekyll deps and scope deploy permissions ([2577a93](https://github.com/theory-cloud/FaceTheory/commit/2577a93fb1625d026af7188c7838fffa970af946))
+* **pages:** remediate THE-1744 Jekyll deploy permissions ([8612be5](https://github.com/theory-cloud/FaceTheory/commit/8612be5bd35722d74c152bf4d3c285491b552bd5))
+* **ssr-hydration:** reject control chars in sidecar prefixes (THE-1724) ([5f24e44](https://github.com/theory-cloud/FaceTheory/commit/5f24e442e96ca673aa1290be33ceedb1f189ed0e))
+* **ssr:** ignore arbitrary cookies in sidecar variants ([7a887d9](https://github.com/theory-cloud/FaceTheory/commit/7a887d951b4c7d2fcd4d463a095a34d0e00dcb0d))
+* **ssr:** ignore arbitrary cookies in sidecar variants ([54205b9](https://github.com/theory-cloud/FaceTheory/commit/54205b9d399310e41f48cfe70866c3843da36d60))
+* **stitch-admin:** block backspace removal of locked tokens ([9e4137a](https://github.com/theory-cloud/FaceTheory/commit/9e4137a86ef2ffb98606066d6232b20645e515f0))
+* **stitch-admin:** block backspace removal of locked tokens ([e46e3ae](https://github.com/theory-cloud/FaceTheory/commit/e46e3ae91fb90d368e968144bee0cfa19dfd8e72))
+* **stitch-admin:** suppress redacted audit title and icon ([1dd7d2d](https://github.com/theory-cloud/FaceTheory/commit/1dd7d2d3879c69d6f81bd77ac9bf9df5bb3b8a05))
+* **stitch-admin:** suppress redacted audit title and icon ([1318b0e](https://github.com/theory-cloud/FaceTheory/commit/1318b0ed483b8bb147037efd59111d7bd0244e5c))
+
 ## [3.4.4-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.4.3...v3.4.4-rc) (2026-05-30)
 
 
