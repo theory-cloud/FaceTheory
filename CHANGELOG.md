@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.0](https://github.com/theory-cloud/FaceTheory/compare/v3.4.4...v3.5.0) (2026-05-31)
+
+
+### Features
+
+* **spa:** add navigation pending browser helper ([547b18d](https://github.com/theory-cloud/FaceTheory/commit/547b18d85a73f97b7162f69024d2d8f7158730b2))
+
 ## [3.5.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.4.4-rc...v3.5.0-rc) (2026-05-31)
 
 
