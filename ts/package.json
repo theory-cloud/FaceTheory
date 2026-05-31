@@ -1,6 +1,6 @@
 {
   "name": "@theory-cloud/facetheory",
-  "version": "3.4.4",
+  "version": "3.5.0-rc",
   "description": "AWS-first SSR, SSG, and blocking ISR runtime for Node.js with React, Vue, and Svelte adapters.",
   "license": "Apache-2.0",
   "type": "module",
@@ -34,6 +34,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./spa": {
+      "types": "./dist/spa.d.ts",
+      "import": "./dist/spa.js"
+    },
+    "./oac-form": {
+      "types": "./dist/oac-form.d.ts",
+      "import": "./dist/oac-form.js"
+    },
+    "./navigation-pending": {
+      "types": "./dist/navigation-pending.d.ts",
+      "import": "./dist/navigation-pending.js"
     },
     "./client": {
       "types": "./dist/client/index.d.ts",

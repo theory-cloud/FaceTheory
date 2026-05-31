@@ -7,6 +7,8 @@ const HYDRATION_DATA_LINK_ID = '__FACETHEORY_DATA_URL__';
 const HYDRATION_DATA_LINK_REL = 'facetheory-hydration';
 const NAVIGATION_CACHE_BUST_PARAM = 'facetheory-nav';
 
+export const FACE_NAVIGATION_CLASSIFIER_SOURCE = 'facetheory_spa_navigation';
+
 export interface FaceNavigationSnapshot {
   url: string;
   title: string | null;
@@ -90,6 +92,17 @@ export interface StartFaceNavigationOptions
   shouldHandleUrl?: (url: URL, anchor: HTMLAnchorElement | null) => boolean;
   viewSelector?: string;
   window?: Window;
+}
+
+export interface ClassifyFaceNavigationAnchorClickOptions {
+  shouldHandleUrl?: (url: URL, anchor: HTMLAnchorElement | null) => boolean;
+  window?: Window;
+}
+
+export interface FaceNavigationAnchorClick {
+  anchor: HTMLAnchorElement;
+  classifierSource: typeof FACE_NAVIGATION_CLASSIFIER_SOURCE;
+  url: URL;
 }
 
 export interface FaceNavigationController {
@@ -464,18 +477,19 @@ export function startFaceNavigation(
   };
 
   const handleClick = (event: MouseEvent): void => {
-    const anchor = findAnchor(event.target);
-    if (!anchor) return;
-
-    const url = new URL(anchor.href, win.location.href);
-    if (!shouldHandleAnchorClick(event, anchor, url, win, options.shouldHandleUrl)) return;
+    const classifyOptions: ClassifyFaceNavigationAnchorClickOptions = { window: win };
+    if (options.shouldHandleUrl !== undefined) {
+      classifyOptions.shouldHandleUrl = options.shouldHandleUrl;
+    }
+    const navigation = classifyFaceNavigationAnchorClick(event, classifyOptions);
+    if (!navigation) return;
 
     event.preventDefault();
-    void navigateInternal(url, {
+    void navigateInternal(navigation.url, {
       source: 'link',
       updateHistory: true,
     }).catch((error) => {
-      reportError(error, 'link', url);
+      reportError(error, 'link', navigation.url);
     });
   };
 
@@ -704,7 +718,27 @@ function withNavigationCacheBust(specifier: string): string {
   return `${specifier}${delimiter}${NAVIGATION_CACHE_BUST_PARAM}=${Date.now()}`;
 }
 
-function shouldHandleAnchorClick(
+export function classifyFaceNavigationAnchorClick(
+  event: MouseEvent,
+  options: ClassifyFaceNavigationAnchorClickOptions = {},
+): FaceNavigationAnchorClick | null {
+  const win = options.window ?? (event.view as Window | null) ?? window;
+  const anchor = findFaceNavigationAnchor(event.target);
+  if (!anchor) return null;
+
+  const url = new URL(anchor.href, win.location.href);
+  if (!shouldHandleAnchorClick(event, anchor, url, win, options.shouldHandleUrl)) {
+    return null;
+  }
+
+  return {
+    anchor,
+    classifierSource: FACE_NAVIGATION_CLASSIFIER_SOURCE,
+    url,
+  };
+}
+
+export function shouldHandleAnchorClick(
   event: MouseEvent,
   anchor: HTMLAnchorElement,
   url: URL,
@@ -726,7 +760,9 @@ function shouldHandleAnchorClick(
   return true;
 }
 
-function findAnchor(target: EventTarget | null): HTMLAnchorElement | null {
+export function findFaceNavigationAnchor(
+  target: EventTarget | null,
+): HTMLAnchorElement | null {
   let current = target as (Node & Partial<Element> & { href?: string }) | null;
   while (current) {
     if (

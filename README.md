@@ -51,12 +51,12 @@ FaceTheory is the **client-delivery layer** of the Theory Cloud stack. It render
 
 FaceTheory is pre-1.0 and under active development. The runtime covers SSR, SSG, and blocking ISR with adapter support for React, Vue, and Svelte. First production use is underway at [Pay Theory](https://paytheory.com) (checkout page). See [CHANGELOG](CHANGELOG.md) for release history.
 
-## Install v3.4.4 <!-- x-release-please-version -->
+## Install v3.5.0-rc <!-- x-release-please-version -->
 
 Install the exact GitHub release tarball:
 
 ```bash
-export FACETHEORY_VERSION=3.4.4 # x-release-please-version
+export FACETHEORY_VERSION=3.5.0-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -105,7 +105,7 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
-The `v3.4.4` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+The `v3.5.0-rc` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
 
 ## At a glance
 
