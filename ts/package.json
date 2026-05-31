@@ -35,6 +35,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./spa": {
+      "types": "./dist/spa.d.ts",
+      "import": "./dist/spa.js"
+    },
+    "./oac-form": {
+      "types": "./dist/oac-form.d.ts",
+      "import": "./dist/oac-form.js"
+    },
+    "./navigation-pending": {
+      "types": "./dist/navigation-pending.d.ts",
+      "import": "./dist/navigation-pending.js"
+    },
     "./client": {
       "types": "./dist/client/index.d.ts",
       "import": "./dist/client/index.js"
