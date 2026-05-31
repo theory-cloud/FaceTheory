@@ -1,6 +1,6 @@
 {
   "name": "@theory-cloud/facetheory",
-  "version": "3.5.0-rc",
+  "version": "3.5.0",
   "description": "AWS-first SSR, SSG, and blocking ISR runtime for Node.js with React, Vue, and Svelte adapters.",
   "license": "Apache-2.0",
   "type": "module",
@@ -46,6 +46,10 @@
     "./navigation-pending": {
       "types": "./dist/navigation-pending.d.ts",
       "import": "./dist/navigation-pending.js"
+    },
+    "./responsive-primitives": {
+      "types": "./dist/responsive-primitives/index.d.ts",
+      "import": "./dist/responsive-primitives/index.js"
     },
     "./client": {
       "types": "./dist/client/index.d.ts",
@@ -103,9 +107,17 @@
       "types": "./dist/react/stitch-admin/index.d.ts",
       "import": "./dist/react/stitch-admin/index.js"
     },
+    "./react/responsive-primitives": {
+      "types": "./dist/react/responsive-primitives/index.d.ts",
+      "import": "./dist/react/responsive-primitives/index.js"
+    },
     "./vue": {
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue/index.js"
+    },
+    "./vue/responsive-primitives": {
+      "types": "./dist/vue/responsive-primitives/index.d.ts",
+      "import": "./dist/vue/responsive-primitives/index.js"
     },
     "./vue/stitch-shell": {
       "types": "./dist/vue/stitch-shell/index.d.ts",
@@ -122,6 +134,11 @@
     "./svelte": {
       "types": "./dist/svelte/index.d.ts",
       "import": "./dist/svelte/index.js"
+    },
+    "./svelte/responsive-primitives": {
+      "types": "./dist/svelte/responsive-primitives/index.d.ts",
+      "svelte": "./dist/svelte/responsive-primitives/index.js",
+      "import": "./dist/svelte/responsive-primitives/index.js"
     },
     "./svelte/stitch-shell": {
       "types": "./dist/svelte/stitch-shell/index.d.ts",
@@ -200,6 +217,9 @@
     "example:vite:svelte:library:serve": "tsx examples/vite-ssr-svelte-library/node-server.ts",
     "example:operator-visibility:build": "tsx examples/operator-visibility-react/build.ts",
     "example:operator-visibility:serve": "tsx examples/operator-visibility-react/node-server.ts",
+    "example:responsive:react": "tsx examples/responsive-primitives-react/render.ts",
+    "example:responsive:vue": "tsx examples/responsive-primitives-vue/render.ts",
+    "example:responsive:svelte": "tsx examples/responsive-primitives-svelte/render.ts",
     "example:vite:svelte:strict-csp:build": "vite build --config examples/vite-strict-csp-svelte/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-strict-csp-svelte/vite.config.ts",
     "example:vite:svelte:strict-csp:serve": "tsx examples/vite-strict-csp-svelte/node-server.ts"
   },

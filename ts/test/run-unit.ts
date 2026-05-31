@@ -9,6 +9,7 @@ await import('./unit/ssr-hydration.test.js');
 await import('./unit/ops.test.js');
 await import('./unit/oac-form.test.js');
 await import('./unit/navigation-pending.test.js');
+await import('./unit/responsive-primitives.test.js');
 await import('./unit/strict-csp-harness.test.js');
 await import('./unit/lambda-url.test.js');
 await import('./unit/aws-s3.test.js');
