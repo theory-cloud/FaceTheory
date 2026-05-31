@@ -1,0 +1,22 @@
+.facetheory-navigation-pending-pill {
+  align-items: center;
+  background: #10233f;
+  border: 1px solid #87a7d9;
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font: 600 0.875rem/1.4 system-ui, sans-serif;
+  gap: 0.4rem;
+  inset: auto 1rem 1rem auto;
+  padding: 0.45rem 0.75rem;
+  position: fixed;
+  z-index: 1000;
+}
+
+.facetheory-navigation-pending-control {
+  cursor: progress;
+}
+
+.facetheory-navigation-pending--reduced-motion {
+  animation: none;
+}
