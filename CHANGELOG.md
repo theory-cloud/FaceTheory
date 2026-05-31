@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.6.0](https://github.com/theory-cloud/FaceTheory/compare/v3.5.0...v3.6.0) (2026-05-31)
+
+
+### Features
+
+* **responsive-primitives:** add control plane primitive parity ([c3bcac8](https://github.com/theory-cloud/FaceTheory/commit/c3bcac8a9f7a15b3f863212405b01de365c8ca52))
+* **responsive-primitives:** add control plane primitive parity ([4119839](https://github.com/theory-cloud/FaceTheory/commit/4119839623ec3ebe152f5f6e46cb5b591b06484f))
+
 ## [3.6.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.5.0...v3.6.0-rc) (2026-05-31)
 
 
