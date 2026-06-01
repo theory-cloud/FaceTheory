@@ -119,17 +119,44 @@ test('react adapter: strict CSP streaming buffers safe all-ready output', async 
   assert.ok(!html.includes('id="__FACETHEORY_DATA__"'));
 });
 
-test('react adapter: strict CSP rejects shell streaming strategy', async () => {
+test('react adapter: strict CSP allows shell streaming with external styles only', async () => {
+  const out = await renderReactStream(
+    baseCtx,
+    React.createElement('main', null, 'Safe shell'),
+    {
+      csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+      styleStrategy: 'shell',
+    },
+  );
+
+  assert.notEqual(typeof out.html, 'string');
+  const html = await collect(out.html as FaceBody);
+  assert.ok(html.includes('<main>Safe shell</main>'));
+});
+
+test('react adapter: strict CSP rejects shell streaming with finalize-time inline style integrations', async () => {
   await assert.rejects(
     () =>
       renderReactStream(
         baseCtx,
-        React.createElement('main', null, 'Unsafe shell'),
+        React.createElement('main', null, 'Unsafe shell styles'),
         {
-          csp: { inlineScripts: false },
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
           styleStrategy: 'shell',
+          integrations: [
+            {
+              name: 'inline-style-finalizer',
+              finalize: (out) => ({
+                ...out,
+                styleTags: [
+                  ...(out.styleTags ?? []),
+                  { cssText: '.unsafe{color:red}' },
+                ],
+              }),
+            },
+          ],
         },
       ),
-    /React adapter strict CSP streaming requires styleStrategy "all-ready"/,
+    /strict CSP shell streaming requires external styles/,
   );
 });

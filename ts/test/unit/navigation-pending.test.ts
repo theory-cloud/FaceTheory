@@ -7,6 +7,7 @@ import {
   DEFAULT_NAVIGATION_PENDING_INDICATOR_ID,
   NAVIGATION_PENDING_ATTRIBUTE,
   NAVIGATION_PENDING_CLASSIFIER_SOURCE,
+  NAVIGATION_PENDING_INDICATOR_ATTRIBUTE,
   NAVIGATION_PENDING_REDUCED_MOTION_ATTRIBUTE,
   startNavigationPending,
 } from '../../src/navigation-pending.js';
@@ -129,6 +130,63 @@ test('navigation pending: shows an immediate status pill for accepted same-origi
 
     controller.stop();
   } finally {
+    dom.window.close();
+  }
+});
+
+test('navigation pending: never reuses a non-indicator element on id collision', () => {
+  const dom = new JSDOM(
+    `<!doctype html><body>
+      <script id="${DEFAULT_NAVIGATION_PENDING_INDICATOR_ID}" type="module"></script>
+      <a id="next" href="/next">Next</a>
+    </body>`,
+    { url: 'https://control.lab.theorymcp.ai/current' },
+  );
+
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (message?: unknown) => {
+    warnings.push(String(message ?? ''));
+  };
+
+  try {
+    const win = dom.window as unknown as DomWindow;
+    const doc = dom.window.document;
+    const anchor = doc.querySelector('a');
+    assert.ok(anchor instanceof dom.window.HTMLAnchorElement);
+
+    const controller = startNavigationPending({ document: doc, window: win });
+    anchor.dispatchEvent(click(win));
+
+    const collided = doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID);
+    assert.ok(collided instanceof dom.window.HTMLScriptElement);
+    assert.equal(collided.textContent, '');
+    assert.equal(
+      collided.hasAttribute(NAVIGATION_PENDING_INDICATOR_ATTRIBUTE),
+      false,
+    );
+
+    const indicator = doc.getElementById(
+      `${DEFAULT_NAVIGATION_PENDING_INDICATOR_ID}-1`,
+    );
+    assert.ok(indicator instanceof dom.window.HTMLDivElement);
+    assert.equal(indicator.textContent, 'Loading…');
+    assert.equal(
+      indicator.getAttribute(NAVIGATION_PENDING_INDICATOR_ATTRIBUTE),
+      'true',
+    );
+    assert.equal(indicator.getAttribute(NAVIGATION_PENDING_ATTRIBUTE), 'link');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0] ?? '', /already belongs to a non-indicator element/);
+
+    controller.stop();
+    assert.equal(
+      doc.getElementById(`${DEFAULT_NAVIGATION_PENDING_INDICATOR_ID}-1`),
+      null,
+    );
+    assert.ok(doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID));
+  } finally {
+    console.warn = originalWarn;
     dom.window.close();
   }
 });
