@@ -195,6 +195,9 @@ async function renderReactStreamInternal(
     adapterName: 'React adapter',
     policy: options.csp,
     styleStrategy,
+    hasFinalizeInlineStyleIntegration: integrations.some(
+      ({ integration }) => typeof integration.finalize === 'function',
+    ),
   });
   const startedAt = Date.now();
   const requestId =

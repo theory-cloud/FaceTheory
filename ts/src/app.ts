@@ -17,6 +17,7 @@ import {
 } from './isr.js';
 import { logLevelForStatus, type FaceObservabilityHooks } from './ops.js';
 import {
+  buildStrictCspHeader,
   requiresStrictCspDocumentValidation,
   validateStrictCspDocument,
 } from './security.js';
@@ -726,6 +727,7 @@ async function toHTTPResponse(
   if (!headers['content-type']) {
     headers['content-type'] = [HTML_CONTENT_TYPE];
   }
+  applyStrictCspResponseHeader(headers, out.csp, req.cspNonce);
 
   const head = renderFaceHead(out, { cspNonce: req.cspNonce });
   const documentParts = withDocumentShell(out);
@@ -748,6 +750,17 @@ async function toHTTPResponse(
   }
 
   if (requiresStrictCspDocumentValidation(out.csp)) {
+    if (canStreamStrictCspWithNonce(out.csp, req.cspNonce)) {
+      validateStrictCspHead(head, out.csp);
+      const body = streamHTMLDocument({
+        ...documentParts,
+        head,
+        body: await preflightStream(out.html),
+      });
+
+      return { status, headers, cookies, body, isBase64: false };
+    }
+
     const strictBody = await collectStreamAsUtf8Text(
       out.html,
       strictCspMaxStreamingBodyBytes,
@@ -775,6 +788,33 @@ async function toHTTPResponse(
   });
 
   return { status, headers, cookies, body, isBase64: false };
+}
+
+function applyStrictCspResponseHeader(
+  headers: Headers,
+  policy: FaceRenderResult['csp'],
+  cspNonce: string | null,
+): void {
+  if (!requiresStrictCspDocumentValidation(policy)) return;
+  if (headers['content-security-policy']?.length) return;
+  headers['content-security-policy'] = [buildStrictCspHeader({ cspNonce })];
+}
+
+function canStreamStrictCspWithNonce(
+  policy: FaceRenderResult['csp'],
+  cspNonce: string | null,
+): boolean {
+  return (
+    policy?.inlineScripts === false && Boolean(String(cspNonce ?? '').trim())
+  );
+}
+
+function validateStrictCspHead(
+  head: string,
+  policy: FaceRenderResult['csp'],
+): void {
+  const headOnlyDocument = renderHTMLDocument({ head, body: '' });
+  validateStrictCspDocument(headOnlyDocument, { policy });
 }
 
 async function collectStreamAsUtf8Text(
