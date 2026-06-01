@@ -37,7 +37,69 @@ async function collectBodyChunks(
 }
 
 function extractScriptTags(html: string): string[] {
-  return html.match(/<script\b[\s\S]*?<\/script>/gi) ?? [];
+  const tags: string[] = [];
+  const lower = html.toLowerCase();
+  let cursor = 0;
+
+  for (;;) {
+    const start = lower.indexOf('<script', cursor);
+    if (start === -1) break;
+    const nameEnd = start + '<script'.length;
+    if (!isHtmlTagBoundary(lower, nameEnd)) {
+      cursor = nameEnd;
+      continue;
+    }
+
+    const startTagEnd = findHtmlTagEnd(html, nameEnd);
+    if (startTagEnd === -1) break;
+    const endStart = findScriptEndTagStart(lower, startTagEnd + 1);
+    if (endStart === -1) break;
+    const endTagEnd = findHtmlTagEnd(html, endStart + '</script'.length);
+    if (endTagEnd === -1) break;
+
+    tags.push(html.slice(start, endTagEnd + 1));
+    cursor = endTagEnd + 1;
+  }
+
+  return tags;
+}
+
+function findScriptEndTagStart(lowerHtml: string, from: number): number {
+  let cursor = from;
+  for (;;) {
+    const start = lowerHtml.indexOf('</script', cursor);
+    if (start === -1) return -1;
+    const nameEnd = start + '</script'.length;
+    if (isHtmlTagBoundary(lowerHtml, nameEnd)) return start;
+    cursor = nameEnd;
+  }
+}
+
+function findHtmlTagEnd(html: string, from: number): number {
+  let quote: '"' | "'" | null = null;
+  for (let index = from; index < html.length; index += 1) {
+    const char = html[index];
+    if (quote) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === '>') return index;
+  }
+  return -1;
+}
+
+function isHtmlTagBoundary(html: string, index: number): boolean {
+  if (index >= html.length) return false;
+  const code = html.charCodeAt(index);
+  return code === 47 || code === 62 || isHtmlWhitespace(code);
+}
+
+function isHtmlWhitespace(code: number): boolean {
+  return code === 9 || code === 10 || code === 12 || code === 13 || code === 32;
 }
 
 function extractHydrationHref(html: string): string {
