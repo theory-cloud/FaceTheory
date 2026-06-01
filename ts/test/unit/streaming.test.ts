@@ -13,10 +13,40 @@ import {
   DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES,
 } from '../../src/app.js';
 import { createReactStreamFace } from '../../src/adapters/react.js';
+import { InMemoryHtmlStore } from '../../src/isr.js';
 import { createAntdEmotionTokenIntegration } from '../../src/react/antd-emotion.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
 import { createEmotionIntegration } from '../../src/react/emotion.js';
 import type { FaceBody } from '../../src/types.js';
+
+async function collectBodyChunks(
+  body: FaceBody,
+): Promise<{ chunks: string[]; full: string }> {
+  const decoder = new TextDecoder();
+  if (body instanceof Uint8Array) {
+    const full = decoder.decode(body);
+    return { chunks: [full], full };
+  }
+
+  const chunks: string[] = [];
+  for await (const chunk of body) {
+    chunks.push(decoder.decode(chunk, { stream: true }));
+  }
+  chunks.push(decoder.decode());
+  return { chunks, full: chunks.join('') };
+}
+
+function extractScriptTags(html: string): string[] {
+  return html.match(/<script\b[\s\S]*?<\/script>/gi) ?? [];
+}
+
+function extractHydrationHref(html: string): string {
+  const tag = /<link\b[^>]*rel="facetheory-hydration"[^>]*>/i.exec(html)?.[0];
+  assert.ok(tag, 'expected FaceTheory hydration link');
+  const href = /\bhref="([^"]+)"/i.exec(tag)?.[1];
+  assert.ok(href, 'expected FaceTheory hydration href');
+  return href;
+}
 
 async function collectBody(body: FaceBody): Promise<Uint8Array> {
   if (body instanceof Uint8Array) return body;
@@ -436,6 +466,150 @@ test('FaceApp: strict CSP streaming violations fail before bytes flush', async (
   assert.ok(full.includes('<h1>Internal Server Error</h1>'));
   assert.equal(full.includes('first chunk'), false);
   assert.equal(full.includes('onclick'), false);
+});
+
+test('FaceApp: strict React stream externalizes hydration sidecar and keeps bootstrap module external', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const app = createFaceApp({
+    ssrHydrationSidecars: {
+      htmlStore,
+      signingSecret: 'strict streaming sidecar signing secret',
+      now: () => 123_000,
+    },
+    faces: [
+      createReactStreamFace({
+        route: '/',
+        mode: 'ssr',
+        render: () =>
+          React.createElement('main', null, 'Strict stream sidecar'),
+        renderOptions: {
+          styleStrategy: 'shell',
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          hydration: {
+            data: { page: 'strict-stream-sidecar' },
+            bootstrapModule: '/assets/strict-stream-entry.js',
+          },
+        },
+      }),
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/',
+    cspNonce: 'nonce-sidecar-stream',
+  });
+  assert.equal(resp.status, 200);
+  assert.ok(!(resp.body instanceof Uint8Array));
+
+  const { full } = await collectBodyChunks(resp.body);
+  assert.ok(full.includes('Strict stream sidecar'));
+  assert.ok(full.includes('id="__FACETHEORY_DATA_URL__"'));
+  assert.ok(full.includes('rel="facetheory-hydration"'));
+  assert.ok(
+    full.includes(
+      '<script nonce="nonce-sidecar-stream" src="/assets/strict-stream-entry.js" type="module"></script>',
+    ),
+  );
+  assert.equal(full.includes('id="__FACETHEORY_DATA__"'), false);
+
+  const dataUrl = extractHydrationHref(full);
+  const sidecarResp = await app.handle({
+    method: 'GET',
+    path: dataUrl,
+    cspNonce: 'nonce-sidecar-resource',
+  });
+  assert.equal(sidecarResp.status, 200);
+  assert.ok(sidecarResp.body instanceof Uint8Array);
+  assert.deepEqual(JSON.parse(new TextDecoder().decode(sidecarResp.body)), {
+    page: 'strict-stream-sidecar',
+  });
+});
+
+test('react adapter: React 19 shell stream nonces bootstrap and Suspense reveal scripts', async () => {
+  const nonce = 'nonce-react19-midstream';
+  const LazyPanel = React.lazy(async () => {
+    await delay(40);
+    return {
+      default: function LazyPanelComponent() {
+        return React.createElement('section', null, 'Late control-plane data');
+      },
+    };
+  });
+
+  const app = createFaceApp({
+    faces: [
+      createReactStreamFace({
+        route: '/',
+        mode: 'ssr',
+        render: () =>
+          React.createElement(
+            'main',
+            null,
+            React.createElement('h1', null, 'Control plane shell'),
+            React.createElement(
+              React.Suspense,
+              { fallback: React.createElement('p', null, 'Loading data') },
+              React.createElement(LazyPanel),
+            ),
+          ),
+        renderOptions: {
+          styleStrategy: 'shell',
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          hydration: {
+            type: 'external',
+            data: { page: 'control-plane-stream' },
+            dataUrl: '/_facetheory/hydration/control-plane-stream.json',
+            bootstrapModule: '/assets/control-plane-entry.js',
+          },
+        },
+      }),
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/', cspNonce: nonce });
+  assert.equal(resp.status, 200);
+  assert.ok(!(resp.body instanceof Uint8Array));
+
+  const { chunks, full } = await collectBodyChunks(resp.body);
+  assert.ok(
+    chunks.length >= 4,
+    `expected streamed chunks, received ${String(chunks.length)}`,
+  );
+  assert.ok(full.includes('Control plane shell'));
+  assert.ok(full.includes('Loading data'));
+  assert.ok(full.includes('Late control-plane data'));
+
+  const scriptTags = extractScriptTags(full);
+  assert.ok(scriptTags.length >= 3, scriptTags.join('\n'));
+  assert.ok(
+    scriptTags.some((tag) =>
+      tag.includes('src="/assets/control-plane-entry.js"'),
+    ),
+    scriptTags.join('\n'),
+  );
+  assert.ok(
+    scriptTags.some((tag) => tag.includes('$RT=performance.now()')),
+    scriptTags.join('\n'),
+  );
+  assert.ok(
+    scriptTags.some((tag) => tag.includes('$RC(')),
+    scriptTags.join('\n'),
+  );
+
+  for (const tag of scriptTags) {
+    assert.ok(tag.includes(`nonce="${nonce}"`), tag);
+  }
+
+  const reactScriptChunks = chunks.filter(
+    (chunk) =>
+      chunk.includes('<script') &&
+      (chunk.includes('$RT=') || chunk.includes('$RC(')),
+  );
+  assert.ok(reactScriptChunks.length >= 2, reactScriptChunks.join('\n'));
+  assert.ok(
+    reactScriptChunks.every((chunk) => chunk.includes(`nonce="${nonce}"`)),
+  );
 });
 
 test('react adapter: streaming includes AntD + Emotion styles in head before body', async () => {
