@@ -65,13 +65,15 @@ export function enforceReactStrictCspStreamingOptions(options: {
   adapterName: string;
   policy?: FaceCspPolicy | undefined;
   styleStrategy: 'all-ready' | 'shell';
+  hasFinalizeInlineStyleIntegration?: boolean;
 }): void {
   if (options.policy?.inlineScripts !== false) return;
   if (options.styleStrategy !== 'shell') return;
+  if (options.hasFinalizeInlineStyleIntegration !== true) return;
 
   const adapterName = normalizeAdapterName(options.adapterName);
   throw new Error(
-    `FaceTheory ${adapterName} strict CSP streaming requires styleStrategy "all-ready"`,
+    `FaceTheory ${adapterName} strict CSP shell streaming requires external styles; finalize-time inline style integrations must use styleStrategy "all-ready"`,
   );
 }
 
