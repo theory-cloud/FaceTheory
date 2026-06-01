@@ -225,7 +225,8 @@
     "example:responsive:vue": "tsx examples/responsive-primitives-vue/render.ts",
     "example:responsive:svelte": "tsx examples/responsive-primitives-svelte/render.ts",
     "example:vite:svelte:strict-csp:build": "vite build --config examples/vite-strict-csp-svelte/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-strict-csp-svelte/vite.config.ts",
-    "example:vite:svelte:strict-csp:serve": "tsx examples/vite-strict-csp-svelte/node-server.ts"
+    "example:vite:svelte:strict-csp:serve": "tsx examples/vite-strict-csp-svelte/node-server.ts",
+    "guardrail:control-plane": "tsx test/unit/control-plane-guardrails.test.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",
