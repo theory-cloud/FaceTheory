@@ -1,6 +1,6 @@
 {
   "name": "@theory-cloud/facetheory",
-  "version": "3.6.0",
+  "version": "3.7.0-rc",
   "description": "AWS-first SSR, SSG, and blocking ISR runtime for Node.js with React, Vue, and Svelte adapters.",
   "license": "Apache-2.0",
   "type": "module",
@@ -46,6 +46,10 @@
     "./navigation-pending": {
       "types": "./dist/navigation-pending.d.ts",
       "import": "./dist/navigation-pending.js"
+    },
+    "./control-plane": {
+      "types": "./dist/control-plane.d.ts",
+      "import": "./dist/control-plane.js"
     },
     "./responsive-primitives": {
       "types": "./dist/responsive-primitives/index.d.ts",
@@ -221,7 +225,12 @@
     "example:responsive:vue": "tsx examples/responsive-primitives-vue/render.ts",
     "example:responsive:svelte": "tsx examples/responsive-primitives-svelte/render.ts",
     "example:vite:svelte:strict-csp:build": "vite build --config examples/vite-strict-csp-svelte/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-strict-csp-svelte/vite.config.ts",
-    "example:vite:svelte:strict-csp:serve": "tsx examples/vite-strict-csp-svelte/node-server.ts"
+    "example:vite:svelte:strict-csp:serve": "tsx examples/vite-strict-csp-svelte/node-server.ts",
+    "guardrail:control-plane": "tsx test/unit/control-plane-guardrails.test.ts",
+    "example:control-plane:client-fill:relaxed": "tsx examples/control-plane-preset/render.ts --mode=relaxed --delivery=client-fill",
+    "example:control-plane:client-fill:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=client-fill",
+    "example:control-plane:streaming:relaxed": "tsx examples/control-plane-preset/render.ts --mode=relaxed --delivery=streaming",
+    "example:control-plane:streaming:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=streaming"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",

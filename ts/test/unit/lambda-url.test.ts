@@ -87,6 +87,7 @@ test('lambdaUrlEventToFaceRequest: maps Lambda URL event shape deterministically
   });
   assert.equal(new TextDecoder().decode(request.body), 'hello world');
   assert.equal(request.isBase64, true);
+  assert.match(request.cspNonce ?? '', /^[A-Za-z0-9+/]+={0,2}$/);
 });
 
 test('faceResponseToLambdaUrlResult: preserves set-cookie as separate values', async () => {
@@ -338,4 +339,80 @@ test('createLambdaUrlStreamingHandler: applies headers once before streaming byt
   const firstChunk = new TextDecoder().decode(chunks[0]);
   assert.ok(firstChunk.startsWith('<!doctype html>'));
   assert.ok(firstChunk.includes('</head><body>'));
+});
+
+test('createLambdaUrlStreamingHandler: writes strict CSP nonce metadata before streaming bytes', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          hydration: {
+            type: 'external',
+            data: { lambda: 'strict-stream' },
+            dataUrl: '/_facetheory/hydration/lambda-strict-stream.json',
+            bootstrapModule: '/assets/lambda-strict-stream.js',
+          },
+          html: streamFromString('<main>strict lambda stream</main>'),
+        }),
+      },
+    ],
+  });
+
+  const events: string[] = [];
+  const chunks: Uint8Array[] = [];
+  let metadata: LambdaUrlResponseMetadata | null = null;
+
+  const rawStream: LambdaWritableStream = {
+    write: (chunk) => {
+      events.push('chunk');
+      chunks.push(typeof chunk === 'string' ? utf8(chunk) : chunk);
+    },
+    end: () => {
+      events.push('end');
+    },
+  };
+
+  const awslambda: AwsLambdaGlobalLike = {
+    streamifyResponse: (impl) => {
+      return async (event, context) => {
+        await impl(event, rawStream, context);
+      };
+    },
+    HttpResponseStream: {
+      from: (stream, nextMetadata) => {
+        metadata = nextMetadata;
+        events.push('head');
+        return stream;
+      },
+    },
+  };
+
+  const handler = createLambdaUrlStreamingHandler({ app, awslambda });
+  await handler(
+    {
+      rawPath: '/',
+      requestContext: { http: { method: 'GET' }, requestId: 'req-strict' },
+    },
+    {},
+  );
+
+  assert.equal(events[0], 'head');
+  assert.ok(chunks.length > 0);
+  const writtenMetadata = metadata as LambdaUrlResponseMetadata | null;
+  assert.ok(writtenMetadata);
+  const csp = writtenMetadata.headers?.['content-security-policy'] ?? '';
+  const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
+  assert.ok(nonce, csp);
+  assert.equal(
+    writtenMetadata.headers?.['content-type'],
+    'text/html; charset=utf-8',
+  );
+
+  const firstChunk = new TextDecoder().decode(chunks[0]);
+  assert.ok(firstChunk.startsWith('<!doctype html>'));
+  assert.ok(firstChunk.includes(`nonce="${nonce}"`), firstChunk);
+  assert.ok(firstChunk.includes('src="/assets/lambda-strict-stream.js"'));
 });
