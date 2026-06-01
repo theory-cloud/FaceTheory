@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.7.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.6.0...v3.7.0-rc) (2026-06-01)
+
+
+### Features
+
+* **control-plane:** add mode-aware delivery preset ([665b2bc](https://github.com/theory-cloud/FaceTheory/commit/665b2bc3aaaa985d1bf21c3c699fed9481c62597))
+* **control-plane:** add mode-aware preset factory ([032968e](https://github.com/theory-cloud/FaceTheory/commit/032968ef475b7d9a08d5fbd32af00126f076706d))
+* **csp:** enable strict CSP shell streaming ([a3c70d1](https://github.com/theory-cloud/FaceTheory/commit/a3c70d109adf9be340de4e9240e413dc9f44d5a5))
+* **csp:** stream strict CSP responses with request nonces ([5948cd4](https://github.com/theory-cloud/FaceTheory/commit/5948cd4253ec6780960b0836f41ad3e1384d94bb))
+* **examples:** add control-plane preset reference app ([0e69a41](https://github.com/theory-cloud/FaceTheory/commit/0e69a41e3e8a177660bc97abc5c2a68e282b8254))
+
+
+### Bug Fixes
+
+* **control-plane:** make nav pending indicator collision-proof ([6b21660](https://github.com/theory-cloud/FaceTheory/commit/6b21660183b5177e2dcab5f8187885e41dcc47b1))
+* **control-plane:** satisfy CodeQL guardrails ([083a368](https://github.com/theory-cloud/FaceTheory/commit/083a368cff67af43e574b8a4d1bb7b653f0daa27))
+* **react:** allow strict shell streams with external styles ([74645c1](https://github.com/theory-cloud/FaceTheory/commit/74645c1b66ea1b629f1175031f54a4c668215cbd))
+
 ## [3.6.0](https://github.com/theory-cloud/FaceTheory/compare/v3.5.0...v3.6.0) (2026-05-31)
 
 
