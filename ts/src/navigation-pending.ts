@@ -8,6 +8,8 @@ export const NAVIGATION_PENDING_CLASSIFIER_SOURCE = FACE_NAVIGATION_CLASSIFIER_S
 export const NAVIGATION_PENDING_ATTRIBUTE = 'data-facetheory-navigation-pending';
 export const NAVIGATION_PENDING_REDUCED_MOTION_ATTRIBUTE =
   'data-facetheory-reduced-motion';
+export const NAVIGATION_PENDING_INDICATOR_ATTRIBUTE =
+  'data-facetheory-navigation-pending-indicator';
 export const DEFAULT_NAVIGATION_PENDING_INDICATOR_ID =
   'facetheory-navigation-pending';
 export const DEFAULT_NAVIGATION_PENDING_TEXT = 'Loading…';
@@ -195,8 +197,9 @@ function showIndicator(options: {
   source: 'link' | 'form';
   text: string;
 }): IndicatorSnapshot {
-  const existing = options.doc.getElementById(options.id);
-  const element = existing ?? options.doc.createElement('div');
+  const resolved = resolveIndicatorElement(options.doc, options.id);
+  const existing = resolved.created ? null : resolved.element;
+  const element = resolved.element;
   const snapshot = snapshotElement(element, [
     'role',
     'aria-live',
@@ -204,16 +207,18 @@ function showIndicator(options: {
     'class',
     NAVIGATION_PENDING_ATTRIBUTE,
     NAVIGATION_PENDING_REDUCED_MOTION_ATTRIBUTE,
+    NAVIGATION_PENDING_INDICATOR_ATTRIBUTE,
   ]);
 
   if (!existing) {
-    element.id = options.id;
+    element.id = resolved.id;
   }
   element.textContent = options.text;
   element.setAttribute('role', 'status');
   element.setAttribute('aria-live', 'polite');
   element.setAttribute('aria-atomic', 'true');
   element.setAttribute(NAVIGATION_PENDING_ATTRIBUTE, options.source);
+  element.setAttribute(NAVIGATION_PENDING_INDICATOR_ATTRIBUTE, 'true');
   element.classList.add(options.classNames.indicator);
 
   if (options.reducedMotion) {
@@ -232,6 +237,67 @@ function showIndicator(options: {
     ...snapshot,
     created: !existing,
   };
+}
+
+function resolveIndicatorElement(
+  doc: Document,
+  requestedId: string,
+): { created: boolean; element: HTMLElement; id: string } {
+  const normalizedId = String(requestedId || DEFAULT_NAVIGATION_PENDING_INDICATOR_ID);
+  const existing = doc.getElementById(normalizedId);
+  if (isNavigationPendingIndicator(existing)) {
+    return { created: false, element: existing, id: normalizedId };
+  }
+  if (!existing) {
+    return {
+      created: true,
+      element: doc.createElement('div'),
+      id: normalizedId,
+    };
+  }
+
+  const resolved = nextAvailableIndicatorElement(doc, normalizedId);
+  warnIndicatorIdCollision(normalizedId, resolved.id);
+  return resolved;
+}
+
+function nextAvailableIndicatorElement(
+  doc: Document,
+  baseId: string,
+): { created: boolean; element: HTMLElement; id: string } {
+  for (let index = 1; index < Number.MAX_SAFE_INTEGER; index += 1) {
+    const candidate = `${baseId}-${String(index)}`;
+    const existing = doc.getElementById(candidate);
+    if (isNavigationPendingIndicator(existing)) {
+      return { created: false, element: existing, id: candidate };
+    }
+    if (!existing) {
+      return {
+        created: true,
+        element: doc.createElement('div'),
+        id: candidate,
+      };
+    }
+  }
+
+  throw new Error('FaceTheory navigation pending could not allocate indicator id');
+}
+
+function warnIndicatorIdCollision(requestedId: string, resolvedId: string): void {
+  const warn = globalThis.console?.warn;
+  if (typeof warn !== 'function') return;
+  warn(
+    `FaceTheory navigation pending indicator id "${requestedId}" already belongs to a non-indicator element; using "${resolvedId}" instead.`,
+  );
+}
+
+function isNavigationPendingIndicator(
+  element: Element | null,
+): element is HTMLElement {
+  return (
+    isElement(element) &&
+    element.getAttribute(NAVIGATION_PENDING_INDICATOR_ATTRIBUTE) === 'true'
+  );
 }
 
 function markPendingElement(
