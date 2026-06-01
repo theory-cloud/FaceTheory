@@ -221,6 +221,111 @@ test('FaceApp: strict CSP streaming responses are coerced to validated buffered 
   assert.equal(full.includes('__FACETHEORY_DATA__'), false);
 });
 
+test('FaceApp: strict CSP streaming with nonce validates the head and preserves streaming', async () => {
+  let streamChunksRead = 0;
+  const metrics: Array<{ name: string; tags?: Record<string, string> }> = [];
+  const logs: Array<{ isStream?: boolean }> = [];
+  const app = createFaceApp({
+    observability: {
+      metric: (entry) => metrics.push(entry),
+      log: (entry) => logs.push(entry),
+    },
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          headTags: [
+            { type: 'title', text: 'Old title' },
+            { type: 'meta', attrs: { name: 'description', content: 'old' } },
+            {
+              type: 'link',
+              attrs: { rel: 'stylesheet', href: '/assets/app.css' },
+            },
+            { type: 'meta', attrs: { charset: 'utf-8' } },
+            { type: 'title', text: 'Strict streamed title' },
+            { type: 'meta', attrs: { name: 'description', content: 'new' } },
+          ],
+          hydration: {
+            type: 'external',
+            data: { page: 'strict-stream' },
+            dataUrl: '/_facetheory/hydration/strict-stream.json',
+            bootstrapModule: '/assets/entry.js',
+          },
+          html: (async function* () {
+            streamChunksRead += 1;
+            yield utf8('<main>strict streamed first</main>');
+            streamChunksRead += 1;
+            yield utf8('<footer>strict streamed second</footer>');
+          })(),
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/',
+    cspNonce: 'nonce-strict-stream',
+  });
+  assert.equal(resp.status, 200);
+  assert.ok(!(resp.body instanceof Uint8Array));
+  assert.equal(streamChunksRead, 1);
+  assert.match(
+    resp.headers['content-security-policy']?.[0] ?? '',
+    /script-src 'self' 'nonce-nonce-strict-stream'/,
+  );
+  assert.match(
+    resp.headers['content-security-policy']?.[0] ?? '',
+    /style-src 'self' 'nonce-nonce-strict-stream'/,
+  );
+
+  const requestMetric = metrics.find(
+    (entry) => entry.name === 'facetheory.request',
+  );
+  assert.equal(requestMetric?.tags?.is_stream, '1');
+  assert.equal(logs.at(-1)?.isStream, true);
+
+  const iterator = (resp.body as AsyncIterable<Uint8Array>)[
+    Symbol.asyncIterator
+  ]();
+  const firstChunk = await iterator.next();
+  assert.equal(firstChunk.done, false);
+  const first = new TextDecoder().decode(firstChunk.value);
+  assert.ok(first.startsWith('<!doctype html>'));
+  assert.match(
+    first,
+    /<head><meta charset="utf-8"><title>Strict streamed title<\/title><link href="\/assets\/app.css" rel="stylesheet"><meta content="new" name="description"><link href="\/_facetheory\/hydration\/strict-stream\.json" id="__FACETHEORY_DATA_URL__" rel="facetheory-hydration" type="application\/json"><script nonce="nonce-strict-stream" src="\/assets\/entry\.js" type="module"><\/script><\/head>/,
+  );
+  assert.equal(first.includes('Old title'), false);
+  assert.equal(first.includes('content="old"'), false);
+  assert.equal(first.includes('strict streamed first'), false);
+
+  const rest: Uint8Array[] = [];
+  for (;;) {
+    const next = await iterator.next();
+    if (next.done) break;
+    rest.push(next.value);
+  }
+  const full =
+    first +
+    new TextDecoder().decode(
+      await collectBody(
+        (async function* () {
+          for (const chunk of rest) yield chunk;
+        })(),
+      ),
+    );
+  assert.ok(full.includes('<main>strict streamed first</main>'));
+  assert.ok(full.includes('<footer>strict streamed second</footer>'));
+  assert.equal(streamChunksRead, 2);
+});
+
 test('FaceApp: strict CSP streaming uses a default bounded collector', async () => {
   const oversized = new Uint8Array(
     DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES + 1,

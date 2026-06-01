@@ -1,4 +1,5 @@
 import { utf8 } from './bytes.js';
+import { createCspNonce } from './security.js';
 import type { FaceBody, FaceRequest, FaceResponse, Headers, Query } from './types.js';
 import { canonicalizeHeaders, parseCookiesFromHeaders, parseQueryString } from './types.js';
 
@@ -93,6 +94,7 @@ export function lambdaUrlEventToFaceRequest(event: LambdaUrlEvent): FaceRequest 
     cookies: parseCookiesFromHeaders(headers),
     body: decodeLambdaBody(event.body, Boolean(event.isBase64Encoded)),
     isBase64: Boolean(event.isBase64Encoded),
+    cspNonce: createCspNonce(),
   };
 }
 
