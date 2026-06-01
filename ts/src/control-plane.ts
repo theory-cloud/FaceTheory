@@ -611,12 +611,29 @@ function slugForRoute(route: string, index: number): string {
 }
 
 function slugForId(value: string): string {
-  const slug = String(value)
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  const input = String(value).trim().toLowerCase();
+  let slug = '';
+  let pendingDash = false;
+
+  for (const char of input) {
+    if (isSlugAsciiAlnum(char)) {
+      if (pendingDash && slug.length > 0) slug += '-';
+      slug += char;
+      pendingDash = false;
+    } else if (slug.length > 0) {
+      pendingDash = true;
+    }
+  }
+
   return slug || 'root';
+}
+
+function isSlugAsciiAlnum(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 97 && code <= 122)
+  );
 }
 
 function normalizeHttpStatus(value: number): number {
