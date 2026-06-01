@@ -47,6 +47,10 @@
       "types": "./dist/navigation-pending.d.ts",
       "import": "./dist/navigation-pending.js"
     },
+    "./control-plane": {
+      "types": "./dist/control-plane.d.ts",
+      "import": "./dist/control-plane.js"
+    },
     "./responsive-primitives": {
       "types": "./dist/responsive-primitives/index.d.ts",
       "import": "./dist/responsive-primitives/index.js"
