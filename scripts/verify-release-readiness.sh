@@ -54,8 +54,13 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
       | scripts/render-release-notes.sh \
       | scripts/test-release-workflow-changelog-preservation.sh \
       | scripts/verify-release-branch.sh \
+      | scripts/verify-ci-rubric-enforced.sh \
+      | scripts/verify-deterministic-builds.sh \
       | scripts/verify-release-draft-target.sh \
+      | scripts/verify-release-pr-postcondition.sh \
+      | scripts/verify-release-publish-postcondition.sh \
       | scripts/verify-release-readiness.sh \
+      | scripts/verify-release-train-promotion.sh \
       | scripts/test-verify-release-draft-target.sh \
       | scripts/test-verify-release-readiness.sh \
       | scripts/verify-ts-pack.sh \

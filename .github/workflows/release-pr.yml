@@ -132,3 +132,8 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           skip-github-release: true
+
+      - name: Verify generated stable release PR postcondition
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-release-pr-postcondition.sh stable

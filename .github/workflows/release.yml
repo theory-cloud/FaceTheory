@@ -9,6 +9,10 @@ on:
         description: "Optional: upload assets to an existing tag's draft release (e.g. v0.2.0)"
         required: false
 
+concurrency:
+  group: release-publisher-${{ github.repository }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -230,9 +234,8 @@ jobs:
             "${RUNNER_TEMP}/facetheory-release-scripts/verify-release-branch.sh" "${TAG_NAME}"
 
           export SOURCE_DATE_EPOCH="$(git show -s --format=%ct "${RELEASE_SOURCE_COMMIT}")"
-          cd ts && npm ci
-          cd ..
-          make rubric
+          scripts/verify-version-alignment.sh
+          scripts/test-release-workflow-changelog-preservation.sh
           scripts/build-release-assets.sh "${TAG_NAME#v}" dist
           scripts/generate-checksums.sh
 
@@ -515,6 +518,12 @@ jobs:
           manifest-file: .release-please-manifest.json
           skip-github-pull-request: true
 
+      - name: Verify stable publish postcondition
+        env:
+          RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+        run: scripts/verify-release-publish-postcondition.sh stable "${RELEASE_CREATED}" "${TAG_NAME}"
+
   resolve-draft-release:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
@@ -656,8 +665,10 @@ jobs:
       - name: Install dependencies
         run: cd ts && npm ci
 
-      - name: Build + verify
-        run: make rubric
+      - name: Verify release hygiene
+        run: |
+          scripts/verify-version-alignment.sh
+          scripts/test-release-workflow-changelog-preservation.sh
 
       - name: Build release assets
         run: scripts/build-release-assets.sh "${{ needs.release-please.outputs.version }}" dist

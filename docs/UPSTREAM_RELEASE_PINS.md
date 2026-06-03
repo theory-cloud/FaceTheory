@@ -7,9 +7,15 @@ This file records the currently pinned versions and the exact install strings we
 
 ## Pins
 
-- AppTheory (TypeScript): `v1.12.1`
-- AppTheory (CDK): `v1.12.1`
-- TableTheory (TypeScript): `v1.9.1`
+- AppTheory (TypeScript): `v1.12.2`
+- AppTheory (CDK): `v1.12.2`
+- TableTheory (TypeScript): `v1.9.4`
+
+## Release Asset SHA-256
+
+- AppTheory runtime tarball: `86fd1da349ca5aaacba3cbe785f552c6d00d037a0dfb88ecbfd2ff9319e2fd06`
+- AppTheory CDK tarball: `337cc28696594e512a4c32e5ee1f4394234154a6904f4b9a29920273577e5143`
+- TableTheory TypeScript tarball: `7c6fa748c4dd08d1f3cb759a5b91eaef1985b2bee52fa25238273ba7e9345e84`
 
 ## Known Audit Exceptions
 
@@ -35,7 +41,7 @@ the `infra/apptheory-*` workspaces only. Anything outside those gates is still t
 
 ### Recently cleared
 
-- **`fast-uri`** — AppTheory CDK `v1.12.1` requires `aws-cdk-lib@2.257.0`, and the infra example
+- **`fast-uri`** — AppTheory CDK `v1.12.2` requires `aws-cdk-lib@2.257.0`, and the infra example
   lockfiles now resolve the previous nested `fast-uri` audit finding to the patched AWS CDK
   dependency set. The `fast-uri` allowlist in `scripts/verify-npm-audit.sh` is kept as a
   belt-and-suspenders guard against future regressions; remove it when `aws-cdk-lib` no
@@ -52,15 +58,15 @@ locks so `npm ci` can validate the AWS CDK package tree under npm 11.
 ```bash
   # AppTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.12.1/theory-cloud-apptheory-1.12.1.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.12.2/theory-cloud-apptheory-1.12.2.tgz
 
   # TableTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.9.1/theory-cloud-tabletheory-ts-1.9.1.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.9.4/theory-cloud-tabletheory-ts-1.9.4.tgz
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.12.1/theory-cloud-apptheory-cdk-1.12.1.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.12.2/theory-cloud-apptheory-cdk-1.12.2.tgz
 ```
 
 ## package.json Snippet (Pinned)
@@ -71,12 +77,12 @@ registry installs:
 ```json
 {
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.12.1/theory-cloud-apptheory-1.12.1.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.9.1/theory-cloud-tabletheory-ts-1.9.1.tgz"
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.12.2/theory-cloud-apptheory-1.12.2.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.9.4/theory-cloud-tabletheory-ts-1.9.4.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.9.1/theory-cloud-tabletheory-ts-1.9.1.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.9.4/theory-cloud-tabletheory-ts-1.9.4.tgz"
     }
   }
 }

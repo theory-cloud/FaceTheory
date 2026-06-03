@@ -2,16 +2,84 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - staging
       - premain
       - main
+  workflow_dispatch:
+    inputs:
+      run_full_rubric:
+        description: "Run Rubric (full gate set)"
+        required: false
+        type: boolean
+        default: true
+      run_deterministic_builds:
+        description: "Run deterministic release-asset build verification"
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
 jobs:
+  release-train-promotion:
+    name: Release train promotion gate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout trusted release gate code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          # Run verifier code from the protected staging lane, never from PR-head content.
+          ref: refs/heads/staging
+      - name: Verify release train promotion path
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          fetch_args=()
+          if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+            fetch_args=(--unshallow)
+          fi
+          git fetch --no-tags "${fetch_args[@]}" origin \
+            "+refs/heads/staging:refs/remotes/origin/staging" \
+            "+refs/heads/premain:refs/remotes/origin/premain" \
+            "+refs/heads/main:refs/remotes/origin/main"
+
+          base_ref_args=()
+          case "${PR_BASE_REF}" in
+            staging|premain|main)
+              base_ref_args=(--base-ref "refs/remotes/origin/${PR_BASE_REF}")
+              ;;
+          esac
+
+          if [[ ! -x scripts/verify-release-train-promotion.sh ]]; then
+            echo "release-train-promotion: SKIP (trusted staging verifier is not present yet; bootstrap PR only)"
+            exit 0
+          fi
+
+          scripts/verify-release-train-promotion.sh \
+            --base "${PR_BASE_REF}" \
+            --head "${PR_HEAD_REF}" \
+            "${base_ref_args[@]}" \
+            --head-sha "${PR_HEAD_SHA}" \
+            --github-repository "${GITHUB_REPOSITORY}" \
+            --github-head-repository "${PR_HEAD_REPOSITORY}" \
+            --pr-title "${PR_TITLE}"
+
   prerelease-readiness:
     name: Prerelease readiness (staging -> premain)
     if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'premain' && github.event.pull_request.head.ref == 'staging'
@@ -73,8 +141,21 @@ jobs:
       - name: Verify tarball
         run: scripts/verify-ts-pack.sh
 
+  deterministic-builds:
+    name: Verify deterministic builds
+    if: (github.event_name == 'workflow_dispatch' && (inputs.run_deterministic_builds == true || inputs.run_deterministic_builds == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "24.13.1"
+      - name: Verify deterministic release asset builds
+        run: scripts/verify-deterministic-builds.sh
+
   rubric:
     name: rubric
+    if: (github.event_name == 'workflow_dispatch' && (inputs.run_full_rubric == true || inputs.run_full_rubric == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -89,7 +170,6 @@ jobs:
         run: cd ts && npm ci
       - name: Run full rubric
         run: make rubric
-
 
   theorycloud-subtree:
     name: TheoryCloud subtree publishing path
