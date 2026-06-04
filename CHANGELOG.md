@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.7.1](https://github.com/theory-cloud/FaceTheory/compare/v3.7.0...v3.7.1) (2026-06-04)
+
+
+### Bug Fixes
+
+* **deps:** align FaceTheory upstream release pins ([286bb9f](https://github.com/theory-cloud/FaceTheory/commit/286bb9fb95eebac10a8c8bd9059f1874f4574a5b))
+* **deps:** align FaceTheory upstream release pins ([f8c8c7e](https://github.com/theory-cloud/FaceTheory/commit/f8c8c7ef6008dbe72f1836efa736fad1abe0aa13))
+* **release:** checkout verifier before PR postcondition ([913461a](https://github.com/theory-cloud/FaceTheory/commit/913461a539a10cca7d87622f77adfa7825326f25))
+* **release:** checkout verifier before PR postcondition ([e7b6efc](https://github.com/theory-cloud/FaceTheory/commit/e7b6efc26272dd67ed133a61b4969f3be6ea64e4))
+
 ## [3.7.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.7.0...v3.7.1-rc) (2026-06-04)
 
 
