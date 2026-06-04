@@ -197,6 +197,24 @@ Rollback:
 - pin consumers to the previous FaceTheory release tarball, or remove the strict-CSP opt-in on affected routes.
 - do not weaken OAC, expose direct Lambda Function URLs, or remove CSP headers as the framework rollback path.
 
+### Release train watchpoints
+
+FaceTheory follows the same single-lane release train as AppTheory and TableTheory:
+
+1. feature or maintenance work merges to `staging`;
+2. `staging` promotes to `premain`;
+3. the generated `release-please--branches--premain` PR publishes the RC from `premain`;
+4. `premain` promotes to `main`;
+5. the generated `release-please--branches--main` PR publishes the stable release from `main`;
+6. `main` returns to `staging` by an explicit back-merge PR.
+
+The workflow guardrails are intentionally fail-closed:
+
+- PRs into `premain` and `main` are release intent. If Release Please does not open the expected RC/stable PR, the postcondition scripts fail instead of silently skipping.
+- Premain owns RC tags and releases. Main must not create, publish, or advertise an RC-shaped release.
+- The full rubric and deterministic release-asset build verifier run only for `staging` PRs (or explicit manual CI dispatch), not on release-branch pushes or release publication jobs.
+- Release workflows run hygiene/build/postcondition checks only and never automate the post-release `main` -> `staging` sync.
+
 ### ISR lock contention diagnostics
 
 Symptoms:

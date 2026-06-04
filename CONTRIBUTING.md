@@ -7,14 +7,25 @@ FaceTheory is the client-delivery layer of the [Theory Cloud](https://github.com
 FaceTheory uses the standard Theory Cloud three-branch flow:
 
 ```
-feature/*  ──merge──▶  staging  ──merge PR──▶  premain  ──merge PR──▶  main
+feature/*  ──merge──▶  staging  ──merge PR──▶  premain  ──RC PR/publish──▶  premain  ──merge PR──▶  main  ──stable PR/publish──▶  main
+                          ▲                                                                                                      │
+                          └──────────────────────── explicit main -> staging back-merge PR ─────────────────────────────────────┘
 ```
 
 - **`staging`** — integration branch. Open feature PRs here.
 - **`premain`** — prerelease branch. Release-Please opens `vX.Y.Z-rc.N` candidates from `premain`.
 - **`main`** — stable release branch. Release-Please cuts `vX.Y.Z` releases from `main`.
 
-After a stable release, `main` is back-merged into `staging`.
+After a stable release, `main` is back-merged into `staging` by an explicit PR. CI does not push that sync for you.
+
+Release-train PRs are intentionally narrow:
+
+- normal work targets `staging` and must include the current `main` baseline when `staging` is behind a stable release;
+- only `staging` or `release-please--branches--premain` targets `premain`;
+- only `premain` or `release-please--branches--main` targets `main`;
+- the generated premain Release Please PR must be RC-shaped, while the generated main Release Please PR must be stable-shaped.
+
+The full `make rubric` gate and deterministic release-asset build verification run for PRs targeting `staging` (and explicit manual CI dispatch). Premain/main workflows use release hygiene, build, and postcondition checks so RC and stable publish paths cannot silently no-op.
 
 ## Commit messages
 

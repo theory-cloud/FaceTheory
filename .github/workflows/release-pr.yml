@@ -132,3 +132,15 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           skip-github-release: true
+
+      - name: Checkout protected main verifier code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.sha }}
+
+      - name: Verify generated stable release PR postcondition
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-release-pr-postcondition.sh stable

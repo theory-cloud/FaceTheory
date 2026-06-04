@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin build-release-assets ensure-release-branches test-ensure-release-branches test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin verify-ci-rubric-enforced verify-deterministic-builds build-release-assets ensure-release-branches test-ensure-release-branches test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
 
 ts-build:
 	cd ts && npm run build
@@ -32,6 +32,12 @@ verify-npm-audit:
 
 verify-go-version-pin:
 	./scripts/verify-go-version-pin.sh
+
+verify-ci-rubric-enforced:
+	./scripts/verify-ci-rubric-enforced.sh
+
+verify-deterministic-builds:
+	./scripts/verify-deterministic-builds.sh
 
 build-release-assets:
 	./scripts/build-release-assets.sh "$$(./scripts/read-version.sh)" dist
@@ -78,4 +84,4 @@ test-theorycloud-targets:
 test-trigger-theorycloud-publish-awscurl:
 	./scripts/test-trigger-theorycloud-publish-awscurl.sh
 
-rubric: ts-typecheck ts-lint ts-test verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation
+rubric: ts-typecheck ts-lint ts-test verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin verify-ci-rubric-enforced test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation

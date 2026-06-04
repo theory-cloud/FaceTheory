@@ -5,6 +5,10 @@ on:
     branches: ["premain"]
   workflow_dispatch: {}
 
+concurrency:
+  group: release-publisher-${{ github.repository }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -123,6 +127,12 @@ jobs:
           config-file: release-please-config.premain.json
           manifest-file: .release-please-manifest.premain.json
           skip-github-pull-request: true
+
+      - name: Verify prerelease publish postcondition
+        env:
+          RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+        run: scripts/verify-release-publish-postcondition.sh prerelease "${RELEASE_CREATED}" "${TAG_NAME}"
 
   resolve-draft-release:
     needs: release-please
@@ -263,8 +273,10 @@ jobs:
       - name: Install dependencies
         run: cd ts && npm ci
 
-      - name: Build + verify
-        run: make rubric
+      - name: Verify release hygiene
+        run: |
+          scripts/verify-version-alignment.sh
+          scripts/test-release-workflow-changelog-preservation.sh
 
       - name: Build release assets
         run: scripts/build-release-assets.sh "${{ needs.release-please.outputs.version }}" dist
