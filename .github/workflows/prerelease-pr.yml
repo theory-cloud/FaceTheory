@@ -75,3 +75,8 @@ jobs:
           config-file: release-please-config.premain.json
           manifest-file: .release-please-manifest.premain.json
           skip-github-release: true
+
+      - name: Verify generated RC release PR postcondition
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-release-pr-postcondition.sh prerelease

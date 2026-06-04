@@ -19,6 +19,12 @@ for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; 
   if grep -Fq 'RELEASE_NOTES.md' "${workflow}"; then
     fail "${workflow} must not shuttle static RELEASE_NOTES.md artifacts into publication"
   fi
+  if grep -Fq 'make rubric' "${workflow}"; then
+    fail "${workflow} release build/publish paths must not run the full rubric"
+  fi
+  if grep -Fq 'scripts/verify-deterministic-builds.sh' "${workflow}"; then
+    fail "${workflow} release build/publish paths must not run deterministic-build verification"
+  fi
 done
 
 if grep -R -Fq 'secrets.GITHUB_TOKEN' .github/workflows; then
@@ -90,6 +96,27 @@ grep -Fq 'expected_title="chore(premain): release ${version}"' .github/workflows
 
 grep -Fq 'Resolve draft release metadata' .github/workflows/release.yml ||
   fail "release.yml must resolve hidden draft release metadata before repo checkout"
+
+for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; do
+  grep -Fq 'concurrency:' "${workflow}" ||
+    fail "${workflow} must serialize release publishers"
+  grep -Fq 'group: release-publisher-${{ github.repository }}' "${workflow}" ||
+    fail "${workflow} must use the shared release-publisher concurrency group"
+  grep -Fq 'cancel-in-progress: false' "${workflow}" ||
+    fail "${workflow} must queue release publisher reruns instead of cancelling active publishers"
+done
+
+grep -Fq 'scripts/verify-release-publish-postcondition.sh prerelease' .github/workflows/prerelease.yml ||
+  fail "prerelease.yml must fail closed when a generated RC release PR merge does not create an RC release"
+
+grep -Fq 'scripts/verify-release-publish-postcondition.sh stable' .github/workflows/release.yml ||
+  fail "release.yml must fail closed when a generated stable release PR merge does not create a stable release"
+
+grep -Fq 'scripts/verify-release-pr-postcondition.sh prerelease' .github/workflows/prerelease-pr.yml ||
+  fail "prerelease-pr.yml must fail closed when Release Please does not open an RC PR"
+
+grep -Fq 'scripts/verify-release-pr-postcondition.sh stable' .github/workflows/release-pr.yml ||
+  fail "release-pr.yml must fail closed when Release Please does not open a stable PR"
 
 for workflow in .github/workflows/prerelease.yml .github/workflows/release.yml; do
   grep -Fq 'for attempt in $(seq 1 72); do' "${workflow}" ||
