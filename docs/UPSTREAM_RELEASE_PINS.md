@@ -11,6 +11,29 @@ This file records the currently pinned versions and the exact install strings we
 - AppTheory (CDK): `v1.12.2`
 - TableTheory (TypeScript): `v1.9.4`
 
+## Compatibility Impact
+
+The AppTheory `v1.12.2` runtime/CDK pins and the TableTheory `v1.9.4` TypeScript pin are a coordinated
+FaceTheory compatibility baseline:
+
+- the AppTheory runtime pin keeps Lambda URL streaming and AppTheory integration examples on the same upstream release
+  line as the deployed reference stacks;
+- the AppTheory CDK pin keeps the SSR and SSG/ISR infrastructure examples aligned with the runtime tarball they deploy;
+- the TableTheory pin keeps ISR cache-entry and regeneration-lease examples on the TableTheory release line FaceTheory
+  validates through the package override below.
+
+Treat future upstream pin moves as dependency compatibility fixes, not release-process bookkeeping. FaceTheory consumers
+install immutable GitHub Release tarballs, so a changed upstream baseline needs a normal RC for review before stable
+promotion.
+
+## Release Watchpoint
+
+A `staging` -> `premain` PR is always RC intent. If upstream pin maintenance reaches `staging` without a
+release-please-eligible `feat:`, `fix:`, or `perf:` commit, `scripts/verify-release-readiness.sh origin/premain
+origin/staging prerelease` must fail rather than silently letting Release Please skip the RC. Do not recover with
+manual tags, manual GitHub Releases, or `Release-As` footers; land a small, truthful compatibility change on `staging`
+and keep the single release lane intact.
+
 ## Release Asset SHA-256
 
 - AppTheory runtime tarball: `86fd1da349ca5aaacba3cbe785f552c6d00d037a0dfb88ecbfd2ff9319e2fd06`
