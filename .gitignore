@@ -24,6 +24,8 @@ ts/*.tgz
 .codex/
 .mcp.json
 .claude
+.agents/
+GEMINI.md
 
 # Jekyll docs build artifacts (GitHub Pages site under docs/)
 docs/_site/
