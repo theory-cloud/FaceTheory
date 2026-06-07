@@ -1,3 +1,5 @@
+Bootstrap: the FaceTheory steward is materialized from the published `facetheory` namespace agent into git-ignored host installs (`.codex/`, `.claude/`, `.agents/`, `.mcp.json`).
+
 # FaceTheory agent notes
 
 These repository-local notes supplement the FaceTheory stewardship instructions.
