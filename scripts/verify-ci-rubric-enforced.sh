@@ -125,7 +125,9 @@ require_contains "${ci}" "  release-train-promotion:" "CI must define the releas
 require_contains "${ci}" "ref: refs/heads/staging" "release train gate must checkout trusted staging verifier code"
 require_contains "${ci}" "scripts/verify-release-train-promotion.sh" "release train gate must use the verifier script"
 require_contains "${ci}" "  rubric:" "CI must define the full rubric job"
-require_contains "${ci}" "run: make rubric" "CI rubric job must run make rubric"
+require_contains "${ci}" "run: bash gov-infra/verifiers/gov-verify-rubric.sh" "CI rubric job must run the gov-infra verifier"
+require_contains "${ci}" "uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4" "CI rubric job must upload governance evidence with the pinned upload-artifact action"
+require_contains "${ci}" "path: gov-infra/evidence/" "CI rubric job must upload gov-infra/evidence/"
 require_contains "${ci}" "run_full_rubric:" "manual CI dispatch must expose an explicit full-rubric toggle"
 require_contains "${ci}" "default: true" "manual CI dispatch must continue to run the full rubric by default"
 require_contains \
@@ -146,9 +148,38 @@ for release_path in \
   "scripts/build-release-assets.sh" \
   "scripts/render-release-notes.sh"; do
   require_not_contains "${release_path}" "make rubric" "full rubric must not run in release build/publish paths"
+  require_not_contains "${release_path}" "gov-infra/verifiers/gov-verify-rubric.sh" "full rubric must not run in release build/publish paths"
   require_not_contains "${release_path}" "Verify deterministic builds" "deterministic builds must not be a release build/publish path"
   require_not_contains "${release_path}" "scripts/verify-deterministic-builds.sh" "release build/publish paths must not run deterministic builds"
 done
+
+python3 - <<'PY'
+import re
+from pathlib import Path
+
+makefile = Path("Makefile").read_text(encoding="utf-8").splitlines()
+recipe = []
+inside = False
+for line in makefile:
+    if re.match(r"^rubric:\s*", line):
+        inside = True
+        continue
+    if inside and line and not line.startswith(("\t", " ")) and re.match(r"^[A-Za-z0-9_.-]+:\s*", line):
+        break
+    if inside:
+        recipe.append(line)
+
+recipe_text = "\n".join(recipe)
+if "bash gov-infra/verifiers/gov-verify-rubric.sh" not in recipe_text:
+    raise SystemExit("ci-rubric: FAIL (Makefile rubric target must call the gov-infra verifier)")
+
+verifier = Path("gov-infra/verifiers/gov-verify-rubric.sh")
+if not verifier.is_file():
+    raise SystemExit("ci-rubric: FAIL (missing gov-infra verifier)")
+
+if re.search(r"(^|[^A-Za-z0-9_-])make\s+rubric([^A-Za-z0-9_-]|$)", verifier.read_text(encoding="utf-8")):
+    raise SystemExit("ci-rubric: FAIL (gov-infra verifier must not call make rubric)")
+PY
 
 require_contains ".github/workflows/prerelease.yml" "scripts/verify-release-publish-postcondition.sh prerelease" \
   "prerelease publisher must fail closed on release-please no-op after generated RC release PR merges"
