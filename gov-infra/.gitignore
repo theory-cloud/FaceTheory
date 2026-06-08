@@ -1,0 +1,2 @@
+# Repo-local pinned tool installs are materialized by verifiers when needed.
+.tools/

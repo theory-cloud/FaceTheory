@@ -84,4 +84,5 @@ test-theorycloud-targets:
 test-trigger-theorycloud-publish-awscurl:
 	./scripts/test-trigger-theorycloud-publish-awscurl.sh
 
-rubric: ts-typecheck ts-lint ts-test verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin verify-ci-rubric-enforced test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation
+rubric:
+	bash gov-infra/verifiers/gov-verify-rubric.sh

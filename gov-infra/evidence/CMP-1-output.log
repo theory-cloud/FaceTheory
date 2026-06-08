@@ -1,0 +1,11 @@
+Verifier: gov_check_compliance
+Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
+Rubric ID: CMP-1
+
+ci-rubric: PASS
+test-verify-release-draft-target: PASS
+test-check-release-baseline-ready: PASS
+test-resolve-release-source-ref: PASS
+test-publish-draft-release-assets: PASS
+test-verify-release-readiness: PASS
+test-release-workflow-changelog-preservation: PASS

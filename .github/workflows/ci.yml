@@ -169,7 +169,14 @@ jobs:
       - name: Install dependencies
         run: cd ts && npm ci
       - name: Run full rubric
-        run: make rubric
+        run: bash gov-infra/verifiers/gov-verify-rubric.sh
+      - name: Upload governance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gov-infra-evidence
+          path: gov-infra/evidence/
+          if-no-files-found: error
 
   theorycloud-subtree:
     name: TheoryCloud subtree publishing path
