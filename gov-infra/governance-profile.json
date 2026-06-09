@@ -1,0 +1,40 @@
+{
+  "$schema": "theorymcp://namespaces/theorycloud/governance-profiles/theorycloud_governance_profile.v0.1/schemas/governance_profile_descriptor.v1",
+  "schemaVersion": 1,
+  "contract_id": "theorycloud_governance_profile.v0.1",
+  "profile_id": "software_repo_gov_infra",
+  "repo_key": "facetheory",
+  "repo_class": "software_repo",
+  "managed_by": "namespace_mcp",
+  "profile_resource_uri": "theorymcp://namespaces/theorycloud/governance-profiles/theorycloud_governance_profile.v0.1/profiles/software_repo_gov_infra",
+  "served_source_commit": "bc41187efb6f5b3c3bfb4d9295836d4e071941d7",
+  "gov_infra": {
+    "required": true,
+    "role": "ci_core",
+    "software_ci_core": true,
+    "verifier_entrypoint": "gov-infra/verifiers/gov-verify-rubric.sh",
+    "verifier_command": "bash gov-infra/verifiers/gov-verify-rubric.sh",
+    "evidence_path": "gov-infra/evidence/",
+    "report_path": "gov-infra/evidence/gov-rubric-report.json",
+    "report_schema": "gov_rubric_report.v1"
+  },
+  "invariants": {
+    "G3": {
+      "description": "software_repo_gov_infra requires an executable verifier plus evidence and report paths",
+      "verifier_entrypoint": "gov-infra/verifiers/gov-verify-rubric.sh",
+      "evidence_path": "gov-infra/evidence/",
+      "report_path": "gov-infra/evidence/gov-rubric-report.json"
+    },
+    "make_rubric_direction": "Makefile rubric target calls the gov verifier; the gov verifier never calls make rubric",
+    "release_policy": "Release and publish workflows remain free of rubric execution"
+  },
+  "authority_denial": {
+    "deploy_authority": false,
+    "merge_authority": false,
+    "repository_mutation_authority": false,
+    "branch_delete_authority": false,
+    "cloud_mutation_authority": false,
+    "signing_authority": false,
+    "signing": "retired/none"
+  }
+}

@@ -1,3 +1,5 @@
+Bootstrap: the FaceTheory steward is materialized from the published `facetheory` namespace agent into git-ignored host installs (`.codex/`, `.claude/`, `.agents/`, `.mcp.json`).
+
 # FaceTheory agent notes
 
 These repository-local notes supplement the FaceTheory stewardship instructions.
@@ -11,6 +13,12 @@ The lab tooling is a convenience layer, not a release-process bypass: all FaceTh
 ## Staging PR version alignment
 
 Before opening or updating any PR into `staging`, verify version alignment for both the stable release path and the release-candidate path. In practice, confirm the root `VERSION`, `ts/package.json`, `ts/package-lock.json`, `.release-please-manifest.json`, and `.release-please-manifest.premain.json` remain consistent with the intended release / RC state, and run `scripts/verify-version-alignment.sh`; this check must fail if the stable manifest or the premain release-candidate manifest has drifted to an older release line.
+
+## Governance profile and GEMINI.md decision
+
+FaceTheory uses the served `theorycloud_governance_profile.v0.1` / `software_repo_gov_infra` profile. The repo-local `gov-infra/` surface is CI-core: `make rubric` calls `bash gov-infra/verifiers/gov-verify-rubric.sh`, and the verifier emits `gov-infra/evidence/gov-rubric-report.json`.
+
+GEMINI.md is intentionally absent from committed FaceTheory state and remains ignored in `.gitignore`; the published namespace steward is materialized through the git-ignored host installs (`.codex/`, `.claude/`, `.agents/`, `.mcp.json`) instead of a committed Gemini stamp.
 
 ## Release and branch reality checks
 

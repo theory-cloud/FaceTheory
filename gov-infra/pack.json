@@ -1,0 +1,43 @@
+{
+  "$schema": "theorymcp://namespaces/theorycloud/lifecycle-packs/govern/schemas/gov_pack.v1",
+  "schemaVersion": 1,
+  "packVersion": "bc41187efb6f",
+  "packDigest": "780b5ac1b375223df4475fa67fcd7f26a669630f2fe3e90bea090c37770d00a8",
+  "domain": "custom",
+  "projectSlug": "facetheory",
+  "generatedAt": "2026-06-08T03:24:06Z",
+  "managedBy": "namespace_mcp",
+  "notVendored": true,
+  "source": {
+    "servedLifecyclePack": "govern",
+    "servedProfile": "theorycloud_governance_profile.v0.1/software_repo_gov_infra",
+    "servedSourceCommit": "bc41187efb6f5b3c3bfb4d9295836d4e071941d7",
+    "repoBaseCommit": "879726c6a12557e1aca80de981fbbf6395b13a8b",
+    "branch": "aron/the-1952-m4-facetheory-real-gov-infra"
+  },
+  "artifacts": {
+    "planning": [
+      "gov-infra/README.md",
+      "gov-infra/AGENTS.md",
+      "gov-infra/planning/facetheory-controls-matrix.md",
+      "gov-infra/planning/facetheory-threat-model.md",
+      "gov-infra/planning/facetheory-10of10-rubric.md",
+      "gov-infra/planning/facetheory-10of10-roadmap.md",
+      "gov-infra/planning/facetheory-evidence-plan.md",
+      "gov-infra/planning/facetheory-supply-chain-allowlist.txt",
+      "gov-infra/planning/facetheory-ai-drift-recovery.md"
+    ],
+    "prompts": [
+      "gov-infra/prompts/README.md"
+    ],
+    "profile": [
+      "gov-infra/governance-profile.json"
+    ],
+    "verifiers": [
+      "gov-infra/verifiers/gov-verify-rubric.sh"
+    ],
+    "evidence": [
+      "gov-infra/evidence/gov-rubric-report.json"
+    ]
+  }
+}

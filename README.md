@@ -51,12 +51,12 @@ FaceTheory is the **client-delivery layer** of the Theory Cloud stack. It render
 
 FaceTheory is pre-1.0 and under active development. The runtime covers SSR, SSG, and blocking ISR with adapter support for React, Vue, and Svelte. First production use is underway at [Pay Theory](https://paytheory.com) (checkout page). See [CHANGELOG](CHANGELOG.md) for release history.
 
-## Install v3.7.1-rc <!-- x-release-please-version -->
+## Install v3.7.1 <!-- x-release-please-version -->
 
 Install the exact GitHub release tarball:
 
 ```bash
-export FACETHEORY_VERSION=3.7.1-rc # x-release-please-version
+export FACETHEORY_VERSION=3.7.1 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -72,9 +72,9 @@ Add the framework peers that match your adapter surface:
 
 Optional companion packages from pinned GitHub releases:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.12.2/theory-cloud-apptheory-1.12.2.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v1.12.2/theory-cloud-apptheory-cdk-1.12.2.tgz`
-- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.9.4/theory-cloud-tabletheory-ts-1.9.4.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.13.0/theory-cloud-apptheory-1.13.0.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v1.13.0/theory-cloud-apptheory-cdk-1.13.0.tgz`
+- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.10.0/theory-cloud-tabletheory-ts-1.10.0.tgz`
 
 ## Quickstart
 
@@ -105,7 +105,7 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
-The `v3.7.1-rc` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+The `v3.7.1` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
 
 ## At a glance
 
