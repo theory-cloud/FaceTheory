@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 
 import {
   CONTROL_PLANE_BOOTSTRAP_MODULE_PATH,
@@ -456,5 +457,24 @@ test('control-plane boundary guardrails: blocks raw data/auth ownership in contr
           "import { TableTheoryIsrMetaStoreAdapter } from '../../src/tabletheory/index.js';\nvoid TableTheoryIsrMetaStoreAdapter;\n",
       },
     ]),
+  );
+});
+
+test('control-plane boundary guardrails: malformed whitespace-heavy imports scan quickly', () => {
+  const whitespace = ' '.repeat(100_000);
+  const startedAt = performance.now();
+
+  assert.doesNotThrow(() =>
+    assertControlPlaneBoundaryGuardrails([
+      {
+        path: 'ts/src/control-plane.ts',
+        content: `import${whitespace}\nexport${whitespace}\nrequire(${whitespace}\nimport(${whitespace}`,
+      },
+    ]),
+  );
+
+  assert.ok(
+    performance.now() - startedAt < 1_000,
+    'malformed import-like whitespace should scan in well under one second',
   );
 });

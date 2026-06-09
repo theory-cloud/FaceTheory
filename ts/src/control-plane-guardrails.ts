@@ -172,20 +172,41 @@ interface EntitlementNormalizer {
 }
 
 function collectModuleImports(content: string): ModuleImport[] {
-  const imports: ModuleImport[] = [];
-  const importPattern =
-    /\b(?:import|export)\s+(?:type\s+)?(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]|require\(\s*['"]([^'"]+)['"]\s*\)|import\(\s*['"]([^'"]+)['"]\s*\)/gms;
+  const imports: Array<ModuleImport & { index: number }> = [];
+  const importExportTokenPattern = /\b(?:import|export)\b/gm;
+  const moduleCallPattern = /\b(?:require|import)\s*\(\s*['"]([^'"]+)['"]\s*\)/gm;
 
-  for (const match of content.matchAll(importPattern)) {
-    const moduleSpecifier = match[1] ?? match[2] ?? match[3];
+  for (const match of content.matchAll(importExportTokenPattern)) {
+    const startIndex = match.index ?? 0;
+    const keywordEndIndex = startIndex + match[0].length;
+    const moduleSpecifier =
+      match[0] === 'import'
+        ? (readSideEffectImportSpecifier(content, keywordEndIndex) ??
+          readFromModuleSpecifier(content, keywordEndIndex))
+        : readFromModuleSpecifier(content, keywordEndIndex);
+
     if (!moduleSpecifier) continue;
     imports.push({
+      index: startIndex,
       moduleSpecifier,
-      line: lineNumberAt(content, match.index ?? 0),
+      line: lineNumberAt(content, startIndex),
     });
   }
 
-  return imports;
+  for (const match of content.matchAll(moduleCallPattern)) {
+    const moduleSpecifier = match[1];
+    if (!moduleSpecifier) continue;
+    const startIndex = match.index ?? 0;
+    imports.push({
+      index: startIndex,
+      moduleSpecifier,
+      line: lineNumberAt(content, startIndex),
+    });
+  }
+
+  return imports
+    .sort((left, right) => left.index - right.index)
+    .map(({ index: _index, ...moduleImport }) => moduleImport);
 }
 
 function collectEntitlementNormalizers(
@@ -193,13 +214,91 @@ function collectEntitlementNormalizers(
 ): EntitlementNormalizer[] {
   const normalizers: EntitlementNormalizer[] = [];
   const normalizerPattern =
-    /\b(?:function|const|let|var|class|type|interface)\s+(?:normalize|normalise|derive|resolve|map|coerce|canonicalize|parse)[A-Za-z0-9_]*Entitlement[A-Za-z0-9_]*/gim;
+    /\b(?:function|const|let|var|class|type|interface)\s+((?:normalize|normalise|derive|resolve|map|coerce|canonicalize|parse)[A-Za-z0-9_]*)/gim;
 
   for (const match of content.matchAll(normalizerPattern)) {
+    if (!match[1]?.toLowerCase().includes('entitlement')) continue;
     normalizers.push({ line: lineNumberAt(content, match.index ?? 0) });
   }
 
   return normalizers;
+}
+
+function readSideEffectImportSpecifier(
+  content: string,
+  offset: number,
+): string | undefined {
+  const quoteIndex = skipWhitespace(content, offset);
+  return readQuotedModuleSpecifier(content, quoteIndex);
+}
+
+function readFromModuleSpecifier(
+  content: string,
+  offset: number,
+): string | undefined {
+  for (let index = offset; index < content.length; index += 1) {
+    const code = content.charCodeAt(index);
+    if (code === 34 || code === 39) return undefined;
+    if (!isFromTokenAt(content, index)) continue;
+
+    const afterFromIndex = index + 'from'.length;
+    if (!isWhitespaceCode(content.charCodeAt(afterFromIndex))) {
+      index = afterFromIndex - 1;
+      continue;
+    }
+
+    const quoteIndex = skipWhitespace(content, afterFromIndex);
+    const moduleSpecifier = readQuotedModuleSpecifier(content, quoteIndex);
+    if (moduleSpecifier) return moduleSpecifier;
+
+    index = afterFromIndex - 1;
+  }
+
+  return undefined;
+}
+
+function readQuotedModuleSpecifier(
+  content: string,
+  quoteIndex: number,
+): string | undefined {
+  const quote = content.charCodeAt(quoteIndex);
+  if (quote !== 34 && quote !== 39) return undefined;
+
+  for (let index = quoteIndex + 1; index < content.length; index += 1) {
+    const code = content.charCodeAt(index);
+    if (code === 34 || code === 39) {
+      return content.slice(quoteIndex + 1, index);
+    }
+  }
+
+  return undefined;
+}
+
+function skipWhitespace(content: string, offset: number): number {
+  let index = offset;
+  while (isWhitespaceCode(content.charCodeAt(index))) index += 1;
+  return index;
+}
+
+function isFromTokenAt(content: string, index: number): boolean {
+  if (!content.startsWith('from', index)) return false;
+  return (
+    !isIdentifierCode(content.charCodeAt(index - 1)) &&
+    !isIdentifierCode(content.charCodeAt(index + 'from'.length))
+  );
+}
+
+function isWhitespaceCode(code: number): boolean {
+  return code === 9 || code === 10 || code === 11 || code === 12 || code === 13 || code === 32;
+}
+
+function isIdentifierCode(code: number): boolean {
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    code === 95 ||
+    (code >= 97 && code <= 122)
+  );
 }
 
 function isControlPlaneOrStitchSurface(path: string): boolean {
