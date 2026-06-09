@@ -1,5 +1,31 @@
 # Changelog
 
+## [3.8.0](https://github.com/theory-cloud/FaceTheory/compare/v3.7.1...v3.8.0) (2026-06-09)
+
+
+### Features
+
+* **control-plane:** accept opaque section read metadata ([6a48894](https://github.com/theory-cloud/FaceTheory/commit/6a488948d6c56dc05778b3105494576dc550772c))
+* **control-plane:** guard host-owned section contracts ([636e502](https://github.com/theory-cloud/FaceTheory/commit/636e50235190886d54117a65084207d13507176a))
+
+
+### Bug Fixes
+
+* **control-plane:** avoid ReDoS-prone guardrail scans ([c1b200c](https://github.com/theory-cloud/FaceTheory/commit/c1b200cc29d0d29738b89fd79674bbd5cd19acba))
+
+## [3.8.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.7.1...v3.8.0-rc) (2026-06-09)
+
+
+### Features
+
+* **control-plane:** accept opaque section read metadata ([6a48894](https://github.com/theory-cloud/FaceTheory/commit/6a488948d6c56dc05778b3105494576dc550772c))
+* **control-plane:** guard host-owned section contracts ([636e502](https://github.com/theory-cloud/FaceTheory/commit/636e50235190886d54117a65084207d13507176a))
+
+
+### Bug Fixes
+
+* **control-plane:** avoid ReDoS-prone guardrail scans ([c1b200c](https://github.com/theory-cloud/FaceTheory/commit/c1b200cc29d0d29738b89fd79674bbd5cd19acba))
+
 ## [3.7.1](https://github.com/theory-cloud/FaceTheory/compare/v3.7.0...v3.7.1) (2026-06-04)
 
 
