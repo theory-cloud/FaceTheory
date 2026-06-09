@@ -1,0 +1,4 @@
+# FaceTheory gov-infra supply-chain allowlist
+#
+# Add exact finding IDs only, with a short justification comment above each entry.
+# This file is intentionally empty for THE-1952.

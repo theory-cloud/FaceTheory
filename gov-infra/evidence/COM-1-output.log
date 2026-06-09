@@ -1,0 +1,7 @@
+Verifier: gov_check_completeness
+Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
+Rubric ID: COM-1
+
+profile-descriptor: PASS
+no-recursion: PASS
+scaffold-inventory: PASS

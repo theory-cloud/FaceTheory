@@ -1,0 +1,17 @@
+{
+  "$schema": "theorymcp://namespaces/theorycloud/governance-profiles/theorycloud_governance_profile.v0.1/schemas/gov_rubric_report.v1",
+  "schemaVersion": "gov_rubric_report.v1",
+  "timestamp": "2026-06-08T03:27:30Z",
+  "pack": {"version": "bc41187efb6f", "digest": "780b5ac1b375223df4475fa67fcd7f26a669630f2fe3e90bea090c37770d00a8"},
+  "project": {"name": "FaceTheory", "slug": "facetheory"},
+  "summary": {"status": "PASS", "pass": 7, "fail": 0, "blocked": 0},
+  "results": [
+    {"id":"QUA-1","category":"Quality","status":"PASS","message":"gov_check_quality succeeded","evidencePath":"gov-infra/evidence/QUA-1-output.log"},
+    {"id":"CON-1","category":"Consistency","status":"PASS","message":"gov_check_consistency succeeded","evidencePath":"gov-infra/evidence/CON-1-output.log"},
+    {"id":"COM-1","category":"Completeness","status":"PASS","message":"gov_check_completeness succeeded","evidencePath":"gov-infra/evidence/COM-1-output.log"},
+    {"id":"SEC-1","category":"Security","status":"PASS","message":"gov_check_security succeeded","evidencePath":"gov-infra/evidence/SEC-1-output.log"},
+    {"id":"CMP-1","category":"Compliance","status":"PASS","message":"gov_check_compliance succeeded","evidencePath":"gov-infra/evidence/CMP-1-output.log"},
+    {"id":"MAI-1","category":"Maintainability","status":"PASS","message":"gov_check_maintainability succeeded","evidencePath":"gov-infra/evidence/MAI-1-output.log"},
+    {"id":"DOC-1","category":"Docs","status":"PASS","message":"gov_check_docs succeeded","evidencePath":"gov-infra/evidence/DOC-1-output.log"}
+  ]
+}

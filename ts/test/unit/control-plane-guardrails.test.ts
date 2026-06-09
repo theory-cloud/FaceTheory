@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { performance } from 'node:perf_hooks';
+
 import {
   CONTROL_PLANE_BOOTSTRAP_MODULE_PATH,
   CONTROL_PLANE_RESPONSIVE_PRIMITIVES_STYLESHEET_PATH,
+  assertControlPlaneBoundaryGuardrails,
   assertControlPlaneDeliveryGuardrails,
   createControlPlaneApp,
   createControlPlanePresetDescriptor,
+  type ControlPlaneSectionReadContract,
 } from '../../src/index.js';
 import { handleLambdaUrlEvent } from '../../src/lambda-url.js';
 import type { FaceBody } from '../../src/types.js';
@@ -18,6 +24,26 @@ async function collect(body: FaceBody): Promise<string> {
   for await (const chunk of body) chunks.push(decoder.decode(chunk, { stream: true }));
   chunks.push(decoder.decode());
   return chunks.join('');
+}
+
+async function collectSourceFiles(
+  dir: string,
+): Promise<Array<{ path: string; content: string }>> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files: Array<{ path: string; content: string }> = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectSourceFiles(fullPath)));
+      continue;
+    }
+    if (!/\.(?:ts|tsx|svelte)$/.test(entry.name)) continue;
+    files.push({
+      path: path.relative(path.resolve('..'), fullPath),
+      content: await readFile(fullPath, 'utf8'),
+    });
+  }
+  return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 function createDemoApp(options: {
@@ -138,6 +164,43 @@ test('control-plane preset: shell-first client-fill leaves section data off crit
   assert.equal(section.headers['content-type']?.[0], 'text/html; charset=utf-8');
   assert.equal(await collect(section.body), '<p>loaded</p>');
   assert.equal(loadCalls, 1);
+});
+
+test('control-plane preset: rejects section reads without bounded tenant scope at app construction', () => {
+  const createWithRead = (read: unknown) => () =>
+    createControlPlaneApp({
+      gate: () => ({ ok: true, tenant: 'tenant-a' }),
+      faces: [
+        {
+          route: '/',
+          sections: [
+            {
+              id: 'unsafe',
+              read: read as ControlPlaneSectionReadContract,
+              load: () => ({ count: 0 }),
+              render: () => '<p>unsafe</p>',
+            },
+          ],
+        },
+      ],
+    });
+
+  assert.throws(
+    createWithRead({ tenantScoped: true }),
+    /control-plane section "unsafe" must declare bounded tenant-scoped reads/,
+  );
+  assert.throws(
+    createWithRead({ bounded: true }),
+    /control-plane section "unsafe" must declare bounded tenant-scoped reads/,
+  );
+  assert.throws(
+    createWithRead({ bounded: false, tenantScoped: true }),
+    /control-plane section "unsafe" must declare bounded tenant-scoped reads/,
+  );
+  assert.throws(
+    createWithRead({ bounded: true, tenantScoped: false }),
+    /control-plane section "unsafe" must declare bounded tenant-scoped reads/,
+  );
 });
 
 test('control-plane preset: streaming capability does not block first shell chunk on section data', async () => {
@@ -335,5 +398,83 @@ test('control-plane guardrails: relaxed mode tolerates antd-cssinjs while strict
         tests: { exercise_real_serving_path: true },
       }),
     /I2/,
+  );
+});
+
+test('control-plane boundary guardrails: current source keeps control-plane and Stitch host-owned', async () => {
+  const files = await collectSourceFiles(path.resolve('src'));
+
+  assert.doesNotThrow(() => assertControlPlaneBoundaryGuardrails(files));
+});
+
+test('control-plane boundary guardrails: blocks raw data/auth ownership in control-plane surfaces', () => {
+  assert.throws(
+    () =>
+      assertControlPlaneBoundaryGuardrails([
+        {
+          path: 'ts/src/stitch-admin/raw-store.ts',
+          content:
+            "import { DynamoDBClient } from '@aws-sdk/client-dynamodb';\nexport const client = new DynamoDBClient({});\n",
+        },
+      ]),
+    /raw DynamoDB clients/,
+  );
+
+  assert.throws(
+    () =>
+      assertControlPlaneBoundaryGuardrails([
+        {
+          path: 'ts/src/control-plane.ts',
+          content:
+            "export function normalizeStaffEntitlement(input: unknown) { return input; }\n",
+        },
+      ]),
+    /entitlement normalization/,
+  );
+
+  assert.throws(
+    () =>
+      assertControlPlaneBoundaryGuardrails([
+        {
+          path: 'ts/src/control-plane.ts',
+          content:
+            "import { createTableTheoryModel } from '@theory-cloud/tabletheory-ts';\nvoid createTableTheoryModel;\n",
+        },
+      ]),
+    /TableTheory imports are limited/,
+  );
+
+  assert.doesNotThrow(() =>
+    assertControlPlaneBoundaryGuardrails([
+      {
+        path: 'ts/src/tabletheory/index.ts',
+        content:
+          "import { createTableTheoryModel } from '@theory-cloud/tabletheory-ts';\nvoid createTableTheoryModel;\n",
+      },
+      {
+        path: 'ts/test/unit/tabletheory-isr-meta-store.test.ts',
+        content:
+          "import { TableTheoryIsrMetaStoreAdapter } from '../../src/tabletheory/index.js';\nvoid TableTheoryIsrMetaStoreAdapter;\n",
+      },
+    ]),
+  );
+});
+
+test('control-plane boundary guardrails: malformed whitespace-heavy imports scan quickly', () => {
+  const whitespace = ' '.repeat(100_000);
+  const startedAt = performance.now();
+
+  assert.doesNotThrow(() =>
+    assertControlPlaneBoundaryGuardrails([
+      {
+        path: 'ts/src/control-plane.ts',
+        content: `import${whitespace}\nexport${whitespace}\nrequire(${whitespace}\nimport(${whitespace}`,
+      },
+    ]),
+  );
+
+  assert.ok(
+    performance.now() - startedAt < 1_000,
+    'malformed import-like whitespace should scan in well under one second',
   );
 });

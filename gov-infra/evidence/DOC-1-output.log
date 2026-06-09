@@ -1,0 +1,6 @@
+Verifier: gov_check_docs
+Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
+Rubric ID: DOC-1
+
+docs-profile: PASS
+gemini-absence: PASS
