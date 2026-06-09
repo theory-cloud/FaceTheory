@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
+
 import {
   CONTROL_PLANE_BOOTSTRAP_MODULE_PATH,
   CONTROL_PLANE_RESPONSIVE_PRIMITIVES_STYLESHEET_PATH,
+  assertControlPlaneBoundaryGuardrails,
   assertControlPlaneDeliveryGuardrails,
   createControlPlaneApp,
   createControlPlanePresetDescriptor,
@@ -19,6 +23,26 @@ async function collect(body: FaceBody): Promise<string> {
   for await (const chunk of body) chunks.push(decoder.decode(chunk, { stream: true }));
   chunks.push(decoder.decode());
   return chunks.join('');
+}
+
+async function collectSourceFiles(
+  dir: string,
+): Promise<Array<{ path: string; content: string }>> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files: Array<{ path: string; content: string }> = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectSourceFiles(fullPath)));
+      continue;
+    }
+    if (!/\.(?:ts|tsx|svelte)$/.test(entry.name)) continue;
+    files.push({
+      path: path.relative(path.resolve('..'), fullPath),
+      content: await readFile(fullPath, 'utf8'),
+    });
+  }
+  return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 function createDemoApp(options: {
@@ -373,5 +397,64 @@ test('control-plane guardrails: relaxed mode tolerates antd-cssinjs while strict
         tests: { exercise_real_serving_path: true },
       }),
     /I2/,
+  );
+});
+
+test('control-plane boundary guardrails: current source keeps control-plane and Stitch host-owned', async () => {
+  const files = await collectSourceFiles(path.resolve('src'));
+
+  assert.doesNotThrow(() => assertControlPlaneBoundaryGuardrails(files));
+});
+
+test('control-plane boundary guardrails: blocks raw data/auth ownership in control-plane surfaces', () => {
+  assert.throws(
+    () =>
+      assertControlPlaneBoundaryGuardrails([
+        {
+          path: 'ts/src/stitch-admin/raw-store.ts',
+          content:
+            "import { DynamoDBClient } from '@aws-sdk/client-dynamodb';\nexport const client = new DynamoDBClient({});\n",
+        },
+      ]),
+    /raw DynamoDB clients/,
+  );
+
+  assert.throws(
+    () =>
+      assertControlPlaneBoundaryGuardrails([
+        {
+          path: 'ts/src/control-plane.ts',
+          content:
+            "export function normalizeStaffEntitlement(input: unknown) { return input; }\n",
+        },
+      ]),
+    /entitlement normalization/,
+  );
+
+  assert.throws(
+    () =>
+      assertControlPlaneBoundaryGuardrails([
+        {
+          path: 'ts/src/control-plane.ts',
+          content:
+            "import { createTableTheoryModel } from '@theory-cloud/tabletheory-ts';\nvoid createTableTheoryModel;\n",
+        },
+      ]),
+    /TableTheory imports are limited/,
+  );
+
+  assert.doesNotThrow(() =>
+    assertControlPlaneBoundaryGuardrails([
+      {
+        path: 'ts/src/tabletheory/index.ts',
+        content:
+          "import { createTableTheoryModel } from '@theory-cloud/tabletheory-ts';\nvoid createTableTheoryModel;\n",
+      },
+      {
+        path: 'ts/test/unit/tabletheory-isr-meta-store.test.ts',
+        content:
+          "import { TableTheoryIsrMetaStoreAdapter } from '../../src/tabletheory/index.js';\nvoid TableTheoryIsrMetaStoreAdapter;\n",
+      },
+    ]),
   );
 });
