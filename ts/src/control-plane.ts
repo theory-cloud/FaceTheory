@@ -95,6 +95,27 @@ export type ControlPlaneGate = (
 ) => ControlPlaneGateResult | Promise<ControlPlaneGateResult>;
 
 export interface ControlPlaneSectionReadContract {
+  /**
+   * Optional host-supplied identifier for the external read contract.
+   *
+   * FaceTheory treats this as an opaque label for audit/debug surfaces. It
+   * must not be parsed for TableTheory key material, auth semantics, or
+   * entitlement decisions.
+   */
+  contractId?: string | undefined;
+  /**
+   * Optional host-supplied authority label for the external read contract.
+   *
+   * This is opaque metadata only; authority resolution remains host-owned.
+   */
+  authority?: string | undefined;
+  /**
+   * Optional host-supplied source/provenance label for the external contract.
+   *
+   * This is opaque metadata only and does not weaken the bounded tenant scope
+   * requirements below.
+   */
+  source?: string | undefined;
   bounded: true;
   tenantScoped: true;
 }
