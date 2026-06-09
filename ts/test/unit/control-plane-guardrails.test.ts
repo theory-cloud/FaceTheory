@@ -7,6 +7,7 @@ import {
   assertControlPlaneDeliveryGuardrails,
   createControlPlaneApp,
   createControlPlanePresetDescriptor,
+  type ControlPlaneSectionReadContract,
 } from '../../src/index.js';
 import { handleLambdaUrlEvent } from '../../src/lambda-url.js';
 import type { FaceBody } from '../../src/types.js';
@@ -138,6 +139,43 @@ test('control-plane preset: shell-first client-fill leaves section data off crit
   assert.equal(section.headers['content-type']?.[0], 'text/html; charset=utf-8');
   assert.equal(await collect(section.body), '<p>loaded</p>');
   assert.equal(loadCalls, 1);
+});
+
+test('control-plane preset: rejects section reads without bounded tenant scope at app construction', () => {
+  const createWithRead = (read: unknown) => () =>
+    createControlPlaneApp({
+      gate: () => ({ ok: true, tenant: 'tenant-a' }),
+      faces: [
+        {
+          route: '/',
+          sections: [
+            {
+              id: 'unsafe',
+              read: read as ControlPlaneSectionReadContract,
+              load: () => ({ count: 0 }),
+              render: () => '<p>unsafe</p>',
+            },
+          ],
+        },
+      ],
+    });
+
+  assert.throws(
+    createWithRead({ tenantScoped: true }),
+    /control-plane section "unsafe" must declare bounded tenant-scoped reads/,
+  );
+  assert.throws(
+    createWithRead({ bounded: true }),
+    /control-plane section "unsafe" must declare bounded tenant-scoped reads/,
+  );
+  assert.throws(
+    createWithRead({ bounded: false, tenantScoped: true }),
+    /control-plane section "unsafe" must declare bounded tenant-scoped reads/,
+  );
+  assert.throws(
+    createWithRead({ bounded: true, tenantScoped: false }),
+    /control-plane section "unsafe" must declare bounded tenant-scoped reads/,
+  );
 });
 
 test('control-plane preset: streaming capability does not block first shell chunk on section data', async () => {
