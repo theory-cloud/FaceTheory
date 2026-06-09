@@ -33,3 +33,6 @@ docs/.jekyll-cache/
 docs/.jekyll-metadata
 docs/vendor/
 docs/.bundle/
+
+# Local TheoryCloud agent materialization
+.claude/
