@@ -2,8 +2,13 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { utf8 } from './bytes.js';
 import { safeJson } from './html.js';
+import {
+  requiresStrictCspDocumentValidation,
+  validateStrictCspDocument,
+} from './security.js';
 import type {
   CookieMap,
+  FaceCspPolicy,
   FaceContext,
   FaceModule,
   FaceResponse,
@@ -35,6 +40,8 @@ const DEFAULT_TENANT_BOUNDARY_HEADERS = [
 const ISR_HYDRATION_QUERY_PARAM = '__facetheory_isr_hydration';
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 const HYDRATION_SIDECAR_CACHE_CONTROL = 'no-store';
+const ISR_HTML_METADATA_CONTENT_SECURITY_POLICY =
+  'facetheory-content-security-policy';
 
 export type IsrFailurePolicy = 'serve-stale' | 'error';
 export type IsrLockContentionPolicy = 'wait' | 'serve-stale';
@@ -55,6 +62,7 @@ export interface HtmlStoreWriteResult {
 export interface HtmlStoreReadResult {
   body: Uint8Array;
   etag?: string | null;
+  metadata?: Record<string, string>;
 }
 
 export interface HtmlStore {
@@ -69,6 +77,8 @@ export interface IsrMetaRecord {
   revalidateSeconds: number;
   status: number;
   contentType: string;
+  contentSecurityPolicy?: string | null;
+  strictCspPolicy?: IsrCachedStrictCspPolicy | null;
   etag: string | null;
   leaseOwner: string | null;
   leaseToken: string | null;
@@ -98,6 +108,8 @@ export interface CommitIsrGenerationInput {
   revalidateSeconds: number;
   status: number;
   contentType: string;
+  contentSecurityPolicy?: string | null;
+  strictCspPolicy?: IsrCachedStrictCspPolicy | null;
   etag?: string | null;
 }
 
@@ -197,7 +209,14 @@ interface PreparedFreshResponse {
   body: Uint8Array;
   status: number;
   contentType: string;
+  contentSecurityPolicy: string | null;
+  strictCspPolicy: IsrCachedStrictCspPolicy | null;
   etag: string | null;
+}
+
+export interface IsrCachedStrictCspPolicy {
+  inlineScripts?: false | undefined;
+  inlineStyles?: false | undefined;
 }
 
 class IsrLeaseConflictError extends Error {
@@ -210,7 +229,11 @@ class IsrLeaseConflictError extends Error {
 export class InMemoryHtmlStore implements HtmlStore {
   private readonly objects = new Map<
     string,
-    { body: Uint8Array; etag: string | null }
+    {
+      body: Uint8Array;
+      etag: string | null;
+      metadata: Record<string, string> | null;
+    }
   >();
 
   async read(key: string): Promise<HtmlStoreReadResult | null> {
@@ -219,6 +242,7 @@ export class InMemoryHtmlStore implements HtmlStore {
     return {
       body: Uint8Array.from(entry.body),
       ...(entry.etag !== null ? { etag: entry.etag } : {}),
+      ...(entry.metadata !== null ? { metadata: { ...entry.metadata } } : {}),
     };
   }
 
@@ -227,6 +251,7 @@ export class InMemoryHtmlStore implements HtmlStore {
     this.objects.set(input.key, {
       body: Uint8Array.from(input.body),
       etag,
+      metadata: input.metadata ? { ...input.metadata } : null,
     });
     return { etag };
   }
@@ -299,6 +324,8 @@ export class InMemoryIsrMetaStore implements IsrMetaStore {
       revalidateSeconds: normalizeRevalidateSeconds(input.revalidateSeconds),
       status: normalizeStatus(input.status),
       contentType: normalizeContentType(input.contentType),
+      contentSecurityPolicy: input.contentSecurityPolicy ?? null,
+      strictCspPolicy: input.strictCspPolicy ?? null,
       etag: input.etag ?? null,
       leaseOwner: null,
       leaseToken: null,
@@ -336,6 +363,7 @@ export interface S3HtmlStoreClient {
   getObject: (input: { bucket: string; key: string }) => Promise<{
     body: Uint8Array | string | AsyncIterable<Uint8Array> | null;
     etag?: string | null;
+    metadata?: Record<string, string>;
   } | null>;
   putObject: (input: {
     bucket: string;
@@ -376,6 +404,7 @@ export class S3HtmlStore implements HtmlStore {
     return {
       body,
       ...(output.etag !== undefined ? { etag: output.etag ?? null } : {}),
+      ...(output.metadata ? { metadata: { ...output.metadata } } : {}),
     };
   }
 
@@ -698,11 +727,13 @@ async function regenerateAndCommit(
       });
     }
 
+    const htmlMetadata = htmlStoreMetadataFromPreparedFreshResponse(prepared);
     const write = await runtimeOptions.htmlStore.write({
       key: htmlPointer,
       body: prepared.body,
       contentType: prepared.contentType,
       cacheControl: blockingIsrCacheControl(revalidateSeconds),
+      ...(htmlMetadata ? { metadata: htmlMetadata } : {}),
     });
     const etag = prepared.etag ?? write.etag ?? null;
 
@@ -715,6 +746,12 @@ async function regenerateAndCommit(
       revalidateSeconds,
       status: prepared.status,
       contentType: prepared.contentType,
+      ...(prepared.contentSecurityPolicy !== null
+        ? { contentSecurityPolicy: prepared.contentSecurityPolicy }
+        : {}),
+      ...(prepared.strictCspPolicy !== null
+        ? { strictCspPolicy: prepared.strictCspPolicy }
+        : {}),
       ...(etag !== null ? { etag } : {}),
     });
 
@@ -726,6 +763,8 @@ async function regenerateAndCommit(
         generatedAt,
         status: prepared.status,
         contentType: prepared.contentType,
+        contentSecurityPolicy: prepared.contentSecurityPolicy,
+        strictCspPolicy: prepared.strictCspPolicy,
         etag,
       },
       prepared.body,
@@ -787,7 +826,14 @@ async function cachedResponseFromRecord(
   if (!html) return null;
 
   const body = Uint8Array.from(html.body);
-  return responseFromStoredHtml(runtimeOptions, record, body, state, nowMs);
+  return responseFromStoredHtml(
+    runtimeOptions,
+    record,
+    body,
+    state,
+    nowMs,
+    html.metadata,
+  );
 }
 
 function responseFromStoredHtml(
@@ -796,8 +842,23 @@ function responseFromStoredHtml(
   body: Uint8Array,
   state: IsrCacheState,
   nowMs: number,
+  htmlMetadata?: Record<string, string> | undefined,
 ): FaceResponse {
   const contentType = normalizeContentType(record.contentType);
+  const contentSecurityPolicy = normalizeOptionalHeaderValue(
+    record.contentSecurityPolicy ??
+      htmlMetadata?.[ISR_HTML_METADATA_CONTENT_SECURITY_POLICY],
+  );
+  const strictCspPolicy = normalizeCachedStrictCspPolicy(
+    record.strictCspPolicy,
+    contentSecurityPolicy,
+  );
+  if (strictCspPolicy !== null) {
+    validateStrictCspDocument(decodeUtf8Html(body), {
+      policy: strictCspPolicy,
+    });
+  }
+
   const isRecordFresh = isFresh(record, nowMs);
   const headers: Headers = {
     'cache-control': [
@@ -810,6 +871,9 @@ function responseFromStoredHtml(
     'content-type': [contentType],
     'x-facetheory-isr': [state],
   };
+  if (contentSecurityPolicy !== null) {
+    headers['content-security-policy'] = [contentSecurityPolicy];
+  }
 
   if (record.etag) {
     headers.etag = [record.etag];
@@ -821,6 +885,15 @@ function responseFromStoredHtml(
     cookies: [],
     body,
     isBase64: false,
+  };
+}
+
+function htmlStoreMetadataFromPreparedFreshResponse(
+  prepared: PreparedFreshResponse,
+): Record<string, string> | undefined {
+  if (prepared.contentSecurityPolicy === null) return undefined;
+  return {
+    [ISR_HTML_METADATA_CONTENT_SECURITY_POLICY]: prepared.contentSecurityPolicy,
   };
 }
 
@@ -1077,6 +1150,8 @@ function createDefaultMetaRecord(
     revalidateSeconds: normalizeRevalidateSeconds(revalidateSeconds),
     status: 200,
     contentType: HTML_CONTENT_TYPE,
+    contentSecurityPolicy: null,
+    strictCspPolicy: null,
     etag: null,
     leaseOwner: null,
     leaseToken: null,
@@ -1152,6 +1227,10 @@ async function prepareFreshResponse(
   const contentType = normalizeContentType(
     firstHeaderValue(headers, 'content-type'),
   );
+  const contentSecurityPolicy = normalizeOptionalHeaderValue(
+    firstHeaderValue(headers, 'content-security-policy'),
+  );
+  const strictCspPolicy = inferCachedStrictCspPolicy(contentSecurityPolicy);
   const etag = firstHeaderValue(headers, 'etag');
   const body = await collectBody(response.body);
 
@@ -1159,8 +1238,83 @@ async function prepareFreshResponse(
     body,
     status,
     contentType,
+    contentSecurityPolicy,
+    strictCspPolicy,
     etag,
   };
+}
+
+function normalizeCachedStrictCspPolicy(
+  policy: IsrCachedStrictCspPolicy | null | undefined,
+  contentSecurityPolicy: string | null,
+): FaceCspPolicy | null {
+  const normalizedPolicy =
+    policy ?? inferCachedStrictCspPolicy(contentSecurityPolicy);
+  if (!normalizedPolicy) return null;
+
+  const cspPolicy: FaceCspPolicy = {};
+  if (normalizedPolicy.inlineScripts === false) {
+    cspPolicy.inlineScripts = false;
+  }
+  if (normalizedPolicy.inlineStyles === false) {
+    cspPolicy.inlineStyles = false;
+  }
+  return requiresStrictCspDocumentValidation(cspPolicy) ? cspPolicy : null;
+}
+
+function inferCachedStrictCspPolicy(
+  contentSecurityPolicy: string | null,
+): IsrCachedStrictCspPolicy | null {
+  if (contentSecurityPolicy === null) return null;
+
+  const directives = parseCspDirectives(contentSecurityPolicy);
+  const scriptDirective =
+    directives.get('script-src') ?? directives.get('default-src');
+  const styleDirective =
+    directives.get('style-src') ?? directives.get('default-src');
+  const policy: IsrCachedStrictCspPolicy = {};
+
+  if (scriptDirective && !directiveAllowsUnsafeInline(scriptDirective)) {
+    policy.inlineScripts = false;
+  }
+  if (styleDirective && !directiveAllowsUnsafeInline(styleDirective)) {
+    policy.inlineStyles = false;
+  }
+
+  return policy.inlineScripts === false || policy.inlineStyles === false
+    ? policy
+    : null;
+}
+
+function parseCspDirectives(value: string): Map<string, string[]> {
+  const directives = new Map<string, string[]>();
+  for (const rawDirective of value.split(';')) {
+    const tokens = rawDirective.trim().split(/\s+/).filter(Boolean);
+    const name = tokens.shift()?.toLowerCase();
+    if (!name || directives.has(name)) continue;
+    directives.set(
+      name,
+      tokens.map((token) => token.toLowerCase()),
+    );
+  }
+  return directives;
+}
+
+function directiveAllowsUnsafeInline(values: readonly string[]): boolean {
+  return values.some(
+    (value) => value.replace(/^'+|'+$/g, '') === 'unsafe-inline',
+  );
+}
+
+function normalizeOptionalHeaderValue(
+  value: string | null | undefined,
+): string | null {
+  const normalized = String(value ?? '').trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function decodeUtf8Html(body: Uint8Array): string {
+  return new TextDecoder('utf-8', { fatal: true }).decode(body);
 }
 
 async function collectBody(body: FaceResponse['body']): Promise<Uint8Array> {

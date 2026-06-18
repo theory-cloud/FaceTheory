@@ -1,4 +1,8 @@
-import { GetObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  type S3Client,
+} from '@aws-sdk/client-s3';
 
 import type { S3HtmlStoreClient } from '../isr.js';
 
@@ -7,7 +11,8 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<Uint8Array> {
     typeof value === 'object' &&
     value !== null &&
     Symbol.asyncIterator in (value as Record<string | symbol, unknown>) &&
-    typeof (value as Record<string | symbol, unknown>)[Symbol.asyncIterator] === 'function'
+    typeof (value as Record<string | symbol, unknown>)[Symbol.asyncIterator] ===
+      'function'
   );
 }
 
@@ -21,11 +26,14 @@ function hasTransformToByteArray(
   return (
     typeof value === 'object' &&
     value !== null &&
-    typeof (value as { transformToByteArray?: unknown }).transformToByteArray === 'function'
+    typeof (value as { transformToByteArray?: unknown })
+      .transformToByteArray === 'function'
   );
 }
 
-function hasArrayBuffer(value: unknown): value is { arrayBuffer: () => Promise<ArrayBuffer> } {
+function hasArrayBuffer(
+  value: unknown,
+): value is { arrayBuffer: () => Promise<ArrayBuffer> } {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -42,7 +50,9 @@ async function normalizeGetObjectBody(
   if (isAsyncIterable(body)) return body;
   if (hasTransformToByteArray(body)) return await body.transformToByteArray();
   if (hasArrayBuffer(body)) return new Uint8Array(await body.arrayBuffer());
-  throw new TypeError('S3 getObject body type is not supported by FaceTheory S3HtmlStoreClient');
+  throw new TypeError(
+    'S3 getObject body type is not supported by FaceTheory S3HtmlStoreClient',
+  );
 }
 
 function isNotFoundError(err: unknown): boolean {
@@ -81,6 +91,7 @@ export function createAwsSdkS3HtmlStoreClient(
         return {
           body,
           ...(out.ETag !== undefined ? { etag: out.ETag ?? null } : {}),
+          ...(out.Metadata ? { metadata: { ...out.Metadata } } : {}),
         };
       } catch (err) {
         if (isNotFoundError(err)) return null;
@@ -94,7 +105,9 @@ export function createAwsSdkS3HtmlStoreClient(
           Key: input.key,
           Body: input.body,
           ContentType: input.contentType,
-          ...(input.cacheControl !== undefined ? { CacheControl: input.cacheControl } : {}),
+          ...(input.cacheControl !== undefined
+            ? { CacheControl: input.cacheControl }
+            : {}),
           ...(input.metadata ? { Metadata: { ...input.metadata } } : {}),
         }),
       );
@@ -105,4 +118,3 @@ export function createAwsSdkS3HtmlStoreClient(
     },
   };
 }
-

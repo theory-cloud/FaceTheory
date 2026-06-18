@@ -60,17 +60,16 @@ export interface FaceAppOptions {
   strictCsp?: FaceStrictCspOptions;
 }
 
-export interface FaceSsrHydrationSidecarOptions
-  extends Pick<
-    SsrHydrationSidecarStoreOptions,
-    | 'htmlStore'
-    | 'signingSecret'
-    | 'now'
-    | 'ttlSeconds'
-    | 'keyPrefix'
-    | 'dataUrlPrefix'
-    | 'scope'
-  > {
+export interface FaceSsrHydrationSidecarOptions extends Pick<
+  SsrHydrationSidecarStoreOptions,
+  | 'htmlStore'
+  | 'signingSecret'
+  | 'now'
+  | 'ttlSeconds'
+  | 'keyPrefix'
+  | 'dataUrlPrefix'
+  | 'scope'
+> {
   /**
    * Request-derived variant binding used when writing a sidecar during the
    * HTML render and when reading it through the framework-owned resource
@@ -87,9 +86,7 @@ export interface FaceSsrHydrationSidecarOptions
 
 export type FaceSsrHydrationSidecarVariantCallback = (
   request: Readonly<Required<FaceRequest>>,
-) =>
-  | SsrHydrationSidecarVariantInput
-  | Promise<SsrHydrationSidecarVariantInput>;
+) => SsrHydrationSidecarVariantInput | Promise<SsrHydrationSidecarVariantInput>;
 
 export interface FaceStrictCspOptions {
   /**
@@ -158,9 +155,7 @@ export class FaceApp {
         options.strictCsp?.maxStreamingBodyBytes,
       );
     this.ssrHydrationSidecarRuntime = options.ssrHydrationSidecars
-      ? createFaceAppSsrHydrationSidecarRuntime(
-          options.ssrHydrationSidecars,
-        )
+      ? createFaceAppSsrHydrationSidecarRuntime(options.ssrHydrationSidecars)
       : null;
 
     for (const face of options.faces) {
@@ -173,7 +168,10 @@ export class FaceApp {
     }
 
     const resources = this.ssrHydrationSidecarRuntime
-      ? [...this.ssrHydrationSidecarRuntime.routes, ...(options.resources ?? [])]
+      ? [
+          ...this.ssrHydrationSidecarRuntime.routes,
+          ...(options.resources ?? []),
+        ]
       : (options.resources ?? []);
 
     for (const resource of resources) {
@@ -750,17 +748,6 @@ async function toHTTPResponse(
   }
 
   if (requiresStrictCspDocumentValidation(out.csp)) {
-    if (canStreamStrictCspWithNonce(out.csp, req.cspNonce)) {
-      validateStrictCspHead(head, out.csp);
-      const body = streamHTMLDocument({
-        ...documentParts,
-        head,
-        body: await preflightStream(out.html),
-      });
-
-      return { status, headers, cookies, body, isBase64: false };
-    }
-
     const strictBody = await collectStreamAsUtf8Text(
       out.html,
       strictCspMaxStreamingBodyBytes,
@@ -798,23 +785,6 @@ function applyStrictCspResponseHeader(
   if (!requiresStrictCspDocumentValidation(policy)) return;
   if (headers['content-security-policy']?.length) return;
   headers['content-security-policy'] = [buildStrictCspHeader({ cspNonce })];
-}
-
-function canStreamStrictCspWithNonce(
-  policy: FaceRenderResult['csp'],
-  cspNonce: string | null,
-): boolean {
-  return (
-    policy?.inlineScripts === false && Boolean(String(cspNonce ?? '').trim())
-  );
-}
-
-function validateStrictCspHead(
-  head: string,
-  policy: FaceRenderResult['csp'],
-): void {
-  const headOnlyDocument = renderHTMLDocument({ head, body: '' });
-  validateStrictCspDocument(headOnlyDocument, { policy });
 }
 
 async function collectStreamAsUtf8Text(
