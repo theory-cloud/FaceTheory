@@ -36,72 +36,6 @@ async function collectBodyChunks(
   return { chunks, full: chunks.join('') };
 }
 
-function extractScriptTags(html: string): string[] {
-  const tags: string[] = [];
-  const lower = html.toLowerCase();
-  let cursor = 0;
-
-  for (;;) {
-    const start = lower.indexOf('<script', cursor);
-    if (start === -1) break;
-    const nameEnd = start + '<script'.length;
-    if (!isHtmlTagBoundary(lower, nameEnd)) {
-      cursor = nameEnd;
-      continue;
-    }
-
-    const startTagEnd = findHtmlTagEnd(html, nameEnd);
-    if (startTagEnd === -1) break;
-    const endStart = findScriptEndTagStart(lower, startTagEnd + 1);
-    if (endStart === -1) break;
-    const endTagEnd = findHtmlTagEnd(html, endStart + '</script'.length);
-    if (endTagEnd === -1) break;
-
-    tags.push(html.slice(start, endTagEnd + 1));
-    cursor = endTagEnd + 1;
-  }
-
-  return tags;
-}
-
-function findScriptEndTagStart(lowerHtml: string, from: number): number {
-  let cursor = from;
-  for (;;) {
-    const start = lowerHtml.indexOf('</script', cursor);
-    if (start === -1) return -1;
-    const nameEnd = start + '</script'.length;
-    if (isHtmlTagBoundary(lowerHtml, nameEnd)) return start;
-    cursor = nameEnd;
-  }
-}
-
-function findHtmlTagEnd(html: string, from: number): number {
-  let quote: '"' | "'" | null = null;
-  for (let index = from; index < html.length; index += 1) {
-    const char = html[index];
-    if (quote) {
-      if (char === quote) quote = null;
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (char === '>') return index;
-  }
-  return -1;
-}
-
-function isHtmlTagBoundary(html: string, index: number): boolean {
-  if (index >= html.length) return false;
-  const code = html.charCodeAt(index);
-  return code === 47 || code === 62 || isHtmlWhitespace(code);
-}
-
-function isHtmlWhitespace(code: number): boolean {
-  return code === 9 || code === 10 || code === 12 || code === 13 || code === 32;
-}
-
 function extractHydrationHref(html: string): string {
   const tag = /<link\b[^>]*rel="facetheory-hydration"[^>]*>/i.exec(html)?.[0];
   assert.ok(tag, 'expected FaceTheory hydration link');
@@ -313,7 +247,7 @@ test('FaceApp: strict CSP streaming responses are coerced to validated buffered 
   assert.equal(full.includes('__FACETHEORY_DATA__'), false);
 });
 
-test('FaceApp: strict CSP streaming with nonce validates the head and preserves streaming', async () => {
+test('FaceApp: strict CSP streaming with nonce validates the full document before responding', async () => {
   let streamChunksRead = 0;
   const metrics: Array<{ name: string; tags?: Record<string, string> }> = [];
   const logs: Array<{ isStream?: boolean }> = [];
@@ -366,8 +300,8 @@ test('FaceApp: strict CSP streaming with nonce validates the head and preserves 
     cspNonce: 'nonce-strict-stream',
   });
   assert.equal(resp.status, 200);
-  assert.ok(!(resp.body instanceof Uint8Array));
-  assert.equal(streamChunksRead, 1);
+  assert.ok(resp.body instanceof Uint8Array);
+  assert.equal(streamChunksRead, 2);
   assert.match(
     resp.headers['content-security-policy']?.[0] ?? '',
     /script-src 'self' 'nonce-nonce-strict-stream'/,
@@ -380,42 +314,19 @@ test('FaceApp: strict CSP streaming with nonce validates the head and preserves 
   const requestMetric = metrics.find(
     (entry) => entry.name === 'facetheory.request',
   );
-  assert.equal(requestMetric?.tags?.is_stream, '1');
-  assert.equal(logs.at(-1)?.isStream, true);
+  assert.equal(requestMetric?.tags?.is_stream, '0');
+  assert.equal(logs.at(-1)?.isStream, false);
 
-  const iterator = (resp.body as AsyncIterable<Uint8Array>)[
-    Symbol.asyncIterator
-  ]();
-  const firstChunk = await iterator.next();
-  assert.equal(firstChunk.done, false);
-  const first = new TextDecoder().decode(firstChunk.value);
-  assert.ok(first.startsWith('<!doctype html>'));
+  const full = new TextDecoder().decode(resp.body);
+  assert.ok(full.startsWith('<!doctype html>'));
   assert.match(
-    first,
+    full,
     /<head><meta charset="utf-8"><title>Strict streamed title<\/title><link href="\/assets\/app.css" rel="stylesheet"><meta content="new" name="description"><link href="\/_facetheory\/hydration\/strict-stream\.json" id="__FACETHEORY_DATA_URL__" rel="facetheory-hydration" type="application\/json"><script nonce="nonce-strict-stream" src="\/assets\/entry\.js" type="module"><\/script><\/head>/,
   );
-  assert.equal(first.includes('Old title'), false);
-  assert.equal(first.includes('content="old"'), false);
-  assert.equal(first.includes('strict streamed first'), false);
-
-  const rest: Uint8Array[] = [];
-  for (;;) {
-    const next = await iterator.next();
-    if (next.done) break;
-    rest.push(next.value);
-  }
-  const full =
-    first +
-    new TextDecoder().decode(
-      await collectBody(
-        (async function* () {
-          for (const chunk of rest) yield chunk;
-        })(),
-      ),
-    );
+  assert.equal(full.includes('Old title'), false);
+  assert.equal(full.includes('content="old"'), false);
   assert.ok(full.includes('<main>strict streamed first</main>'));
   assert.ok(full.includes('<footer>strict streamed second</footer>'));
-  assert.equal(streamChunksRead, 2);
 });
 
 test('FaceApp: strict CSP streaming uses a default bounded collector', async () => {
@@ -530,6 +441,41 @@ test('FaceApp: strict CSP streaming violations fail before bytes flush', async (
   assert.equal(full.includes('onclick'), false);
 });
 
+test('FaceApp: strict CSP streaming with nonce rejects unsafe body scripts before bytes flush', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          html: (async function* () {
+            yield utf8('<main>safe first chunk</main>');
+            yield utf8('<script nonce="nonce-stream">alert("unsafe")</script>');
+          })(),
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/',
+    cspNonce: 'nonce-stream',
+  });
+  assert.equal(resp.status, 500);
+  assert.ok(resp.body instanceof Uint8Array);
+
+  const full = new TextDecoder().decode(resp.body);
+  assert.ok(full.includes('<h1>Internal Server Error</h1>'));
+  assert.equal(full.includes('safe first chunk'), false);
+  assert.equal(full.includes('alert("unsafe")'), false);
+});
+
 test('FaceApp: strict React stream externalizes hydration sidecar and keeps bootstrap module external', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const app = createFaceApp({
@@ -562,7 +508,7 @@ test('FaceApp: strict React stream externalizes hydration sidecar and keeps boot
     cspNonce: 'nonce-sidecar-stream',
   });
   assert.equal(resp.status, 200);
-  assert.ok(!(resp.body instanceof Uint8Array));
+  assert.ok(resp.body instanceof Uint8Array);
 
   const { full } = await collectBodyChunks(resp.body);
   assert.ok(full.includes('Strict stream sidecar'));
@@ -588,7 +534,7 @@ test('FaceApp: strict React stream externalizes hydration sidecar and keeps boot
   });
 });
 
-test('react adapter: React 19 shell stream nonces bootstrap and Suspense reveal scripts', async () => {
+test('react adapter: strict CSP shell stream fails closed on Suspense reveal scripts', async () => {
   const nonce = 'nonce-react19-midstream';
   const LazyPanel = React.lazy(async () => {
     await delay(40);
@@ -630,48 +576,14 @@ test('react adapter: React 19 shell stream nonces bootstrap and Suspense reveal 
   });
 
   const resp = await app.handle({ method: 'GET', path: '/', cspNonce: nonce });
-  assert.equal(resp.status, 200);
-  assert.ok(!(resp.body instanceof Uint8Array));
+  assert.equal(resp.status, 500);
+  assert.ok(resp.body instanceof Uint8Array);
 
-  const { chunks, full } = await collectBodyChunks(resp.body);
-  assert.ok(
-    chunks.length >= 4,
-    `expected streamed chunks, received ${String(chunks.length)}`,
-  );
-  assert.ok(full.includes('Control plane shell'));
-  assert.ok(full.includes('Loading data'));
-  assert.ok(full.includes('Late control-plane data'));
-
-  const scriptTags = extractScriptTags(full);
-  assert.ok(scriptTags.length >= 3, scriptTags.join('\n'));
-  assert.ok(
-    scriptTags.some((tag) =>
-      tag.includes('src="/assets/control-plane-entry.js"'),
-    ),
-    scriptTags.join('\n'),
-  );
-  assert.ok(
-    scriptTags.some((tag) => tag.includes('$RT=performance.now()')),
-    scriptTags.join('\n'),
-  );
-  assert.ok(
-    scriptTags.some((tag) => tag.includes('$RC(')),
-    scriptTags.join('\n'),
-  );
-
-  for (const tag of scriptTags) {
-    assert.ok(tag.includes(`nonce="${nonce}"`), tag);
-  }
-
-  const reactScriptChunks = chunks.filter(
-    (chunk) =>
-      chunk.includes('<script') &&
-      (chunk.includes('$RT=') || chunk.includes('$RC(')),
-  );
-  assert.ok(reactScriptChunks.length >= 2, reactScriptChunks.join('\n'));
-  assert.ok(
-    reactScriptChunks.every((chunk) => chunk.includes(`nonce="${nonce}"`)),
-  );
+  const full = new TextDecoder().decode(resp.body);
+  assert.ok(full.includes('<h1>Internal Server Error</h1>'));
+  assert.equal(full.includes('Control plane shell'), false);
+  assert.equal(full.includes('Late control-plane data'), false);
+  assert.equal(full.includes('$RC('), false);
 });
 
 test('react adapter: streaming includes AntD + Emotion styles in head before body', async () => {
@@ -843,7 +755,12 @@ test('react adapter: integrations receive isolated per-render state across the r
       createReactStreamFace({
         route: '/',
         mode: 'ssr',
-        render: () => React.createElement('main', { className: 'from-int' }, 'Request state'),
+        render: () =>
+          React.createElement(
+            'main',
+            { className: 'from-int' },
+            'Request state',
+          ),
         renderOptions: {
           integrations: [
             {
@@ -852,7 +769,9 @@ test('react adapter: integrations receive isolated per-render state across the r
               wrapTree: (tree, _ctx, state) =>
                 React.createElement(
                   'section',
-                  { className: `wrapped-${String((state as { id: number }).id)}` },
+                  {
+                    className: `wrapped-${String((state as { id: number }).id)}`,
+                  },
                   tree,
                 ),
               contribute: (_ctx, state) => ({
@@ -868,7 +787,9 @@ test('react adapter: integrations receive isolated per-render state across the r
                 styleTags: [
                   {
                     cssText: `.from-int-${String((state as { id: number }).id)}{color:rgb(4,5,6);}`,
-                    attrs: { id: `style-state-${String((state as { id: number }).id)}` },
+                    attrs: {
+                      id: `style-state-${String((state as { id: number }).id)}`,
+                    },
                   },
                 ],
               }),

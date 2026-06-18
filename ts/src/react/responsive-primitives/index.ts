@@ -7,6 +7,7 @@ import {
   handleResponsiveLinkClick,
   loadingStateClassName,
   normalizeAsyncViewState,
+  sanitizeResponsiveLinkHref,
   skeletonClassName,
   spinnerClassName,
   spinnerSvgSize,
@@ -393,6 +394,7 @@ export function Link(props: LinkProps): React.ReactElement {
     ...rest
   } = props;
   const resolvedHref = href ?? '';
+  const safeHref = sanitizeResponsiveLinkHref(resolvedHref);
   const safeRel = forcedSafeLinkRel({
     href: resolvedHref,
     rel,
@@ -424,7 +426,7 @@ export function Link(props: LinkProps): React.ReactElement {
     {
       ...rest,
       className: ['facetheory-rcp-link', className].filter(Boolean).join(' '),
-      href: resolvedHref,
+      href: safeHref,
       onClick: handleClick,
       rel: safeRel,
       target,

@@ -19,10 +19,7 @@ import {
 
 type DomWindow = Window & typeof globalThis;
 
-function click(
-  win: DomWindow,
-  init: MouseEventInit = {},
-): MouseEvent {
+function click(win: DomWindow, init: MouseEventInit = {}): MouseEvent {
   return new win.MouseEvent('click', {
     bubbles: true,
     button: 0,
@@ -32,7 +29,10 @@ function click(
   });
 }
 
-function pageTransitionEvent(win: DomWindow, type: 'pagehide' | 'pageshow'): Event {
+function pageTransitionEvent(
+  win: DomWindow,
+  type: 'pagehide' | 'pageshow',
+): Event {
   const PageTransitionEventCtor = (
     win as Window & { PageTransitionEvent?: typeof PageTransitionEvent }
   ).PageTransitionEvent;
@@ -69,7 +69,9 @@ test('navigation pending: reuses the FaceTheory SPA navigation classifier source
         win,
         undefined,
       );
-      const classification = classifyFaceNavigationAnchorClick(event, { window: win });
+      const classification = classifyFaceNavigationAnchorClick(event, {
+        window: win,
+      });
       composedClassifierSource = classification?.classifierSource ?? null;
       composedUrl = classification?.url.toString() ?? null;
     });
@@ -80,7 +82,10 @@ test('navigation pending: reuses the FaceTheory SPA navigation classifier source
       NAVIGATION_PENDING_CLASSIFIER_SOURCE,
       FACE_NAVIGATION_CLASSIFIER_SOURCE,
     );
-    assert.equal(NAVIGATION_PENDING_CLASSIFIER_SOURCE, 'facetheory_spa_navigation');
+    assert.equal(
+      NAVIGATION_PENDING_CLASSIFIER_SOURCE,
+      'facetheory_spa_navigation',
+    );
     assert.equal(directClassifierResult, true);
     assert.equal(composedClassifierSource, FACE_NAVIGATION_CLASSIFIER_SOURCE);
     assert.equal(composedUrl, 'https://control.lab.theorymcp.ai/next');
@@ -114,9 +119,14 @@ test('navigation pending: shows an immediate status pill for accepted same-origi
       anchor.classList.contains('facetheory-navigation-pending-control'),
       true,
     );
-    assert.equal(anchor.classList.contains('facetheory-navigation-pending-link'), true);
+    assert.equal(
+      anchor.classList.contains('facetheory-navigation-pending-link'),
+      true,
+    );
 
-    const indicator = doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID);
+    const indicator = doc.getElementById(
+      DEFAULT_NAVIGATION_PENDING_INDICATOR_ID,
+    );
     assert.ok(indicator instanceof dom.window.HTMLElement);
     assert.equal(indicator.textContent, 'Loading…');
     assert.equal(indicator.getAttribute('role'), 'status');
@@ -158,7 +168,9 @@ test('navigation pending: never reuses a non-indicator element on id collision',
     const controller = startNavigationPending({ document: doc, window: win });
     anchor.dispatchEvent(click(win));
 
-    const collided = doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID);
+    const collided = doc.getElementById(
+      DEFAULT_NAVIGATION_PENDING_INDICATOR_ID,
+    );
     assert.ok(collided instanceof dom.window.HTMLScriptElement);
     assert.equal(collided.textContent, '');
     assert.equal(
@@ -177,7 +189,10 @@ test('navigation pending: never reuses a non-indicator element on id collision',
     );
     assert.equal(indicator.getAttribute(NAVIGATION_PENDING_ATTRIBUTE), 'link');
     assert.equal(warnings.length, 1);
-    assert.match(warnings[0] ?? '', /already belongs to a non-indicator element/);
+    assert.match(
+      warnings[0] ?? '',
+      /already belongs to a non-indicator element/,
+    );
 
     controller.stop();
     assert.equal(
@@ -253,7 +268,10 @@ test('navigation pending: preserves native behavior for skipped link classificat
       const win = dom.window as unknown as DomWindow;
       const doc = dom.window.document;
       const anchor = doc.querySelector('a');
-      assert.ok(anchor instanceof dom.window.HTMLAnchorElement, skippedCase.name);
+      assert.ok(
+        anchor instanceof dom.window.HTMLAnchorElement,
+        skippedCase.name,
+      );
 
       const controller = startNavigationPending({ document: doc, window: win });
       const event = click(win, skippedCase.event);
@@ -325,7 +343,10 @@ test('navigation pending: observes form submits without taking submit authority'
     assert.equal(controller.isPending(), true);
     assert.equal(form.getAttribute(NAVIGATION_PENDING_ATTRIBUTE), 'form');
     assert.equal(form.getAttribute('aria-busy'), 'true');
-    assert.equal(submitter.getAttribute(NAVIGATION_PENDING_ATTRIBUTE), 'submitter');
+    assert.equal(
+      submitter.getAttribute(NAVIGATION_PENDING_ATTRIBUTE),
+      'submitter',
+    );
     assert.equal(submitter.getAttribute('aria-busy'), 'true');
 
     controller.stop();
@@ -335,7 +356,11 @@ test('navigation pending: observes form submits without taking submit authority'
 });
 
 test('navigation pending: clears pending UI on lifecycle cleanup events', () => {
-  for (const lifecycleEventName of ['pageshow', 'pagehide', 'visibilitychange'] as const) {
+  for (const lifecycleEventName of [
+    'pageshow',
+    'pagehide',
+    'visibilitychange',
+  ] as const) {
     const dom = new JSDOM(
       '<!doctype html><body><a id="next" href="/next">Next</a></body>',
       { url: 'https://control.lab.theorymcp.ai/current' },
@@ -379,6 +404,36 @@ test('navigation pending: clears pending UI on lifecycle cleanup events', () => 
   }
 });
 
+test('navigation pending: clearing marked links preserves nested DOM content', () => {
+  const dom = new JSDOM(
+    '<!doctype html><body><a id="next" href="/next"><span>Next <strong>step</strong></span></a></body>',
+    { url: 'https://control.lab.theorymcp.ai/current' },
+  );
+
+  try {
+    const win = dom.window as unknown as DomWindow;
+    const doc = dom.window.document;
+    const anchor = doc.getElementById('next');
+    assert.ok(anchor instanceof dom.window.HTMLAnchorElement);
+    const before = anchor.innerHTML;
+
+    const controller = startNavigationPending({ document: doc, window: win });
+    anchor.dispatchEvent(click(win));
+    assert.equal(controller.isPending(), true);
+
+    controller.clear();
+
+    assert.equal(controller.isPending(), false);
+    assert.equal(anchor.innerHTML, before);
+    assert.ok(anchor.querySelector('span > strong'));
+    assert.equal(anchor.hasAttribute(NAVIGATION_PENDING_ATTRIBUTE), false);
+    assert.equal(anchor.hasAttribute('aria-busy'), false);
+    controller.stop();
+  } finally {
+    dom.window.close();
+  }
+});
+
 test('navigation pending: marks reduced-motion status without adding motion itself', () => {
   const dom = new JSDOM(
     '<!doctype html><body><a id="next" href="/next">Next</a></body>',
@@ -407,14 +462,18 @@ test('navigation pending: marks reduced-motion status without adding motion itse
     const controller = startNavigationPending({ document: doc, window: win });
     anchor.dispatchEvent(click(win));
 
-    const indicator = doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID);
+    const indicator = doc.getElementById(
+      DEFAULT_NAVIGATION_PENDING_INDICATOR_ID,
+    );
     assert.ok(indicator instanceof dom.window.HTMLElement);
     assert.equal(
       indicator.getAttribute(NAVIGATION_PENDING_REDUCED_MOTION_ATTRIBUTE),
       'true',
     );
     assert.equal(
-      indicator.classList.contains('facetheory-navigation-pending--reduced-motion'),
+      indicator.classList.contains(
+        'facetheory-navigation-pending--reduced-motion',
+      ),
       true,
     );
 
