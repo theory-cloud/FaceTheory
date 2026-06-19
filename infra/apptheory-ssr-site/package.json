@@ -12,7 +12,7 @@
     "synth": "tsx scripts/synth.ts"
   },
   "devDependencies": {
-    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v1.13.0/theory-cloud-apptheory-cdk-1.13.0.tgz",
+    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v1.13.2/theory-cloud-apptheory-cdk-1.13.2.tgz",
     "@types/node": "^24.12.4",
     "aws-cdk-lib": "2.257.0",
     "constructs": "10.6.0",
