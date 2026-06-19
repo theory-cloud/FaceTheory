@@ -30,6 +30,7 @@ import {
   RESPONSIVE_LINK_CLASSIFIER_SOURCE,
   forcedSafeLinkRel,
   handleResponsiveLinkClick,
+  sanitizeResponsiveLinkHref,
   suppressButtonActivation,
 } from '../../src/responsive-primitives/index.js';
 import type { ResponsivePrimitiveName } from '../../src/responsive-primitives/index.js';
@@ -94,6 +95,15 @@ async function renderReactResponsive(): Promise<string> {
               },
               'Docs',
             ),
+            React.createElement(
+              ReactLink,
+              {
+                id: 'react-unsafe-link',
+                key: 'unsafe-link',
+                href: 'java\nscript:alert(1)',
+              },
+              'Unsafe',
+            ),
           ]),
       }),
     ],
@@ -133,6 +143,14 @@ async function renderVueResponsive(): Promise<string> {
               VueLink,
               { href: 'https://example.com/docs', target: '_blank' },
               { default: () => 'Docs' },
+            ),
+            h(
+              VueLink,
+              {
+                id: 'vue-unsafe-link',
+                href: 'data:text/html,<script>alert(1)</script>',
+              },
+              { default: () => 'Unsafe' },
             ),
           ]),
       }),
@@ -238,6 +256,14 @@ test('responsive primitives: React adapter renders a11y contract without inline 
   assert.match(body, /facetheory-rcp-button__spinner--append/);
   assert.match(body, /role="status" aria-live="polite">Loading/);
   assert.match(body, /rel="noopener noreferrer"/);
+  const dom = new JSDOM(body);
+  assert.equal(
+    dom.window.document
+      .getElementById('react-unsafe-link')
+      ?.getAttribute('href'),
+    null,
+  );
+  assert.equal(body.includes('java\nscript'), false);
   assert.doesNotMatch(body, /style="/);
 });
 
@@ -256,6 +282,12 @@ test('responsive primitives: Vue adapter renders parity a11y contract without in
   assert.match(body, /facetheory-rcp-button__spinner--append/);
   assert.match(body, /role="status" aria-live="polite">Loading/);
   assert.match(body, /rel="noopener noreferrer"/);
+  const dom = new JSDOM(body);
+  assert.equal(
+    dom.window.document.getElementById('vue-unsafe-link')?.getAttribute('href'),
+    null,
+  );
+  assert.equal(body.includes('data:text/html'), false);
   assert.doesNotMatch(body, /style="/);
 });
 
@@ -309,8 +341,55 @@ test('responsive primitives: Svelte adapter renders parity a11y contract without
   assert.match(link, /href="https:\/\/example.com\/docs"/);
   assert.match(link, /rel="noopener noreferrer"/);
 
-  for (const html of [spinner, skeleton, loading, boundary, button, link]) {
+  const unsafeLink = await renderSvelteComponent('Link', {
+    href: '\u0000javascript:alert(1)',
+  });
+  const unsafeDom = new JSDOM(unsafeLink);
+  assert.equal(
+    unsafeDom.window.document.querySelector('a')?.getAttribute('href'),
+    null,
+  );
+  assert.equal(unsafeLink.includes('javascript:'), false);
+
+  for (const html of [
+    spinner,
+    skeleton,
+    loading,
+    boundary,
+    button,
+    link,
+    unsafeLink,
+  ]) {
     assert.doesNotMatch(html, /style="/);
+  }
+});
+
+test('responsive primitives: Link href sanitizer rejects dangerous schemes and preserves safe URLs', () => {
+  const unsafe = [
+    'javascript:alert(1)',
+    'JaVaScRiPt:alert(1)',
+    ' java\t\nscript:alert(1)',
+    '\u0000javascript:alert(1)',
+    'data:text/html,<script>alert(1)</script>',
+    'vbscript:msgbox(1)',
+    'file:///etc/passwd',
+  ];
+  for (const href of unsafe) {
+    assert.equal(sanitizeResponsiveLinkHref(href), undefined, href);
+  }
+
+  const safe = [
+    'https://example.com/docs',
+    'http://example.com/docs',
+    'mailto:ops@example.test',
+    'tel:+15551234567',
+    '/relative/path',
+    '?tab=agents',
+    '#section',
+    '//cdn.example.com/app.css',
+  ];
+  for (const href of safe) {
+    assert.equal(sanitizeResponsiveLinkHref(href), href, href);
   }
 });
 

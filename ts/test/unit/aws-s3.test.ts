@@ -57,6 +57,7 @@ test('aws-s3: getObject forwards body and etag', async () => {
           yield new TextEncoder().encode('hello');
         })(),
         ETag: '"etag"',
+        Metadata: { 'facetheory-content-security-policy': "script-src 'self'" },
       };
     },
   } as unknown as S3Client;
@@ -65,6 +66,9 @@ test('aws-s3: getObject forwards body and etag', async () => {
   const out = await client.getObject({ bucket: 'b', key: 'k' });
   assert.ok(out !== null);
   assert.equal(out.etag, '"etag"');
+  assert.deepEqual(out.metadata, {
+    'facetheory-content-security-policy': "script-src 'self'",
+  });
   const body = await collectBody(out.body ?? new Uint8Array());
   assert.equal(new TextDecoder().decode(body), 'hello');
 });
@@ -100,4 +104,3 @@ test('aws-s3: putObject maps bucket/key/body/contentType/cacheControl/metadata',
   assert.equal(seen.CacheControl, 'public,max-age=0');
   assert.deepEqual(seen.Metadata, { a: '1' });
 });
-

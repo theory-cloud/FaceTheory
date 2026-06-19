@@ -8,6 +8,7 @@ import {
   handleResponsiveLinkClick,
   loadingStateClassName,
   normalizeAsyncViewState,
+  sanitizeResponsiveLinkHref,
   skeletonClassName,
   spinnerClassName,
   spinnerSvgSize,
@@ -428,6 +429,7 @@ export const Link = defineComponent({
         sameOriginBaseHref: props.sameOriginBaseHref,
         target: props.target,
       });
+      const safeHref = sanitizeResponsiveLinkHref(props.href);
 
       const handleClick = (event: MouseEvent): void => {
         callVueHandler(onClick, event);
@@ -452,7 +454,7 @@ export const Link = defineComponent({
         {
           ...rest,
           class: ['facetheory-rcp-link', attrClass],
-          href: props.href,
+          href: safeHref,
           onClick: handleClick,
           rel: safeRel,
           target: props.target,

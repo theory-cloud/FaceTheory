@@ -11,10 +11,12 @@ github_repository="${GITHUB_REPOSITORY:-}"
 github_head_repository=""
 pr_title=""
 remote="origin"
+self_test="false"
 
 usage() {
   cat <<'USAGE'
 usage: scripts/verify-release-train-promotion.sh --base <branch> --head <branch> [--base-ref <ref>] [--head-sha <sha>] [--github-repository owner/name] [--github-head-repository owner/name] [--pr-title <title>]
+       scripts/verify-release-train-promotion.sh --self-test
 USAGE
 }
 
@@ -27,6 +29,7 @@ while [[ $# -gt 0 ]]; do
     --github-repository) github_repository="${2:-}"; shift 2 ;;
     --github-head-repository) github_head_repository="${2:-}"; shift 2 ;;
     --pr-title) pr_title="${2:-}"; shift 2 ;;
+    --self-test) self_test="true"; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "release-train-promotion: FAIL (unknown argument $1)" >&2; usage >&2; exit 1 ;;
   esac
@@ -46,36 +49,6 @@ normalize_branch() {
   value="${value#refs/heads/}"
   printf '%s\n' "${value}"
 }
-
-base="$(normalize_branch "${base}")"
-head="$(normalize_branch "${head}")"
-
-[[ -n "${base}" ]] || fail "missing PR base branch"
-[[ -n "${head}" ]] || fail "missing PR head branch"
-
-if [[ -z "${github_head_repository}" ]]; then
-  github_head_repository="${github_repository}"
-fi
-
-case "${base}" in
-  staging|premain|main) ;;
-  *)
-    pass "non-release target ${head} -> ${base}"
-    exit 0
-    ;;
-esac
-
-if [[ -z "${github_repository}" ]]; then
-  if command -v gh >/dev/null 2>&1; then
-    github_repository="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
-  else
-    fail "GITHUB_REPOSITORY is required"
-  fi
-fi
-
-if [[ ! "${github_repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-  fail "GitHub repository must be owner/name, got ${github_repository}"
-fi
 
 require_ref() {
   local ref="$1"
@@ -104,6 +77,19 @@ is_ancestor_ref() {
   git merge-base --is-ancestor "${ancestor}" "${descendant}"
 }
 
+target_has_no_extra_non_merge_content() {
+  local source_ref="$1"
+  local target_ref="$2"
+  local extra_count
+
+  # Release-train promotion requires the protected target to carry no content
+  # outside the promoted source. Literal ancestry can over-reject when the target
+  # has a merge commit whose non-merge commits are already in the source, so
+  # inspect source..target and ignore merge commits only for that benign shape.
+  extra_count="$(git rev-list --no-merges --count "${source_ref}..${target_ref}")"
+  [[ "${extra_count}" == "0" ]]
+}
+
 require_protected_ancestor() {
   local ancestor_branch="$1"
   local descendant_branch="$2"
@@ -111,9 +97,13 @@ require_protected_ancestor() {
   local ancestor_ref descendant_ref
   ancestor_ref="$(release_ref "${ancestor_branch}")"
   descendant_ref="$(release_ref "${descendant_branch}")"
-  if ! is_ancestor_ref "${ancestor_ref}" "${descendant_ref}"; then
-    fail "${description}: ${ancestor_branch} is not an ancestor of ${descendant_branch}"
+  if is_ancestor_ref "${ancestor_ref}" "${descendant_ref}"; then
+    return 0
   fi
+  if target_has_no_extra_non_merge_content "${descendant_ref}" "${ancestor_ref}"; then
+    return 0
+  fi
+  fail "${description}: ${ancestor_branch} is not an ancestor of ${descendant_branch}"
 }
 
 api_compare_status() {
@@ -179,6 +169,152 @@ require_title_rc() {
     fail "premain Release Please PR must advertise an RC: ${pr_title}"
   fi
 }
+
+self_test_commit() {
+  local tree="$1"
+  shift
+  GIT_AUTHOR_NAME="FaceTheory Release Self Test" \
+  GIT_AUTHOR_EMAIL="facetheory-release-self-test@example.invalid" \
+  GIT_AUTHOR_DATE="2026-06-19T00:00:00Z" \
+  GIT_COMMITTER_NAME="FaceTheory Release Self Test" \
+  GIT_COMMITTER_EMAIL="facetheory-release-self-test@example.invalid" \
+  GIT_COMMITTER_DATE="2026-06-19T00:00:00Z" \
+    git commit-tree "${tree}" "$@"
+}
+
+self_test_tree() {
+  local content="$1"
+  local blob
+  blob="$(printf '%s\n' "${content}" | git hash-object -w --stdin)"
+  printf '100644 blob %s\tself-test.txt\n' "${blob}" | git mktree
+}
+
+self_test_release_train_promotion() {
+  local test_remote="facetheory-release-self-test/$$"
+  local ref_prefix="refs/remotes/${test_remote}"
+  local cleanup_refs=()
+  local empty_tree content_tree rogue_tree
+  local baseline source target_merge rogue_target output
+
+  cleanup_release_train_self_test_refs() {
+    local ref
+    for ref in "${cleanup_refs[@]:-}"; do
+      git update-ref -d "${ref}" >/dev/null 2>&1 || true
+    done
+    trap - RETURN
+  }
+  trap cleanup_release_train_self_test_refs RETURN
+
+  empty_tree="$(git mktree </dev/null)"
+  content_tree="$(self_test_tree 'source content')"
+  rogue_tree="$(self_test_tree 'rogue target content')"
+  baseline="$(self_test_commit "${empty_tree}" -m 'chore: seed release-train baseline')"
+  source="$(self_test_commit "${content_tree}" -p "${baseline}" -m 'fix: source content')"
+  target_merge="$(self_test_commit "${content_tree}" -p "${baseline}" -p "${source}" -m 'Merge source content into target')"
+  rogue_target="$(self_test_commit "${rogue_tree}" -p "${baseline}" -m 'fix: rogue target content')"
+
+  git update-ref "${ref_prefix}/staging" "${source}"
+  git update-ref "${ref_prefix}/premain" "${target_merge}"
+  cleanup_refs+=("${ref_prefix}/staging" "${ref_prefix}/premain")
+
+  if ! output="$(
+    (
+      remote="${test_remote}"
+      require_protected_ancestor "premain" "staging" "self-test staging -> premain benign divergence"
+    ) 2>&1
+  )"; then
+    printf '%s\n' "${output}" >&2
+    echo "release-train-promotion: FAIL (self-test benign merge-commit divergence was rejected)" >&2
+    return 1
+  fi
+  echo "release-train-promotion: PASS (self-test benign merge-commit divergence accepted)"
+
+  git update-ref "${ref_prefix}/premain" "${rogue_target}"
+  if output="$(
+    (
+      remote="${test_remote}"
+      require_protected_ancestor "premain" "staging" "self-test staging -> premain rogue target content"
+    ) 2>&1
+  )"; then
+    printf '%s\n' "${output}" >&2
+    echo "release-train-promotion: FAIL (self-test rogue target non-merge content was accepted)" >&2
+    return 1
+  fi
+  if [[ "${output}" != *"self-test staging -> premain rogue target content: premain is not an ancestor of staging"* ]]; then
+    printf '%s\n' "${output}" >&2
+    echo "release-train-promotion: FAIL (self-test rogue target non-merge content did not preserve the fail-closed message)" >&2
+    return 1
+  fi
+  echo "release-train-promotion: PASS (self-test rogue target non-merge content failed closed)"
+
+  git update-ref "${ref_prefix}/main" "${source}"
+  git update-ref "${ref_prefix}/staging" "${target_merge}"
+  cleanup_refs+=("${ref_prefix}/main")
+  if ! output="$(
+    (
+      remote="${test_remote}"
+      require_protected_ancestor "staging" "main" "self-test main -> staging benign divergence"
+    ) 2>&1
+  )"; then
+    printf '%s\n' "${output}" >&2
+    echo "release-train-promotion: FAIL (self-test main -> staging benign divergence was rejected)" >&2
+    return 1
+  fi
+  echo "release-train-promotion: PASS (self-test main -> staging benign divergence accepted)"
+
+  git update-ref "${ref_prefix}/staging" "${rogue_target}"
+  if output="$(
+    (
+      remote="${test_remote}"
+      require_protected_ancestor "staging" "main" "self-test main -> staging rogue target content"
+    ) 2>&1
+  )"; then
+    printf '%s\n' "${output}" >&2
+    echo "release-train-promotion: FAIL (self-test main -> staging rogue target non-merge content was accepted)" >&2
+    return 1
+  fi
+  if [[ "${output}" != *"self-test main -> staging rogue target content: staging is not an ancestor of main"* ]]; then
+    printf '%s\n' "${output}" >&2
+    echo "release-train-promotion: FAIL (self-test main -> staging rogue target content did not preserve the fail-closed message)" >&2
+    return 1
+  fi
+  echo "release-train-promotion: PASS (self-test main -> staging rogue target non-merge content failed closed)"
+}
+
+if [[ "${self_test}" == "true" ]]; then
+  self_test_release_train_promotion
+  exit $?
+fi
+
+base="$(normalize_branch "${base}")"
+head="$(normalize_branch "${head}")"
+
+[[ -n "${base}" ]] || fail "missing PR base branch"
+[[ -n "${head}" ]] || fail "missing PR head branch"
+
+if [[ -z "${github_head_repository}" ]]; then
+  github_head_repository="${github_repository}"
+fi
+
+case "${base}" in
+  staging|premain|main) ;;
+  *)
+    pass "non-release target ${head} -> ${base}"
+    exit 0
+    ;;
+esac
+
+if [[ -z "${github_repository}" ]]; then
+  if command -v gh >/dev/null 2>&1; then
+    github_repository="$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"
+  else
+    fail "GITHUB_REPOSITORY is required"
+  fi
+fi
+
+if [[ ! "${github_repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+  fail "GitHub repository must be owner/name, got ${github_repository}"
+fi
 
 if [[ "${base}" == "staging" ]]; then
   case "${head}" in

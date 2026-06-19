@@ -4,8 +4,10 @@ import {
 } from './spa.js';
 import type { ClassifyFaceNavigationAnchorClickOptions } from './spa.js';
 
-export const NAVIGATION_PENDING_CLASSIFIER_SOURCE = FACE_NAVIGATION_CLASSIFIER_SOURCE;
-export const NAVIGATION_PENDING_ATTRIBUTE = 'data-facetheory-navigation-pending';
+export const NAVIGATION_PENDING_CLASSIFIER_SOURCE =
+  FACE_NAVIGATION_CLASSIFIER_SOURCE;
+export const NAVIGATION_PENDING_ATTRIBUTE =
+  'data-facetheory-navigation-pending';
 export const NAVIGATION_PENDING_REDUCED_MOTION_ATTRIBUTE =
   'data-facetheory-reduced-motion';
 export const NAVIGATION_PENDING_INDICATOR_ATTRIBUTE =
@@ -49,8 +51,8 @@ interface ResolvedNavigationPendingClassNames {
 
 interface ElementSnapshot {
   attributes: Map<string, string | null>;
+  childNodes?: Node[] | undefined;
   element: Element;
-  textContent?: string | null;
 }
 
 interface IndicatorSnapshot extends ElementSnapshot {
@@ -63,8 +65,10 @@ export function startNavigationPending(
   const doc = options.document ?? document;
   const win = options.window ?? doc.defaultView ?? window;
   const classNames = resolveClassNames(options.classNames);
-  const indicatorId = options.indicatorId ?? DEFAULT_NAVIGATION_PENDING_INDICATOR_ID;
-  const indicatorText = options.indicatorText ?? DEFAULT_NAVIGATION_PENDING_TEXT;
+  const indicatorId =
+    options.indicatorId ?? DEFAULT_NAVIGATION_PENDING_INDICATOR_ID;
+  const indicatorText =
+    options.indicatorText ?? DEFAULT_NAVIGATION_PENDING_TEXT;
 
   let indicator: IndicatorSnapshot | null = null;
   let pendingElements: ElementSnapshot[] = [];
@@ -102,13 +106,21 @@ export function startNavigationPending(
 
   const showPending = (
     source: 'link' | 'form',
-    targets: ReadonlyArray<{ element: Element; role: 'link' | 'form' | 'submitter' }>,
+    targets: ReadonlyArray<{
+      element: Element;
+      role: 'link' | 'form' | 'submitter';
+    }>,
   ): void => {
     if (stopped) return;
     clearPending();
 
     for (const target of targets) {
-      markPendingElement(target.element, target.role, classNames, pendingElements);
+      markPendingElement(
+        target.element,
+        target.role,
+        classNames,
+        pendingElements,
+      );
     }
 
     indicator = showIndicator({
@@ -124,7 +136,10 @@ export function startNavigationPending(
   };
 
   const handleClick = (event: MouseEvent): void => {
-    const navigation = classifyFaceNavigationAnchorClick(event, classifyOptions());
+    const navigation = classifyFaceNavigationAnchorClick(
+      event,
+      classifyOptions(),
+    );
     if (!navigation) return;
 
     showPending('link', [{ element: navigation.anchor, role: 'link' }]);
@@ -200,15 +215,19 @@ function showIndicator(options: {
   const resolved = resolveIndicatorElement(options.doc, options.id);
   const existing = resolved.created ? null : resolved.element;
   const element = resolved.element;
-  const snapshot = snapshotElement(element, [
-    'role',
-    'aria-live',
-    'aria-atomic',
-    'class',
-    NAVIGATION_PENDING_ATTRIBUTE,
-    NAVIGATION_PENDING_REDUCED_MOTION_ATTRIBUTE,
-    NAVIGATION_PENDING_INDICATOR_ATTRIBUTE,
-  ]);
+  const snapshot = snapshotElement(
+    element,
+    [
+      'role',
+      'aria-live',
+      'aria-atomic',
+      'class',
+      NAVIGATION_PENDING_ATTRIBUTE,
+      NAVIGATION_PENDING_REDUCED_MOTION_ATTRIBUTE,
+      NAVIGATION_PENDING_INDICATOR_ATTRIBUTE,
+    ],
+    { childNodes: true },
+  );
 
   if (!existing) {
     element.id = resolved.id;
@@ -243,7 +262,9 @@ function resolveIndicatorElement(
   doc: Document,
   requestedId: string,
 ): { created: boolean; element: HTMLElement; id: string } {
-  const normalizedId = String(requestedId || DEFAULT_NAVIGATION_PENDING_INDICATOR_ID);
+  const normalizedId = String(
+    requestedId || DEFAULT_NAVIGATION_PENDING_INDICATOR_ID,
+  );
   const existing = doc.getElementById(normalizedId);
   if (isNavigationPendingIndicator(existing)) {
     return { created: false, element: existing, id: normalizedId };
@@ -280,10 +301,15 @@ function nextAvailableIndicatorElement(
     }
   }
 
-  throw new Error('FaceTheory navigation pending could not allocate indicator id');
+  throw new Error(
+    'FaceTheory navigation pending could not allocate indicator id',
+  );
 }
 
-function warnIndicatorIdCollision(requestedId: string, resolvedId: string): void {
+function warnIndicatorIdCollision(
+  requestedId: string,
+  resolvedId: string,
+): void {
   const warn = globalThis.console?.warn;
   if (typeof warn !== 'function') return;
   warn(
@@ -330,16 +356,19 @@ function markPendingElement(
 function snapshotElement(
   element: Element,
   attributeNames: readonly string[],
+  options: { childNodes?: boolean } = {},
 ): ElementSnapshot {
   const attributes = new Map<string, string | null>();
   for (const name of attributeNames) {
     attributes.set(name, element.getAttribute(name));
   }
-  return {
-    attributes,
-    element,
-    textContent: element.textContent,
-  };
+  const snapshot: ElementSnapshot = { attributes, element };
+  if (options.childNodes === true) {
+    snapshot.childNodes = Array.from(element.childNodes).map((node) =>
+      node.cloneNode(true),
+    );
+  }
+  return snapshot;
 }
 
 function restoreElementSnapshot(snapshot: ElementSnapshot): void {
@@ -351,8 +380,10 @@ function restoreElementSnapshot(snapshot: ElementSnapshot): void {
     }
   }
 
-  if (snapshot.textContent !== undefined) {
-    snapshot.element.textContent = snapshot.textContent;
+  if (snapshot.childNodes !== undefined) {
+    snapshot.element.replaceChildren(
+      ...snapshot.childNodes.map((node) => node.cloneNode(true)),
+    );
   }
 }
 
@@ -387,6 +418,9 @@ function isElement(value: EventTarget | null): value is Element {
   );
 }
 
-function isElementWithTag(value: EventTarget | null, tagName: string): value is Element {
+function isElementWithTag(
+  value: EventTarget | null,
+  tagName: string,
+): value is Element {
   return isElement(value) && value.tagName.toLowerCase() === tagName;
 }

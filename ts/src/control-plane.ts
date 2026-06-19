@@ -14,8 +14,10 @@ import {
   methodNotAllowedResourceResponse,
   textResourceResponse,
 } from './resource.js';
+import { buildStrictCspHeader, validateStrictCspDocument } from './security.js';
 import type {
   FaceContext,
+  FaceCspPolicy,
   FaceHeadTag,
   FaceMode,
   FaceModule,
@@ -47,6 +49,11 @@ const NOSNIFF = 'nosniff';
 const CONTROL_PLANE_MODE_HEADER = 'x-facetheory-control-plane-csp-mode';
 const STRICT_CSP_SUPPORTED_HEADER =
   'x-facetheory-control-plane-strict-csp-supported';
+const STRICT_CONTROL_PLANE_CSP: FaceCspPolicy = {
+  inlineScripts: false,
+  inlineStyles: false,
+  rawHead: false,
+};
 
 export interface ControlPlanePresetDescriptor {
   readonly contract: typeof CONTROL_PLANE_PRESET_CONTRACT;
@@ -193,8 +200,9 @@ export interface ControlPlaneBrowserAsset {
   cacheControl?: string | null | undefined;
 }
 
-interface NormalizedControlPlaneDataSection<Data = unknown>
-  extends ControlPlaneDataSection<Data> {
+interface NormalizedControlPlaneDataSection<
+  Data = unknown,
+> extends ControlPlaneDataSection<Data> {
   endpoint: string;
   slug: string;
 }
@@ -267,9 +275,11 @@ export function createControlPlaneAssetRoutes(
 ): FaceResourceRoute[] {
   return assets.map((asset) => {
     const route = normalizePath(asset.route);
-    const body = asset.body instanceof Uint8Array ? asset.body : utf8(asset.body);
+    const body =
+      asset.body instanceof Uint8Array ? asset.body : utf8(asset.body);
     const contentType = asset.contentType ?? JAVASCRIPT_CONTENT_TYPE;
-    const cacheControl = asset.cacheControl === undefined ? NO_STORE : asset.cacheControl;
+    const cacheControl =
+      asset.cacheControl === undefined ? NO_STORE : asset.cacheControl;
 
     return {
       route,
@@ -370,7 +380,13 @@ function createPresetFace(
       if (!gate.ok) return deniedControlPlaneResult(gate, options.cspMode);
 
       const helpers = createShellHelpers(normalized, ctx, gate, options);
-      const base = await baseControlPlaneResult(normalized, ctx, gate, helpers, options);
+      const base = await baseControlPlaneResult(
+        normalized,
+        ctx,
+        gate,
+        helpers,
+        options,
+      );
       if (options.delivery === 'streaming') {
         return {
           ...base,
@@ -420,7 +436,7 @@ async function baseControlPlaneResult(
     'data-facetheory-control-plane-delivery': options.delivery,
   };
   if (options.cspMode === 'strict') {
-    result.csp = { inlineScripts: false, inlineStyles: false, rawHead: false };
+    result.csp = STRICT_CONTROL_PLANE_CSP;
   }
   return result;
 }
@@ -457,7 +473,9 @@ function createShellHelpers(
 function renderDefaultControlPlaneShell(
   helpers: ControlPlaneShellHelpers,
 ): string {
-  const sections = helpers.sections.map((section) => helpers.section(section.id)).join('');
+  const sections = helpers.sections
+    .map((section) => helpers.section(section.id))
+    .join('');
   return `<main data-facetheory-view data-facetheory-control-plane-shell="true">${sections}</main>`;
 }
 
@@ -507,7 +525,12 @@ function createControlPlaneSectionRoutes(
           const gate = await options.gate(ctx);
           if (!gate.ok) return deniedSectionResponse(gate);
           const html = await renderSectionDataHtml(section, ctx, gate);
-          return sectionHtmlResponse(html, ctx.request.method === 'HEAD');
+          return sectionHtmlResponse(
+            html,
+            ctx.request.method === 'HEAD',
+            options.cspMode,
+            ctx.request.cspNonce,
+          );
         },
       });
     }
@@ -532,10 +555,29 @@ async function renderSectionDataHtml<Data>(
   }
 }
 
-function sectionHtmlResponse(html: string, headOnly: boolean): FaceResponse {
+function sectionHtmlResponse(
+  html: string,
+  headOnly: boolean,
+  cspMode: ControlPlaneCspMode,
+  cspNonce: string | null,
+): FaceResponse {
+  const headers: Record<string, string> = { 'x-content-type-options': NOSNIFF };
+  if (cspMode === 'strict') {
+    headers['content-security-policy'] = buildStrictCspHeader({ cspNonce });
+    try {
+      validateStrictCspDocument(html, { policy: STRICT_CONTROL_PLANE_CSP });
+    } catch {
+      return textResourceResponse('', {
+        status: 500,
+        contentType: HTML_FRAGMENT_CONTENT_TYPE,
+        headers,
+      });
+    }
+  }
+
   const response = textResourceResponse(headOnly ? '' : html, {
     contentType: HTML_FRAGMENT_CONTENT_TYPE,
-    headers: { 'x-content-type-options': NOSNIFF },
+    headers,
   });
   return response;
 }
@@ -545,7 +587,8 @@ function deniedSectionResponse(gate: ControlPlaneGateRejected): FaceResponse {
   return jsonResourceResponse(
     {
       error: gate.title ?? 'Forbidden',
-      message: gate.message ?? 'The requested control-plane section is not available.',
+      message:
+        gate.message ?? 'The requested control-plane section is not available.',
     },
     { status, headers: { 'x-content-type-options': NOSNIFF } },
   );
@@ -557,7 +600,8 @@ function deniedControlPlaneResult(
 ): FaceRenderResult {
   const status = normalizeHttpStatus(gate.status ?? 403);
   const title = gate.title ?? (status === 401 ? 'Unauthorized' : 'Forbidden');
-  const message = gate.message ?? 'This control-plane surface is not available.';
+  const message =
+    gate.message ?? 'This control-plane surface is not available.';
   const result: FaceRenderResult = {
     status,
     headers: {
@@ -571,7 +615,7 @@ function deniedControlPlaneResult(
   };
   if (gate.cookies !== undefined) result.cookies = gate.cookies;
   if (cspMode === 'strict') {
-    result.csp = { inlineScripts: false, inlineStyles: false, rawHead: false };
+    result.csp = STRICT_CONTROL_PLANE_CSP;
   }
   return result;
 }
@@ -584,7 +628,9 @@ function staticAssetResponse(input: {
   return {
     status: 200,
     headers: sortHeaderValues({
-      ...(input.cacheControl === null ? {} : { 'cache-control': [input.cacheControl] }),
+      ...(input.cacheControl === null
+        ? {}
+        : { 'cache-control': [input.cacheControl] }),
       'content-type': [input.contentType],
       'x-content-type-options': [NOSNIFF],
     }),
@@ -651,10 +697,7 @@ function slugForId(value: string): string {
 
 function isSlugAsciiAlnum(char: string): boolean {
   const code = char.charCodeAt(0);
-  return (
-    (code >= 48 && code <= 57) ||
-    (code >= 97 && code <= 122)
-  );
+  return (code >= 48 && code <= 57) || (code >= 97 && code <= 122);
 }
 
 function normalizeHttpStatus(value: number): number {
@@ -663,9 +706,12 @@ function normalizeHttpStatus(value: number): number {
   return status;
 }
 
-function sortHeaderValues(headers: Record<string, string[]>): Record<string, string[]> {
+function sortHeaderValues(
+  headers: Record<string, string[]>,
+): Record<string, string[]> {
   const sorted: Record<string, string[]> = {};
-  for (const key of Object.keys(headers).sort()) sorted[key] = headers[key] ?? [];
+  for (const key of Object.keys(headers).sort())
+    sorted[key] = headers[key] ?? [];
   return sorted;
 }
 
