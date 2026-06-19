@@ -1,5 +1,29 @@
 # Changelog
 
+## [3.8.1](https://github.com/theory-cloud/FaceTheory/compare/v3.8.0...v3.8.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* **deps:** pin AppTheory v1.13.2 and TableTheory v1.10.1 ([86337b1](https://github.com/theory-cloud/FaceTheory/commit/86337b18fec5ae2938e2a48f100ff03b5346db2e))
+* harden facetheory strict csp surfaces ([0c74a91](https://github.com/theory-cloud/FaceTheory/commit/0c74a91bb14b32838d40e39db78b5cd68a5302e1))
+* patch audited build dependencies ([ad41117](https://github.com/theory-cloud/FaceTheory/commit/ad4111796cdb2af2200d577742ad62a20043e6dc))
+* **release:** accept benign train topology divergence ([32c9d79](https://github.com/theory-cloud/FaceTheory/commit/32c9d792360425703c7051a5c28651e81929ece0))
+* **release:** correct release-train gate no-ops ([d7708db](https://github.com/theory-cloud/FaceTheory/commit/d7708dbdf9cd1698e27e6abc636f71680c62266e))
+* **release:** treat release-please no-op as legitimate ([905477d](https://github.com/theory-cloud/FaceTheory/commit/905477d10de5b357e839e153b40669ea051d7362))
+
+## [3.8.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.8.0...v3.8.1-rc) (2026-06-19)
+
+
+### Bug Fixes
+
+* **deps:** pin AppTheory v1.13.2 and TableTheory v1.10.1 ([86337b1](https://github.com/theory-cloud/FaceTheory/commit/86337b18fec5ae2938e2a48f100ff03b5346db2e))
+* harden facetheory strict csp surfaces ([0c74a91](https://github.com/theory-cloud/FaceTheory/commit/0c74a91bb14b32838d40e39db78b5cd68a5302e1))
+* patch audited build dependencies ([ad41117](https://github.com/theory-cloud/FaceTheory/commit/ad4111796cdb2af2200d577742ad62a20043e6dc))
+* **release:** accept benign train topology divergence ([32c9d79](https://github.com/theory-cloud/FaceTheory/commit/32c9d792360425703c7051a5c28651e81929ece0))
+* **release:** correct release-train gate no-ops ([d7708db](https://github.com/theory-cloud/FaceTheory/commit/d7708dbdf9cd1698e27e6abc636f71680c62266e))
+* **release:** treat release-please no-op as legitimate ([905477d](https://github.com/theory-cloud/FaceTheory/commit/905477d10de5b357e839e153b40669ea051d7362))
+
 ## [3.8.0](https://github.com/theory-cloud/FaceTheory/compare/v3.7.1...v3.8.0) (2026-06-09)
 
 
