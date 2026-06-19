@@ -522,7 +522,26 @@ export function forcedSafeLinkRel(options: LinkRelOptions): string | undefined {
 
 export function linkRequiresNoopener(options: LinkRelOptions): boolean {
   if (options.target === '_blank') return true;
-  return isExternalLinkHref(options.href, options.sameOriginBaseHref);
+  const href = sanitizeResponsiveLinkHref(options.href);
+  if (href === undefined) return false;
+  return isExternalLinkHref(href, options.sameOriginBaseHref);
+}
+
+export function sanitizeResponsiveLinkHref(
+  href: string | null | undefined,
+): string | undefined {
+  const value = String(href ?? '');
+  const scheme = unsafeNormalizedHrefScheme(value);
+  if (scheme === null) return value;
+  if (
+    scheme === 'http' ||
+    scheme === 'https' ||
+    scheme === 'mailto' ||
+    scheme === 'tel'
+  ) {
+    return value;
+  }
+  return undefined;
 }
 
 export function isExternalLinkHref(
@@ -581,4 +600,10 @@ export function handleResponsiveLinkClick(
 
 function isHttpUrlLike(href: string): boolean {
   return /^https?:\/\//i.test(href.trim());
+}
+
+function unsafeNormalizedHrefScheme(href: string): string | null {
+  const normalized = href.trimStart().replace(/[\u0000-\u0020\u007f]+/g, '');
+  const match = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(normalized);
+  return match?.[1] ? match[1].toLowerCase() : null;
 }
