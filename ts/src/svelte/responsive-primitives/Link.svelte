@@ -3,6 +3,7 @@
     classifyResponsiveLinkClick,
     forcedSafeLinkRel,
     handleResponsiveLinkClick,
+    sanitizeResponsiveLinkHref,
     type ResponsiveLinkNavigateHandler,
   } from '../../responsive-primitives/index.js';
 
@@ -20,6 +21,7 @@
   export { className as class };
 
   $: safeRel = forcedSafeLinkRel({ href, rel, sameOriginBaseHref, target });
+  $: safeHref = sanitizeResponsiveLinkHref(href);
   $: resolvedClass = ['facetheory-rcp-link', className].filter(Boolean).join(' ');
 
   function handleClick(event: MouseEvent): void {
@@ -37,7 +39,7 @@
 <a
   {...$$restProps}
   class={resolvedClass}
-  {href}
+  href={safeHref}
   rel={safeRel}
   {target}
   onclick={handleClick}

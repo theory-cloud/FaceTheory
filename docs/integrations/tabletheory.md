@@ -8,7 +8,7 @@ FaceTheory uses TableTheory for blocking ISR's cache metadata, regeneration leas
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.10.0/theory-cloud-tabletheory-ts-1.10.0.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz
 ```
 
 ## The TableTheory entry point

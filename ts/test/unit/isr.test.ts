@@ -23,6 +23,10 @@ function decodeBody(body: Uint8Array): string {
   return new TextDecoder().decode(body);
 }
 
+function encodeBody(body: string): Uint8Array {
+  return new TextEncoder().encode(body);
+}
+
 function externalHydrationHref(html: string): string {
   const tag = /<link\b[^>]*__FACETHEORY_DATA_URL__[^>]*>/i.exec(html)?.[0];
   assert.ok(tag, 'expected external hydration link tag');
@@ -648,6 +652,53 @@ class RecordingMetaStore implements IsrMetaStore {
   }
 }
 
+class CspMetadataDroppingMetaStore implements IsrMetaStore {
+  private readonly inner = new InMemoryIsrMetaStore();
+
+  async get(cacheKey: string): Promise<IsrMetaRecord | null> {
+    return dropCspMetadata(await this.inner.get(cacheKey));
+  }
+
+  async tryAcquireLease(
+    input: TryAcquireIsrLeaseInput,
+  ): Promise<TryAcquireIsrLeaseResult> {
+    const result = await this.inner.tryAcquireLease(input);
+    return {
+      ...result,
+      record: dropCspMetadata(result.record) ?? result.record,
+    };
+  }
+
+  async commitGeneration(input: CommitIsrGenerationInput): Promise<void> {
+    const {
+      contentSecurityPolicy: _contentSecurityPolicy,
+      strictCspPolicy: _strictCspPolicy,
+      ...rest
+    } = input;
+    await this.inner.commitGeneration(rest);
+  }
+
+  async releaseLease(input: ReleaseIsrLeaseInput): Promise<void> {
+    await this.inner.releaseLease(input);
+  }
+
+  debugSnapshot(): IsrMetaRecord[] {
+    return this.inner
+      .debugSnapshot()
+      .map((record) => dropCspMetadata(record) ?? record);
+  }
+}
+
+function dropCspMetadata(record: IsrMetaRecord | null): IsrMetaRecord | null {
+  if (record === null) return null;
+  const {
+    contentSecurityPolicy: _contentSecurityPolicy,
+    strictCspPolicy: _strictCspPolicy,
+    ...rest
+  } = record;
+  return rest;
+}
+
 test('isr: metadata commits never include HTML body text', async () => {
   const marker = 'SUPER_SECRET_HTML_PAYLOAD';
   const htmlStore = new InMemoryHtmlStore();
@@ -735,6 +786,14 @@ test('isr: strict CSP hydration writes and serves pointer-derived sidecars', asy
   const sidecarHref = externalHydrationHref(missHtml);
 
   assert.equal(miss.headers['x-facetheory-isr']?.[0], 'miss');
+  assert.match(
+    miss.headers['content-security-policy']?.[0] ?? '',
+    /script-src 'self'/,
+  );
+  assert.match(
+    miss.headers['content-security-policy']?.[0] ?? '',
+    /style-src 'self'/,
+  );
   assert.ok(missHtml.includes('<main>a-1</main>'));
   assert.ok(missHtml.includes('src="/assets/client-entry.js"'));
   assert.equal(missHtml.includes('id="__FACETHEORY_DATA__"'), false);
@@ -761,12 +820,100 @@ test('isr: strict CSP hydration writes and serves pointer-derived sidecars', asy
   const hit = await app.handle({ method: 'GET', path: '/posts/a' });
   const hitHtml = decodeBody(hit.body as Uint8Array);
   assert.equal(hit.headers['x-facetheory-isr']?.[0], 'hit');
+  assert.equal(
+    hit.headers['content-security-policy']?.[0],
+    miss.headers['content-security-policy']?.[0],
+  );
   assert.equal(externalHydrationHref(hitHtml), sidecarHref);
   assert.equal(renderCount, 1);
 
-  const serializedMeta = JSON.stringify(metaStore.debugSnapshot());
+  const records = metaStore.debugSnapshot();
+  assert.equal(records[0]?.strictCspPolicy?.inlineScripts, false);
+  assert.equal(records[0]?.strictCspPolicy?.inlineStyles, false);
+  assert.equal(
+    records[0]?.contentSecurityPolicy,
+    miss.headers['content-security-policy']?.[0],
+  );
+  const serializedMeta = JSON.stringify(records);
   assert.equal(serializedMeta.includes(secret), false);
   assert.equal(serializedMeta.includes('terminator'), false);
+});
+
+test('isr: strict CSP cached HTML is validated before re-emitting stored bodies', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new CspMetadataDroppingMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/strict',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: () => {
+          renderCount += 1;
+          return {
+            csp: {
+              inlineScripts: false,
+              inlineStyles: false,
+              rawHead: false,
+            },
+            html: '<main>strict cached html</main>',
+          };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => 1_000,
+    },
+  });
+
+  const miss = await app.handle({ method: 'GET', path: '/strict' });
+  assert.equal(miss.status, 200);
+  assert.equal(miss.headers['x-facetheory-isr']?.[0], 'miss');
+  assert.match(
+    miss.headers['content-security-policy']?.[0] ?? '',
+    /script-src 'self'/,
+  );
+
+  const record = metaStore.debugSnapshot()[0];
+  assert.ok(record?.htmlPointer);
+  assert.equal(record.strictCspPolicy, undefined);
+  assert.equal(record.contentSecurityPolicy, undefined);
+
+  const stored = await htmlStore.read(record.htmlPointer);
+  assert.ok(stored?.metadata);
+  assert.ok(
+    Object.values(stored.metadata).some((value) =>
+      value.includes("script-src 'self'"),
+    ),
+  );
+
+  const hit = await app.handle({ method: 'GET', path: '/strict' });
+  assert.equal(hit.status, 200);
+  assert.equal(
+    hit.headers['content-security-policy']?.[0],
+    miss.headers['content-security-policy']?.[0],
+  );
+
+  await htmlStore.write({
+    key: record.htmlPointer,
+    body: encodeBody(
+      '<!doctype html><html><head><title>Unsafe</title></head><body><main>tampered</main><script>alert("cached")</script></body></html>',
+    ),
+    contentType: 'text/html; charset=utf-8',
+    metadata: stored.metadata,
+  });
+
+  const tamperedHit = await app.handle({ method: 'GET', path: '/strict' });
+  assert.equal(tamperedHit.status, 500);
+  const tamperedHtml = decodeBody(tamperedHit.body as Uint8Array);
+  assert.ok(tamperedHtml.includes('<h1>Internal Server Error</h1>'));
+  assert.equal(tamperedHtml.includes('tampered'), false);
+  assert.equal(tamperedHtml.includes('alert("cached")'), false);
+  assert.equal(renderCount, 1);
 });
 
 test('isr: strict CSP hydration sidecars are bound to tenant and auth variants', async () => {

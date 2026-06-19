@@ -21,7 +21,8 @@ async function collect(body: FaceBody): Promise<string> {
   if (body instanceof Uint8Array) return new TextDecoder().decode(body);
   const decoder = new TextDecoder();
   const chunks: string[] = [];
-  for await (const chunk of body) chunks.push(decoder.decode(chunk, { stream: true }));
+  for await (const chunk of body)
+    chunks.push(decoder.decode(chunk, { stream: true }));
   chunks.push(decoder.decode());
   return chunks.join('');
 }
@@ -96,7 +97,10 @@ test('control-plane preset: relaxed mode is the default and strict CSP remains s
   const html = await collect(response.body);
 
   assert.equal(response.status, 200);
-  assert.equal(response.headers['x-facetheory-control-plane-csp-mode']?.[0], 'relaxed');
+  assert.equal(
+    response.headers['x-facetheory-control-plane-csp-mode']?.[0],
+    'relaxed',
+  );
   assert.equal(
     response.headers['x-facetheory-control-plane-strict-csp-supported']?.[0],
     'true',
@@ -113,14 +117,29 @@ test('control-plane preset: strict mode opts into no-inline CSP and external ass
   const app = createDemoApp({ mode: 'strict', delivery: 'client-fill' });
   const result = await handleLambdaUrlEvent(app, {
     rawPath: '/',
-    requestContext: { http: { method: 'GET', path: '/' }, requestId: 'strict-1' },
+    requestContext: {
+      http: { method: 'GET', path: '/' },
+      requestId: 'strict-1',
+    },
   });
 
   assert.equal(result.statusCode, 200);
-  assert.match(result.headers?.['content-security-policy'] ?? '', /script-src 'self'/);
-  assert.match(result.headers?.['content-security-policy'] ?? '', /style-src 'self'/);
-  assert.ok(result.body.includes(`href="${CONTROL_PLANE_RESPONSIVE_PRIMITIVES_STYLESHEET_PATH}"`));
-  assert.ok(result.body.includes(`src="${CONTROL_PLANE_BOOTSTRAP_MODULE_PATH}"`));
+  assert.match(
+    result.headers?.['content-security-policy'] ?? '',
+    /script-src 'self'/,
+  );
+  assert.match(
+    result.headers?.['content-security-policy'] ?? '',
+    /style-src 'self'/,
+  );
+  assert.ok(
+    result.body.includes(
+      `href="${CONTROL_PLANE_RESPONSIVE_PRIMITIVES_STYLESHEET_PATH}"`,
+    ),
+  );
+  assert.ok(
+    result.body.includes(`src="${CONTROL_PLANE_BOOTSTRAP_MODULE_PATH}"`),
+  );
   assert.equal(result.body.includes('<style'), false);
   assert.equal(result.body.includes('__FACETHEORY_DATA__'), false);
 });
@@ -142,7 +161,8 @@ test('control-plane preset: shell-first client-fill leaves section data off crit
               loadCalls += 1;
               return { value: 'loaded' };
             },
-            render: (_ctx, data) => `<p>${String((data as { value: string }).value)}</p>`,
+            render: (_ctx, data) =>
+              `<p>${String((data as { value: string }).value)}</p>`,
           },
         ],
       },
@@ -161,9 +181,85 @@ test('control-plane preset: shell-first client-fill leaves section data off crit
     path: '/_facetheory/control-plane/sections/root-0/slow',
   });
   assert.equal(section.status, 200);
-  assert.equal(section.headers['content-type']?.[0], 'text/html; charset=utf-8');
+  assert.equal(
+    section.headers['content-type']?.[0],
+    'text/html; charset=utf-8',
+  );
   assert.equal(await collect(section.body), '<p>loaded</p>');
   assert.equal(loadCalls, 1);
+});
+
+test('control-plane preset: strict section endpoints emit no-inline CSP headers', async () => {
+  const app = createDemoApp({ mode: 'strict', delivery: 'client-fill' });
+
+  const section = await app.handle({
+    method: 'GET',
+    path: '/_facetheory/control-plane/sections/root-0/agents',
+    cspNonce: 'section-nonce',
+  });
+
+  assert.equal(section.status, 200);
+  assert.equal(
+    section.headers['content-type']?.[0],
+    'text/html; charset=utf-8',
+  );
+  assert.equal(section.headers['x-content-type-options']?.[0], 'nosniff');
+  assert.match(
+    section.headers['content-security-policy']?.[0] ?? '',
+    /script-src 'self' 'nonce-section-nonce'/,
+  );
+  assert.match(
+    section.headers['content-security-policy']?.[0] ?? '',
+    /style-src 'self' 'nonce-section-nonce'/,
+  );
+  assert.equal(
+    await collect(section.body),
+    '<p class="agents-count">2 agents</p>',
+  );
+
+  const head = await app.handle({
+    method: 'HEAD',
+    path: '/_facetheory/control-plane/sections/root-0/agents',
+    cspNonce: 'section-nonce',
+  });
+  assert.equal(head.status, 200);
+  assert.match(
+    head.headers['content-security-policy']?.[0] ?? '',
+    /script-src 'self'/,
+  );
+  assert.equal(await collect(head.body), '');
+});
+
+test('control-plane preset: strict section endpoints fail closed on unsafe fragments', async () => {
+  const app = createControlPlaneApp({
+    csp: { mode: 'strict' },
+    gate: () => ({ ok: true }),
+    faces: [
+      {
+        route: '/',
+        sections: [
+          {
+            id: 'unsafe',
+            read: { bounded: true, tenantScoped: true },
+            load: () => ({}),
+            render: () => '<script>alert("unsafe")</script>',
+          },
+        ],
+      },
+    ],
+  });
+
+  const section = await app.handle({
+    method: 'GET',
+    path: '/_facetheory/control-plane/sections/root-0/unsafe',
+  });
+
+  assert.equal(section.status, 500);
+  assert.match(
+    section.headers['content-security-policy']?.[0] ?? '',
+    /script-src 'self'/,
+  );
+  assert.equal(await collect(section.body), '');
 });
 
 test('control-plane preset: rejects section reads without bounded tenant scope at app construction', () => {
@@ -250,8 +346,16 @@ test('control-plane preset: streaming capability does not block first shell chun
 });
 
 test('control-plane preset: gate rejection is buffered before any shell is returned', async () => {
-  const app = createDemoApp({ mode: 'strict', delivery: 'streaming', gate: 'deny' });
-  const response = await app.handle({ method: 'GET', path: '/', cspNonce: 'gate-nonce' });
+  const app = createDemoApp({
+    mode: 'strict',
+    delivery: 'streaming',
+    gate: 'deny',
+  });
+  const response = await app.handle({
+    method: 'GET',
+    path: '/',
+    cspNonce: 'gate-nonce',
+  });
   assert.equal(response.status, 403);
   assert.ok(response.body instanceof Uint8Array);
   const html = await collect(response.body);
@@ -426,7 +530,7 @@ test('control-plane boundary guardrails: blocks raw data/auth ownership in contr
         {
           path: 'ts/src/control-plane.ts',
           content:
-            "export function normalizeStaffEntitlement(input: unknown) { return input; }\n",
+            'export function normalizeStaffEntitlement(input: unknown) { return input; }\n',
         },
       ]),
     /entitlement normalization/,
