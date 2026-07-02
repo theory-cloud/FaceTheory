@@ -1,52 +1,41 @@
-await import('./unit/router.test.js');
-await import('./unit/html.test.js');
-await import('./unit/head.test.js');
-await import('./unit/app.test.js');
-await import('./unit/resource.test.js');
-await import('./unit/spa.test.js');
-await import('./unit/client-hydration.test.js');
-await import('./unit/ssr-hydration.test.js');
-await import('./unit/ops.test.js');
-await import('./unit/oac-form.test.js');
-await import('./unit/navigation-pending.test.js');
-await import('./unit/responsive-primitives.test.js');
-await import('./unit/strict-csp-harness.test.js');
-await import('./unit/control-plane-guardrails.test.js');
-await import('./unit/control-plane-host-contracts-example.test.js');
-await import('./unit/lambda-url.test.js');
-await import('./unit/aws-s3.test.js');
-await import('./unit/ssg.test.js');
-await import('./unit/isr.test.js');
-await import('./unit/tabletheory-isr-meta-store.test.js');
-await import('./unit/react.test.js');
-await import('./unit/vite.test.js');
-await import('./unit/antd.test.js');
-await import('./unit/emotion.test.js');
-await import('./unit/stitch-tokens.test.js');
-await import('./unit/stitch-shell.test.js');
-await import('./unit/stitch-hosted-auth.test.js');
-await import('./unit/stitch-admin.test.js');
-await import('./unit/stitch-admin-wizard.test.js');
-await import('./unit/stitch-admin-wizard-reconciliation-plan.test.js');
-await import('./unit/stitch-admin-wizard-authority-context-strip.test.js');
-await import('./unit/stitch-admin-selectable-card-grid.test.js');
-await import('./unit/stitch-admin-package-source-input.test.js');
-await import('./unit/stitch-admin-wizard-editable-token-input.test.js');
-await import('./unit/stitch-admin-audit-trail.test.js');
-await import('./unit/portal-fixtures.test.js');
-await import('./unit/antd-coverage.test.js');
-await import('./unit/portal-reference.test.js');
-await import('./unit/streaming.test.js');
-await import('./unit/react-stream.test.js');
-await import('./unit/vue.test.js');
-await import('./unit/vue-stitch-shell.test.js');
-await import('./unit/vue-stitch-hosted-auth.test.js');
-await import('./unit/vue-stitch-admin.test.js');
-await import('./unit/svelte.test.js');
-await import('./unit/svelte-stitch-admin.test.js');
-await import('./unit/operator-visibility-example.test.js');
-await import('./unit/vite-ssr-example.test.js');
-await import('./unit/vite-ssr-vue-example.test.js');
-await import('./unit/vite-ssr-svelte-example.test.js');
-await import('./unit/vite-strict-csp-svelte-example.test.js');
-await import('./unit/vite-ssr-svelte-library-example.test.js');
+import { spawn } from 'node:child_process';
+import { glob } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const testRoot = dirname(fileURLToPath(import.meta.url));
+const unitTestFiles: string[] = [];
+
+for await (const testFile of glob('unit/*.test.ts', { cwd: testRoot })) {
+  unitTestFiles.push(testFile);
+}
+
+unitTestFiles.sort();
+
+console.log(`FaceTheory unit test files discovered: ${unitTestFiles.length}`);
+
+const child = spawn(
+  process.execPath,
+  [
+    '--import',
+    'tsx',
+    '--test',
+    '--test-concurrency=1',
+    ...unitTestFiles.map((testFile) => join(testRoot, testFile)),
+  ],
+  { stdio: 'inherit' },
+);
+
+const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+  (resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', (code, signal) => resolve({ code, signal }));
+  },
+);
+
+if (result.signal !== null) {
+  console.error(`FaceTheory unit test runner terminated by signal ${result.signal}`);
+  process.exitCode = 1;
+} else {
+  process.exitCode = result.code ?? 1;
+}

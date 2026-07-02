@@ -204,6 +204,7 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "check": "npm run lint && npm run typecheck && npm test",
     "test": "npm run test:unit",
     "test:unit": "tsx test/run-unit.ts",
     "ssg": "tsx src/ssg-cli.ts",

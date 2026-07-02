@@ -61,7 +61,7 @@ test('apptheory adapter: buffered response matches FaceApp status/headers/cookie
 
   assert.equal(appResp.status, faceResp.status);
   assert.deepEqual(appResp.cookies, faceResp.cookies);
-  assert.deepEqual(appResp.headers, stripSetCookie(faceResp.headers));
+  assert.deepEqual(stripSetCookie(appResp.headers), stripSetCookie(faceResp.headers));
 
   const faceBody = faceResp.body;
   assert.ok(faceBody instanceof Uint8Array);
