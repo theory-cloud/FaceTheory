@@ -100,6 +100,50 @@ Why this is incorrect:
 - It omits the coordinated HTML and metadata stores that blocking ISR expects in production.
 - If the page renders tenant-specific HTML, it also omits the explicit `tenantKey` or custom `cacheKey` required to partition that cache. FaceTheory fails closed when known tenant boundary headers reach ISR without such a partition.
 
+
+## Pattern: Pick an explicit trailing-slash policy
+
+Problem:
+You need route matching, redirects, CloudFront behavior, and SSG output paths to
+agree on whether `/docs` and `/docs/` are the same URL.
+
+**CORRECT**
+
+```ts
+import { createFaceApp } from "@theory-cloud/facetheory";
+
+const app = createFaceApp({
+  faces,
+  trailingSlash: "redirect",
+});
+```
+
+Why this is correct:
+
+- FaceTheory's default is `"strict"`, which preserves existing behavior exactly:
+  `/docs` and `/docs/` are distinct paths.
+- `"redirect"` returns a deterministic `308` from `/docs/` to `/docs` when the
+  canonical route exists. This is the recommended production policy because it
+  makes accidental alternate URLs explicit without silently changing cache keys.
+- `"normalize"` matches both forms silently. Use it only when upstream routing
+  already canonicalizes the URL and you intentionally want FaceTheory to accept
+  either spelling.
+- For SSG output, align the app policy with the repository CLI's
+  `--trailing-slash` flag. The recommended `"redirect"` policy pairs with
+  `--trailing-slash never` so generated objects and runtime canonical URLs both
+  use `/docs` rather than `/docs/`.
+
+**INCORRECT**
+
+```ts
+const app = createFaceApp({ faces, trailingSlash: "normalize" });
+```
+
+Why this is incorrect:
+
+- It silently accepts two URLs for the same Face. That can hide CloudFront, S3,
+  or SSG output drift unless another layer is already enforcing canonical URLs.
+
 ## Pattern: Use resource response helpers for raw routes
 
 Problem:

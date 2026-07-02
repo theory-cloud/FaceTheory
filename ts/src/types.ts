@@ -97,6 +97,8 @@ export interface FaceResponse {
 
 export type FaceMode = 'ssr' | 'ssg' | 'isr';
 
+export type TrailingSlashPolicy = 'strict' | 'redirect' | 'normalize';
+
 export type FaceContractWarningCode =
   | 'isr.revalidate_seconds_missing'
   | 'ssg.generate_static_params_missing';

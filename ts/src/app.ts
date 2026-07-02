@@ -27,7 +27,12 @@ import {
   requiresStrictCspDocumentValidation,
   validateStrictCspDocument,
 } from './security.js';
-import { routePatternConflict, Router } from './router.js';
+import {
+  canonicalizePathForTrailingSlashPolicy,
+  normalizeTrailingSlashPolicy,
+  routePatternConflict,
+  Router,
+} from './router.js';
 import { jsonResourceResponse, textResourceResponse } from './resource.js';
 import {
   createSsrHydrationSidecarStore,
@@ -48,6 +53,7 @@ import type {
   FaceRequest,
   FaceResponse,
   Headers,
+  TrailingSlashPolicy,
 } from './types.js';
 import {
   canonicalizeHeaders,
@@ -65,6 +71,7 @@ export interface FaceAppOptions {
   ssrHydrationSidecars?: FaceSsrHydrationSidecarOptions;
   observability?: FaceAppObservabilityHooks;
   strictCsp?: FaceStrictCspOptions;
+  trailingSlash?: TrailingSlashPolicy;
 }
 
 export type FaceAppLogRecord =
@@ -180,9 +187,11 @@ export class FaceApp {
   private readonly ssrHydrationSidecarRuntime: FaceAppSsrHydrationSidecarRuntime | null;
   private readonly observability: FaceAppObservabilityHooks | null;
   private readonly strictCspMaxStreamingBodyBytes: number;
+  private readonly trailingSlash: TrailingSlashPolicy;
 
   constructor(options: FaceAppOptions) {
-    this.router = new Router();
+    this.trailingSlash = normalizeTrailingSlashPolicy(options.trailingSlash);
+    this.router = new Router({ trailingSlash: this.trailingSlash });
     this.faceByPattern = new Map();
     this.resourceByPattern = new Map();
     this.observability = options.observability ?? null;
@@ -197,7 +206,10 @@ export class FaceApp {
     const constructionWarnings: FaceContractWarningLogRecord[] = [];
 
     for (const face of options.faces) {
-      const pattern = validateFaceContract(face);
+      const pattern = canonicalizePathForTrailingSlashPolicy(
+        validateFaceContract(face),
+        this.trailingSlash,
+      );
       if (this.faceByPattern.has(pattern)) {
         throw new Error(`duplicate face route: ${pattern}`);
       }
@@ -214,7 +226,10 @@ export class FaceApp {
       : (options.resources ?? []);
 
     for (const resource of resources) {
-      const pattern = normalizePath(resource.route);
+      const pattern = canonicalizePathForTrailingSlashPolicy(
+        resource.route,
+        this.trailingSlash,
+      );
       if (this.resourceByPattern.has(pattern)) {
         throw new Error(`duplicate resource route: ${pattern}`);
       }
@@ -274,6 +289,27 @@ export class FaceApp {
     let routePattern = '';
     let mode: FaceMode | 'none' = 'none';
     let renderMs: number | null = null;
+
+    const trailingSlashRedirectPath = this.router.redirectPath(
+      normalizedReq.path,
+    );
+    if (trailingSlashRedirectPath !== null) {
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        redirectResponse(
+          withQueryString(trailingSlashRedirectPath, normalizedReq.query),
+        ),
+        {
+          routePattern: trailingSlashRedirectPath,
+          mode,
+          renderMs,
+        },
+      );
+    }
 
     let response: FaceResponse;
     const match = this.router.match(normalizedReq.path);
@@ -1017,6 +1053,24 @@ async function preflightStream(
       yield next.value;
     }
   })();
+}
+
+function withQueryString(path: string, query: Record<string, string[]>): string {
+  const params = new URLSearchParams();
+  for (const [key, values] of Object.entries(query)) {
+    for (const value of values) {
+      params.append(key, value);
+    }
+  }
+  const queryString = params.toString();
+  return queryString ? `${path}?${queryString}` : path;
+}
+
+function redirectResponse(location: string): FaceResponse {
+  return textResponse(308, 'Permanent Redirect', {
+    location: [location],
+    'content-type': ['text/plain; charset=utf-8'],
+  });
 }
 
 function textResponse(

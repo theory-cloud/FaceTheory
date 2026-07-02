@@ -202,6 +202,71 @@ test('FaceApp: warns for soft face contract gaps at construction', () => {
   assert.match(String(records[1]?.message ?? ''), /revalidateSeconds/);
 });
 
+
+test('FaceApp: strict trailing-slash policy preserves current 404 behavior', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/docs',
+        mode: 'ssr',
+        render: () => ({ html: '<main>docs</main>' }),
+      },
+    ],
+  });
+
+  const canonical = await app.handle({ method: 'GET', path: '/docs' });
+  assert.equal(canonical.status, 200);
+
+  const trailing = await app.handle({ method: 'GET', path: '/docs/' });
+  assert.equal(trailing.status, 404);
+});
+
+test('FaceApp: redirect trailing-slash policy returns a 308 canonical URL', async () => {
+  let renderCount = 0;
+  const app = createFaceApp({
+    trailingSlash: 'redirect',
+    faces: [
+      {
+        route: '/docs',
+        mode: 'ssr',
+        render: () => {
+          renderCount += 1;
+          return { html: '<main>docs</main>' };
+        },
+      },
+    ],
+  });
+
+  const trailing = await app.handle({ method: 'GET', path: '/docs/' });
+  assert.equal(trailing.status, 308);
+  assert.equal(trailing.headers.location?.[0], '/docs');
+  assert.equal(renderCount, 0);
+
+  const canonical = await app.handle({ method: 'GET', path: '/docs' });
+  assert.equal(canonical.status, 200);
+  assert.equal(renderCount, 1);
+});
+
+test('FaceApp: normalize trailing-slash policy matches both silently', async () => {
+  const app = createFaceApp({
+    trailingSlash: 'normalize',
+    faces: [
+      {
+        route: '/docs',
+        mode: 'ssr',
+        render: () => ({ html: '<main>docs</main>' }),
+      },
+    ],
+  });
+
+  const canonical = await app.handle({ method: 'GET', path: '/docs' });
+  const trailing = await app.handle({ method: 'GET', path: '/docs/' });
+
+  assert.equal(canonical.status, 200);
+  assert.equal(trailing.status, 200);
+  assert.ok(decodeBody(trailing.body as Uint8Array).includes('<main>docs</main>'));
+});
+
 test('FaceApp: propagates x-request-id and injects one when missing', async () => {
   let seen: string | null = null;
   const app = createFaceApp({
