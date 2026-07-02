@@ -624,6 +624,64 @@ test('isr: default cache key partitions by auth headers and cookies without raw 
   assert.equal(serializedKeys.includes('session'), false);
 });
 
+test('isr: varyCookies allowlist scopes request variant cookie partitioning', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/account',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>account-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      varyCookies: ['session'],
+    },
+  });
+
+  const sessionA = await app.handle({
+    method: 'GET',
+    path: '/account',
+    headers: { cookie: ['session=COOKIE_SECRET_A; theme=light'] },
+  });
+  const sessionAThemeChanged = await app.handle({
+    method: 'GET',
+    path: '/account',
+    headers: { cookie: ['session=COOKIE_SECRET_A; theme=dark'] },
+  });
+  const sessionB = await app.handle({
+    method: 'GET',
+    path: '/account',
+    headers: { cookie: ['session=COOKIE_SECRET_B; theme=dark'] },
+  });
+
+  assert.ok(decodeBody(sessionA.body as Uint8Array).includes('account-1'));
+  assert.ok(
+    decodeBody(sessionAThemeChanged.body as Uint8Array).includes('account-1'),
+  );
+  assert.ok(decodeBody(sessionB.body as Uint8Array).includes('account-2'));
+  assert.equal(renderCount, 2);
+
+  const serializedKeys = metaStore
+    .debugSnapshot()
+    .map((record) => record.cacheKey)
+    .join('\n');
+  assert.equal(metaStore.debugSnapshot().length, 2);
+  assert.equal(serializedKeys.includes('COOKIE_SECRET_A'), false);
+  assert.equal(serializedKeys.includes('COOKIE_SECRET_B'), false);
+  assert.equal(serializedKeys.includes('session'), false);
+  assert.equal(serializedKeys.includes('theme'), false);
+});
+
 class RecordingMetaStore implements IsrMetaStore {
   private readonly inner: IsrMetaStore;
   readonly commits: CommitIsrGenerationInput[] = [];

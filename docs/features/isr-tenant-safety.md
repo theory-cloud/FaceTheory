@@ -6,7 +6,7 @@ Blocking ISR is **fail-closed** when known tenant-boundary headers reach FaceThe
 
 ## The hazard
 
-ISR computes a cache key from the path, query, and (optionally) headers / cookies / a tenant key. If the cache key doesn't include the tenant dimension but the rendered HTML varies per tenant, the first request from one tenant pollutes the cache and the next request from a different tenant serves the wrong page.
+ISR computes a cache key from the path, query, and (optionally) headers / cookies / a tenant key. By default, any request cookie folds into an hashed variant digest so unknown cookie variance fails safe by partitioning the cache entry. If the cache key doesn't include the tenant dimension but the rendered HTML varies per tenant, the first request from one tenant pollutes the cache and the next request from a different tenant serves the wrong page.
 
 ## The fail-closed behavior
 
@@ -49,6 +49,22 @@ If the cached HTML varies per tenant, choose one of:
   ```
 
   The cache key must include every request-varying dimension that affects the cached HTML.
+
+## Cookie request variants
+
+By default, the built-in ISR cache key folds all request cookies into a digest. This is the fail-safe posture: an unexpected session or personalization cookie partitions the cache instead of allowing a potentially personalized render to be shared.
+
+If a deployment knows that only specific cookies affect the ISR HTML, set `varyCookies` to that allowlist:
+
+```typescript
+isr: {
+  htmlStore,
+  metaStore,
+  varyCookies: ['session'],
+},
+```
+
+Requests that differ only in non-listed cookies share the same cache entry; requests that differ in a listed cookie partition. Keep the list complete for every cookie that can affect the rendered HTML.
 
 ## Migration
 

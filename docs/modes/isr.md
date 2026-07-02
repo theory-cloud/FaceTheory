@@ -64,6 +64,23 @@ Blocking ISR is **fail-closed** when known tenant-boundary headers (e.g. `x-tena
 
 See [ISR tenant safety](../features/isr-tenant-safety.md) and [Migration Guide → Adopt ISR tenant fail-closed defaults](../migration-guide.md).
 
+## Cookie request variants
+
+The built-in ISR cache key includes all request cookies in a hashed variant by default. This preserves the fail-safe behavior for unknown personalization cookies. To share entries across non-render-affecting cookies, configure an allowlist:
+
+```typescript
+export const app = createFaceApp({
+  faces,
+  isr: {
+    htmlStore,
+    metaStore,
+    varyCookies: ['session'],
+  },
+});
+```
+
+With `varyCookies`, only listed cookies partition the default cache key; absent `varyCookies` keeps the all-cookies default.
+
 ## What ISR guarantees
 
 - Fresh entries serve from cache without invoking `render` or `load`.

@@ -148,6 +148,7 @@ export interface IsrCacheKeyInput {
   query: Query;
   headers?: Headers;
   cookies?: CookieMap;
+  varyCookies?: readonly string[];
 }
 
 export interface IsrCacheControlOptions {
@@ -195,6 +196,7 @@ export interface FaceIsrOptions {
   lockContentionPolicy?: IsrLockContentionPolicy;
   tenantKey?: (ctx: FaceContext) => string | null | undefined;
   cacheKey?: (input: IsrCacheKeyInput) => string;
+  varyCookies?: string[];
   htmlPointerPrefix?: string;
   cacheControl?: (input: IsrCacheHeaderInput) => string;
   observability?: FaceObservabilityHooks | null;
@@ -214,6 +216,7 @@ interface CreateIsrRuntimeOptions {
   hasExplicitTenantKey: boolean;
   cacheKey: (input: IsrCacheKeyInput) => string;
   hasExplicitCacheKey: boolean;
+  varyCookies: readonly string[] | null;
   tenantBoundaryHeaders: readonly string[];
   htmlPointerPrefix: string;
   cacheControl: (input: IsrCacheHeaderInput) => string;
@@ -471,14 +474,18 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
       const query = hydrationSidecarPointer.present
         ? queryWithoutHydrationSidecar(input.ctx.request.query)
         : input.ctx.request.query;
-      const cacheKey = runtimeOptions.cacheKey({
+      const cacheKeyInput: IsrCacheKeyInput = {
         tenant,
         routePattern: normalizePath(input.routePattern),
         params: input.ctx.params,
         query,
         headers: input.ctx.request.headers,
         cookies: input.ctx.request.cookies,
-      });
+      };
+      if (runtimeOptions.varyCookies !== null) {
+        cacheKeyInput.varyCookies = runtimeOptions.varyCookies;
+      }
+      const cacheKey = runtimeOptions.cacheKey(cacheKeyInput);
 
       if (hydrationSidecarPointer.present) {
         if (
@@ -681,7 +688,7 @@ function requestVariantKeyParts(input: IsrCacheKeyInput): string[] {
   );
   if (authHeadersDigest) parts.push(`auth=${authHeadersDigest}`);
 
-  const cookiesDigest = digestCookies(input.cookies);
+  const cookiesDigest = digestCookies(input.cookies, input.varyCookies);
   if (cookiesDigest) parts.push(`cookies=${cookiesDigest}`);
   return parts;
 }
@@ -706,9 +713,15 @@ function digestSelectedHeaders(
   return digestVariantLines(lines);
 }
 
-function digestCookies(cookies: CookieMap | undefined): string | null {
+function digestCookies(
+  cookies: CookieMap | undefined,
+  varyCookies?: readonly string[],
+): string | null {
   if (!cookies) return null;
-  const lines = Object.keys(cookies)
+  const cookieNames =
+    varyCookies === undefined ? Object.keys(cookies) : [...varyCookies];
+  const lines = [...new Set(cookieNames)]
+    .filter((name) => Object.hasOwn(cookies, name))
     .sort((left, right) => left.localeCompare(right))
     .map((name) => `${name}=${String(cookies[name])}`);
   return digestVariantLines(lines);
@@ -1063,6 +1076,9 @@ function normalizeRuntimeOptions(
   const cacheKey =
     typeof input.cacheKey === 'function' ? input.cacheKey : defaultIsrCacheKey;
   const hasExplicitCacheKey = typeof input.cacheKey === 'function';
+  const varyCookies = Array.isArray(input.varyCookies)
+    ? normalizeVaryCookies(input.varyCookies)
+    : null;
 
   return {
     htmlStore,
@@ -1090,6 +1106,7 @@ function normalizeRuntimeOptions(
     hasExplicitTenantKey,
     cacheKey,
     hasExplicitCacheKey,
+    varyCookies,
     tenantBoundaryHeaders: DEFAULT_TENANT_BOUNDARY_HEADERS,
     htmlPointerPrefix: normalizeObjectPrefix(input.htmlPointerPrefix ?? 'isr'),
     cacheControl:
@@ -1097,6 +1114,12 @@ function normalizeRuntimeOptions(
       ((options) => blockingIsrCacheControl(options.revalidateSeconds)),
     observability: input.observability ?? null,
   };
+}
+
+function normalizeVaryCookies(varyCookies: readonly string[]): readonly string[] {
+  return [...new Set(varyCookies.map((name) => String(name).trim()))].filter(
+    (name) => name.length > 0,
+  );
 }
 
 function assertPartitionedTenantBoundary(
