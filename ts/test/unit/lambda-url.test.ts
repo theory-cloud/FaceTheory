@@ -197,6 +197,92 @@ test('writeFaceResponseToLambdaWriter: writes head once before first body bytes'
   assert.ok(firstChunk.includes('</head><body>'));
 });
 
+test('writeFaceResponseToLambdaWriter: waits for drain when writes apply backpressure', async () => {
+  const events: string[] = [];
+  const sourceChunks = [utf8('alpha'), utf8('beta'), utf8('gamma')];
+
+  async function* body(): AsyncIterable<Uint8Array> {
+    for (const [index, chunk] of sourceChunks.entries()) {
+      events.push(`source:${String(index)}`);
+      yield chunk;
+    }
+  }
+
+  const writtenChunks: Uint8Array[] = [];
+  let pendingBackpressure = false;
+  let bufferedWrites = 0;
+  let maxBufferedWrites = 0;
+  let drainCount = 0;
+
+  const writer: LambdaResponseWriter = {
+    writeHead: () => {
+      events.push('head');
+    },
+    write: (chunk) => {
+      if (pendingBackpressure) {
+        throw new Error('next chunk was written before drain resolved');
+      }
+
+      const text = new TextDecoder().decode(chunk);
+      events.push(`write:${text}`);
+      writtenChunks.push(chunk);
+      pendingBackpressure = true;
+      bufferedWrites += 1;
+      maxBufferedWrites = Math.max(maxBufferedWrites, bufferedWrites);
+      return false;
+    },
+    drain: async () => {
+      assert.equal(pendingBackpressure, true);
+      events.push('drain:start');
+      drainCount += 1;
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
+      pendingBackpressure = false;
+      bufferedWrites -= 1;
+      events.push('drain:end');
+    },
+    end: () => {
+      assert.equal(pendingBackpressure, false);
+      events.push('end');
+    },
+  };
+
+  await writeFaceResponseToLambdaWriter(
+    {
+      status: 200,
+      headers: { 'content-type': ['text/plain; charset=utf-8'] },
+      cookies: [],
+      body: body(),
+      isBase64: false,
+    },
+    writer,
+  );
+
+  assert.equal(drainCount, sourceChunks.length);
+  assert.equal(maxBufferedWrites, 1);
+  assert.equal(
+    new TextDecoder().decode(Buffer.concat(writtenChunks.map((chunk) => Buffer.from(chunk)))),
+    'alphabetagamma',
+  );
+  assert.deepEqual(events, [
+    'head',
+    'source:0',
+    'write:alpha',
+    'drain:start',
+    'drain:end',
+    'source:1',
+    'write:beta',
+    'drain:start',
+    'drain:end',
+    'source:2',
+    'write:gamma',
+    'drain:start',
+    'drain:end',
+    'end',
+  ]);
+});
+
 test('handleLambdaUrlEvent: serves emitted SSR hydration sidecar URL as raw JSON without rerendering', async () => {
   const htmlStore = new RecordingHtmlStore();
   let loadCount = 0;

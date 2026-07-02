@@ -40,13 +40,15 @@ export interface LambdaUrlResponseMetadata {
 
 export interface LambdaResponseWriter {
   writeHead: (metadata: LambdaUrlResponseMetadata) => void;
-  write: (chunk: Uint8Array) => void;
-  end: () => void;
+  write: (chunk: Uint8Array) => boolean | void | Promise<boolean | void>;
+  drain?: () => Promise<void>;
+  end: () => void | Promise<void>;
 }
 
 export interface LambdaWritableStream {
-  write: (chunk: Uint8Array | string) => void;
+  write: (chunk: Uint8Array | string) => boolean | void;
   end: (chunk?: Uint8Array | string) => void;
+  once?: (event: 'drain', listener: () => void) => unknown;
   setHeader?: (name: string, value: string | string[]) => void;
   statusCode?: number;
 }
@@ -157,16 +159,39 @@ export async function writeFaceResponseToLambdaWriter(
 
   if (response.body instanceof Uint8Array) {
     if (response.body.length > 0) {
-      writer.write(response.body);
+      await writeLambdaChunk(writer, response.body);
     }
-    writer.end();
+    await writer.end();
     return;
   }
 
   for await (const chunk of response.body) {
-    writer.write(chunk);
+    await writeLambdaChunk(writer, chunk);
   }
-  writer.end();
+  await writer.end();
+}
+
+async function writeLambdaChunk(
+  writer: LambdaResponseWriter,
+  chunk: Uint8Array,
+): Promise<void> {
+  const accepted = await writer.write(chunk);
+  if (accepted === false) {
+    await waitForWriterDrain(writer);
+  }
+}
+
+async function waitForWriterDrain(
+  writer: LambdaResponseWriter,
+): Promise<void> {
+  if (typeof writer.drain === 'function') {
+    await writer.drain();
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
 }
 
 export function createLambdaUrlStreamingHandler<
@@ -219,15 +244,24 @@ function createStreamWriter(
     }
   };
 
-  const write = (chunk: Uint8Array): void => {
-    stream.write(chunk);
+  const write = (chunk: Uint8Array): boolean | void => {
+    return stream.write(chunk);
   };
+
+  const drain =
+    typeof stream.once === 'function'
+      ? async (): Promise<void> => {
+          await new Promise<void>((resolve) => {
+            stream.once?.('drain', resolve);
+          });
+        }
+      : undefined;
 
   const end = (): void => {
     stream.end();
   };
 
-  return { writeHead, write, end };
+  return drain ? { writeHead, write, drain, end } : { writeHead, write, end };
 }
 
 function getDefaultAwsLambdaGlobal(): AwsLambdaGlobalLike {
