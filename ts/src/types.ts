@@ -97,6 +97,19 @@ export interface FaceResponse {
 
 export type FaceMode = 'ssr' | 'ssg' | 'isr';
 
+export type FaceContractWarningCode =
+  | 'isr.revalidate_seconds_missing'
+  | 'ssg.generate_static_params_missing';
+
+export interface FaceContractWarningLogRecord {
+  level: 'warn';
+  event: 'facetheory.app.contract.warning';
+  warningCode: FaceContractWarningCode;
+  routePattern: string;
+  mode: FaceMode;
+  message: string;
+}
+
 export interface FaceContext {
   request: Readonly<Required<FaceRequest>>;
   params: Readonly<Record<string, string>>;

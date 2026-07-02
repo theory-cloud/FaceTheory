@@ -116,7 +116,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 
 | Interface           | Purpose                              | Notes                                                                                                                                                                                                                                                           |
 | ------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FaceModule`        | Route definition                     | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`. SSG params must resolve to normal route segments; dot-segments such as `.` and `..` are rejected.                                                                         |
+| `FaceModule`        | Route definition                     | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`. `createFaceApp()` rejects empty routes, non-function `render`, and modes outside `ssr`, `ssg`, or `isr`. SSG params must resolve to normal route segments; dot-segments such as `.` and `..` are rejected. |
 | `FaceResourceRoute` | Raw resource route                   | Uses `route` and `handle`. The handler receives the same normalized `FaceContext` route params/proxy/request shape as a Face and returns a raw `FaceResponse` directly. Resource routes do not declare a `mode` and are not document-rendered.                  |
 | `FaceMode`          | Rendering mode                       | One of `ssr`, `ssg`, or `isr`.                                                                                                                                                                                                                                  |
 | `FaceRequest`       | Normalized request input             | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`.                                                                                                                                                                                 |
@@ -788,6 +788,7 @@ Observability is optional, but the hook surface is part of the public runtime co
 `createFaceApp({ observability })` supports:
 
 - `observability.log(record)` for `facetheory.request.completed`
+- `observability.log(record)` for construction warnings with `event: "facetheory.app.contract.warning"`, `level: "warn"`, a stable `warningCode`, and the affected `routePattern` / `mode`. Current warnings cover ISR Faces without `revalidateSeconds` and SSG parameter routes without `generateStaticParams`; they remain warnings in the 3.x train and escalate in the planned v4 contract pass.
 - `observability.metric(record)` for request and render timing metrics
 - `observability.now()` to override the clock used for durations
 

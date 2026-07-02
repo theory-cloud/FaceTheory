@@ -8,7 +8,7 @@ import type {
   HtmlStoreWriteInput,
   HtmlStoreWriteResult,
 } from '../../src/isr.js';
-import type { FaceResourceRoute } from '../../src/types.js';
+import type { FaceModule, FaceResourceRoute } from '../../src/types.js';
 import { parseCookiesFromHeaders, parseQueryString } from '../../src/types.js';
 import { viteHydrationForEntry } from '../../src/vite.js';
 
@@ -100,6 +100,106 @@ test('FaceApp: renders HTML with title', async () => {
   const body = decodeBody(resp.body as Uint8Array);
   assert.ok(body.includes('<title>Home</title>'));
   assert.ok(body.includes('<div>hi</div>'));
+});
+
+
+test('FaceApp: validates face contracts at construction', () => {
+  assert.throws(
+    () =>
+      createFaceApp({
+        faces: [
+          {
+            route: '/',
+            mode: 'spa',
+            render: () => ({ html: '<div>unreachable</div>' }),
+          } as unknown as FaceModule,
+        ],
+      }),
+    /invalid face mode for route "\/": expected ssr, ssg, or isr/,
+  );
+
+  assert.throws(
+    () =>
+      createFaceApp({
+        faces: [
+          {
+            route: '   ',
+            mode: 'ssr',
+            render: () => ({ html: '<div>unreachable</div>' }),
+          },
+        ],
+      }),
+    /face route must be a non-empty string/,
+  );
+
+  assert.throws(
+    () =>
+      createFaceApp({
+        faces: [
+          {
+            route: '/missing-render',
+            mode: 'ssr',
+          } as unknown as FaceModule,
+        ],
+      }),
+    /face render for route "\/missing-render" must be a function/,
+  );
+});
+
+test('FaceApp: warns for soft face contract gaps at construction', () => {
+  const records: Array<Record<string, unknown>> = [];
+
+  createFaceApp({
+    faces: [
+      {
+        route: '/news/{slug}',
+        mode: 'ssg',
+        render: () => ({ html: '<div>news</div>' }),
+      },
+      {
+        route: '/preview',
+        mode: 'isr',
+        render: () => ({ html: '<div>preview</div>' }),
+      },
+      {
+        route: '/docs/{slug}',
+        mode: 'ssg',
+        generateStaticParams: async () => [{ slug: 'intro' }],
+        render: () => ({ html: '<div>docs</div>' }),
+      },
+    ],
+    observability: {
+      log: (record) => records.push(record as unknown as Record<string, unknown>),
+    },
+  });
+
+  assert.deepEqual(
+    records.map((record) => ({
+      event: record.event,
+      level: record.level,
+      warningCode: record.warningCode,
+      routePattern: record.routePattern,
+      mode: record.mode,
+    })),
+    [
+      {
+        event: 'facetheory.app.contract.warning',
+        level: 'warn',
+        warningCode: 'ssg.generate_static_params_missing',
+        routePattern: '/news/{slug}',
+        mode: 'ssg',
+      },
+      {
+        event: 'facetheory.app.contract.warning',
+        level: 'warn',
+        warningCode: 'isr.revalidate_seconds_missing',
+        routePattern: '/preview',
+        mode: 'isr',
+      },
+    ],
+  );
+  assert.match(String(records[0]?.message ?? ''), /generateStaticParams/);
+  assert.match(String(records[1]?.message ?? ''), /revalidateSeconds/);
 });
 
 test('FaceApp: propagates x-request-id and injects one when missing', async () => {

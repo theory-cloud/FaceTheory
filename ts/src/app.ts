@@ -20,6 +20,7 @@ import {
   reportFaceError,
   type FaceErrorPhase,
   type FaceObservabilityHooks,
+  type FaceRequestCompletedLogRecord,
 } from './ops.js';
 import {
   buildStrictCspHeader,
@@ -37,6 +38,7 @@ import {
 } from './ssr-hydration.js';
 import type {
   FaceContext,
+  FaceContractWarningLogRecord,
   FaceExternalHydration,
   FaceHydration,
   FaceMode,
@@ -61,8 +63,25 @@ export interface FaceAppOptions {
   resources?: FaceResourceRoute[];
   isr?: FaceIsrOptions;
   ssrHydrationSidecars?: FaceSsrHydrationSidecarOptions;
-  observability?: FaceObservabilityHooks;
+  observability?: FaceAppObservabilityHooks;
   strictCsp?: FaceStrictCspOptions;
+}
+
+export type FaceAppLogRecord =
+  | FaceRequestCompletedLogRecord
+  | (FaceContractWarningLogRecord &
+      Partial<Omit<FaceRequestCompletedLogRecord, 'event'>>);
+
+export type FaceAppLogHook = (record: FaceAppLogRecord) => void;
+
+export interface FaceAppObservabilityHooks
+  extends Omit<FaceObservabilityHooks, 'log'> {
+  /**
+   * Structured request completion records and construction-time contract
+   * warnings. Contract warnings remain warnings until the planned v4 contract
+   * escalation.
+   */
+  log?: FaceAppLogHook;
 }
 
 export interface FaceSsrHydrationSidecarOptions extends Pick<
@@ -159,7 +178,7 @@ export class FaceApp {
   private readonly resourceByPattern: Map<string, FaceResourceRoute>;
   private readonly isrRuntime: IsrRuntime | null;
   private readonly ssrHydrationSidecarRuntime: FaceAppSsrHydrationSidecarRuntime | null;
-  private readonly observability: FaceObservabilityHooks | null;
+  private readonly observability: FaceAppObservabilityHooks | null;
   private readonly strictCspMaxStreamingBodyBytes: number;
 
   constructor(options: FaceAppOptions) {
@@ -175,13 +194,16 @@ export class FaceApp {
       ? createFaceAppSsrHydrationSidecarRuntime(options.ssrHydrationSidecars)
       : null;
 
+    const constructionWarnings: FaceContractWarningLogRecord[] = [];
+
     for (const face of options.faces) {
-      const pattern = normalizePath(face.route);
+      const pattern = validateFaceContract(face);
       if (this.faceByPattern.has(pattern)) {
         throw new Error(`duplicate face route: ${pattern}`);
       }
       this.router.add(pattern);
       this.faceByPattern.set(pattern, face);
+      constructionWarnings.push(...faceContractWarnings(face, pattern));
     }
 
     const resources = this.ssrHydrationSidecarRuntime
@@ -228,16 +250,17 @@ export class FaceApp {
     const hasIsrFace = options.faces.some((face) => face.mode === 'isr');
     if (!hasIsrFace) {
       this.isrRuntime = null;
-      return;
+    } else {
+      const isrOptions = options.isr ?? {};
+      this.isrRuntime = createIsrRuntime({
+        ...isrOptions,
+        htmlStore: isrOptions.htmlStore ?? new InMemoryHtmlStore(),
+        metaStore: isrOptions.metaStore ?? new InMemoryIsrMetaStore(),
+        observability: this.observability ?? isrOptions.observability ?? null,
+      });
     }
 
-    const isrOptions = options.isr ?? {};
-    this.isrRuntime = createIsrRuntime({
-      ...isrOptions,
-      htmlStore: isrOptions.htmlStore ?? new InMemoryHtmlStore(),
-      metaStore: isrOptions.metaStore ?? new InMemoryIsrMetaStore(),
-      observability: this.observability ?? isrOptions.observability ?? null,
-    });
+    emitFaceContractWarnings(this.observability, constructionWarnings);
   }
 
   async handle(request: FaceRequest): Promise<FaceResponse> {
@@ -428,6 +451,82 @@ export class FaceApp {
 
 export function createFaceApp(options: FaceAppOptions): FaceApp {
   return new FaceApp(options);
+}
+
+function validateFaceContract(face: FaceModule): string {
+  const route = String((face as { route?: unknown }).route ?? '').trim();
+  if (!route) {
+    throw new Error('face route must be a non-empty string');
+  }
+
+  const mode = (face as { mode?: unknown }).mode;
+  if (mode !== 'ssr' && mode !== 'ssg' && mode !== 'isr') {
+    throw new Error(
+      `invalid face mode for route "${route}": expected ssr, ssg, or isr`,
+    );
+  }
+
+  if (typeof (face as { render?: unknown }).render !== 'function') {
+    throw new Error(`face render for route "${route}" must be a function`);
+  }
+
+  return normalizePath(route);
+}
+
+function faceContractWarnings(
+  face: FaceModule,
+  routePattern: string,
+): FaceContractWarningLogRecord[] {
+  const warnings: FaceContractWarningLogRecord[] = [];
+
+  if (face.mode === 'isr' && face.revalidateSeconds === undefined) {
+    warnings.push({
+      level: 'warn',
+      event: 'facetheory.app.contract.warning',
+      warningCode: 'isr.revalidate_seconds_missing',
+      routePattern,
+      mode: face.mode,
+      message:
+        `ISR face "${routePattern}" does not declare revalidateSeconds; ` +
+        'this remains a construction warning until the v4 contract escalation.',
+    });
+  }
+
+  if (
+    face.mode === 'ssg' &&
+    routePatternHasParams(routePattern) &&
+    typeof face.generateStaticParams !== 'function'
+  ) {
+    warnings.push({
+      level: 'warn',
+      event: 'facetheory.app.contract.warning',
+      warningCode: 'ssg.generate_static_params_missing',
+      routePattern,
+      mode: face.mode,
+      message:
+        `SSG param face "${routePattern}" does not declare generateStaticParams; ` +
+        'this remains a construction warning until the v4 contract escalation.',
+    });
+  }
+
+  return warnings;
+}
+
+function routePatternHasParams(routePattern: string): boolean {
+  return routePattern.split('/').some((segment) => {
+    const trimmed = segment.trim();
+    return trimmed.startsWith('{') && trimmed.endsWith('}') && trimmed.length > 2;
+  });
+}
+
+function emitFaceContractWarnings(
+  hooks: FaceAppObservabilityHooks | null,
+  warnings: readonly FaceContractWarningLogRecord[],
+): void {
+  const log = hooks?.log as FaceAppLogHook | undefined;
+  for (const warning of warnings) {
+    log?.(warning);
+  }
 }
 
 function createFaceAppSsrHydrationSidecarRuntime(
