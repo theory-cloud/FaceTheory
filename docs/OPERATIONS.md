@@ -48,7 +48,7 @@ AWS example (`infra/apptheory-ssg-isr-site/`) additionally:
 
 - `x-request-id`: request correlation across edge/origin/logs.
 - `x-facetheory-ssr: 1`: marker for SSR responses in the infra examples.
-- `x-facetheory-isr`: ISR cache state (`hit` | `miss` | `stale` | `wait-hit`; degraded ISR states are documented in the ISR runbook below).
+- `x-facetheory-isr`: ISR cache state (`hit` | `miss` | `stale` | `wait-hit`; `stale-metadata-error` means stale HTML was served because the metadata store failed after a last-known pointer was available).
 
 ### Structured logs and minimal metrics
 
@@ -223,9 +223,11 @@ The workflow guardrails are intentionally fail-closed:
 
 Symptoms:
 - Elevated `x-facetheory-isr: stale` or `x-facetheory-isr: wait-hit`.
+- Any `x-facetheory-isr: stale-metadata-error` response, which indicates a metadata-store read or lease failure was degraded to stale HTML using a last-known pointer.
 
 Checks:
 - CloudWatch logs for request patterns and render durations (`renderMs`).
+- `observability.onError` events with `ctx.phase === "isr-metadata"`; inspect `ctx.errorClass` and the associated `x-request-id` before treating the stale response as healthy.
 - DynamoDB table hot partitions (if tenant+route concentrates traffic).
 - Regeneration time vs lease duration:
   - If regeneration routinely exceeds the lease, you will see contention and repeated stale serving.

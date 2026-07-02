@@ -69,6 +69,8 @@ See [ISR tenant safety](../features/isr-tenant-safety.md) and [Migration Guide â
 - Fresh entries serve from cache without invoking `render` or `load`.
 - Stale entries serve only after regeneration completes (blocking model â€” no stale-while-revalidate by default).
 - Regeneration is serialized per cache key by a lease: concurrent requests for the same stale entry wait for the lease holder rather than thundering the origin.
+- If the metadata store fails after this Lambda runtime has a serveable last-known pointer for the cache key, FaceTheory serves that stale HTML with `x-facetheory-isr: stale-metadata-error` instead of turning a metadata outage into a 500. The original metadata exception is sent to `observability.onError` with `ctx.phase === "isr-metadata"`.
+- If no serveable entry is known, metadata-store failures still fail closed as 500 responses through the normal error hook path.
 - TTL controls freshness; failure policy (`'serve-stale'` vs `'error'`) and lock-contention policy (`'wait'` vs `'serve-stale'`) are configurable via `FaceIsrOptions`.
 
 ## Related docs

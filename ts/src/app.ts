@@ -236,6 +236,7 @@ export class FaceApp {
       ...isrOptions,
       htmlStore: isrOptions.htmlStore ?? new InMemoryHtmlStore(),
       metaStore: isrOptions.metaStore ?? new InMemoryIsrMetaStore(),
+      observability: this.observability ?? isrOptions.observability ?? null,
     });
   }
 

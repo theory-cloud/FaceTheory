@@ -3,6 +3,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import { utf8 } from './bytes.js';
 import { safeJson } from './html.js';
 import {
+  reportFaceError,
+  type FaceObservabilityHooks,
+} from './ops.js';
+import {
   requiresStrictCspDocumentValidation,
   validateStrictCspDocument,
 } from './security.js';
@@ -44,10 +48,16 @@ const ISR_HTML_METADATA_CONTENT_SECURITY_POLICY =
   'facetheory-content-security-policy';
 const ISR_HTML_METADATA_STATUS = 'facetheory-status';
 const ISR_HTML_METADATA_CONTENT_TYPE = 'facetheory-content-type';
+const ISR_STATE_STALE_METADATA_ERROR = 'stale-metadata-error';
 
 export type IsrFailurePolicy = 'serve-stale' | 'error';
 export type IsrLockContentionPolicy = 'wait' | 'serve-stale';
-export type IsrCacheState = 'miss' | 'hit' | 'stale' | 'wait-hit';
+export type IsrCacheState =
+  | 'miss'
+  | 'hit'
+  | 'stale'
+  | 'wait-hit'
+  | typeof ISR_STATE_STALE_METADATA_ERROR;
 
 export interface HtmlStoreWriteInput {
   key: string;
@@ -186,6 +196,7 @@ export interface FaceIsrOptions {
   cacheKey?: (input: IsrCacheKeyInput) => string;
   htmlPointerPrefix?: string;
   cacheControl?: (input: IsrCacheHeaderInput) => string;
+  observability?: FaceObservabilityHooks | null;
 }
 
 interface CreateIsrRuntimeOptions {
@@ -205,6 +216,7 @@ interface CreateIsrRuntimeOptions {
   tenantBoundaryHeaders: readonly string[];
   htmlPointerPrefix: string;
   cacheControl: (input: IsrCacheHeaderInput) => string;
+  observability: FaceObservabilityHooks | null;
 }
 
 interface PreparedFreshResponse {
@@ -434,6 +446,16 @@ export class S3HtmlStore implements HtmlStore {
 
 export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
   const runtimeOptions = normalizeRuntimeOptions(options);
+  const lastKnownRecords = new Map<string, IsrMetaRecord>();
+  const rememberRecord = (record: IsrMetaRecord | null): void => {
+    if (!record?.htmlPointer) return;
+    lastKnownRecords.set(record.cacheKey, cloneIsrMetaRecord(record));
+  };
+  const lastKnownRecord = (cacheKey: string): IsrMetaRecord | null => {
+    const record = lastKnownRecords.get(cacheKey);
+    return record ? cloneIsrMetaRecord(record) : null;
+  };
+
   return {
     handleFace: async (input) => {
       const revalidateSeconds = normalizeRevalidateSeconds(
@@ -477,7 +499,20 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
       }
 
       const currentNow = runtimeOptions.now();
-      const existing = await runtimeOptions.metaStore.get(cacheKey);
+      let existing: IsrMetaRecord | null;
+      try {
+        existing = await runtimeOptions.metaStore.get(cacheKey);
+        rememberRecord(existing);
+      } catch (err) {
+        const stale = await staleResponseForMetadataFailure(
+          runtimeOptions,
+          input,
+          lastKnownRecord(cacheKey),
+          err,
+        );
+        if (stale) return stale;
+        throw err;
+      }
 
       if (existing && isFresh(existing, currentNow)) {
         const cachedFresh = await cachedResponseFromRecord(
@@ -487,17 +522,33 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           currentNow,
           false,
         );
-        if (cachedFresh) return cachedFresh;
+        if (cachedFresh) {
+          rememberRecord(existing);
+          return cachedFresh;
+        }
       }
 
       const leaseOwner = runtimeOptions.createLeaseOwner();
-      const acquire = await runtimeOptions.metaStore.tryAcquireLease({
-        cacheKey,
-        leaseOwner,
-        nowMs: currentNow,
-        leaseDurationMs: runtimeOptions.leaseDurationMs,
-        fallbackRevalidateSeconds: revalidateSeconds,
-      });
+      let acquire: TryAcquireIsrLeaseResult;
+      try {
+        acquire = await runtimeOptions.metaStore.tryAcquireLease({
+          cacheKey,
+          leaseOwner,
+          nowMs: currentNow,
+          leaseDurationMs: runtimeOptions.leaseDurationMs,
+          fallbackRevalidateSeconds: revalidateSeconds,
+        });
+        rememberRecord(acquire.record);
+      } catch (err) {
+        const stale = await staleResponseForMetadataFailure(
+          runtimeOptions,
+          input,
+          existing ?? lastKnownRecord(cacheKey),
+          err,
+        );
+        if (stale) return stale;
+        throw err;
+      }
 
       if (acquire.acquired && acquire.leaseToken) {
         return regenerateAndCommit(
@@ -508,6 +559,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           acquire.leaseToken,
           revalidateSeconds,
           existing ?? acquire.record,
+          rememberRecord,
         );
       }
 
@@ -515,12 +567,25 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
       if (runtimeOptions.lockContentionPolicy === 'wait') {
         const deadline =
           runtimeOptions.now() + runtimeOptions.regenerationWaitTimeoutMs;
-        const waited = await waitForRegeneratedRecord(
-          runtimeOptions,
-          cacheKey,
-          staleRecord.generatedAt,
-          deadline,
-        );
+        let waited: IsrMetaRecord | null;
+        try {
+          waited = await waitForRegeneratedRecord(
+            runtimeOptions,
+            cacheKey,
+            staleRecord.generatedAt,
+            deadline,
+          );
+          rememberRecord(waited);
+        } catch (err) {
+          const stale = await staleResponseForMetadataFailure(
+            runtimeOptions,
+            input,
+            staleRecord,
+            err,
+          );
+          if (stale) return stale;
+          throw err;
+        }
         if (waited) {
           const cached = await cachedResponseFromRecord(
             runtimeOptions,
@@ -533,13 +598,26 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         }
       }
 
-      const retryAcquire = await runtimeOptions.metaStore.tryAcquireLease({
-        cacheKey,
-        leaseOwner,
-        nowMs: runtimeOptions.now(),
-        leaseDurationMs: runtimeOptions.leaseDurationMs,
-        fallbackRevalidateSeconds: revalidateSeconds,
-      });
+      let retryAcquire: TryAcquireIsrLeaseResult;
+      try {
+        retryAcquire = await runtimeOptions.metaStore.tryAcquireLease({
+          cacheKey,
+          leaseOwner,
+          nowMs: runtimeOptions.now(),
+          leaseDurationMs: runtimeOptions.leaseDurationMs,
+          fallbackRevalidateSeconds: revalidateSeconds,
+        });
+        rememberRecord(retryAcquire.record);
+      } catch (err) {
+        const stale = await staleResponseForMetadataFailure(
+          runtimeOptions,
+          input,
+          staleRecord,
+          err,
+        );
+        if (stale) return stale;
+        throw err;
+      }
       if (retryAcquire.acquired && retryAcquire.leaseToken) {
         return regenerateAndCommit(
           runtimeOptions,
@@ -549,6 +627,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           retryAcquire.leaseToken,
           revalidateSeconds,
           staleRecord,
+          rememberRecord,
         );
       }
 
@@ -688,6 +767,7 @@ async function regenerateAndCommit(
   leaseToken: string,
   revalidateSeconds: number,
   staleRecord: IsrMetaRecord,
+  rememberRecord: (record: IsrMetaRecord | null) => void,
 ): Promise<FaceResponse> {
   const generatedAt = runtimeOptions.now();
   const htmlPointer = buildHtmlPointer(
@@ -757,18 +837,21 @@ async function regenerateAndCommit(
       ...(etag !== null ? { etag } : {}),
     });
 
+    const committedRecord: IsrMetaRecord = {
+      ...createDefaultMetaRecord(cacheKey, revalidateSeconds),
+      htmlPointer,
+      generatedAt,
+      status: prepared.status,
+      contentType: prepared.contentType,
+      contentSecurityPolicy: prepared.contentSecurityPolicy,
+      strictCspPolicy: prepared.strictCspPolicy,
+      etag,
+    };
+    rememberRecord(committedRecord);
+
     return responseFromStoredHtml(
       runtimeOptions,
-      {
-        ...createDefaultMetaRecord(cacheKey, revalidateSeconds),
-        htmlPointer,
-        generatedAt,
-        status: prepared.status,
-        contentType: prepared.contentType,
-        contentSecurityPolicy: prepared.contentSecurityPolicy,
-        strictCspPolicy: prepared.strictCspPolicy,
-        etag,
-      },
+      committedRecord,
       prepared.body,
       'miss',
       runtimeOptions.now(),
@@ -794,6 +877,34 @@ async function regenerateAndCommit(
   }
 }
 
+async function staleResponseForMetadataFailure(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  input: HandleIsrFaceInput,
+  record: IsrMetaRecord | null,
+  err: unknown,
+): Promise<FaceResponse | null> {
+  const response = await cachedResponseFromRecord(
+    runtimeOptions,
+    record,
+    ISR_STATE_STALE_METADATA_ERROR,
+    runtimeOptions.now(),
+    true,
+  );
+  if (!response) return null;
+
+  reportFaceError(runtimeOptions.observability, err, {
+    requestId: String(input.ctx.request.headers['x-request-id']?.[0] ?? ''),
+    method: input.ctx.request.method,
+    path: input.ctx.request.path,
+    routePattern: input.routePattern,
+    mode: 'isr',
+    phase: 'isr-metadata',
+    status: response.status,
+    isrState: response.headers['x-facetheory-isr']?.[0] ?? null,
+  });
+  return response;
+}
+
 async function waitForRegeneratedRecord(
   runtimeOptions: CreateIsrRuntimeOptions,
   cacheKey: string,
@@ -816,12 +927,12 @@ async function waitForRegeneratedRecord(
 
 async function cachedResponseFromRecord(
   runtimeOptions: CreateIsrRuntimeOptions,
-  record: IsrMetaRecord,
+  record: IsrMetaRecord | null,
   state: IsrCacheState,
   nowMs: number,
   allowStale: boolean,
 ): Promise<FaceResponse | null> {
-  if (!record.htmlPointer) return null;
+  if (!record?.htmlPointer) return null;
   if (!allowStale && !isFresh(record, nowMs)) return null;
 
   const html = await runtimeOptions.htmlStore.read(record.htmlPointer);
@@ -953,6 +1064,7 @@ function normalizeRuntimeOptions(
     cacheControl:
       input.cacheControl ??
       ((options) => blockingIsrCacheControl(options.revalidateSeconds)),
+    observability: input.observability ?? null,
   };
 }
 

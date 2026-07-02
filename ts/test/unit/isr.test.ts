@@ -699,6 +699,36 @@ function dropCspMetadata(record: IsrMetaRecord | null): IsrMetaRecord | null {
   return rest;
 }
 
+class ToggleableFailingMetaStore implements IsrMetaStore {
+  private readonly inner = new InMemoryIsrMetaStore();
+  getError: unknown = null;
+  acquireError: unknown = null;
+
+  async get(cacheKey: string): Promise<IsrMetaRecord | null> {
+    if (this.getError !== null) throw this.getError;
+    return await this.inner.get(cacheKey);
+  }
+
+  async tryAcquireLease(
+    input: TryAcquireIsrLeaseInput,
+  ): Promise<TryAcquireIsrLeaseResult> {
+    if (this.acquireError !== null) throw this.acquireError;
+    return await this.inner.tryAcquireLease(input);
+  }
+
+  async commitGeneration(input: CommitIsrGenerationInput): Promise<void> {
+    await this.inner.commitGeneration(input);
+  }
+
+  async releaseLease(input: ReleaseIsrLeaseInput): Promise<void> {
+    await this.inner.releaseLease(input);
+  }
+
+  debugSnapshot(): IsrMetaRecord[] {
+    return this.inner.debugSnapshot();
+  }
+}
+
 class StatusContentTypeDroppingMetaStore implements IsrMetaStore {
   private readonly inner = new InMemoryIsrMetaStore();
 
@@ -843,6 +873,173 @@ test('isr: cache hits preserve status and content type from HTML metadata', asyn
     decodeBody(miss.body as Uint8Array),
   );
   assert.equal(renderCount, 1);
+});
+
+test('isr: metadata get failure serves last-known stale entry with degraded state', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new ToggleableFailingMetaStore();
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+  const metrics: Array<Record<string, unknown>> = [];
+
+  let nowMs = 10_000;
+  let renderCount = 0;
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/meta-read',
+        mode: 'isr',
+        revalidateSeconds: 1,
+        render: () => {
+          const seq = ++renderCount;
+          return { html: `<main>read-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+    },
+    observability: {
+      onError: (err, ctx) =>
+        observedErrors.push({
+          err,
+          ctx: ctx as unknown as Record<string, unknown>,
+        }),
+      metric: (record) => metrics.push(record as unknown as Record<string, unknown>),
+    },
+  });
+
+  const warm = await app.handle({ method: 'GET', path: '/meta-read' });
+  assert.ok(decodeBody(warm.body as Uint8Array).includes('read-1'));
+  assert.equal(warm.headers['x-facetheory-isr']?.[0], 'miss');
+
+  nowMs = 11_000;
+  const metadataError = new Error('metadata read unavailable');
+  metaStore.getError = metadataError;
+  const stale = await app.handle({
+    method: 'GET',
+    path: '/meta-read',
+    headers: { 'x-request-id': ['meta-read-failure'] },
+  });
+
+  assert.equal(stale.status, 200);
+  assert.ok(decodeBody(stale.body as Uint8Array).includes('read-1'));
+  assert.equal(
+    stale.headers['x-facetheory-isr']?.[0],
+    'stale-metadata-error',
+  );
+  assert.equal(renderCount, 1);
+  assert.equal(observedErrors.length, 1);
+  assert.equal(observedErrors[0]?.err, metadataError);
+  assert.equal(observedErrors[0]?.ctx.phase, 'isr-metadata');
+  assert.equal(observedErrors[0]?.ctx.requestId, 'meta-read-failure');
+
+  const degradedMetric = metrics
+    .filter((metric) => metric.name === 'facetheory.request')
+    .at(-1);
+  assert.equal(
+    (degradedMetric?.tags as Record<string, string> | undefined)?.isr_state,
+    'stale-metadata-error',
+  );
+});
+
+test('isr: lease failure serves current stale entry with degraded state', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new ToggleableFailingMetaStore();
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+
+  let nowMs = 20_000;
+  let renderCount = 0;
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/meta-lease',
+        mode: 'isr',
+        revalidateSeconds: 1,
+        render: () => {
+          const seq = ++renderCount;
+          return { html: `<main>lease-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+    },
+    observability: {
+      onError: (err, ctx) =>
+        observedErrors.push({
+          err,
+          ctx: ctx as unknown as Record<string, unknown>,
+        }),
+    },
+  });
+
+  await app.handle({ method: 'GET', path: '/meta-lease' });
+  nowMs = 21_000;
+  const leaseError = new Error('lease unavailable');
+  metaStore.acquireError = leaseError;
+
+  const stale = await app.handle({
+    method: 'GET',
+    path: '/meta-lease',
+    headers: { 'x-request-id': ['meta-lease-failure'] },
+  });
+
+  assert.equal(stale.status, 200);
+  assert.ok(decodeBody(stale.body as Uint8Array).includes('lease-1'));
+  assert.equal(
+    stale.headers['x-facetheory-isr']?.[0],
+    'stale-metadata-error',
+  );
+  assert.equal(renderCount, 1);
+  assert.equal(observedErrors.length, 1);
+  assert.equal(observedErrors[0]?.err, leaseError);
+  assert.equal(observedErrors[0]?.ctx.phase, 'isr-metadata');
+  assert.equal(observedErrors[0]?.ctx.requestId, 'meta-lease-failure');
+});
+
+test('isr: metadata failure without a serveable entry returns 500 through onError', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new ToggleableFailingMetaStore();
+  const metadataError = new Error('metadata unavailable before warm');
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+  metaStore.getError = metadataError;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/no-entry',
+        mode: 'isr',
+        revalidateSeconds: 1,
+        render: () => ({ html: '<main>unreachable</main>' }),
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => 30_000,
+    },
+    observability: {
+      onError: (err, ctx) =>
+        observedErrors.push({
+          err,
+          ctx: ctx as unknown as Record<string, unknown>,
+        }),
+    },
+  });
+
+  const response = await app.handle({ method: 'GET', path: '/no-entry' });
+  assert.equal(response.status, 500);
+  assert.equal(response.headers['x-facetheory-isr'], undefined);
+  const body = decodeBody(response.body as Uint8Array);
+  assert.ok(body.includes('<h1>Internal Server Error</h1>'));
+  assert.equal(body.includes('metadata unavailable before warm'), false);
+  assert.equal(observedErrors.length, 1);
+  assert.equal(observedErrors[0]?.err, metadataError);
+  assert.equal(observedErrors[0]?.ctx.phase, 'render');
 });
 
 test('isr: strict CSP hydration writes and serves pointer-derived sidecars', async () => {
