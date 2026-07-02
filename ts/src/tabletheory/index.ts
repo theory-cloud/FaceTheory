@@ -17,6 +17,11 @@ import type {
 const DEFAULT_STATUS = 200;
 const DEFAULT_CONTENT_TYPE = 'text/html; charset=utf-8';
 
+// TableTheory's current FaceTheory ISR metadata model does not expose
+// status/contentType fields. Until that schema grows, the adapter keeps
+// deterministic defaults here and FaceTheory restores response status and
+// content type from HTML object metadata on cache hits.
+
 function normalizeRevalidateSeconds(value: number): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;

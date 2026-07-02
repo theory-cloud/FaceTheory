@@ -57,7 +57,11 @@ test('aws-s3: getObject forwards body and etag', async () => {
           yield new TextEncoder().encode('hello');
         })(),
         ETag: '"etag"',
-        Metadata: { 'facetheory-content-security-policy': "script-src 'self'" },
+        Metadata: {
+          'facetheory-content-security-policy': "script-src 'self'",
+          'facetheory-content-type': 'application/problem+json',
+          'facetheory-status': '404',
+        },
       };
     },
   } as unknown as S3Client;
@@ -68,6 +72,8 @@ test('aws-s3: getObject forwards body and etag', async () => {
   assert.equal(out.etag, '"etag"');
   assert.deepEqual(out.metadata, {
     'facetheory-content-security-policy': "script-src 'self'",
+    'facetheory-content-type': 'application/problem+json',
+    'facetheory-status': '404',
   });
   const body = await collectBody(out.body ?? new Uint8Array());
   assert.equal(new TextDecoder().decode(body), 'hello');
@@ -92,7 +98,10 @@ test('aws-s3: putObject maps bucket/key/body/contentType/cacheControl/metadata',
     body,
     contentType: 'text/html; charset=utf-8',
     cacheControl: 'public,max-age=0',
-    metadata: { a: '1' },
+    metadata: {
+      'facetheory-content-type': 'application/problem+json',
+      'facetheory-status': '404',
+    },
   });
 
   assert.equal(out.etag, '"put-etag"');
@@ -102,5 +111,8 @@ test('aws-s3: putObject maps bucket/key/body/contentType/cacheControl/metadata',
   assert.deepEqual(seen.Body, body);
   assert.equal(seen.ContentType, 'text/html; charset=utf-8');
   assert.equal(seen.CacheControl, 'public,max-age=0');
-  assert.deepEqual(seen.Metadata, { a: '1' });
+  assert.deepEqual(seen.Metadata, {
+    'facetheory-content-type': 'application/problem+json',
+    'facetheory-status': '404',
+  });
 });

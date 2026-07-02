@@ -42,6 +42,8 @@ const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 const HYDRATION_SIDECAR_CACHE_CONTROL = 'no-store';
 const ISR_HTML_METADATA_CONTENT_SECURITY_POLICY =
   'facetheory-content-security-policy';
+const ISR_HTML_METADATA_STATUS = 'facetheory-status';
+const ISR_HTML_METADATA_CONTENT_TYPE = 'facetheory-content-type';
 
 export type IsrFailurePolicy = 'serve-stale' | 'error';
 export type IsrLockContentionPolicy = 'wait' | 'serve-stale';
@@ -844,7 +846,13 @@ function responseFromStoredHtml(
   nowMs: number,
   htmlMetadata?: Record<string, string> | undefined,
 ): FaceResponse {
-  const contentType = normalizeContentType(record.contentType);
+  const contentType = normalizeContentType(
+    htmlMetadata?.[ISR_HTML_METADATA_CONTENT_TYPE] ?? record.contentType,
+  );
+  const status = normalizeStatusFromMetadata(
+    htmlMetadata?.[ISR_HTML_METADATA_STATUS],
+    record.status,
+  );
   const contentSecurityPolicy = normalizeOptionalHeaderValue(
     record.contentSecurityPolicy ??
       htmlMetadata?.[ISR_HTML_METADATA_CONTENT_SECURITY_POLICY],
@@ -880,7 +888,7 @@ function responseFromStoredHtml(
   }
 
   return {
-    status: normalizeStatus(record.status),
+    status,
     headers: sortHeaders(headers),
     cookies: [],
     body,
@@ -890,11 +898,16 @@ function responseFromStoredHtml(
 
 function htmlStoreMetadataFromPreparedFreshResponse(
   prepared: PreparedFreshResponse,
-): Record<string, string> | undefined {
-  if (prepared.contentSecurityPolicy === null) return undefined;
-  return {
-    [ISR_HTML_METADATA_CONTENT_SECURITY_POLICY]: prepared.contentSecurityPolicy,
+): Record<string, string> {
+  const metadata: Record<string, string> = {
+    [ISR_HTML_METADATA_STATUS]: String(prepared.status),
+    [ISR_HTML_METADATA_CONTENT_TYPE]: prepared.contentType,
   };
+  if (prepared.contentSecurityPolicy !== null) {
+    metadata[ISR_HTML_METADATA_CONTENT_SECURITY_POLICY] =
+      prepared.contentSecurityPolicy;
+  }
+  return metadata;
 }
 
 function normalizeRuntimeOptions(
@@ -1181,6 +1194,14 @@ function normalizeStatus(value: number): number {
   const int = Math.trunc(Number(value));
   if (!Number.isFinite(int) || int < 100 || int > 599) return 200;
   return int;
+}
+
+function normalizeStatusFromMetadata(
+  metadataValue: string | undefined,
+  fallback: number,
+): number {
+  if (metadataValue === undefined) return normalizeStatus(fallback);
+  return normalizeStatus(Number(metadataValue));
 }
 
 function firstHeaderValue(headers: Headers, key: string): string | null {

@@ -699,6 +699,53 @@ function dropCspMetadata(record: IsrMetaRecord | null): IsrMetaRecord | null {
   return rest;
 }
 
+class StatusContentTypeDroppingMetaStore implements IsrMetaStore {
+  private readonly inner = new InMemoryIsrMetaStore();
+
+  async get(cacheKey: string): Promise<IsrMetaRecord | null> {
+    return dropStatusContentType(await this.inner.get(cacheKey));
+  }
+
+  async tryAcquireLease(
+    input: TryAcquireIsrLeaseInput,
+  ): Promise<TryAcquireIsrLeaseResult> {
+    const result = await this.inner.tryAcquireLease(input);
+    return {
+      ...result,
+      record: dropStatusContentType(result.record) ?? result.record,
+    };
+  }
+
+  async commitGeneration(input: CommitIsrGenerationInput): Promise<void> {
+    await this.inner.commitGeneration({
+      ...input,
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+    });
+  }
+
+  async releaseLease(input: ReleaseIsrLeaseInput): Promise<void> {
+    await this.inner.releaseLease(input);
+  }
+
+  debugSnapshot(): IsrMetaRecord[] {
+    return this.inner
+      .debugSnapshot()
+      .map((record) => dropStatusContentType(record) ?? record);
+  }
+}
+
+function dropStatusContentType(
+  record: IsrMetaRecord | null,
+): IsrMetaRecord | null {
+  if (record === null) return null;
+  return {
+    ...record,
+    status: 200,
+    contentType: 'text/html; charset=utf-8',
+  };
+}
+
 test('isr: metadata commits never include HTML body text', async () => {
   const marker = 'SUPER_SECRET_HTML_PAYLOAD';
   const htmlStore = new InMemoryHtmlStore();
@@ -738,6 +785,64 @@ test('isr: metadata commits never include HTML body text', async () => {
         typeof commit.htmlPointer === 'string' && commit.htmlPointer.length > 0,
     ),
   );
+});
+
+test('isr: cache hits preserve status and content type from HTML metadata', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new StatusContentTypeDroppingMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/api/missing',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: () => {
+          renderCount += 1;
+          return {
+            status: 404,
+            headers: { 'content-type': 'application/problem+json' },
+            html: '{"error":"missing"}',
+          };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => 1_000,
+    },
+  });
+
+  const miss = await app.handle({ method: 'GET', path: '/api/missing' });
+  assert.equal(miss.status, 404);
+  assert.equal(miss.headers['content-type']?.[0], 'application/problem+json');
+  assert.equal(miss.headers['x-facetheory-isr']?.[0], 'miss');
+
+  const record = metaStore.debugSnapshot()[0];
+  assert.ok(record?.htmlPointer);
+  assert.equal(record.status, 200);
+  assert.equal(record.contentType, 'text/html; charset=utf-8');
+
+  const stored = await htmlStore.read(record.htmlPointer);
+  assert.deepEqual(stored?.metadata, {
+    'facetheory-content-type': 'application/problem+json',
+    'facetheory-status': '404',
+  });
+
+  const hit = await app.handle({ method: 'GET', path: '/api/missing' });
+  assert.equal(hit.status, miss.status);
+  assert.equal(
+    hit.headers['content-type']?.[0],
+    miss.headers['content-type']?.[0],
+  );
+  assert.equal(hit.headers['x-facetheory-isr']?.[0], 'hit');
+  assert.equal(
+    decodeBody(hit.body as Uint8Array),
+    decodeBody(miss.body as Uint8Array),
+  );
+  assert.equal(renderCount, 1);
 });
 
 test('isr: strict CSP hydration writes and serves pointer-derived sidecars', async () => {
