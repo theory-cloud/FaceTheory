@@ -6,13 +6,18 @@ import { fileURLToPath } from 'node:url';
 const testRoot = dirname(fileURLToPath(import.meta.url));
 const unitTestFiles: string[] = [];
 
-for await (const testFile of glob('unit/*.test.ts', { cwd: testRoot })) {
+for await (const testFile of glob('unit/**/*.test.ts', { cwd: testRoot })) {
   unitTestFiles.push(testFile);
 }
 
 unitTestFiles.sort();
 
 console.log(`FaceTheory unit test files discovered: ${unitTestFiles.length}`);
+
+if (unitTestFiles.length === 0) {
+  console.error('FaceTheory unit test discovery found no files for unit/**/*.test.ts');
+  process.exit(1);
+}
 
 const child = spawn(
   process.execPath,
