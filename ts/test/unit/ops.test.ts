@@ -44,11 +44,53 @@ test('FaceApp: observability hooks receive request + ISR state + render duration
   assert.equal(logs[1]?.requestId, 'req-2');
   assert.equal(logs[1]?.isrState, 'hit');
   assert.equal(logs[1]?.renderMs, null);
+  assert.equal(logs[1]?.errorClass, null);
 
   const requestMetrics = metrics.filter((m) => m.name === 'facetheory.request');
   assert.equal(requestMetrics.length, 2);
+  assert.equal(
+    (requestMetrics[0]?.tags as Record<string, string> | undefined)?.error_class,
+    '',
+  );
 
   const renderMetrics = metrics.filter((m) => m.name === 'facetheory.render_ms');
   assert.equal(renderMetrics.length, 1);
 });
 
+
+
+test('FaceApp: request metrics tag deterministic render errors by class', async () => {
+  const renderError = new TypeError('sensitive typed failure');
+  const errors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+  const metrics: Array<Record<string, unknown>> = [];
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/boom',
+        mode: 'ssr',
+        render: () => {
+          throw renderError;
+        },
+      },
+    ],
+    observability: {
+      onError: (err, ctx) => errors.push({ err, ctx: ctx as unknown as Record<string, unknown> }),
+      metric: (record) => metrics.push(record as unknown as Record<string, unknown>),
+    },
+  });
+
+  const response = await app.handle({ method: 'GET', path: '/boom' });
+  assert.equal(response.status, 500);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0]?.err, renderError);
+  assert.equal(errors[0]?.ctx.errorClass, 'TypeError');
+  assert.equal(errors[0]?.ctx.phase, 'render');
+
+  const requestMetric = metrics.find((m) => m.name === 'facetheory.request');
+  assert.ok(requestMetric);
+  assert.equal(
+    (requestMetric.tags as Record<string, string>).error_class,
+    'TypeError',
+  );
+});

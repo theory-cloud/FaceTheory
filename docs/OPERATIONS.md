@@ -48,17 +48,21 @@ AWS example (`infra/apptheory-ssg-isr-site/`) additionally:
 
 - `x-request-id`: request correlation across edge/origin/logs.
 - `x-facetheory-ssr: 1`: marker for SSR responses in the infra examples.
-- `x-facetheory-isr`: ISR cache state (`hit` | `miss` | `stale` | `wait-hit`).
+- `x-facetheory-isr`: ISR cache state (`hit` | `miss` | `stale` | `wait-hit`; degraded ISR states are documented in the ISR runbook below).
 
 ### Structured logs and minimal metrics
 
 FaceTheory `createFaceApp({ observability: ... })` supports:
 - `observability.log(record)`:
   - `event: "facetheory.request.completed"`
-  - `requestId`, `routePattern`, `mode`, `status`, `durationMs`, `renderMs`, `isrState`, `isStream`
+  - `requestId`, `routePattern`, `mode`, `status`, `durationMs`, `renderMs`, `isrState`, `isStream`, `errorClass`
 - `observability.metric(record)`:
-  - `facetheory.request` counter (tags include `route_pattern`, `mode`, `status`, `isr_state`)
+  - `facetheory.request` counter (tags include `route_pattern`, `mode`, `status`, `isr_state`, `error_class`)
   - `facetheory.render_ms` timing for requests that actually rendered
+- `observability.onError(err, ctx)`:
+  - Receives the original thrown value when FaceTheory converts an internal failure into a deterministic response, fallback fragment, sidecar miss, or degraded ISR state.
+  - The hook is for telemetry only; rendered error HTML remains bounded and does not include the thrown message or stack.
+  - `ctx.phase` names the failure surface (`render`, `stream-preflight`, `resource`, `ssr-hydration-sidecar`, `control-plane-section`, or `isr-metadata`), and `ctx.errorClass` matches the request metric tag.
 
 React streaming readiness (React adapter):
 - `renderReactStream(..., { onReadiness })` emits readiness timing for:

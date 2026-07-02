@@ -10,6 +10,10 @@ import {
   RESPONSIVE_PRIMITIVES_CLASS_PREFIX,
 } from './responsive-primitives/index.js';
 import {
+  reportFaceError,
+  type FaceObservabilityHooks,
+} from './ops.js';
+import {
   jsonResourceResponse,
   methodNotAllowedResourceResponse,
   textResourceResponse,
@@ -218,6 +222,7 @@ interface NormalizedControlPlaneAppOptions {
   cspMode: ControlPlaneCspMode;
   delivery: ControlPlaneDeliveryCapability;
   gate: ControlPlaneGate;
+  observability: FaceObservabilityHooks | null;
 }
 
 export function createControlPlaneApp(
@@ -332,7 +337,12 @@ function normalizeControlPlaneAppOptions(
     );
   }
 
-  return { cspMode, delivery, gate: options.gate };
+  return {
+    cspMode,
+    delivery,
+    gate: options.gate,
+    observability: options.faceApp?.observability ?? null,
+  };
 }
 
 function normalizeControlPlaneFaces(
@@ -390,7 +400,13 @@ function createPresetFace(
       if (options.delivery === 'streaming') {
         return {
           ...base,
-          html: streamControlPlaneSections(base.html, normalized, ctx, gate),
+          html: streamControlPlaneSections(
+            base.html,
+            normalized,
+            ctx,
+            gate,
+            options.observability,
+          ),
         };
       }
       return base;
@@ -494,6 +510,7 @@ async function* streamControlPlaneSections(
   normalized: NormalizedControlPlaneFace,
   ctx: FaceContext,
   gate: ControlPlaneGateAccepted,
+  observability: FaceObservabilityHooks | null,
 ): AsyncIterable<Uint8Array> {
   if (typeof shell === 'string') {
     yield utf8(shell);
@@ -502,7 +519,12 @@ async function* streamControlPlaneSections(
   }
 
   for (const section of normalized.sections) {
-    const html = await renderSectionDataHtml(section, ctx, gate);
+    const html = await renderSectionDataHtml(
+      section,
+      ctx,
+      gate,
+      observability,
+    );
     yield utf8(
       `<section class="facetheory-control-plane-section facetheory-control-plane-section--streamed" data-facetheory-control-streamed-section="${escapeHtml(section.id)}" data-state="success"><div class="facetheory-control-plane-section__body">${html}</div></section>`,
     );
@@ -524,7 +546,12 @@ function createControlPlaneSectionRoutes(
           }
           const gate = await options.gate(ctx);
           if (!gate.ok) return deniedSectionResponse(gate);
-          const html = await renderSectionDataHtml(section, ctx, gate);
+          const html = await renderSectionDataHtml(
+            section,
+            ctx,
+            gate,
+            options.observability,
+          );
           return sectionHtmlResponse(
             html,
             ctx.request.method === 'HEAD',
@@ -542,6 +569,7 @@ async function renderSectionDataHtml<Data>(
   section: NormalizedControlPlaneDataSection<Data>,
   ctx: FaceContext,
   gate: ControlPlaneGateAccepted,
+  observability: FaceObservabilityHooks | null,
 ): Promise<string> {
   try {
     const data = await section.load(ctx, gate);
@@ -550,9 +578,29 @@ async function renderSectionDataHtml<Data>(
       return section.emptyHtml;
     }
     return rendered;
-  } catch {
+  } catch (err) {
+    reportControlPlaneSectionError(observability, err, section, ctx);
     return section.errorHtml ?? defaultSectionErrorHtml(section);
   }
+}
+
+function reportControlPlaneSectionError<Data>(
+  observability: FaceObservabilityHooks | null,
+  err: unknown,
+  section: NormalizedControlPlaneDataSection<Data>,
+  ctx: FaceContext,
+): void {
+  reportFaceError(observability, err, {
+    requestId: String(ctx.request.headers['x-request-id']?.[0] ?? ''),
+    method: ctx.request.method,
+    path: ctx.request.path,
+    routePattern: section.endpoint,
+    mode: 'none',
+    phase: 'control-plane-section',
+    status: 200,
+    isrState: null,
+    sectionId: section.id,
+  });
 }
 
 function sectionHtmlResponse(

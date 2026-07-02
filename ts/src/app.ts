@@ -15,7 +15,12 @@ import {
   type IsrRenderFreshOptions,
   type IsrRuntime,
 } from './isr.js';
-import { logLevelForStatus, type FaceObservabilityHooks } from './ops.js';
+import {
+  logLevelForStatus,
+  reportFaceError,
+  type FaceErrorPhase,
+  type FaceObservabilityHooks,
+} from './ops.js';
 import {
   buildStrictCspHeader,
   requiresStrictCspDocumentValidation,
@@ -109,8 +114,20 @@ const SAFE_PAYLOAD_TOO_LARGE_HTML = renderHTMLDocument({
 });
 
 const REQUEST_ID_HEADER = 'x-request-id';
+const OBSERVED_ERROR = Symbol('facetheory.observed-error');
+
+interface ObservedFaceError {
+  phase: FaceErrorPhase;
+  value: unknown;
+}
+
+type FaceResponseWithObservedError = FaceResponse & {
+  [OBSERVED_ERROR]?: ObservedFaceError;
+};
 
 class StreamPreflightError extends Error {
+  readonly cause: unknown;
+
   constructor(cause: unknown) {
     super('stream body failed before first chunk');
     this.name = 'StreamPreflightError';
@@ -267,9 +284,11 @@ export class FaceApp {
 
     if (resource) {
       routePattern = routePatternForMatch;
+      let observedError: ObservedFaceError | null = null;
       try {
         response = await resource.handle(ctx);
-      } catch {
+      } catch (err) {
+        observedError = { phase: 'resource', value: err };
         response = internalErrorResponse();
       }
 
@@ -284,6 +303,7 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          error: observedError,
         },
       );
     }
@@ -382,6 +402,7 @@ export class FaceApp {
         },
       );
     } catch (err) {
+      const observedError = observedErrorFromCaughtRenderError(err);
       response =
         err instanceof StrictCspStreamBodyTooLargeError
           ? strictCspStreamBodyTooLargeResponse()
@@ -397,6 +418,7 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          error: observedError,
         },
       );
     }
@@ -472,8 +494,12 @@ async function handleSsrHydrationSidecarResource(
     const variant = await runtime.requestVariant(ctx.request);
     const sidecar = await runtime.store.read({ token, variant });
     return jsonResourceResponse(sidecar.data);
-  } catch {
-    return ssrHydrationSidecarFailureResponse();
+  } catch (err) {
+    return withObservedError(
+      ssrHydrationSidecarFailureResponse(),
+      'ssr-hydration-sidecar',
+      err,
+    );
   }
 }
 
@@ -526,6 +552,7 @@ function finishResponse(
     routePattern: string;
     mode: FaceMode | 'none';
     renderMs: number | null;
+    error?: ObservedFaceError | null;
   },
 ): FaceResponse {
   const headers: Headers = { ...(response.headers ?? {}) };
@@ -544,6 +571,20 @@ function finishResponse(
   const isStream = !(out.body instanceof Uint8Array);
 
   const level = logLevelForStatus(out.status);
+  const observedError =
+    context.error ?? observedErrorFromResponse(response) ?? null;
+  const errorClass = observedError
+    ? reportFaceError(hooks, observedError.value, {
+        requestId,
+        method: req.method,
+        path: req.path,
+        routePattern: context.routePattern,
+        mode: context.mode,
+        phase: observedError.phase,
+        status: out.status,
+        isrState,
+      })
+    : null;
 
   hooks?.log?.({
     level,
@@ -558,6 +599,7 @@ function finishResponse(
     renderMs: context.renderMs,
     isrState,
     isStream,
+    errorClass,
   });
 
   hooks?.metric?.({
@@ -570,6 +612,7 @@ function finishResponse(
       status: String(out.status),
       isr_state: isrState ?? '',
       is_stream: isStream ? '1' : '0',
+      error_class: errorClass ?? '',
     },
   });
 
@@ -586,6 +629,33 @@ function finishResponse(
   }
 
   return out;
+}
+
+function withObservedError(
+  response: FaceResponse,
+  phase: FaceErrorPhase,
+  value: unknown,
+): FaceResponse {
+  Object.defineProperty(response, OBSERVED_ERROR, {
+    value: { phase, value },
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+  return response;
+}
+
+function observedErrorFromResponse(
+  response: FaceResponse,
+): ObservedFaceError | null {
+  return (response as FaceResponseWithObservedError)[OBSERVED_ERROR] ?? null;
+}
+
+function observedErrorFromCaughtRenderError(err: unknown): ObservedFaceError {
+  if (err instanceof StreamPreflightError) {
+    return { phase: 'stream-preflight', value: err.cause };
+  }
+  return { phase: 'render', value: err };
 }
 
 function queryFromPath(path: string): Record<string, string[]> {

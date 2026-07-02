@@ -133,13 +133,16 @@ test('FaceApp: propagates x-request-id and injects one when missing', async () =
 });
 
 test('FaceApp: load/render errors return deterministic 500 HTML', async () => {
+  const loadError = new Error('sensitive load message');
+  const renderError = new Error('sensitive render message');
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
   const app = createFaceApp({
     faces: [
       {
         route: '/load-error',
         mode: 'ssr',
         load: async () => {
-          throw new Error('sensitive load message');
+          throw loadError;
         },
         render: () => ({ html: '<div>unreachable</div>' }),
       },
@@ -147,10 +150,17 @@ test('FaceApp: load/render errors return deterministic 500 HTML', async () => {
         route: '/render-error',
         mode: 'ssr',
         render: async () => {
-          throw new Error('sensitive render message');
+          throw renderError;
         },
       },
     ],
+    observability: {
+      onError: (err, ctx) =>
+        observedErrors.push({
+          err,
+          ctx: ctx as unknown as Record<string, unknown>,
+        }),
+    },
   });
 
   const loadResp = await app.handle({ method: 'GET', path: '/load-error' });
@@ -176,6 +186,13 @@ test('FaceApp: load/render errors return deterministic 500 HTML', async () => {
   assert.ok(loadHtml.includes('data-facetheory-error="true"'));
   assert.ok(!loadHtml.includes('sensitive load message'));
   assert.ok(!loadHtml.includes('sensitive render message'));
+  assert.equal(observedErrors.length, 2);
+  assert.equal(observedErrors[0]?.err, loadError);
+  assert.equal(observedErrors[0]?.ctx.phase, 'render');
+  assert.equal(observedErrors[0]?.ctx.routePattern, '/load-error');
+  assert.equal(observedErrors[1]?.err, renderError);
+  assert.equal(observedErrors[1]?.ctx.phase, 'render');
+  assert.equal(observedErrors[1]?.ctx.routePattern, '/render-error');
 });
 
 test('FaceApp: merges set-cookie header values and cookies array without joining', async () => {
@@ -821,7 +838,61 @@ test('parseCookiesFromHeaders: preserves special keys without prototype mutation
   assert.equal(({} as Record<string, unknown>)['polluted'], undefined);
 });
 
+
+test('FaceApp: onError receives original resource and sidecar exceptions', async () => {
+  const resourceError = new Error('sensitive resource failure');
+  const sidecarError = new Error('sensitive sidecar failure');
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+
+  const app = createFaceApp({
+    faces: [],
+    resources: [
+      {
+        route: '/resource',
+        handle: () => {
+          throw resourceError;
+        },
+      },
+    ],
+    ssrHydrationSidecars: {
+      htmlStore: new RecordingHtmlStore(),
+      signingSecret: SIDECAR_SIGNING_SECRET,
+      requestVariant: () => {
+        throw sidecarError;
+      },
+    },
+    observability: {
+      onError: (err, ctx) =>
+        observedErrors.push({
+          err,
+          ctx: ctx as unknown as Record<string, unknown>,
+        }),
+    },
+  });
+
+  const resource = await app.handle({ method: 'GET', path: '/resource' });
+  const sidecar = await app.handle({
+    method: 'GET',
+    path: '/_facetheory/ssr-data/not-a-valid-token',
+  });
+
+  assert.equal(resource.status, 500);
+  assert.equal(sidecar.status, 404);
+  assert.equal(observedErrors.length, 2);
+  assert.equal(observedErrors[0]?.err, resourceError);
+  assert.equal(observedErrors[0]?.ctx.phase, 'resource');
+  assert.equal(observedErrors[0]?.ctx.routePattern, '/resource');
+  assert.equal(observedErrors[1]?.err, sidecarError);
+  assert.equal(observedErrors[1]?.ctx.phase, 'ssr-hydration-sidecar');
+  assert.equal(
+    observedErrors[1]?.ctx.routePattern,
+    '/_facetheory/ssr-data/{token}',
+  );
+});
+
 test('FaceApp: streaming body error before first chunk falls back to buffered 500', async () => {
+  const streamError = new Error('stream failed before bytes');
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
   const app = createFaceApp({
     faces: [
       {
@@ -830,7 +901,7 @@ test('FaceApp: streaming body error before first chunk falls back to buffered 50
         render: () => ({
           html: (async function* () {
             await Promise.resolve();
-            throw new Error('stream failed before bytes');
+            throw streamError;
             // Unreachable, but required to satisfy eslint `require-yield`.
             // This test depends on the stream failing before the first chunk.
             yield new Uint8Array();
@@ -838,6 +909,13 @@ test('FaceApp: streaming body error before first chunk falls back to buffered 50
         }),
       },
     ],
+    observability: {
+      onError: (err, ctx) =>
+        observedErrors.push({
+          err,
+          ctx: ctx as unknown as Record<string, unknown>,
+        }),
+    },
   });
 
   const resp = await app.handle({ method: 'GET', path: '/' });
@@ -849,4 +927,7 @@ test('FaceApp: streaming body error before first chunk falls back to buffered 50
       '<h1>Internal Server Error</h1>',
     ),
   );
+  assert.equal(observedErrors.length, 1);
+  assert.equal(observedErrors[0]?.err, streamError);
+  assert.equal(observedErrors[0]?.ctx.phase, 'stream-preflight');
 });
