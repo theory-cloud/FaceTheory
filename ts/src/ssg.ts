@@ -9,7 +9,7 @@ import type {
   FaceInlineHydration,
   FaceModule,
   FaceRenderResult,
-  Headers,
+  FaceHeaders,
 } from './types.js';
 import {
   normalizePath,
@@ -440,7 +440,7 @@ async function collectBody(body: FaceBody): Promise<Uint8Array> {
   return out;
 }
 
-function firstHeaderValue(headers: Headers, key: string): string | null {
+function firstHeaderValue(headers: FaceHeaders, key: string): string | null {
   const values = headers[key] ?? headers[key.toLowerCase()] ?? [];
   if (!values.length) return null;
   return values[0] ?? null;

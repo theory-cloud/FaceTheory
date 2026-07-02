@@ -103,7 +103,7 @@ interface FaceRequest {
   method: string;
   path: string;
   query?: Query;
-  headers?: Headers;
+  headers?: FaceHeaders;
   cookies?: CookieMap;
   body?: Uint8Array;
   isBase64?: boolean;
@@ -116,12 +116,17 @@ interface FaceRequest {
 ```typescript
 interface FaceResponse {
   status: number;
-  headers: Headers;
+  headers: FaceHeaders;
   cookies: string[];
   body: FaceBody;       // Uint8Array | AsyncIterable<Uint8Array>
   isBase64: boolean;
 }
 ```
+
+`FaceHeaders` is the canonical request/response header map name:
+`Record<string, string[]>`. The old exported `Headers` alias is deprecated for
+new code and remains only as a 3.x compatibility bridge until the planned v4.0.0
+removal.
 
 ## `FaceRenderResult`
 

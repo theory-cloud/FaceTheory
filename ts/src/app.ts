@@ -52,7 +52,7 @@ import type {
   FaceRenderResult,
   FaceRequest,
   FaceResponse,
-  Headers,
+  FaceHeaders,
   TrailingSlashPolicy,
 } from './types.js';
 import {
@@ -677,7 +677,7 @@ function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
   };
 }
 
-function ensureRequestId(headers: Headers): void {
+function ensureRequestId(headers: FaceHeaders): void {
   const existing = headers[REQUEST_ID_HEADER] ?? [];
   const first = String(existing[0] ?? '').trim();
   headers[REQUEST_ID_HEADER] = [first || randomUUID()];
@@ -697,10 +697,10 @@ function finishResponse(
     error?: ObservedFaceError | null;
   },
 ): FaceResponse {
-  const headers: Headers = { ...(response.headers ?? {}) };
+  const headers: FaceHeaders = { ...(response.headers ?? {}) };
   headers[REQUEST_ID_HEADER] = [requestId];
 
-  const sorted: Headers = {};
+  const sorted: FaceHeaders = {};
   for (const key of Object.keys(headers).sort()) {
     sorted[key] = headers[key] ?? [];
   }
@@ -809,8 +809,8 @@ function queryFromPath(path: string): Record<string, string[]> {
 function toHeaders(
   input: FaceRenderResult['headers'],
   cookies: string[] | undefined,
-): Headers {
-  const headers: Headers = {};
+): FaceHeaders {
+  const headers: FaceHeaders = {};
   const setCookieValues: string[] = [];
 
   for (const [key, value] of Object.entries(input ?? {})) {
@@ -841,7 +841,7 @@ function toHeaders(
     headers['set-cookie'] = setCookieValues;
   }
 
-  const sortedHeaders: Headers = {};
+  const sortedHeaders: FaceHeaders = {};
   for (const key of Object.keys(headers).sort()) {
     sortedHeaders[key] = headers[key] ?? [];
   }
@@ -990,7 +990,7 @@ async function toHTTPResponse(
 }
 
 function applyStrictCspResponseHeader(
-  headers: Headers,
+  headers: FaceHeaders,
   policy: FaceRenderResult['csp'],
   cspNonce: string | null,
 ): void {
@@ -1082,7 +1082,7 @@ function redirectResponse(location: string): FaceResponse {
 function textResponse(
   status: number,
   body: string,
-  headers: Headers,
+  headers: FaceHeaders,
 ): FaceResponse {
   return {
     status,

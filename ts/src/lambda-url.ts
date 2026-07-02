@@ -1,6 +1,6 @@
 import { utf8 } from './bytes.js';
 import { createCspNonce } from './security.js';
-import type { FaceBody, FaceRequest, FaceResponse, Headers, Query } from './types.js';
+import type { FaceBody, FaceRequest, FaceResponse, FaceHeaders, Query } from './types.js';
 import { canonicalizeHeaders, parseCookiesFromHeaders, parseQueryString } from './types.js';
 
 export interface LambdaUrlHttpContext {
@@ -357,8 +357,8 @@ function getDefaultAwsLambdaGlobal(): AwsLambdaGlobalLike {
 
 function headersFromLambdaEvent(
   input: Record<string, string | undefined> | undefined,
-): Headers {
-  const headers: Headers = {};
+): FaceHeaders {
+  const headers: FaceHeaders = {};
   for (const [name, value] of Object.entries(input ?? {})) {
     const key = String(name).trim();
     if (!key || value === undefined) continue;
@@ -367,7 +367,7 @@ function headersFromLambdaEvent(
   return headers;
 }
 
-function appendCookieArrayToHeaders(headers: Headers, cookies: string[] | undefined): void {
+function appendCookieArrayToHeaders(headers: FaceHeaders, cookies: string[] | undefined): void {
   if (!cookies?.length) return;
 
   const cookieHeaderKey = findHeaderKey(headers, 'cookie') ?? 'cookie';
@@ -379,7 +379,7 @@ function appendCookieArrayToHeaders(headers: Headers, cookies: string[] | undefi
   }
 }
 
-function findHeaderKey(headers: Headers, lowerName: string): string | null {
+function findHeaderKey(headers: FaceHeaders, lowerName: string): string | null {
   for (const key of Object.keys(headers)) {
     if (key.trim().toLowerCase() === lowerName) return key;
   }

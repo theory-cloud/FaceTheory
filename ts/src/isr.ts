@@ -16,7 +16,7 @@ import type {
   FaceContext,
   FaceModule,
   FaceResponse,
-  Headers,
+  FaceHeaders,
   Query,
 } from './types.js';
 import {
@@ -146,7 +146,7 @@ export interface IsrCacheKeyInput {
   routePattern: string;
   params: Record<string, string>;
   query: Query;
-  headers?: Headers;
+  headers?: FaceHeaders;
   cookies?: CookieMap;
   varyCookies?: readonly string[];
 }
@@ -695,7 +695,7 @@ function requestVariantKeyParts(input: IsrCacheKeyInput): string[] {
 }
 
 function digestSelectedHeaders(
-  headers: Headers | undefined,
+  headers: FaceHeaders | undefined,
   headerNames: readonly string[],
 ): string | null {
   const canonical = canonicalizeHeaders(headers);
@@ -1024,7 +1024,7 @@ function responseFromStoredHtml(
   }
 
   const isRecordFresh = isFresh(record, nowMs);
-  const headers: Headers = {
+  const headers: FaceHeaders = {
     'cache-control': [
       runtimeOptions.cacheControl({
         revalidateSeconds: record.revalidateSeconds,
@@ -1160,7 +1160,7 @@ function assertPartitionedTenantBoundary(
 }
 
 function hasNonEmptyHeader(
-  headers: Headers | undefined,
+  headers: FaceHeaders | undefined,
   headerNames: readonly string[],
 ): boolean {
   const canonical = canonicalizeHeaders(headers);
@@ -1306,7 +1306,7 @@ async function cachedHydrationSidecarResponse(
   const sidecar = await runtimeOptions.htmlStore.read(pointer);
   if (!sidecar) return hydrationSidecarNotFoundResponse();
 
-  const headers: Headers = {
+  const headers: FaceHeaders = {
     'cache-control': [HYDRATION_SIDECAR_CACHE_CONTROL],
     'content-type': [JSON_CONTENT_TYPE],
   };
@@ -1360,9 +1360,9 @@ function cloneIsrMetaRecord(record: IsrMetaRecord): IsrMetaRecord {
   return { ...record };
 }
 
-function sortHeaders(headers: Headers): Headers {
+function sortHeaders(headers: FaceHeaders): FaceHeaders {
   const canonical = canonicalizeHeaders(headers);
-  const out: Headers = {};
+  const out: FaceHeaders = {};
   for (const key of Object.keys(canonical).sort()) {
     out[key] = [...(canonical[key] ?? [])];
   }
@@ -1388,7 +1388,7 @@ function normalizeStatusFromMetadata(
   return normalizeStatus(Number(metadataValue));
 }
 
-function firstHeaderValue(headers: Headers, key: string): string | null {
+function firstHeaderValue(headers: FaceHeaders, key: string): string | null {
   const values = headers[key] ?? headers[key.toLowerCase()] ?? [];
   const first = values[0] ?? '';
   const normalized = String(first).trim();

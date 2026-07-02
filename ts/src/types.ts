@@ -1,4 +1,10 @@
-export type Headers = Record<string, string[]>;
+export type FaceHeaders = Record<string, string[]>;
+
+/**
+ * @deprecated Use `FaceHeaders`. The legacy `Headers` alias remains for 3.x
+ * compatibility and will be removed in v4.0.0.
+ */
+export type Headers = FaceHeaders;
 export type FaceResponseHeaderValue = string | readonly string[];
 export type FaceResponseHeaders = Record<string, FaceResponseHeaderValue>;
 export type Query = Record<string, string[]>;
@@ -78,7 +84,7 @@ export interface FaceRequest {
   method: string;
   path: string;
   query?: Query;
-  headers?: Headers;
+  headers?: FaceHeaders;
   cookies?: CookieMap;
   body?: Uint8Array;
   isBase64?: boolean;
@@ -89,7 +95,7 @@ export type FaceBody = Uint8Array | AsyncIterable<Uint8Array>;
 
 export interface FaceResponse {
   status: number;
-  headers: Headers;
+  headers: FaceHeaders;
   cookies: string[];
   body: FaceBody;
   isBase64: boolean;
@@ -249,7 +255,7 @@ export function trimOuterSlashes(value: string): string {
   return trimTrailingSlashes(trimLeadingSlashes(value));
 }
 
-export function canonicalizeHeaders(headers: Headers | undefined): Headers {
+export function canonicalizeHeaders(headers: FaceHeaders | undefined): FaceHeaders {
   if (!headers) return {};
   const out = new Map<string, string[]>();
   for (const [key, values] of Object.entries(headers)) {
@@ -301,7 +307,7 @@ export function cloneCookies(cookies: CookieMap | undefined): CookieMap {
 }
 
 export function parseCookiesFromHeaders(
-  headers: Headers | undefined,
+  headers: FaceHeaders | undefined,
 ): CookieMap {
   if (!headers) return {};
   const out = new Map<string, string>();

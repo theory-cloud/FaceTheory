@@ -5,7 +5,7 @@ import type {
   Response as AppTheoryResponse,
 } from '@theory-cloud/apptheory';
 
-import type { FaceRequest, FaceResponse, Headers } from '../types.js';
+import type { FaceRequest, FaceResponse, FaceHeaders } from '../types.js';
 
 export interface FaceRequestHandler {
   handle: (request: FaceRequest) => Promise<FaceResponse>;
@@ -38,7 +38,7 @@ export function appTheoryContextToFaceRequest(ctx: AppTheoryContext): FaceReques
   // so logs/headers correlate across the adapter boundary.
   const requestId = String(ctx.requestId ?? '').trim();
   if (requestId) {
-    const headers: Headers = { ...(req.headers ?? {}) };
+    const headers: FaceHeaders = { ...(req.headers ?? {}) };
     headers['x-request-id'] = [requestId];
     req.headers = headers;
   }
@@ -46,8 +46,8 @@ export function appTheoryContextToFaceRequest(ctx: AppTheoryContext): FaceReques
   return req;
 }
 
-function cloneHeadersWithoutSetCookie(input: Headers): Headers {
-  const out: Headers = {};
+function cloneFaceHeadersWithoutSetCookie(input: FaceHeaders): FaceHeaders {
+  const out: FaceHeaders = {};
   for (const [key, values] of Object.entries(input ?? {})) {
     if (String(key).trim().toLowerCase() === 'set-cookie') continue;
     out[key] = Array.isArray(values) ? values.map(String) : [String(values)];
@@ -69,7 +69,7 @@ export function faceResponseToAppTheoryResponse(response: FaceResponse): AppTheo
     // AppTheory normalizes set-cookie from headers into cookies, but FaceTheory mirrors set-cookie into
     // both `headers['set-cookie']` and `response.cookies`. Drop the header representation to avoid
     // duplicates when AppTheory normalizes.
-    headers: cloneHeadersWithoutSetCookie(response.headers),
+    headers: cloneFaceHeadersWithoutSetCookie(response.headers),
     cookies: response.cookies.map(String),
     body,
     bodyStream,
