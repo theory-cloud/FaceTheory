@@ -10,9 +10,21 @@ ISR computes a cache key from the path, query, and (optionally) headers / cookie
 
 ## The fail-closed behavior
 
-When FaceTheory's ISR runtime sees a known tenant-boundary header — for example `x-tenant-id` or `x-facetheory-tenant` — and the Face has not configured a `tenantKey` or custom `cacheKey` that explicitly accounts for it, the runtime refuses to serve cached HTML and emits an error response instead.
+When FaceTheory's ISR runtime sees a known tenant-boundary header — by default `x-tenant-id` or `x-facetheory-tenant` — and the Face has not configured a `tenantKey` or custom `cacheKey` that explicitly accounts for it, the runtime refuses to serve cached HTML and emits an error response instead.
 
 This is intentional. The framework cannot tell whether the rendered HTML is tenant-invariant or tenant-varying, so the safe default is to fail and force the consumer to declare intent.
+
+If a deployment uses additional tenant-like headers, register them with `tenantBoundaryHeaders`. The default headers remain active; the configured names extend the fail-closed list rather than replacing it.
+
+```typescript
+isr: {
+  htmlStore,
+  metaStore,
+  tenantBoundaryHeaders: ['x-org-id', 'x-account-id'],
+},
+```
+
+Custom tenant headers must be registered here, stripped before ISR, or included in an explicit `tenantKey` / custom `cacheKey` partition.
 
 ## Tenant-invariant deployments
 

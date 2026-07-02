@@ -375,6 +375,60 @@ test('isr: default tenant partition fails closed on tenant boundary headers', as
   );
 });
 
+test('isr: custom tenant boundary headers extend fail-closed defaults', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/tenant-custom/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async (ctx) => {
+          const seq = ++renderCount;
+          const tenant = ctx.request.headers['x-org-id']?.[0] ?? 'missing';
+          return { html: `<main>${tenant}-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      tenantBoundaryHeaders: ['x-org-id'],
+    },
+  });
+
+  const customHeader = await app.handle({
+    method: 'GET',
+    path: '/tenant-custom/home',
+    headers: { 'x-org-id': ['TENANT_SECRET_CUSTOM'] },
+  });
+  const defaultHeader = await app.handle({
+    method: 'GET',
+    path: '/tenant-custom/home',
+    headers: { 'x-tenant-id': ['TENANT_SECRET_DEFAULT'] },
+  });
+
+  assert.equal(customHeader.status, 500);
+  assert.equal(defaultHeader.status, 500);
+  assert.equal(renderCount, 0);
+  assert.deepEqual(metaStore.debugSnapshot(), []);
+  assert.equal(
+    decodeBody(customHeader.body as Uint8Array).includes(
+      'TENANT_SECRET_CUSTOM',
+    ),
+    false,
+  );
+  assert.equal(
+    decodeBody(defaultHeader.body as Uint8Array).includes(
+      'TENANT_SECRET_DEFAULT',
+    ),
+    false,
+  );
+});
+
 for (const variant of [
   {
     label: 'null tenantKey',

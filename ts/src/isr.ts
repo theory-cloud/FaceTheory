@@ -197,6 +197,7 @@ export interface FaceIsrOptions {
   tenantKey?: (ctx: FaceContext) => string | null | undefined;
   cacheKey?: (input: IsrCacheKeyInput) => string;
   varyCookies?: string[];
+  tenantBoundaryHeaders?: string[];
   htmlPointerPrefix?: string;
   cacheControl?: (input: IsrCacheHeaderInput) => string;
   observability?: FaceObservabilityHooks | null;
@@ -1107,7 +1108,9 @@ function normalizeRuntimeOptions(
     cacheKey,
     hasExplicitCacheKey,
     varyCookies,
-    tenantBoundaryHeaders: DEFAULT_TENANT_BOUNDARY_HEADERS,
+    tenantBoundaryHeaders: normalizeTenantBoundaryHeaders(
+      input.tenantBoundaryHeaders,
+    ),
     htmlPointerPrefix: normalizeObjectPrefix(input.htmlPointerPrefix ?? 'isr'),
     cacheControl:
       input.cacheControl ??
@@ -1120,6 +1123,21 @@ function normalizeVaryCookies(varyCookies: readonly string[]): readonly string[]
   return [...new Set(varyCookies.map((name) => String(name).trim()))].filter(
     (name) => name.length > 0,
   );
+}
+
+function normalizeTenantBoundaryHeaders(
+  tenantBoundaryHeaders: readonly string[] | undefined,
+): readonly string[] {
+  const configured = Array.isArray(tenantBoundaryHeaders)
+    ? tenantBoundaryHeaders
+    : [];
+  return [
+    ...new Set(
+      [...DEFAULT_TENANT_BOUNDARY_HEADERS, ...configured]
+        .map((name) => String(name).trim().toLowerCase())
+        .filter((name) => name.length > 0),
+    ),
+  ];
 }
 
 function assertPartitionedTenantBoundary(
