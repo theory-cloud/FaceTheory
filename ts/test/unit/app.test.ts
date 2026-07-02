@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createFaceApp } from '../../src/app.js';
+import { createFaceApp, defineFace } from '../../src/app.js';
 import type {
   HtmlStore,
   HtmlStoreReadResult,
@@ -102,6 +102,51 @@ test('FaceApp: renders HTML with title', async () => {
   assert.ok(body.includes('<div>hi</div>'));
 });
 
+test('FaceApp: typed FaceModule load data flows into render', async () => {
+  type ProfileData = {
+    name: string;
+    visitCount: number;
+  };
+
+  const annotatedFace: FaceModule<ProfileData> = {
+    route: '/typed/annotated',
+    mode: 'ssr',
+    load: async () => ({ name: 'Ada', visitCount: 7 }),
+    render: (_ctx, data) => ({
+      head: { title: data.name },
+      html: `<main>${data.name}:${data.visitCount.toFixed(0)}</main>`,
+    }),
+  };
+
+  const inferredFace = defineFace({
+    route: '/typed/inferred',
+    mode: 'ssr',
+    load: async () => ({ title: 'Inferred', score: 42 }),
+    render: (_ctx, data) => ({
+      head: { title: data.title },
+      html: `<main>${data.title}:${data.score.toFixed(0)}</main>`,
+    }),
+  });
+
+  const app = createFaceApp({ faces: [annotatedFace, inferredFace] });
+
+  const annotated = await app.handle({
+    method: 'GET',
+    path: '/typed/annotated',
+  });
+  assert.equal(annotated.status, 200);
+  assert.ok(
+    decodeBody(annotated.body as Uint8Array).includes('<main>Ada:7</main>'),
+  );
+
+  const inferred = await app.handle({ method: 'GET', path: '/typed/inferred' });
+  assert.equal(inferred.status, 200);
+  assert.ok(
+    decodeBody(inferred.body as Uint8Array).includes(
+      '<main>Inferred:42</main>',
+    ),
+  );
+});
 
 test('FaceApp: validates face contracts at construction', () => {
   assert.throws(

@@ -489,6 +489,12 @@ export function createFaceApp(options: FaceAppOptions): FaceApp {
   return new FaceApp(options);
 }
 
+export function defineFace<TData = unknown>(
+  face: FaceModule<TData>,
+): FaceModule<TData> {
+  return face;
+}
+
 function validateFaceContract(face: FaceModule): string {
   const route = String((face as { route?: unknown }).route ?? '').trim();
   if (!route) {

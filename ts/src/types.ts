@@ -202,16 +202,16 @@ export async function prepareUIIntegrations<
   return prepared;
 }
 
-export interface FaceModule {
+export interface FaceModule<TData = unknown> {
   route: string;
   mode: FaceMode;
   generateStaticParams?: () => Promise<Array<Record<string, string>>>;
   revalidateSeconds?: number;
-  load?: (ctx: FaceContext) => Promise<unknown>;
-  render: (
+  load?: (ctx: FaceContext) => Promise<TData> | TData;
+  render(
     ctx: FaceContext,
-    data: unknown,
-  ) => Promise<FaceRenderResult> | FaceRenderResult;
+    data: TData,
+  ): Promise<FaceRenderResult> | FaceRenderResult;
 }
 
 export function normalizePath(path: string): string {

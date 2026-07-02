@@ -41,7 +41,7 @@ Use this table as the public entrypoint map for package consumers. It reflects t
 
 | Export                                               | Surface                              | Primary interfaces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ---------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@theory-cloud/facetheory`                           | Core runtime                         | `createFaceApp`, `FaceApp`, `FaceModule`, `FaceResourceRoute`, `FaceResourceHandler`, `jsonResourceResponse`, `textResourceResponse`, `emptyResourceResponse`, `methodNotAllowedResourceResponse`, `createSsrHydrationSidecarStore`, `buildSsrHydrationSidecarDataUrl`, `serializeSsrHydrationSidecarJson`, `SsrHydrationSidecarError`, `DEFAULT_SSR_HYDRATION_SIDECAR_TTL_SECONDS`, `FaceMode`, `FaceRequest`, `FaceResponse`, `FaceRenderResult`, `buildSsgSite`, `createLambdaUrlStreamingHandler`, `S3HtmlStore`, `InMemoryHtmlStore`, `InMemoryIsrMetaStore`, `blockingIsrCacheControl`, `viteAssetsForEntry`, `viteHydrationForEntry`, `externalHydrationForEntry`, `createCspNonce`, `buildStrictCspHeader`, `validateStrictCspDocument`, `readFaceHydrationData`, `parseFaceNavigationSnapshot`, `fetchFaceNavigationSnapshot`, `applyFaceNavigationSnapshot`, `loadFaceNavigationModule`, `startFaceNavigation`, `startAwsOacFormTransport`, `createAwsOacUrlEncodedFormPayload` |
+| `@theory-cloud/facetheory`                           | Core runtime                         | `createFaceApp`, `defineFace`, `FaceApp`, `FaceModule`, `FaceResourceRoute`, `FaceResourceHandler`, `jsonResourceResponse`, `textResourceResponse`, `emptyResourceResponse`, `methodNotAllowedResourceResponse`, `createSsrHydrationSidecarStore`, `buildSsrHydrationSidecarDataUrl`, `serializeSsrHydrationSidecarJson`, `SsrHydrationSidecarError`, `DEFAULT_SSR_HYDRATION_SIDECAR_TTL_SECONDS`, `FaceMode`, `FaceRequest`, `FaceResponse`, `FaceRenderResult`, `buildSsgSite`, `createLambdaUrlStreamingHandler`, `S3HtmlStore`, `InMemoryHtmlStore`, `InMemoryIsrMetaStore`, `blockingIsrCacheControl`, `viteAssetsForEntry`, `viteHydrationForEntry`, `externalHydrationForEntry`, `createCspNonce`, `buildStrictCspHeader`, `validateStrictCspDocument`, `readFaceHydrationData`, `parseFaceNavigationSnapshot`, `fetchFaceNavigationSnapshot`, `applyFaceNavigationSnapshot`, `loadFaceNavigationModule`, `startFaceNavigation`, `startAwsOacFormTransport`, `createAwsOacUrlEncodedFormPayload` |
 | `@theory-cloud/facetheory/client`                     | Browser hydration helpers             | `loadFaceHydrationData`, `fetchExternalFaceHydrationData`, `readFaceInlineHydrationData`, `readFaceExternalHydrationDataUrl`, `resolveSameOriginFaceHydrationUrl`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `@theory-cloud/facetheory/apptheory`                 | AppTheory adapter                    | `createAppTheoryFaceHandler`, `appTheoryContextToFaceRequest`, `faceResponseToAppTheoryResponse`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `@theory-cloud/facetheory/aws-s3`                    | AWS SDK S3 adapter                   | `createAwsSdkS3HtmlStoreClient`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -116,7 +116,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 
 | Interface           | Purpose                              | Notes                                                                                                                                                                                                                                                           |
 | ------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FaceModule`        | Route definition                     | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`. `createFaceApp()` rejects empty routes, non-function `render`, and modes outside `ssr`, `ssg`, or `isr`. SSG params must resolve to normal route segments; dot-segments such as `.` and `..` are rejected. |
+| `FaceModule<TData>` | Route definition                     | Uses `route`, `mode`, optional `load`, optional `generateStaticParams`, and `render`. `load` returns `TData` and `render(ctx, data)` receives that same type; `defineFace()` infers it from the loader. `createFaceApp()` rejects empty routes, non-function `render`, and modes outside `ssr`, `ssg`, or `isr`. SSG params must resolve to normal route segments; dot-segments such as `.` and `..` are rejected. |
 | `FaceResourceRoute` | Raw resource route                   | Uses `route` and `handle`. The handler receives the same normalized `FaceContext` route params/proxy/request shape as a Face and returns a raw `FaceResponse` directly. Resource routes do not declare a `mode` and are not document-rendered.                  |
 | `FaceMode`          | Rendering mode                       | One of `ssr`, `ssg`, or `isr`.                                                                                                                                                                                                                                  |
 | `FaceRequest`       | Normalized request input             | Supports headers, cookies, query, body, base64 marker, and optional `cspNonce`.                                                                                                                                                                                 |
@@ -139,18 +139,25 @@ These examples show the shortest supported path from route definitions to a depl
 ### Create an app
 
 ```ts
-import { createFaceApp, type FaceModule } from "@theory-cloud/facetheory";
+import { createFaceApp, defineFace } from "@theory-cloud/facetheory";
 
-const faces: FaceModule[] = [
-  {
-    route: "/",
-    mode: "ssr",
-    render: async () => ({ html: "<h1>Hello FaceTheory</h1>" }),
-  },
-];
+const homeFace = defineFace({
+  route: "/",
+  mode: "ssr",
+  load: async () => ({ greeting: "Hello FaceTheory", visits: 1 }),
+  render: async (_ctx, data) => ({
+    html: `<h1>${data.greeting}</h1><p>Visit ${data.visits.toFixed(0)}</p>`,
+  }),
+});
 
-const app = createFaceApp({ faces });
+const app = createFaceApp({ faces: [homeFace] });
 ```
+
+`defineFace()` is an identity helper for the core `FaceModule<TData>` contract:
+when a Face declares `load`, TypeScript infers the loader's resolved data shape
+and gives `render(ctx, data)` that same type without annotating `data` manually.
+Existing untyped `FaceModule[]` declarations remain supported for routes that do
+not need typed load data.
 
 ### Add a raw resource route
 
