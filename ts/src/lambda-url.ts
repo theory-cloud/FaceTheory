@@ -45,10 +45,24 @@ export interface LambdaResponseWriter {
   end: () => void | Promise<void>;
 }
 
+type LambdaWritableStreamEvent = 'drain' | 'error' | 'close';
+type LambdaWritableStreamListener = (...args: unknown[]) => void;
+
 export interface LambdaWritableStream {
   write: (chunk: Uint8Array | string) => boolean | void;
   end: (chunk?: Uint8Array | string) => void;
-  once?: (event: 'drain', listener: () => void) => unknown;
+  once?: (
+    event: LambdaWritableStreamEvent,
+    listener: LambdaWritableStreamListener,
+  ) => unknown;
+  off?: (
+    event: LambdaWritableStreamEvent,
+    listener: LambdaWritableStreamListener,
+  ) => unknown;
+  removeListener?: (
+    event: LambdaWritableStreamEvent,
+    listener: LambdaWritableStreamListener,
+  ) => unknown;
   setHeader?: (name: string, value: string | string[]) => void;
   statusCode?: number;
 }
@@ -248,20 +262,89 @@ function createStreamWriter(
     return stream.write(chunk);
   };
 
-  const drain =
-    typeof stream.once === 'function'
-      ? async (): Promise<void> => {
-          await new Promise<void>((resolve) => {
-            stream.once?.('drain', resolve);
-          });
-        }
-      : undefined;
+  const drain = createStreamDrainWaiter(stream);
 
   const end = (): void => {
     stream.end();
   };
 
   return drain ? { writeHead, write, drain, end } : { writeHead, write, end };
+}
+
+function createStreamDrainWaiter(
+  stream: LambdaWritableStream,
+): (() => Promise<void>) | undefined {
+  if (typeof stream.once !== 'function') return undefined;
+
+  let terminalError: Error | null = null;
+  let didClose = false;
+  const onTerminalError = (err: unknown): void => {
+    terminalError = normalizeStreamError(err);
+  };
+  const onTerminalClose = (): void => {
+    didClose = true;
+  };
+  stream.once('error', onTerminalError);
+  stream.once('close', onTerminalClose);
+
+  return async (): Promise<void> => {
+    if (terminalError) throw terminalError;
+    if (didClose) throw closedBeforeDrainError();
+
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const resolveOnce = (): void => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      };
+      const rejectOnce = (err: Error): void => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(err);
+      };
+      const onDrain = (): void => resolveOnce();
+      const onError = (err: unknown): void => {
+        rejectOnce(normalizeStreamError(err));
+      };
+      const onClose = (): void => {
+        rejectOnce(closedBeforeDrainError());
+      };
+      const cleanup = (): void => {
+        removeStreamListener(stream, 'drain', onDrain);
+        removeStreamListener(stream, 'error', onError);
+        removeStreamListener(stream, 'close', onClose);
+      };
+
+      stream.once?.('drain', onDrain);
+      stream.once?.('error', onError);
+      stream.once?.('close', onClose);
+    });
+  };
+}
+
+function removeStreamListener(
+  stream: LambdaWritableStream,
+  event: LambdaWritableStreamEvent,
+  listener: LambdaWritableStreamListener,
+): void {
+  if (typeof stream.off === 'function') {
+    stream.off(event, listener);
+    return;
+  }
+  stream.removeListener?.(event, listener);
+}
+
+function normalizeStreamError(err: unknown): Error {
+  return err instanceof Error
+    ? err
+    : new Error(`Lambda response stream error before drain: ${String(err)}`);
+}
+
+function closedBeforeDrainError(): Error {
+  return new Error('Lambda response stream closed before drain');
 }
 
 function getDefaultAwsLambdaGlobal(): AwsLambdaGlobalLike {

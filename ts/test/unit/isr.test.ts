@@ -944,6 +944,129 @@ test('isr: metadata get failure serves last-known stale entry with degraded stat
   );
 });
 
+test('isr: metadata get failure honors error policy instead of serving stale', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new ToggleableFailingMetaStore();
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+
+  let nowMs = 40_000;
+  let renderCount = 0;
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/meta-error-policy',
+        mode: 'isr',
+        revalidateSeconds: 1,
+        render: () => {
+          const seq = ++renderCount;
+          return { html: `<main>error-policy-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+      failurePolicy: 'error',
+    },
+    observability: {
+      onError: (err, ctx) =>
+        observedErrors.push({
+          err,
+          ctx: ctx as unknown as Record<string, unknown>,
+        }),
+    },
+  });
+
+  const warm = await app.handle({
+    method: 'GET',
+    path: '/meta-error-policy',
+  });
+  assert.ok(decodeBody(warm.body as Uint8Array).includes('error-policy-1'));
+  assert.equal(warm.headers['x-facetheory-isr']?.[0], 'miss');
+
+  nowMs = 41_000;
+  const metadataError = new Error('metadata read unavailable for error policy');
+  metaStore.getError = metadataError;
+  const response = await app.handle({
+    method: 'GET',
+    path: '/meta-error-policy',
+    headers: { 'x-request-id': ['meta-error-policy-failure'] },
+  });
+
+  assert.equal(response.status, 500);
+  assert.equal(response.headers['x-facetheory-isr'], undefined);
+  const body = decodeBody(response.body as Uint8Array);
+  assert.ok(body.includes('<h1>Internal Server Error</h1>'));
+  assert.equal(body.includes('error-policy-1'), false);
+  assert.equal(renderCount, 1);
+  assert.equal(observedErrors.length, 1);
+  assert.equal(observedErrors[0]?.err, metadataError);
+  assert.equal(observedErrors[0]?.ctx.phase, 'render');
+  assert.equal(observedErrors[0]?.ctx.requestId, 'meta-error-policy-failure');
+});
+
+test('isr: metadata-failure last-known records evict least-recent cache keys', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new ToggleableFailingMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/meta-lru',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: (ctx) => {
+          renderCount += 1;
+          const variant = ctx.request.query.v?.[0] ?? 'missing';
+          return { html: `<main>meta-lru-${variant}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => 50_000,
+    },
+  });
+
+  for (let index = 0; index <= 128; index += 1) {
+    const response = await app.handle({
+      method: 'GET',
+      path: `/meta-lru?v=${String(index)}`,
+    });
+    assert.equal(response.headers['x-facetheory-isr']?.[0], 'miss');
+    assert.ok(
+      decodeBody(response.body as Uint8Array).includes(
+        `meta-lru-${String(index)}`,
+      ),
+    );
+  }
+  assert.equal(renderCount, 129);
+
+  metaStore.getError = new Error('metadata unavailable after cap');
+  const evicted = await app.handle({ method: 'GET', path: '/meta-lru?v=0' });
+  assert.equal(evicted.status, 500);
+  assert.equal(evicted.headers['x-facetheory-isr'], undefined);
+  assert.equal(
+    decodeBody(evicted.body as Uint8Array).includes('meta-lru-0'),
+    false,
+  );
+
+  const retained = await app.handle({
+    method: 'GET',
+    path: '/meta-lru?v=128',
+  });
+  assert.equal(retained.status, 200);
+  assert.equal(
+    retained.headers['x-facetheory-isr']?.[0],
+    'stale-metadata-error',
+  );
+  assert.ok(decodeBody(retained.body as Uint8Array).includes('meta-lru-128'));
+  assert.equal(renderCount, 129);
+});
+
 test('isr: lease failure serves current stale entry with degraded state', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new ToggleableFailingMetaStore();

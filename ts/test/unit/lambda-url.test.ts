@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
@@ -53,6 +54,28 @@ function extractHydrationHref(html: string): string {
   const href = /\bhref="([^"]+)"/i.exec(tag)?.[1];
   assert.ok(href, 'expected FaceTheory hydration href');
   return href;
+}
+
+async function withTimeout<T>(
+  input: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  return await new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
+    input.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
 }
 
 test('lambdaUrlEventToFaceRequest: maps Lambda URL event shape deterministically', () => {
@@ -282,6 +305,84 @@ test('writeFaceResponseToLambdaWriter: waits for drain when writes apply backpre
     'end',
   ]);
 });
+
+for (const terminalEvent of ['close', 'error'] as const) {
+  test(`createLambdaUrlStreamingHandler: stops drain wait on raw stream ${terminalEvent} before drain`, async () => {
+    const app = createFaceApp({
+      faces: [
+        {
+          route: '/',
+          mode: 'ssr',
+          render: () => ({
+            html: streamFromString('<main>backpressure</main>'),
+          }),
+        },
+      ],
+    });
+
+    const events: string[] = [];
+    const emitter = new EventEmitter();
+    const terminalError = new Error('client disconnected before drain');
+    const rawStream: LambdaWritableStream = {
+      write: (chunk) => {
+        const text =
+          typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
+        events.push(`write:${text}`);
+        setImmediate(() => {
+          if (terminalEvent === 'error') {
+            emitter.emit('error', terminalError);
+            return;
+          }
+          emitter.emit('close');
+        });
+        return false;
+      },
+      end: () => {
+        events.push('end');
+      },
+      once: (event, listener) => {
+        emitter.once(event, listener);
+        return emitter;
+      },
+      off: (event, listener) => {
+        emitter.off(event, listener);
+        return emitter;
+      },
+    };
+
+    const awslambda: AwsLambdaGlobalLike = {
+      streamifyResponse: (impl) => {
+        return async (event, context) => {
+          await impl(event, rawStream, context);
+        };
+      },
+    };
+
+    const handler = createLambdaUrlStreamingHandler({ app, awslambda });
+
+    await assert.rejects(
+      withTimeout(
+        handler(
+          {
+            rawPath: '/',
+            requestContext: { http: { method: 'GET' } },
+          },
+          {},
+        ),
+        1_000,
+      ),
+      (err) => {
+        if (terminalEvent === 'error') return err === terminalError;
+        return (
+          err instanceof Error &&
+          err.message.includes('Lambda response stream closed before drain')
+        );
+      },
+    );
+    assert.ok(events.some((entry) => entry.startsWith('write:')));
+    assert.equal(events.includes('end'), false);
+  });
+}
 
 test('handleLambdaUrlEvent: serves emitted SSR hydration sidecar URL as raw JSON without rerendering', async () => {
   const htmlStore = new RecordingHtmlStore();

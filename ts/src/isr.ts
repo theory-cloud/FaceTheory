@@ -49,6 +49,7 @@ const ISR_HTML_METADATA_CONTENT_SECURITY_POLICY =
 const ISR_HTML_METADATA_STATUS = 'facetheory-status';
 const ISR_HTML_METADATA_CONTENT_TYPE = 'facetheory-content-type';
 const ISR_STATE_STALE_METADATA_ERROR = 'stale-metadata-error';
+const DEFAULT_LAST_KNOWN_ISR_RECORD_LIMIT = 128;
 
 export type IsrFailurePolicy = 'serve-stale' | 'error';
 export type IsrLockContentionPolicy = 'wait' | 'serve-stale';
@@ -448,12 +449,10 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
   const runtimeOptions = normalizeRuntimeOptions(options);
   const lastKnownRecords = new Map<string, IsrMetaRecord>();
   const rememberRecord = (record: IsrMetaRecord | null): void => {
-    if (!record?.htmlPointer) return;
-    lastKnownRecords.set(record.cacheKey, cloneIsrMetaRecord(record));
+    rememberLastKnownRecord(lastKnownRecords, record);
   };
   const lastKnownRecord = (cacheKey: string): IsrMetaRecord | null => {
-    const record = lastKnownRecords.get(cacheKey);
-    return record ? cloneIsrMetaRecord(record) : null;
+    return readLastKnownRecord(lastKnownRecords, cacheKey);
   };
 
   return {
@@ -883,6 +882,8 @@ async function staleResponseForMetadataFailure(
   record: IsrMetaRecord | null,
   err: unknown,
 ): Promise<FaceResponse | null> {
+  if (runtimeOptions.failurePolicy !== 'serve-stale') return null;
+
   const response = await cachedResponseFromRecord(
     runtimeOptions,
     record,
@@ -903,6 +904,36 @@ async function staleResponseForMetadataFailure(
     isrState: response.headers['x-facetheory-isr']?.[0] ?? null,
   });
   return response;
+}
+
+function rememberLastKnownRecord(
+  records: Map<string, IsrMetaRecord>,
+  record: IsrMetaRecord | null,
+): void {
+  if (!record?.htmlPointer) return;
+
+  if (records.has(record.cacheKey)) {
+    records.delete(record.cacheKey);
+  }
+  records.set(record.cacheKey, cloneIsrMetaRecord(record));
+
+  while (records.size > DEFAULT_LAST_KNOWN_ISR_RECORD_LIMIT) {
+    const oldestCacheKey = records.keys().next().value;
+    if (oldestCacheKey === undefined) break;
+    records.delete(oldestCacheKey);
+  }
+}
+
+function readLastKnownRecord(
+  records: Map<string, IsrMetaRecord>,
+  cacheKey: string,
+): IsrMetaRecord | null {
+  const record = records.get(cacheKey);
+  if (!record) return null;
+
+  records.delete(cacheKey);
+  records.set(cacheKey, record);
+  return cloneIsrMetaRecord(record);
 }
 
 async function waitForRegeneratedRecord(
