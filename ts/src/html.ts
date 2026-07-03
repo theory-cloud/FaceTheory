@@ -81,6 +81,7 @@ export interface HTMLDocumentStreamParts {
   bodyAttrs?: FaceAttributes;
   head?: string;
   body: AsyncIterable<Uint8Array>;
+  onStreamError?: (err: unknown) => void;
 }
 
 import { utf8 } from './bytes.js';
@@ -102,6 +103,11 @@ export async function* streamHTMLDocument(
   } catch (err) {
     // Avoid breaking the full HTML document shape on streaming errors.
     // Do not include error details in HTML (may contain sensitive information).
+    try {
+      parts.onStreamError?.(err);
+    } catch {
+      // Telemetry hooks must not alter emitted streaming bytes.
+    }
     console.error('FaceTheory: streaming body error', err);
     yield utf8('<template data-facetheory-stream-error="true"></template>');
   }

@@ -63,8 +63,13 @@ FaceTheory `createFaceApp({ observability: ... })` supports:
   - `event: "facetheory.request.completed"`
   - `requestId`, `routePattern`, `mode`, `status`, `durationMs`, `renderMs`, `isrState`, `isStream`, `errorClass`
 - `observability.metric(record)`:
-  - `facetheory.request` counter (tags include `route_pattern`, `mode`, `status`, `isr_state`, `error_class`)
+  - `facetheory.request` counter (tags include `route_pattern`, `mode`, `status`, `isr_state`, `error_class`, and `cold_start`; the first request handled by a FaceApp instance reports `cold_start: "1"`, later requests report `"0"`)
   - `facetheory.render_ms` timing for requests that actually rendered
+  - `facetheory.isr.cache` counter for ISR responses (tags include `state: hit|miss|stale|wait-hit|stale-metadata-error`, `route_pattern`, and `status`)
+  - `facetheory.isr.regeneration_ms` timing for ISR regeneration attempts, distinct from Face render timing and tagged with `outcome`
+  - `facetheory.isr.lease_contention` counter when an ISR request observes another active regeneration lease
+  - `facetheory.stream_error` counter when a non-strict streaming body fails after bytes have started
+- `observability.log(record)` also receives `event: "facetheory.stream_error"` when a non-strict streaming response emits the bounded `<template data-facetheory-stream-error="true">` marker after a body failure. This log is emitted in addition to the historical `console.error` and the response bytes remain unchanged by telemetry hooks.
 - `observability.onError(err, ctx)`:
   - Receives the original thrown value when FaceTheory converts an internal failure into a deterministic response, fallback fragment, sidecar miss, or degraded ISR state.
   - The hook is for telemetry only; rendered error HTML remains bounded and does not include the thrown message or stack.

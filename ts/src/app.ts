@@ -16,11 +16,13 @@ import {
   type IsrRuntime,
 } from './isr.js';
 import {
+  errorClassFor,
   logLevelForStatus,
   reportFaceError,
   type FaceErrorPhase,
   type FaceObservabilityHooks,
   type FaceRequestCompletedLogRecord,
+  type FaceStreamErrorLogRecord,
 } from './ops.js';
 import {
   buildStrictCspHeader,
@@ -76,13 +78,16 @@ export interface FaceAppOptions {
 
 export type FaceAppLogRecord =
   | FaceRequestCompletedLogRecord
+  | FaceStreamErrorLogRecord
   | (FaceContractWarningLogRecord &
       Partial<Omit<FaceRequestCompletedLogRecord, 'event'>>);
 
 export type FaceAppLogHook = (record: FaceAppLogRecord) => void;
 
-export interface FaceAppObservabilityHooks
-  extends Omit<FaceObservabilityHooks, 'log'> {
+export interface FaceAppObservabilityHooks extends Omit<
+  FaceObservabilityHooks,
+  'log'
+> {
   /**
    * Structured request completion records and construction-time contract
    * warnings. Contract warnings remain warnings until the planned v4 contract
@@ -188,6 +193,7 @@ export class FaceApp {
   private readonly observability: FaceAppObservabilityHooks | null;
   private readonly strictCspMaxStreamingBodyBytes: number;
   private readonly trailingSlash: TrailingSlashPolicy;
+  private coldStartPending = true;
 
   constructor(options: FaceAppOptions) {
     this.trailingSlash = normalizeTrailingSlashPolicy(options.trailingSlash);
@@ -285,6 +291,7 @@ export class FaceApp {
 
     const normalizedReq = normalizeRequest(request);
     const requestId = normalizedReq.headers[REQUEST_ID_HEADER]?.[0] ?? '';
+    const coldStart = this.consumeColdStartMarker();
 
     let routePattern = '';
     let mode: FaceMode | 'none' = 'none';
@@ -307,6 +314,7 @@ export class FaceApp {
           routePattern: trailingSlashRedirectPath,
           mode,
           renderMs,
+          coldStart,
         },
       );
     }
@@ -329,6 +337,7 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          coldStart,
         },
       );
     }
@@ -363,6 +372,7 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          coldStart,
           error: observedError,
         },
       );
@@ -384,6 +394,7 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          coldStart,
         },
       );
     }
@@ -414,6 +425,14 @@ export class FaceApp {
             preparedOut,
             normalizedReq,
             this.strictCspMaxStreamingBodyBytes,
+            {
+              hooks,
+              method: normalizedReq.method,
+              mode,
+              path: normalizedReq.path,
+              requestId,
+              routePattern,
+            },
           );
         } finally {
           renderMs = Math.max(0, now() - renderStartedAt);
@@ -443,6 +462,7 @@ export class FaceApp {
             routePattern,
             mode,
             renderMs,
+            coldStart,
           },
         );
       }
@@ -459,6 +479,7 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          coldStart,
         },
       );
     } catch (err) {
@@ -478,10 +499,17 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          coldStart,
           error: observedError,
         },
       );
     }
+  }
+
+  private consumeColdStartMarker(): boolean {
+    const coldStart = this.coldStartPending;
+    this.coldStartPending = false;
+    return coldStart;
   }
 }
 
@@ -557,7 +585,9 @@ function faceContractWarnings(
 function routePatternHasParams(routePattern: string): boolean {
   return routePattern.split('/').some((segment) => {
     const trimmed = segment.trim();
-    return trimmed.startsWith('{') && trimmed.endsWith('}') && trimmed.length > 2;
+    return (
+      trimmed.startsWith('{') && trimmed.endsWith('}') && trimmed.length > 2
+    );
   });
 }
 
@@ -694,6 +724,7 @@ function finishResponse(
     routePattern: string;
     mode: FaceMode | 'none';
     renderMs: number | null;
+    coldStart?: boolean;
     error?: ObservedFaceError | null;
   },
 ): FaceResponse {
@@ -755,8 +786,22 @@ function finishResponse(
       isr_state: isrState ?? '',
       is_stream: isStream ? '1' : '0',
       error_class: errorClass ?? '',
+      cold_start: context.coldStart ? '1' : '0',
     },
   });
+
+  if (context.mode === 'isr' && isrState !== null) {
+    hooks?.metric?.({
+      name: 'facetheory.isr.cache',
+      value: 1,
+      tags: {
+        method: req.method,
+        route_pattern: context.routePattern || req.path,
+        state: isrState,
+        status: String(out.status),
+      },
+    });
+  }
 
   if (context.renderMs !== null) {
     hooks?.metric?.({
@@ -925,10 +970,20 @@ function isExternalHydration(
   return hydration.type === 'external';
 }
 
+interface StreamErrorTelemetryContext {
+  hooks: FaceObservabilityHooks | null;
+  requestId: string;
+  method: string;
+  path: string;
+  routePattern: string;
+  mode: FaceMode | 'none';
+}
+
 async function toHTTPResponse(
   out: FaceRenderResult,
   req: Readonly<Required<FaceRequest>>,
   strictCspMaxStreamingBodyBytes: number,
+  streamTelemetry?: StreamErrorTelemetryContext,
 ): Promise<FaceResponse> {
   const status = out.status ?? 200;
   const headers = toHeaders(out.headers, out.cookies);
@@ -984,9 +1039,42 @@ async function toHTTPResponse(
     ...documentParts,
     head,
     body: await preflightStream(out.html),
+    ...(streamTelemetry
+      ? {
+          onStreamError: (err: unknown) =>
+            reportStreamError(streamTelemetry, err),
+        }
+      : {}),
   });
 
   return { status, headers, cookies, body, isBase64: false };
+}
+
+function reportStreamError(
+  context: StreamErrorTelemetryContext,
+  err: unknown,
+): void {
+  const errorClass = errorClassFor(err);
+  context.hooks?.log?.({
+    level: 'error',
+    event: 'facetheory.stream_error',
+    requestId: context.requestId,
+    method: context.method,
+    path: context.path,
+    routePattern: context.routePattern,
+    mode: context.mode,
+    errorClass,
+  });
+  context.hooks?.metric?.({
+    name: 'facetheory.stream_error',
+    value: 1,
+    tags: {
+      method: context.method,
+      route_pattern: context.routePattern || context.path,
+      mode: String(context.mode),
+      error_class: errorClass,
+    },
+  });
 }
 
 function applyStrictCspResponseHeader(
@@ -1061,7 +1149,10 @@ async function preflightStream(
   })();
 }
 
-function withQueryString(path: string, query: Record<string, string[]>): string {
+function withQueryString(
+  path: string,
+  query: Record<string, string[]>,
+): string {
   const params = new URLSearchParams();
   for (const [key, values] of Object.entries(query)) {
     for (const value of values) {

@@ -2,10 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { utf8 } from './bytes.js';
 import { safeJson } from './html.js';
-import {
-  reportFaceError,
-  type FaceObservabilityHooks,
-} from './ops.js';
+import { reportFaceError, type FaceObservabilityHooks } from './ops.js';
 import {
   requiresStrictCspDocumentValidation,
   validateStrictCspDocument,
@@ -557,6 +554,10 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         throw err;
       }
 
+      if (!acquire.acquired) {
+        emitIsrLeaseContentionMetric(runtimeOptions, input);
+      }
+
       if (acquire.acquired && acquire.leaseToken) {
         return regenerateAndCommit(
           runtimeOptions,
@@ -782,6 +783,8 @@ async function regenerateAndCommit(
   staleRecord: IsrMetaRecord,
   rememberRecord: (record: IsrMetaRecord | null) => void,
 ): Promise<FaceResponse> {
+  const regenerationMetricStartedAt = metricNow();
+  let regenerationOutcome = 'error';
   const generatedAt = runtimeOptions.now();
   const htmlPointer = buildHtmlPointer(
     cacheKey,
@@ -850,6 +853,8 @@ async function regenerateAndCommit(
       ...(etag !== null ? { etag } : {}),
     });
 
+    regenerationOutcome = 'success';
+
     const committedRecord: IsrMetaRecord = {
       ...createDefaultMetaRecord(cacheKey, revalidateSeconds),
       htmlPointer,
@@ -878,16 +883,61 @@ async function regenerateAndCommit(
         runtimeOptions.now(),
         true,
       );
-      if (stale) return stale;
+      if (stale) {
+        regenerationOutcome = 'stale_after_error';
+        return stale;
+      }
     }
     throw err;
   } finally {
+    emitIsrRegenerationMetric(
+      runtimeOptions,
+      input,
+      Math.max(0, metricNow() - regenerationMetricStartedAt),
+      regenerationOutcome,
+    );
     await runtimeOptions.metaStore.releaseLease({
       cacheKey,
       leaseOwner,
       leaseToken,
     });
   }
+}
+
+function emitIsrLeaseContentionMetric(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  input: HandleIsrFaceInput,
+): void {
+  runtimeOptions.observability?.metric?.({
+    name: 'facetheory.isr.lease_contention',
+    value: 1,
+    tags: {
+      method: input.ctx.request.method,
+      route_pattern: input.routePattern,
+      policy: runtimeOptions.lockContentionPolicy,
+    },
+  });
+}
+
+function emitIsrRegenerationMetric(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  input: HandleIsrFaceInput,
+  durationMs: number,
+  outcome: string,
+): void {
+  runtimeOptions.observability?.metric?.({
+    name: 'facetheory.isr.regeneration_ms',
+    value: durationMs,
+    tags: {
+      method: input.ctx.request.method,
+      route_pattern: input.routePattern,
+      outcome,
+    },
+  });
+}
+
+function metricNow(): number {
+  return Date.now();
 }
 
 async function staleResponseForMetadataFailure(
@@ -1119,7 +1169,9 @@ function normalizeRuntimeOptions(
   };
 }
 
-function normalizeVaryCookies(varyCookies: readonly string[]): readonly string[] {
+function normalizeVaryCookies(
+  varyCookies: readonly string[],
+): readonly string[] {
   return [...new Set(varyCookies.map((name) => String(name).trim()))].filter(
     (name) => name.length > 0,
   );

@@ -40,6 +40,21 @@ export interface FaceRequestCompletedLogRecord {
   errorClass: string | null;
 }
 
+export interface FaceStreamErrorLogRecord {
+  level: 'error';
+  event: 'facetheory.stream_error';
+  requestId: string;
+  method: string;
+  path: string;
+  routePattern: string;
+  mode: FaceMode | 'none';
+  errorClass: string;
+}
+
+export type FaceObservabilityLogRecord =
+  | FaceRequestCompletedLogRecord
+  | FaceStreamErrorLogRecord;
+
 export interface FaceMetricRecord {
   name: string;
   value: number;
@@ -56,7 +71,7 @@ export interface FaceObservabilityHooks {
   /**
    * Structured log sink.
    */
-  log?: (record: FaceRequestCompletedLogRecord) => void;
+  log?: (record: FaceObservabilityLogRecord) => void;
 
   /**
    * Minimal metrics sink (counters / histograms depending on backend).

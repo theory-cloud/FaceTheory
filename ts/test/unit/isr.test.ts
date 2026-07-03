@@ -67,6 +67,7 @@ test('isr: stale burst triggers one regeneration and waiters share result', asyn
 
   let nowMs = 1_000;
   let renderCount = 0;
+  const metrics: Array<Record<string, unknown>> = [];
 
   const app = createFaceApp({
     faces: [
@@ -81,6 +82,10 @@ test('isr: stale burst triggers one regeneration and waiters share result', asyn
         },
       },
     ],
+    observability: {
+      metric: (record) =>
+        metrics.push(record as unknown as Record<string, unknown>),
+    },
     isr: {
       htmlStore,
       metaStore,
@@ -112,6 +117,18 @@ test('isr: stale burst triggers one regeneration and waiters share result', asyn
       ),
     );
   }
+
+  const leaseContentionMetrics = metrics.filter(
+    (metric) => metric.name === 'facetheory.isr.lease_contention',
+  );
+  assert.ok(leaseContentionMetrics.length >= 1);
+  assert.ok(
+    leaseContentionMetrics.every(
+      (metric) =>
+        (metric.tags as Record<string, string>).route_pattern ===
+        '/posts/{slug}',
+    ),
+  );
 });
 
 test('isr: regeneration failure serves stale and keeps pointer intact', async () => {
@@ -990,7 +1007,8 @@ test('isr: cache hits preserve status and content type from HTML metadata', asyn
 test('isr: metadata get failure serves last-known stale entry with degraded state', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new ToggleableFailingMetaStore();
-  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> =
+    [];
   const metrics: Array<Record<string, unknown>> = [];
 
   let nowMs = 10_000;
@@ -1018,7 +1036,8 @@ test('isr: metadata get failure serves last-known stale entry with degraded stat
           err,
           ctx: ctx as unknown as Record<string, unknown>,
         }),
-      metric: (record) => metrics.push(record as unknown as Record<string, unknown>),
+      metric: (record) =>
+        metrics.push(record as unknown as Record<string, unknown>),
     },
   });
 
@@ -1037,10 +1056,7 @@ test('isr: metadata get failure serves last-known stale entry with degraded stat
 
   assert.equal(stale.status, 200);
   assert.ok(decodeBody(stale.body as Uint8Array).includes('read-1'));
-  assert.equal(
-    stale.headers['x-facetheory-isr']?.[0],
-    'stale-metadata-error',
-  );
+  assert.equal(stale.headers['x-facetheory-isr']?.[0], 'stale-metadata-error');
   assert.equal(renderCount, 1);
   assert.equal(observedErrors.length, 1);
   assert.equal(observedErrors[0]?.err, metadataError);
@@ -1059,7 +1075,8 @@ test('isr: metadata get failure serves last-known stale entry with degraded stat
 test('isr: metadata get failure honors error policy instead of serving stale', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new ToggleableFailingMetaStore();
-  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> =
+    [];
 
   let nowMs = 40_000;
   let renderCount = 0;
@@ -1182,7 +1199,8 @@ test('isr: metadata-failure last-known records evict least-recent cache keys', a
 test('isr: lease failure serves current stale entry with degraded state', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new ToggleableFailingMetaStore();
-  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> =
+    [];
 
   let nowMs = 20_000;
   let renderCount = 0;
@@ -1225,10 +1243,7 @@ test('isr: lease failure serves current stale entry with degraded state', async 
 
   assert.equal(stale.status, 200);
   assert.ok(decodeBody(stale.body as Uint8Array).includes('lease-1'));
-  assert.equal(
-    stale.headers['x-facetheory-isr']?.[0],
-    'stale-metadata-error',
-  );
+  assert.equal(stale.headers['x-facetheory-isr']?.[0], 'stale-metadata-error');
   assert.equal(renderCount, 1);
   assert.equal(observedErrors.length, 1);
   assert.equal(observedErrors[0]?.err, leaseError);
@@ -1240,7 +1255,8 @@ test('isr: metadata failure without a serveable entry returns 500 through onErro
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new ToggleableFailingMetaStore();
   const metadataError = new Error('metadata unavailable before warm');
-  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> =
+    [];
   metaStore.getError = metadataError;
 
   const app = createFaceApp({
