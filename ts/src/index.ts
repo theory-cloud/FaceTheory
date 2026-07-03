@@ -1,4 +1,5 @@
 export * from './app.js';
+export * from './adapter-pipeline.js';
 export * from './bytes.js';
 export * from './control-plane.js';
 export * from './control-plane-guardrails.js';
