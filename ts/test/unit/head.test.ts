@@ -180,14 +180,16 @@ test('head helpers: strict JSON-LD fails closed without matching request nonce',
 });
 
 test('head helpers: keyless JSON-LD tags remain dedup exempt', () => {
+  const firstJsonLd = jsonLd({ '@type': 'BreadcrumbList', position: 1 });
   const head = renderFaceHead({
     html: '<main>jsonld</main>',
     headTags: [
-      jsonLd({ '@type': 'BreadcrumbList', position: 1 }),
+      firstJsonLd,
       jsonLd({ '@type': 'NewsArticle', headline: 'Two' }),
     ],
   });
 
+  assert.equal((firstJsonLd as { body?: string }).body, undefined);
   assert.equal(
     (head.match(/type="application\/ld\+json"/g) ?? []).length,
     2,

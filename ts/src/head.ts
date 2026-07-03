@@ -72,6 +72,7 @@ export interface JsonLdOptions {
 }
 
 const JSON_LD_SCRIPT_TYPE = 'application/ld+json';
+const JSON_LD_DATA_ATTRIBUTE = 'data-facetheory-jsonld';
 
 function escapeScriptText(value: string): string {
   return value.replaceAll(/<\/script/gi, '<\\/script');
@@ -188,20 +189,39 @@ function normalizeScriptType(value: unknown): string {
   return mediaType.trim().toLowerCase();
 }
 
-function isJsonLdScriptTag(
-  tag: FaceHeadTag,
-): tag is Extract<FaceHeadTag, { type: 'script' }> {
+function isJsonLdScriptTag(tag: FaceHeadTag): boolean {
   return (
     tag.type === 'script' &&
     normalizeScriptType(tag.attrs.type) === JSON_LD_SCRIPT_TYPE
   );
 }
 
+function scriptBodyForRender(
+  tag: Extract<FaceHeadTag, { type: 'script' }>,
+): string | undefined {
+  if (tag.body !== undefined) return tag.body;
+  if (!isJsonLdScriptTag(tag)) return undefined;
+  const jsonLdBody = tag.attrs[JSON_LD_DATA_ATTRIBUTE];
+  return typeof jsonLdBody === 'string' ? jsonLdBody : undefined;
+}
+
+function scriptAttrsForRender(
+  tag: Extract<FaceHeadTag, { type: 'script' }>,
+): FaceAttributes {
+  if (!isJsonLdScriptTag(tag)) return tag.attrs;
+  const attrs = { ...tag.attrs };
+  delete attrs[JSON_LD_DATA_ATTRIBUTE];
+  return attrs;
+}
+
 function isNonceCarriedJsonLdScriptTag(
   tag: FaceHeadTag,
   expectedNonce: string | null,
 ): boolean {
-  if (!expectedNonce || !isJsonLdScriptTag(tag)) return false;
+  if (!expectedNonce || tag.type !== 'script' || !isJsonLdScriptTag(tag)) {
+    return false;
+  }
+  if (scriptBodyForRender(tag) === undefined) return false;
   const nonce = tag.attrs.nonce;
   return typeof nonce === 'string' && nonce === expectedNonce;
 }
@@ -275,7 +295,7 @@ function validateStrictHeadTags(
       case 'script':
         if (
           isCspDisabled(policy, 'inlineScripts') &&
-          tag.body !== undefined &&
+          scriptBodyForRender(tag) !== undefined &&
           !isNonceCarriedJsonLdScriptTag(tag, expectedNonce)
         ) {
           throw new Error('FaceTheory strict CSP rejects inline script tags');
@@ -453,8 +473,10 @@ export function jsonLd(data: unknown, options: JsonLdOptions = {}): FaceHeadTag 
 
   return {
     type: 'script',
-    attrs,
-    body: safeJson(data),
+    attrs: {
+      ...attrs,
+      [JSON_LD_DATA_ATTRIBUTE]: safeJson(data),
+    },
   };
 }
 
@@ -590,8 +612,9 @@ export function renderHeadTag(tag: FaceHeadTag): string {
     case 'link':
       return `<link${renderAttributes(tag.attrs)}>`;
     case 'script': {
-      const body = tag.body === undefined ? '' : escapeScriptText(tag.body);
-      return `<script${renderAttributes(tag.attrs)}>${body}</script>`;
+      const body = scriptBodyForRender(tag);
+      const renderedBody = body === undefined ? '' : escapeScriptText(body);
+      return `<script${renderAttributes(scriptAttrsForRender(tag))}>${renderedBody}</script>`;
     }
     case 'style': {
       const body = escapeStyleText(tag.cssText);
