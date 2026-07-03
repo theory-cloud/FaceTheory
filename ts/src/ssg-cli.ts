@@ -219,8 +219,12 @@ function isDirectExecution(): boolean {
 }
 
 if (isDirectExecution()) {
-  runSsgCli().catch((err) => {
-    console.error(err instanceof Error ? err.message : String(err));
-    process.exitCode = 1;
-  });
+  runSsgCli()
+    .then((exitCode) => {
+      process.exitCode = exitCode;
+    })
+    .catch((err) => {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    });
 }

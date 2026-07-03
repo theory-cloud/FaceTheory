@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import test from 'node:test';
 
 import {
@@ -11,10 +12,52 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 import { buildSsgSite, SsgBuildFailedError } from '../../src/ssg.js';
 import { runSsgCli } from '../../src/ssg-cli.js';
 import type { FaceModule } from '../../src/types.js';
+
+const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const ssgCliEntrypoint = path.resolve(packageRoot, 'src/ssg-cli.ts');
+
+interface SsgCliProcessResult {
+  exitCode: number;
+  stderr: string;
+  stdout: string;
+}
+
+async function runSsgCliEntrypoint(args: string[]): Promise<SsgCliProcessResult> {
+  return await new Promise<SsgCliProcessResult>((resolve, reject) => {
+    execFile(
+      process.execPath,
+      ['--import', 'tsx', ssgCliEntrypoint, ...args],
+      {
+        cwd: packageRoot,
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024,
+        timeout: 10_000,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          const childError = error as NodeJS.ErrnoException & {
+            code?: number | string | null;
+            killed?: boolean;
+            signal?: NodeJS.Signals | null;
+          };
+          if (childError.killed || childError.signal || typeof childError.code !== 'number') {
+            reject(error);
+            return;
+          }
+          resolve({ exitCode: childError.code, stderr, stdout });
+          return;
+        }
+
+        resolve({ exitCode: 0, stderr, stdout });
+      },
+    );
+  });
+}
 
 async function listFilesRecursively(rootDir: string): Promise<string[]> {
   const out: string[] = [];
@@ -416,6 +459,42 @@ test('ssg cli: --concurrency reports isolated route failures as non-zero', async
     assert.ok(okHtml.includes('<main>ok</main>'));
   } finally {
     console.error = originalError;
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('ssg cli: entrypoint exits non-zero for isolated route failures', async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-cli-entrypoint-'));
+  const entryPath = path.resolve(tempRoot, 'ssg-config.mjs');
+  const outDir = path.resolve(tempRoot, 'out');
+
+  await writeFile(
+    entryPath,
+    [
+      'export const faces = [',
+      '  { route: "/ok", mode: "ssg", render: () => ({ html: "<main>ok</main>" }) },',
+      '  { route: "/bad", mode: "ssg", render: () => ({ status: 500, html: "<main>bad</main>" }) },',
+      '];',
+      '',
+    ].join('\n'),
+  );
+
+  try {
+    const result = await runSsgCliEntrypoint([
+      '--entry',
+      entryPath,
+      '--out',
+      outDir,
+      '--concurrency',
+      '2',
+    ]);
+
+    assert.equal(result.exitCode, 1);
+    assert.ok(result.stderr.includes('SSG failed: 1 route(s) failed'));
+    assert.ok(result.stderr.includes('/bad'));
+    const okHtml = await readFile(path.resolve(outDir, 'ok/index.html'), 'utf8');
+    assert.ok(okHtml.includes('<main>ok</main>'));
+  } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
 });
