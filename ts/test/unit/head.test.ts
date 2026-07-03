@@ -111,6 +111,38 @@ test('head helpers: title template requires an explicit placeholder', () => {
   );
 });
 
+test('head helpers: title template treats dollar sequences as literal title text', () => {
+  const dollarMatchTitle = titleTag('Rock $& Roll', {
+    template: '%s · FaceTheory',
+  });
+  const dollarEscapeTitle = titleTag('Save $$ now', {
+    template: '%s · FaceTheory',
+  });
+
+  assert.deepEqual(dollarMatchTitle, {
+    type: 'title',
+    text: 'Rock $& Roll · FaceTheory',
+  });
+  assert.deepEqual(dollarEscapeTitle, {
+    type: 'title',
+    text: 'Save $$ now · FaceTheory',
+  });
+  assert.equal(
+    renderFaceHead({
+      html: '<main>ok</main>',
+      headTags: [dollarMatchTitle],
+    }),
+    '<title>Rock $&amp; Roll · FaceTheory</title>',
+  );
+  assert.equal(
+    renderFaceHead({
+      html: '<main>ok</main>',
+      headTags: [dollarEscapeTitle],
+    }),
+    '<title>Save $$ now · FaceTheory</title>',
+  );
+});
+
 test('head helpers: JSON-LD carries request nonce through strict CSP', () => {
   const strictCsp = {
     inlineScripts: false,

@@ -334,7 +334,7 @@ function applyTitleTemplate(title: string, template: HeadTitleTemplate | undefin
   if (!templateText.includes('%s')) {
     throw new Error('FaceTheory title template must include a %s placeholder');
   }
-  return templateText.replaceAll('%s', normalizedTitle);
+  return templateText.replaceAll('%s', () => normalizedTitle);
 }
 
 function normalizeMetaContent(value: HeadMetaContent): string {
