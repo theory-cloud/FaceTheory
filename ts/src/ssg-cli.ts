@@ -24,6 +24,7 @@ interface ParsedSsgCliArgs {
   outDir: string;
   trailingSlash?: SsgTrailingSlashPolicy;
   concurrency?: number;
+  incremental: boolean;
   allowNetwork: boolean;
   emitHydrationData: boolean;
 }
@@ -38,6 +39,7 @@ export async function runSsgCli(argv: string[] = process.argv.slice(2)): Promise
 
   const trailingSlash = args.trailingSlash ?? moduleOptions.trailingSlash;
   const concurrency = args.concurrency ?? moduleOptions.concurrency;
+  const incremental = args.incremental || (moduleOptions.incremental ?? false);
   const allowNetwork = args.allowNetwork || (moduleOptions.allowNetwork ?? false);
   const emitHydrationData = args.emitHydrationData || (moduleOptions.emitHydrationData ?? false);
 
@@ -47,6 +49,7 @@ export async function runSsgCli(argv: string[] = process.argv.slice(2)): Promise
     outDir: path.resolve(args.outDir),
     allowNetwork,
     emitHydrationData,
+    incremental,
     ...(trailingSlash !== undefined ? { trailingSlash } : {}),
     ...(concurrency !== undefined ? { concurrency } : {}),
   };
@@ -63,7 +66,7 @@ export async function runSsgCli(argv: string[] = process.argv.slice(2)): Promise
   }
 
   console.log(
-    `SSG complete: ${buildResult.pages.length} page(s) written to ${buildResult.outDir} (manifest: ${buildResult.manifestFile})`,
+    `SSG complete: ${buildResult.pages.length} page(s) written to ${buildResult.outDir} (manifest: ${buildResult.manifestFile})${formatSkippedRoutesSuffix(buildResult.skippedRoutes?.length ?? 0)}`,
   );
   return 0;
 }
@@ -73,6 +76,7 @@ function parseSsgCliArgs(argv: string[]): ParsedSsgCliArgs {
   let outDir = '';
   let trailingSlash: SsgTrailingSlashPolicy | undefined;
   let concurrency: number | undefined;
+  let incremental = false;
   let allowNetwork = false;
   let emitHydrationData = false;
 
@@ -108,6 +112,10 @@ function parseSsgCliArgs(argv: string[]): ParsedSsgCliArgs {
       i += 1;
       continue;
     }
+    if (arg === '--incremental') {
+      incremental = true;
+      continue;
+    }
     if (arg === '--allow-network') {
       allowNetwork = true;
       continue;
@@ -122,6 +130,7 @@ function parseSsgCliArgs(argv: string[]): ParsedSsgCliArgs {
         showHelp: true,
         entryPath: '',
         outDir: '',
+        incremental,
         allowNetwork,
         emitHydrationData,
         ...(trailingSlash !== undefined ? { trailingSlash } : {}),
@@ -141,6 +150,7 @@ function parseSsgCliArgs(argv: string[]): ParsedSsgCliArgs {
     outDir,
     ...(trailingSlash !== undefined ? { trailingSlash } : {}),
     ...(concurrency !== undefined ? { concurrency } : {}),
+    incremental,
     allowNetwork,
     emitHydrationData,
   };
@@ -177,6 +187,7 @@ function printUsage(): void {
       'Options:',
       '  --trailing-slash <always|never>   HTML output style (default: always)',
       '  --concurrency <count>             Render routes with bounded concurrency (default: 1)',
+      '  --incremental                     Skip unchanged writes using the SSG manifest',
       '  --emit-hydration-data             Write hydration JSON files when present',
       '  --allow-network                   Allow real fetch() calls during SSG',
     ].join('\n'),
@@ -185,7 +196,7 @@ function printUsage(): void {
 
 function printSsgBuildFailure(error: SsgBuildFailedError): void {
   console.error(
-    `SSG failed: ${error.failedRoutes.length} route(s) failed; ${error.result.pages.length} page(s) written to ${error.result.outDir}`,
+    `SSG failed: ${error.failedRoutes.length} route(s) failed; ${error.result.pages.length} page(s) written to ${error.result.outDir}${formatSkippedRoutesSuffix(error.result.skippedRoutes?.length ?? 0)}`,
   );
   for (const failedRoute of error.failedRoutes) {
     const status =
@@ -194,6 +205,11 @@ function printSsgBuildFailure(error: SsgBuildFailedError): void {
       `- ${failedRoute.path} (${failedRoute.routePattern})${status}: ${failedRoute.message}`,
     );
   }
+}
+
+function formatSkippedRoutesSuffix(skippedCount: number): string {
+  if (skippedCount === 0) return '';
+  return `; ${skippedCount} unchanged page(s) skipped`;
 }
 
 function isDirectExecution(): boolean {

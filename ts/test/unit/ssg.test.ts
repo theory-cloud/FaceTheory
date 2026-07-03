@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -176,6 +183,105 @@ test('ssg: static + param routes produce deterministic files and manifest', asyn
   }
 });
 
+test('ssg: incremental builds skip unchanged route outputs', async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-incremental-'));
+  const outDir = path.resolve(tempRoot, 'out');
+  const indexPath = path.resolve(outDir, 'index.html');
+  const markerPath = path.resolve(outDir, 'marker.txt');
+  let content = 'first';
+  let renderCount = 0;
+
+  const faces: FaceModule[] = [
+    {
+      route: '/',
+      mode: 'ssg',
+      render: () => {
+        renderCount += 1;
+        return {
+          html: `<main>${content}</main>`,
+        };
+      },
+    },
+  ];
+
+  try {
+    await buildSsgSite({
+      faces,
+      outDir,
+      write404Fallback: false,
+    });
+
+    const firstManifest = JSON.parse(
+      await readFile(path.resolve(outDir, '.facetheory/ssg-manifest.json'), 'utf8'),
+    ) as {
+      pages: Array<{ path: string; contentHash?: string }>;
+    };
+    const firstHash = firstManifest.pages[0]?.contentHash;
+    assert.match(firstHash ?? '', /^sha256-[a-f0-9]{64}$/);
+
+    await writeFile(markerPath, 'kept across incremental builds');
+    const beforeSkipMtime = (await stat(indexPath, { bigint: true })).mtimeNs;
+    await delay(20);
+
+    const skipped = await buildSsgSite({
+      faces,
+      outDir,
+      incremental: true,
+      write404Fallback: false,
+    });
+
+    assert.equal(renderCount, 2);
+    assert.deepEqual(
+      skipped.skippedRoutes?.map((route) => ({
+        path: route.path,
+        reason: route.reason,
+        contentHash: route.contentHash,
+      })),
+      [
+        {
+          path: '/',
+          reason: 'content-hash-match',
+          contentHash: firstHash,
+        },
+      ],
+    );
+    assert.equal(
+      (await stat(indexPath, { bigint: true })).mtimeNs,
+      beforeSkipMtime,
+    );
+    assert.equal(
+      await readFile(markerPath, 'utf8'),
+      'kept across incremental builds',
+    );
+
+    content = 'second';
+    await delay(20);
+    const rewritten = await buildSsgSite({
+      faces,
+      outDir,
+      incremental: true,
+      write404Fallback: false,
+    });
+
+    assert.equal(renderCount, 3);
+    assert.equal(rewritten.skippedRoutes, undefined);
+    assert.match(await readFile(indexPath, 'utf8'), /<main>second<\/main>/);
+    assert.equal(
+      await readFile(markerPath, 'utf8'),
+      'kept across incremental builds',
+    );
+
+    await buildSsgSite({
+      faces,
+      outDir,
+      write404Fallback: false,
+    });
+    await assert.rejects(readFile(markerPath, 'utf8'), /ENOENT/);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('ssg: concurrency defaults to serial and can be raised', async () => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-concurrency-'));
   const serialOut = path.resolve(tempRoot, 'serial');
@@ -310,6 +416,40 @@ test('ssg cli: --concurrency reports isolated route failures as non-zero', async
     assert.ok(okHtml.includes('<main>ok</main>'));
   } finally {
     console.error = originalError;
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('ssg cli: --incremental reports skipped unchanged pages', async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-cli-incremental-'));
+  const entryPath = path.resolve(tempRoot, 'ssg-config.mjs');
+  const outDir = path.resolve(tempRoot, 'out');
+  const logs: string[] = [];
+  const originalLog = console.log;
+
+  await writeFile(
+    entryPath,
+    [
+      'export const faces = [',
+      '  { route: "/", mode: "ssg", render: () => ({ html: "<main>ok</main>" }) },',
+      '];',
+      '',
+    ].join('\n'),
+  );
+
+  try {
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map(String).join(' '));
+    };
+
+    assert.equal(await runSsgCli(['--entry', entryPath, '--out', outDir]), 0);
+    assert.equal(
+      await runSsgCli(['--entry', entryPath, '--out', outDir, '--incremental']),
+      0,
+    );
+    assert.ok(logs.join('\n').includes('1 unchanged page(s) skipped'));
+  } finally {
+    console.log = originalLog;
     await rm(tempRoot, { recursive: true, force: true });
   }
 });

@@ -1,4 +1,5 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { createFaceApp } from './app.js';
@@ -24,6 +25,7 @@ export interface BuildSsgSiteOptions {
   outDir: string;
   clean?: boolean;
   concurrency?: number;
+  incremental?: boolean;
   trailingSlash?: SsgTrailingSlashPolicy;
   write404Fallback?: boolean;
   emitHydrationData?: boolean;
@@ -39,6 +41,7 @@ export interface SsgPageEntry {
   status: number;
   contentType: string;
   hydrationDataFile?: string;
+  contentHash?: string;
 }
 
 export interface SsgFailedRoute {
@@ -46,6 +49,15 @@ export interface SsgFailedRoute {
   path: string;
   message: string;
   status?: number;
+}
+
+export interface SsgSkippedRoute {
+  routePattern: string;
+  path: string;
+  file: string;
+  reason: 'content-hash-match';
+  contentHash: string;
+  hydrationDataFile?: string;
 }
 
 export interface SsgManifest {
@@ -67,6 +79,7 @@ export interface BuildSsgSiteResult {
   pages: SsgPageEntry[];
   notFoundFile?: string;
   failedRoutes?: SsgFailedRoute[];
+  skippedRoutes?: SsgSkippedRoute[];
 }
 
 interface SsgRouteSegment {
@@ -90,6 +103,7 @@ type SsgPageBuildOutcome =
       ok: true;
       entry: SsgPageEntry;
       html: string;
+      skippedRoute?: SsgSkippedRoute;
     }
   | {
       ok: false;
@@ -131,7 +145,8 @@ export async function buildSsgSite(
   options: BuildSsgSiteOptions,
 ): Promise<BuildSsgSiteResult> {
   const outDir = path.resolve(options.outDir);
-  const clean = options.clean ?? true;
+  const incremental = options.incremental ?? false;
+  const clean = incremental ? false : (options.clean ?? true);
   const trailingSlash = options.trailingSlash ?? 'always';
   const write404Fallback = options.write404Fallback ?? true;
   const emitHydrationData = options.emitHydrationData ?? false;
@@ -144,6 +159,12 @@ export async function buildSsgSite(
   if (clean) {
     await rm(outDir, { recursive: true, force: true });
   }
+  const previousManifest = incremental
+    ? await readPreviousSsgManifest(outDir)
+    : null;
+  const previousPagesByPath = new Map(
+    (previousManifest?.pages ?? []).map((entry) => [entry.path, entry]),
+  );
   await mkdir(outDir, { recursive: true });
 
   const strictHydrationSidecars = new Map<string, SsgHydrationSidecar>();
@@ -157,6 +178,7 @@ export async function buildSsgSite(
 
   const builtPages: SsgPageEntry[] = [];
   const failedRoutes: SsgFailedRoute[] = [];
+  const skippedRoutes: SsgSkippedRoute[] = [];
   const htmlByPath = new Map<string, string>();
 
   const buildOutcomes = await withFetchGuard(
@@ -165,23 +187,29 @@ export async function buildSsgSite(
       ...(fetchImpl !== undefined ? { fetch: fetchImpl } : {}),
     },
     async () =>
-      mapWithConcurrency(plannedPages, concurrency, (page) =>
-        buildSsgPage({
+      mapWithConcurrency(plannedPages, concurrency, (page) => {
+        const previousEntry = previousPagesByPath.get(page.path);
+        return buildSsgPage({
           app,
           page,
           outDir,
           trailingSlash,
           emitHydrationData,
           strictHydrationSidecars,
+          incremental,
+          ...(previousEntry !== undefined ? { previousEntry } : {}),
           allowNetwork,
           hasFetchOverride: fetchImpl !== undefined,
-        }),
-      ),
+        });
+      }),
   );
 
   for (const outcome of buildOutcomes) {
     if (outcome.ok) {
       builtPages.push(outcome.entry);
+      if (outcome.skippedRoute !== undefined) {
+        skippedRoutes.push(outcome.skippedRoute);
+      }
       htmlByPath.set(outcome.entry.path, outcome.html);
       continue;
     }
@@ -190,6 +218,7 @@ export async function buildSsgSite(
 
   builtPages.sort((left, right) => left.path.localeCompare(right.path));
   failedRoutes.sort((left, right) => left.path.localeCompare(right.path));
+  skippedRoutes.sort((left, right) => left.path.localeCompare(right.path));
 
   let notFoundFile: string | undefined;
   if (write404Fallback) {
@@ -225,6 +254,7 @@ export async function buildSsgSite(
     manifestFile,
     pages: builtPages,
     ...(notFoundFile !== undefined ? { notFoundFile } : {}),
+    ...(skippedRoutes.length > 0 ? { skippedRoutes } : {}),
   };
 
   if (failedRoutes.length > 0) {
@@ -311,6 +341,8 @@ async function buildSsgPage(options: {
   trailingSlash: SsgTrailingSlashPolicy;
   emitHydrationData: boolean;
   strictHydrationSidecars: Map<string, SsgHydrationSidecar>;
+  incremental: boolean;
+  previousEntry?: SsgPageEntry;
   allowNetwork: boolean;
   hasFetchOverride: boolean;
 }): Promise<SsgPageBuildOutcome> {
@@ -321,6 +353,8 @@ async function buildSsgPage(options: {
     trailingSlash,
     emitHydrationData,
     strictHydrationSidecars,
+    incremental,
+    previousEntry,
     allowNetwork,
     hasFetchOverride,
   } = options;
@@ -350,40 +384,57 @@ async function buildSsgPage(options: {
       firstHeaderValue(response.headers, 'content-type') ??
       'text/html; charset=utf-8';
 
-    await writeOutFile(outDir, file, html);
-
     const strictHydrationSidecar = strictHydrationSidecars.get(page.path);
     let hydrationDataFile: string | undefined;
+    let hydrationDataContent: string | undefined;
     if (strictHydrationSidecar !== undefined) {
       hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
-      await writeOutFile(
-        outDir,
-        hydrationDataFile,
-        `${safeJson(strictHydrationSidecar.data)}\n`,
-      );
+      hydrationDataContent = `${safeJson(strictHydrationSidecar.data)}\n`;
     } else if (emitHydrationData) {
       const hydrationJson = extractHydrationDataJson(html);
       if (hydrationJson !== null) {
         hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
-        await writeOutFile(outDir, hydrationDataFile, `${hydrationJson}\n`);
+        hydrationDataContent = `${hydrationJson}\n`;
       }
     }
 
+    const contentHash = hashSsgRenderedOutput(html, hydrationDataContent);
     const entry: SsgPageEntry = {
       routePattern: page.routePattern,
       path: page.path,
       file,
       status: response.status,
       contentType,
+      contentHash,
     };
     if (hydrationDataFile !== undefined) {
       entry.hydrationDataFile = hydrationDataFile;
+    }
+
+    const skippedRoute = await ssgSkippedRouteIfUnchanged({
+      incremental,
+      outDir,
+      entry,
+      html,
+      ...(hydrationDataContent !== undefined ? { hydrationDataContent } : {}),
+      ...(previousEntry !== undefined ? { previousEntry } : {}),
+    });
+
+    if (skippedRoute === undefined) {
+      await writeOutFile(outDir, file, html);
+      if (
+        hydrationDataFile !== undefined &&
+        hydrationDataContent !== undefined
+      ) {
+        await writeOutFile(outDir, hydrationDataFile, hydrationDataContent);
+      }
     }
 
     return {
       ok: true,
       entry,
       html,
+      ...(skippedRoute !== undefined ? { skippedRoute } : {}),
     };
   } catch (error) {
     return {
@@ -471,6 +522,118 @@ function formatSsgBuildFailureMessage(failedRoutes: SsgFailedRoute[]): string {
     .map((route) => `${route.path}: ${route.message}`)
     .join('\n');
   return `SSG build failed for ${failedRoutes.length} ${routeWord}: ${routeList}\n${routeMessages}`;
+}
+
+async function readPreviousSsgManifest(
+  outDir: string,
+): Promise<SsgManifest | null> {
+  const manifestPath = path.resolve(outDir, SSG_MANIFEST_FILE);
+  let raw: string;
+  try {
+    raw = await readFile(manifestPath, 'utf8');
+  } catch (error) {
+    if (errorHasCode(error, 'ENOENT')) return null;
+    throw error;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<SsgManifest>;
+    if (parsed.version !== 1 || !Array.isArray(parsed.pages)) return null;
+    return parsed as SsgManifest;
+  } catch {
+    return null;
+  }
+}
+
+function hashSsgRenderedOutput(
+  html: string,
+  hydrationDataContent: string | undefined,
+): string {
+  const hash = createHash('sha256');
+  hash.update('facetheory:ssg-output:v1\0html\0');
+  hash.update(html);
+  hash.update('\0hydration-data\0');
+  if (hydrationDataContent !== undefined) {
+    hash.update(hydrationDataContent);
+  }
+  return `sha256-${hash.digest('hex')}`;
+}
+
+async function ssgSkippedRouteIfUnchanged(options: {
+  incremental: boolean;
+  outDir: string;
+  entry: SsgPageEntry;
+  html: string;
+  hydrationDataContent?: string;
+  previousEntry?: SsgPageEntry;
+}): Promise<SsgSkippedRoute | undefined> {
+  const {
+    incremental,
+    outDir,
+    entry,
+    html,
+    hydrationDataContent,
+    previousEntry,
+  } = options;
+
+  if (!incremental) return undefined;
+  if (entry.contentHash === undefined) return undefined;
+  if (previousEntry?.contentHash !== entry.contentHash) return undefined;
+  if (previousEntry.file !== entry.file) return undefined;
+  if (previousEntry.hydrationDataFile !== entry.hydrationDataFile) {
+    return undefined;
+  }
+  if (!(await ssgOutputFileMatches(outDir, entry.file, html))) {
+    return undefined;
+  }
+  if (entry.hydrationDataFile !== undefined) {
+    if (hydrationDataContent === undefined) return undefined;
+    if (
+      !(await ssgOutputFileMatches(
+        outDir,
+        entry.hydrationDataFile,
+        hydrationDataContent,
+      ))
+    ) {
+      return undefined;
+    }
+  }
+
+  const skippedRoute: SsgSkippedRoute = {
+    routePattern: entry.routePattern,
+    path: entry.path,
+    file: entry.file,
+    reason: 'content-hash-match',
+    contentHash: entry.contentHash,
+  };
+  if (entry.hydrationDataFile !== undefined) {
+    skippedRoute.hydrationDataFile = entry.hydrationDataFile;
+  }
+  return skippedRoute;
+}
+
+async function ssgOutputFileMatches(
+  outDir: string,
+  relativePath: string,
+  expectedContent: string,
+): Promise<boolean> {
+  const absolutePath = path.resolve(outDir, relativePath);
+  assertSafeSsgOutputPath(outDir, relativePath, absolutePath);
+  try {
+    return (await readFile(absolutePath, 'utf8')) === expectedContent;
+  } catch (error) {
+    if (errorHasCode(error, 'ENOENT')) return false;
+    throw error;
+  }
+}
+
+function errorHasCode(error: unknown, code: string): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === code
+  );
 }
 
 export function ssgFilePathForRoute(

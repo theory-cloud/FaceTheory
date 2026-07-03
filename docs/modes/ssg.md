@@ -72,6 +72,28 @@ npm run ssg -- --entry ./ssg.config.ts --out ./dist-static --concurrency 4
 
 When one route fails, FaceTheory continues rendering the remaining planned routes. Successful pages and the manifest for those pages are still written, then the build reports the failed routes and exits non-zero (or `buildSsgSite` rejects with `SsgBuildFailedError` for programmatic callers).
 
+## Incremental builds
+
+Full clean output remains the default: `buildSsgSite` removes the output directory before writing so removed routes or stale assets do not linger.
+
+Use incremental builds when a local or CI cache already holds the previous SSG output and you want unchanged route files to keep their existing bytes and mtimes:
+
+```typescript
+await buildSsgSite({
+  faces,
+  outDir: './dist-static',
+  incremental: true,
+});
+```
+
+The CLI flag is:
+
+```bash
+npm run ssg -- --entry ./ssg.config.ts --out ./dist-static --incremental
+```
+
+Incremental mode does not run `rm -rf` on the output directory. Each route is still rendered so FaceTheory can compute a SHA-256 content hash over the rendered HTML and any emitted hydration sidecar. If the hash matches the previous `.facetheory/ssg-manifest.json` entry and the expected files are still present with matching bytes, FaceTheory skips rewriting that route and reports it in `skippedRoutes`. Run a full clean build when you need to prune routes or files that no longer exist.
+
 ## Related helpers
 
 - `planSsgPages(faces)` — preview the routes and params the build will produce, without writing files.
