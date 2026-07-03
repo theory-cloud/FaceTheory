@@ -53,6 +53,52 @@ form-action 'self'
 
 Nonces are unique per response and consistent within a response so that `<script nonce>` attributes match the `Content-Security-Policy` header.
 
+Hosts can extend the canonical directives without abandoning the strict helper:
+
+```typescript
+const cspHeader = buildStrictCspHeader({
+  directives: {
+    'connect-src': ['https://api.example.com', 'wss://events.example.com'],
+    'img-src': 'https://img.example.com',
+    'report-to': 'facetheory-csp',
+  },
+});
+```
+
+Extension values are appended to existing directives when the directive is part
+of the baseline (`connect-src`, `img-src`, and so on). New directives such as
+`report-to` are appended after the baseline in deterministic name order. Values
+are individual CSP tokens; pass multiple values as an array instead of a
+space-separated string.
+
+The strict builder remains fail-closed. It rejects directive injection shapes
+(invalid names, semicolons, or whitespace inside a single value), and it refuses
+`'unsafe-inline'` and `'unsafe-eval'` with actionable errors. Use external assets
+or FaceTheory-owned request nonces; do not weaken the strict CSP baseline.
+
+JSON-LD structured data uses the head helper path:
+
+```typescript
+import { jsonLd } from '@theory-cloud/facetheory';
+
+return {
+  csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+  headTags: [
+    jsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: 'Strict page',
+    }),
+  ],
+  html: '<main>Strict page</main>',
+};
+```
+
+`createFaceApp()` carries the request nonce into head emission. The JSON-LD tag
+must remain in `<head>`, use `type="application/ld+json"`, and carry the
+matching nonce. This allowance does not apply to inline hydration data or generic
+inline scripts.
+
 ## Document validation
 
 For defense in depth, FaceTheory can validate the rendered document against the policy before emitting it:

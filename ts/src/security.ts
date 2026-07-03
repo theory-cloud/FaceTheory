@@ -21,7 +21,22 @@ export interface StrictCspHeaderOptions {
    * no-inline baseline for external hydration contracts.
    */
   cspNonce?: string | null;
+  /**
+   * Add source expressions to FaceTheory's canonical directives or append new
+   * directives. Values are individual CSP tokens; never include
+   * `'unsafe-inline'` or `'unsafe-eval'`.
+   */
+  directives?: StrictCspDirectiveExtensions;
 }
+
+export type StrictCspDirectiveValue = string;
+export type StrictCspDirectiveValues =
+  | StrictCspDirectiveValue
+  | readonly StrictCspDirectiveValue[];
+export type StrictCspDirectiveExtensions = Record<
+  string,
+  StrictCspDirectiveValues | null | undefined
+>;
 
 export interface StrictCspDocumentValidationOptions {
   policy?: FaceCspPolicy | undefined;
@@ -71,14 +86,25 @@ export function buildStrictCspHeader(
   options: StrictCspHeaderOptions = {},
 ): string {
   const nonce = normalizeCspNonce(options.cspNonce ?? null);
+  const extensions = normalizeStrictCspDirectiveExtensions(options.directives);
+  const emitted = new Set<string>();
 
-  return STRICT_CSP_DIRECTIVES.map(([name, baseValues]) => {
+  const baseDirectives = STRICT_CSP_DIRECTIVES.map(([name, baseValues]) => {
     const values = [...baseValues];
     if ((name === 'script-src' || name === 'style-src') && nonce) {
       values.push(`'nonce-${nonce}'`);
     }
-    return `${name} ${values.join(' ')}`;
-  }).join('; ');
+    appendUniqueValues(values, extensions.get(name) ?? []);
+    emitted.add(name);
+    return formatCspDirective(name, values);
+  });
+
+  const extensionDirectives = [...extensions.entries()]
+    .filter(([name]) => !emitted.has(name))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, values]) => formatCspDirective(name, values));
+
+  return [...baseDirectives, ...extensionDirectives].join('; ');
 }
 
 /**
@@ -123,6 +149,85 @@ function normalizeCspNonce(nonce: string | null): string | null {
     throw new Error('FaceTheory strict CSP nonce contains unsafe characters');
   }
   return trimmed;
+}
+
+function normalizeStrictCspDirectiveExtensions(
+  directives: StrictCspDirectiveExtensions | undefined,
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  if (!directives) return out;
+
+  for (const [rawName, rawValues] of Object.entries(directives)) {
+    if (rawValues === undefined || rawValues === null) continue;
+
+    const name = normalizeStrictCspDirectiveName(rawName);
+    const values = Array.isArray(rawValues) ? rawValues : [rawValues];
+    if (values.length === 0) {
+      throw new Error(
+        `FaceTheory strict CSP directive "${name}" must include at least one value`,
+      );
+    }
+
+    const normalizedValues = values.map((value) =>
+      normalizeStrictCspDirectiveValue(name, value),
+    );
+    const existing = out.get(name) ?? [];
+    appendUniqueValues(existing, normalizedValues);
+    out.set(name, existing);
+  }
+
+  return out;
+}
+
+function normalizeStrictCspDirectiveName(name: string): string {
+  const normalized = String(name ?? '').trim().toLowerCase();
+  if (!/^[a-z][a-z0-9-]*$/.test(normalized)) {
+    throw new Error(
+      `FaceTheory strict CSP directive name is invalid: "${String(name)}"`,
+    );
+  }
+  return normalized;
+}
+
+function normalizeStrictCspDirectiveValue(
+  directiveName: string,
+  value: string,
+): string {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) {
+    throw new Error(
+      `FaceTheory strict CSP directive "${directiveName}" contains an empty value`,
+    );
+  }
+  if (/[\s;]/.test(normalized)) {
+    throw new Error(
+      `FaceTheory strict CSP directive "${directiveName}" values must be individual CSP tokens without whitespace or semicolons`,
+    );
+  }
+
+  const lowerValue = normalized.toLowerCase();
+  if (lowerValue === "'unsafe-inline'" || lowerValue === 'unsafe-inline') {
+    throw new Error(
+      `FaceTheory strict CSP rejects 'unsafe-inline' in ${directiveName}; use external assets or FaceTheory-owned request nonces instead`,
+    );
+  }
+  if (lowerValue === "'unsafe-eval'" || lowerValue === 'unsafe-eval') {
+    throw new Error(
+      `FaceTheory strict CSP rejects 'unsafe-eval' in ${directiveName}; remove eval-like runtime code before using the strict CSP helper`,
+    );
+  }
+
+  return normalized;
+}
+
+function appendUniqueValues(target: string[], values: readonly string[]): void {
+  for (const value of values) {
+    if (!target.includes(value)) target.push(value);
+  }
+}
+
+function formatCspDirective(name: string, values: readonly string[]): string {
+  return `${name} ${values.join(' ')}`;
 }
 
 function validateNoInlineScriptElements(

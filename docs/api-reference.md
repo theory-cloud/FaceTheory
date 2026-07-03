@@ -541,8 +541,11 @@ Core strict-CSP exports:
 - `jsonLd(data)` returns a safe `application/ld+json` head tag. Under `inlineScripts:false`, this is the only
   nonce-carried inline script body FaceTheory permits: the rendered tag must stay in `<head>`, carry the matching
   request nonce, and use the JSON-LD MIME type. It does not allow generic inline scripts or inline hydration JSON.
-- `buildStrictCspHeader({ cspNonce? })` returns FaceTheory's same-origin CSP header baseline. Header attachment is
-  explicit through `FaceRenderResult.headers`; FaceTheory validates output but does not silently add response headers.
+- `buildStrictCspHeader({ cspNonce?, directives? })` returns FaceTheory's same-origin CSP header baseline. Header
+  attachment is explicit through `FaceRenderResult.headers`; FaceTheory validates output but does not silently add
+  response headers. `directives` appends individual source-expression tokens to existing directives or adds new
+  directives such as `report-to`; the helper rejects invalid directive names, semicolon/whitespace injection shapes,
+  `'unsafe-inline'`, and `'unsafe-eval'`.
 - `validateStrictCspDocument(html, { policy })` is the body-level validator used by the runtime before returning strict
   buffered HTML. It catches raw body output that structured head validation cannot see.
 - `externalHydrationForEntry(manifest, entry, data, { dataUrl, ...options })` pairs Vite asset tags with
