@@ -16,6 +16,63 @@ export interface NormalizeHeadTagsOptions {
   cspNonce?: string | null;
 }
 
+export type HeadTitleTemplate = string | ((title: string) => string);
+
+export interface TitleTagOptions {
+  /**
+   * Template applied to the title before emission. String templates must contain
+   * `%s`; function templates receive the already-normalized title text.
+   */
+  template?: HeadTitleTemplate;
+}
+
+export type HeadMetaContent = string | number | boolean;
+
+export type HeadMetaExtraAttributes = Omit<
+  FaceAttributes,
+  'charset' | 'content' | 'http-equiv' | 'name' | 'property'
+>;
+
+export type HeadLinkExtraAttributes = Omit<FaceAttributes, 'href' | 'rel'>;
+
+export interface OpenGraphOptions {
+  title?: HeadMetaContent;
+  type?: HeadMetaContent;
+  url?: HeadMetaContent;
+  image?: HeadMetaContent;
+  description?: HeadMetaContent;
+  siteName?: HeadMetaContent;
+  locale?: HeadMetaContent;
+  determiner?: HeadMetaContent;
+  additional?: Record<string, HeadMetaContent | null | undefined>;
+  attrs?: HeadMetaExtraAttributes;
+}
+
+export interface TwitterCardOptions {
+  card: HeadMetaContent;
+  site?: HeadMetaContent;
+  creator?: HeadMetaContent;
+  title?: HeadMetaContent;
+  description?: HeadMetaContent;
+  image?: HeadMetaContent;
+  imageAlt?: HeadMetaContent;
+  additional?: Record<string, HeadMetaContent | null | undefined>;
+  attrs?: HeadMetaExtraAttributes;
+}
+
+export interface JsonLdOptions {
+  /**
+   * Optional request CSP nonce. `renderFaceHead(..., { cspNonce })` also applies
+   * the nonce automatically, so most callers should pass the request nonce at
+   * render time rather than storing it in reusable head tag arrays.
+   */
+  nonce?: string | null;
+  id?: string;
+  attrs?: Omit<FaceAttributes, 'nonce' | 'type'>;
+}
+
+const JSON_LD_SCRIPT_TYPE = 'application/ld+json';
+
 function escapeScriptText(value: string): string {
   return value.replaceAll(/<\/script/gi, '<\\/script');
 }
@@ -116,6 +173,39 @@ function isCspDisabled(
   return policy?.[key] === false;
 }
 
+function normalizeOptionalNonce(nonce: string | null | undefined): string | null {
+  if (nonce === undefined || nonce === null) return null;
+  const trimmed = String(nonce).trim();
+  if (!trimmed) return null;
+  if (/[\s;'\r\n]/.test(trimmed)) {
+    throw new Error('FaceTheory strict CSP nonce contains unsafe characters');
+  }
+  return trimmed;
+}
+
+function normalizeScriptType(value: unknown): string {
+  const [mediaType = ''] = String(value ?? '').split(';', 1);
+  return mediaType.trim().toLowerCase();
+}
+
+function isJsonLdScriptTag(
+  tag: FaceHeadTag,
+): tag is Extract<FaceHeadTag, { type: 'script' }> {
+  return (
+    tag.type === 'script' &&
+    normalizeScriptType(tag.attrs.type) === JSON_LD_SCRIPT_TYPE
+  );
+}
+
+function isNonceCarriedJsonLdScriptTag(
+  tag: FaceHeadTag,
+  expectedNonce: string | null,
+): boolean {
+  if (!expectedNonce || !isJsonLdScriptTag(tag)) return false;
+  const nonce = tag.attrs.nonce;
+  return typeof nonce === 'string' && nonce === expectedNonce;
+}
+
 function validateStrictAttributes(
   tag: FaceHeadTag,
   attrs: FaceAttributes | undefined,
@@ -163,12 +253,14 @@ function validateStrictHeadTags(
   options: {
     allowedOrigin?: string | URL;
     allowedEscapedRawHtml?: string | null;
+    cspNonce?: string | null;
   } = {},
 ): void {
   if (!policy) return;
 
   const allowedOrigin = normalizeAllowedOrigin(options.allowedOrigin);
   const allowedEscapedRawHtml = options.allowedEscapedRawHtml ?? null;
+  const expectedNonce = normalizeOptionalNonce(options.cspNonce);
 
   for (const tag of tags) {
     switch (tag.type) {
@@ -181,7 +273,11 @@ function validateStrictHeadTags(
         }
         break;
       case 'script':
-        if (isCspDisabled(policy, 'inlineScripts') && tag.body !== undefined) {
+        if (
+          isCspDisabled(policy, 'inlineScripts') &&
+          tag.body !== undefined &&
+          !isNonceCarriedJsonLdScriptTag(tag, expectedNonce)
+        ) {
           throw new Error('FaceTheory strict CSP rejects inline script tags');
         }
         validateStrictAttributes(tag, tag.attrs, policy, allowedOrigin);
@@ -200,6 +296,166 @@ function validateStrictHeadTags(
         break;
     }
   }
+}
+
+function normalizeTitleText(value: string): string {
+  return String(value ?? '').trim();
+}
+
+function applyTitleTemplate(title: string, template: HeadTitleTemplate | undefined): string {
+  const normalizedTitle = normalizeTitleText(title);
+  if (template === undefined) return normalizedTitle;
+
+  if (typeof template === 'function') {
+    return String(template(normalizedTitle));
+  }
+
+  const templateText = String(template);
+  if (!templateText.includes('%s')) {
+    throw new Error('FaceTheory title template must include a %s placeholder');
+  }
+  return templateText.replaceAll('%s', normalizedTitle);
+}
+
+function normalizeMetaContent(value: HeadMetaContent): string {
+  return String(value);
+}
+
+function appendMetaTag(
+  tags: FaceHeadTag[],
+  key: 'name' | 'property',
+  value: string,
+  content: HeadMetaContent,
+  attrs: HeadMetaExtraAttributes | undefined,
+): void {
+  tags.push({
+    type: 'meta',
+    attrs: {
+      ...(attrs ?? {}),
+      [key]: value,
+      content: normalizeMetaContent(content),
+    },
+  });
+}
+
+function appendMetaValues(
+  tags: FaceHeadTag[],
+  key: 'name' | 'property',
+  prefix: string,
+  name: string,
+  value: HeadMetaContent | null | undefined,
+  attrs: HeadMetaExtraAttributes | undefined,
+): void {
+  if (value === undefined || value === null) return;
+  const property = `${prefix}:${name}`;
+  appendMetaTag(tags, key, property, value, attrs);
+}
+
+function appendAdditionalMetaValues(
+  tags: FaceHeadTag[],
+  key: 'name' | 'property',
+  prefix: string,
+  additional:
+    | Record<string, HeadMetaContent | null | undefined>
+    | undefined,
+  attrs: HeadMetaExtraAttributes | undefined,
+): void {
+  if (!additional) return;
+  for (const name of Object.keys(additional).sort()) {
+    appendMetaValues(tags, key, prefix, name, additional[name], attrs);
+  }
+}
+
+export function titleTag(title: string, options: TitleTagOptions = {}): FaceHeadTag {
+  return { type: 'title', text: applyTitleTemplate(title, options.template) };
+}
+
+export function metaTag(
+  name: string,
+  content: HeadMetaContent,
+  attrs: HeadMetaExtraAttributes = {},
+): FaceHeadTag {
+  return {
+    type: 'meta',
+    attrs: {
+      ...attrs,
+      name,
+      content: normalizeMetaContent(content),
+    },
+  };
+}
+
+export function openGraph(options: OpenGraphOptions): FaceHeadTag[] {
+  const tags: FaceHeadTag[] = [];
+  const attrs = options.attrs;
+  appendMetaValues(tags, 'property', 'og', 'title', options.title, attrs);
+  appendMetaValues(tags, 'property', 'og', 'type', options.type, attrs);
+  appendMetaValues(tags, 'property', 'og', 'url', options.url, attrs);
+  appendMetaValues(tags, 'property', 'og', 'image', options.image, attrs);
+  appendMetaValues(
+    tags,
+    'property',
+    'og',
+    'description',
+    options.description,
+    attrs,
+  );
+  appendMetaValues(tags, 'property', 'og', 'site_name', options.siteName, attrs);
+  appendMetaValues(tags, 'property', 'og', 'locale', options.locale, attrs);
+  appendMetaValues(tags, 'property', 'og', 'determiner', options.determiner, attrs);
+  appendAdditionalMetaValues(tags, 'property', 'og', options.additional, attrs);
+  return tags;
+}
+
+export function twitterCard(options: TwitterCardOptions): FaceHeadTag[] {
+  const tags: FaceHeadTag[] = [];
+  const attrs = options.attrs;
+  appendMetaValues(tags, 'name', 'twitter', 'card', options.card, attrs);
+  appendMetaValues(tags, 'name', 'twitter', 'site', options.site, attrs);
+  appendMetaValues(tags, 'name', 'twitter', 'creator', options.creator, attrs);
+  appendMetaValues(tags, 'name', 'twitter', 'title', options.title, attrs);
+  appendMetaValues(
+    tags,
+    'name',
+    'twitter',
+    'description',
+    options.description,
+    attrs,
+  );
+  appendMetaValues(tags, 'name', 'twitter', 'image', options.image, attrs);
+  appendMetaValues(tags, 'name', 'twitter', 'image:alt', options.imageAlt, attrs);
+  appendAdditionalMetaValues(tags, 'name', 'twitter', options.additional, attrs);
+  return tags;
+}
+
+export function canonical(
+  href: string,
+  attrs: HeadLinkExtraAttributes = {},
+): FaceHeadTag {
+  return {
+    type: 'link',
+    attrs: {
+      ...attrs,
+      rel: 'canonical',
+      href: requireSafeHttpUrl(href, 'canonical href'),
+    },
+  };
+}
+
+export function jsonLd(data: unknown, options: JsonLdOptions = {}): FaceHeadTag {
+  const attrs: FaceAttributes = {
+    ...(options.attrs ?? {}),
+    type: JSON_LD_SCRIPT_TYPE,
+  };
+  if (options.id) attrs.id = options.id;
+  const nonce = normalizeOptionalNonce(options.nonce);
+  if (nonce) attrs.nonce = nonce;
+
+  return {
+    type: 'script',
+    attrs,
+    body: safeJson(data),
+  };
 }
 
 function isCharsetMeta(tag: FaceHeadTag): boolean {
@@ -411,13 +667,18 @@ export function renderFaceHead(
   const validationOptions: {
     allowedOrigin?: string | URL;
     allowedEscapedRawHtml?: string | null;
+    cspNonce?: string | null;
   } = { allowedEscapedRawHtml: escapedLegacyHeadHtml };
   if (options.allowedOrigin !== undefined) {
     validationOptions.allowedOrigin = options.allowedOrigin;
   }
-  validateStrictHeadTags(tags, out.csp, validationOptions);
+  validationOptions.cspNonce = options.cspNonce ?? null;
+  const tagsWithNonce = options.cspNonce
+    ? tags.map((tag) => applyCspNonce(tag, options.cspNonce ?? null))
+    : tags;
+  validateStrictHeadTags(tagsWithNonce, out.csp, validationOptions);
 
-  return normalizeHeadTags(tags, { cspNonce: options.cspNonce ?? null })
+  return normalizeHeadTags(tagsWithNonce, { cspNonce: options.cspNonce ?? null })
     .map(renderHeadTag)
     .join('');
 }
