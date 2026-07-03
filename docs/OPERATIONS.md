@@ -202,6 +202,17 @@ Rollback:
 2. Roll back assets by switching the assets prefix (preferred) or redeploying the previous assets set.
 3. Invalidate CloudFront for any non-hashed keys that may be cached.
 
+### ISR on-demand invalidation and orphaned HTML objects
+
+`IsrMetaStore.invalidate(cacheKey)` invalidates the metadata pointer, not the stored HTML object. That is deliberate: FaceTheory's ISR state authority is the metadata record and regeneration lease. Deleting an S3 object independently of the metadata/lease flow can turn a still-fresh pointer into a cache read failure.
+
+Operational guidance:
+
+- Local/in-memory invalidation deletes the metadata record; the next request regenerates and writes a new HTML pointer.
+- The TableTheory adapter throws `IsrInvalidateUnsupportedError` until TableTheory provides a coordinated invalidation/delete operation for the FaceTheory ISR metadata model. Do not patch around it with raw DynamoDB writes from FaceTheory.
+- For S3-backed HTML stores, configure lifecycle expiration for the ISR HTML prefix (and strict-CSP ISR hydration sidecar suffixes) so metadata-invalidated or superseded objects age out automatically. Choose the lifecycle window longer than your maximum rollback/debugging window and longer than any CloudFront/S3 cache horizon for the same keys.
+- If you need emergency removal of sensitive HTML, coordinate both sides: invalidate or remove the metadata pointer through the supported meta-store path, remove or deny the S3 object, and invalidate CloudFront for affected paths.
+
 ### SSG cache invalidation strategy
 
 Prefer versioned prefixes for HTML/data outputs:

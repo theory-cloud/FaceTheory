@@ -7,17 +7,25 @@ Blocking ISR is FaceTheory's incremental static regeneration model. Requests ser
 ## Declaring an ISR Face
 
 ```typescript
-import { createFaceApp, type FaceModule } from '@theory-cloud/facetheory';
+import { createFaceApp, type FaceModule } from "@theory-cloud/facetheory";
 
 const faces: FaceModule[] = [
   {
-    route: '/news/{slug}',
-    mode: 'isr',
+    route: "/news/{slug}",
+    mode: "isr",
     revalidateSeconds: 30,
-    load: async (ctx) => ({ slug: ctx.params.slug, latest: await fetchLatest(ctx.params.slug) }),
+    load: async (ctx) => ({
+      slug: ctx.params.slug,
+      latest: await fetchLatest(ctx.params.slug),
+    }),
     render: (_ctx, data) => {
-      const { slug, latest } = data as { slug: string; latest: { title: string; body: string } };
-      return { html: `<article><h1>${latest.title}</h1><p>${latest.body}</p></article>` };
+      const { slug, latest } = data as {
+        slug: string;
+        latest: { title: string; body: string };
+      };
+      return {
+        html: `<article><h1>${latest.title}</h1><p>${latest.body}</p></article>`,
+      };
     },
   },
 ];
@@ -30,7 +38,11 @@ const faces: FaceModule[] = [
 Configure the ISR runtime when constructing the app:
 
 ```typescript
-import { createFaceApp, InMemoryHtmlStore, InMemoryIsrMetaStore } from '@theory-cloud/facetheory';
+import {
+  createFaceApp,
+  InMemoryHtmlStore,
+  InMemoryIsrMetaStore,
+} from "@theory-cloud/facetheory";
 
 const htmlStore = new InMemoryHtmlStore();
 const metaStore = new InMemoryIsrMetaStore();
@@ -74,12 +86,33 @@ export const app = createFaceApp({
   isr: {
     htmlStore,
     metaStore,
-    varyCookies: ['session'],
+    varyCookies: ["session"],
   },
 });
 ```
 
 With `varyCookies`, only listed cookies partition the default cache key; absent `varyCookies` keeps the all-cookies default.
+
+## On-demand invalidation
+
+`IsrMetaStore.invalidate(cacheKey)` is the FaceTheory-side invalidation primitive. The in-memory store deletes the metadata record for the cache key, so the next request cannot find a fresh pointer and performs a normal blocking regeneration. The HTML object that used to be referenced is not deleted by metadata invalidation; in production it becomes an orphan until object lifecycle cleanup removes it.
+
+Use the same cache-key function the app uses for ISR requests. For the default key, call `defaultIsrCacheKey(...)` with the route pattern, params, query, tenant, and request variant dimensions that affect the Face output.
+
+```typescript
+import { defaultIsrCacheKey } from "@theory-cloud/facetheory";
+
+const cacheKey = defaultIsrCacheKey({
+  tenant: "default",
+  routePattern: "/news/{slug}",
+  params: { slug: "launch" },
+  query: {},
+});
+
+await metaStore.invalidate(cacheKey);
+```
+
+The TableTheory adapter currently throws `IsrInvalidateUnsupportedError` for `invalidate(cacheKey)`. This is intentional: FaceTheory must not hand-roll a DynamoDB delete/update beside TableTheory's lease and lifecycle semantics. TableTheory needs a first-class ISR invalidation/delete operation before production TableTheory-backed invalidation can be enabled.
 
 ## What ISR guarantees
 

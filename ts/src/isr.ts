@@ -131,6 +131,7 @@ export interface ReleaseIsrLeaseInput {
 
 export interface IsrMetaStore {
   get: (cacheKey: string) => Promise<IsrMetaRecord | null>;
+  invalidate: (cacheKey: string) => Promise<void>;
   tryAcquireLease: (
     input: TryAcquireIsrLeaseInput,
   ) => Promise<TryAcquireIsrLeaseResult>;
@@ -279,6 +280,10 @@ export class InMemoryIsrMetaStore implements IsrMetaStore {
   async get(cacheKey: string): Promise<IsrMetaRecord | null> {
     const record = this.records.get(cacheKey);
     return record ? cloneIsrMetaRecord(record) : null;
+  }
+
+  async invalidate(cacheKey: string): Promise<void> {
+    this.records.delete(cacheKey);
   }
 
   async tryAcquireLease(

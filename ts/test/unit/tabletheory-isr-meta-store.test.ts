@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { TableTheoryIsrMetaStoreAdapter } from '../../src/tabletheory/index.js';
+import {
+  IsrInvalidateUnsupportedError,
+  TableTheoryIsrMetaStoreAdapter,
+} from '../../src/tabletheory/index.js';
 
 test('tabletheory adapter: get returns null when missing', async () => {
   const adapter = new TableTheoryIsrMetaStoreAdapter({
@@ -154,3 +157,21 @@ test('tabletheory adapter: commitGeneration maps args to TableTheory store', asy
   assert.equal(seen.etag, '"e"');
 });
 
+test('tabletheory adapter: invalidate throws pending-coordination error', async () => {
+  const adapter = new TableTheoryIsrMetaStoreAdapter({
+    get: async () => null,
+    tryAcquireLease: async () => null,
+    commitGeneration: async () => {},
+    releaseLease: async () => {},
+  } as any);
+
+  await assert.rejects(
+    () => adapter.invalidate('cache-key'),
+    (err: unknown) => {
+      assert.ok(err instanceof IsrInvalidateUnsupportedError);
+      assert.equal(err.cacheKey, 'cache-key');
+      assert.match(String(err.message), /pending TableTheory coordination/i);
+      return true;
+    },
+  );
+});

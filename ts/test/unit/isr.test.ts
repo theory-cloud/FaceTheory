@@ -131,6 +131,43 @@ test('isr: stale burst triggers one regeneration and waiters share result', asyn
   );
 });
 
+test('isr: in-memory invalidate deletes meta so the next request regenerates', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/invalidate',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: () => ({ html: `<main>render-${++renderCount}</main>` }),
+      },
+    ],
+    isr: { htmlStore, metaStore },
+  });
+
+  const warm = await app.handle({ method: 'GET', path: '/invalidate' });
+  assert.equal(warm.headers['x-facetheory-isr']?.[0], 'miss');
+  assert.ok(decodeBody(warm.body as Uint8Array).includes('render-1'));
+
+  const hit = await app.handle({ method: 'GET', path: '/invalidate' });
+  assert.equal(hit.headers['x-facetheory-isr']?.[0], 'hit');
+  assert.ok(decodeBody(hit.body as Uint8Array).includes('render-1'));
+
+  const cacheKey = metaStore.debugSnapshot()[0]?.cacheKey;
+  assert.ok(cacheKey);
+  assert.ok(cacheKey.includes('default::/invalidate?'));
+  await metaStore.invalidate(cacheKey);
+  assert.deepEqual(metaStore.debugSnapshot(), []);
+
+  const regenerated = await app.handle({ method: 'GET', path: '/invalidate' });
+  assert.equal(regenerated.headers['x-facetheory-isr']?.[0], 'miss');
+  assert.ok(decodeBody(regenerated.body as Uint8Array).includes('render-2'));
+  assert.equal(renderCount, 2);
+});
+
 test('isr: regeneration failure serves stale and keeps pointer intact', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new InMemoryIsrMetaStore();
@@ -765,6 +802,10 @@ class RecordingMetaStore implements IsrMetaStore {
     return await this.inner.get(cacheKey);
   }
 
+  async invalidate(cacheKey: string): Promise<void> {
+    await this.inner.invalidate(cacheKey);
+  }
+
   async tryAcquireLease(
     input: TryAcquireIsrLeaseInput,
   ): Promise<TryAcquireIsrLeaseResult> {
@@ -786,6 +827,10 @@ class CspMetadataDroppingMetaStore implements IsrMetaStore {
 
   async get(cacheKey: string): Promise<IsrMetaRecord | null> {
     return dropCspMetadata(await this.inner.get(cacheKey));
+  }
+
+  async invalidate(cacheKey: string): Promise<void> {
+    await this.inner.invalidate(cacheKey);
   }
 
   async tryAcquireLease(
@@ -838,6 +883,10 @@ class ToggleableFailingMetaStore implements IsrMetaStore {
     return await this.inner.get(cacheKey);
   }
 
+  async invalidate(cacheKey: string): Promise<void> {
+    await this.inner.invalidate(cacheKey);
+  }
+
   async tryAcquireLease(
     input: TryAcquireIsrLeaseInput,
   ): Promise<TryAcquireIsrLeaseResult> {
@@ -863,6 +912,10 @@ class StatusContentTypeDroppingMetaStore implements IsrMetaStore {
 
   async get(cacheKey: string): Promise<IsrMetaRecord | null> {
     return dropStatusContentType(await this.inner.get(cacheKey));
+  }
+
+  async invalidate(cacheKey: string): Promise<void> {
+    await this.inner.invalidate(cacheKey);
   }
 
   async tryAcquireLease(
