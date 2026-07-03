@@ -7,7 +7,10 @@ import {
   enforceAdapterStrictCspResult,
   enforceReactStrictCspStreamingOptions,
 } from '../adapter-csp.js';
-import { prepareUIIntegrations } from '../types.js';
+import {
+  modeUsesRuntimeHydrationSidecars,
+  runAdapterRenderPipeline,
+} from '../adapter-pipeline.js';
 import type {
   FaceContext,
   FaceCspPolicy,
@@ -84,62 +87,23 @@ async function renderReactInternal(
   options: RenderReactOptions,
   validationOptions: ReactRenderValidationOptions = {},
 ): Promise<FaceRenderResult> {
-  const integrations = await prepareUIIntegrations<
+  return runAdapterRenderPipeline<
     React.ReactElement,
     UIIntegration<React.ReactElement>
-  >(options.integrations ?? [], ctx);
-
-  let tree: React.ReactElement = React.createElement(
-    React.Fragment,
-    null,
-    node,
-  );
-
-  for (const { integration, state } of integrations) {
-    if (integration.wrapTree) {
-      tree = integration.wrapTree(tree, ctx, state);
-    }
-  }
-
-  const integrationHeadTags: FaceHeadTag[] = [];
-  const integrationStyleTags: FaceStyleTag[] = [];
-
-  for (const { integration, state } of integrations) {
-    if (!integration.contribute) continue;
-    const contribution = await integration.contribute(ctx, state);
-    if (contribution.headTags)
-      integrationHeadTags.push(...contribution.headTags);
-    if (contribution.styleTags)
-      integrationStyleTags.push(...contribution.styleTags);
-  }
-
-  const html = ReactDOMServer.renderToString(tree);
-  const headTags = [...integrationHeadTags, ...(options.headTags ?? [])];
-  const styleTags = [...integrationStyleTags, ...(options.styleTags ?? [])];
-
-  let out: FaceRenderResult = { html };
-  if (options.status !== undefined) out.status = options.status;
-  if (options.headers !== undefined) out.headers = options.headers;
-  if (options.cookies !== undefined) out.cookies = options.cookies;
-  if (options.head !== undefined) out.head = options.head;
-  if (headTags.length) out.headTags = headTags;
-  if (styleTags.length) out.styleTags = styleTags;
-  if (options.hydration !== undefined) out.hydration = options.hydration;
-  if (options.csp !== undefined) out.csp = options.csp;
-
-  for (const { integration, state } of integrations) {
-    if (integration.finalize) {
-      out = await integration.finalize(out, ctx, state);
-    }
-  }
-
-  enforceAdapterStrictCspResult(out, {
-    adapterName: 'React adapter',
-    deferHydrationValidation:
-      validationOptions.deferStrictCspHydrationValidation === true,
+  >({
+    ctx,
+    tree: React.createElement(React.Fragment, null, node),
+    options,
+    integrations: options.integrations ?? [],
+    renderTree: (tree) => ReactDOMServer.renderToString(tree),
+    enforceStrictCsp: (out) => {
+      enforceAdapterStrictCspResult(out, {
+        adapterName: 'React adapter',
+        deferHydrationValidation:
+          validationOptions.deferStrictCspHydrationValidation === true,
+      });
+    },
   });
-
-  return out;
 }
 
 export async function renderReactStream(
@@ -156,185 +120,144 @@ async function renderReactStreamInternal(
   options: RenderReactStreamOptions,
   validationOptions: ReactRenderValidationOptions = {},
 ): Promise<FaceRenderResult> {
-  const integrations = await prepareUIIntegrations<
+  return runAdapterRenderPipeline<
     React.ReactElement,
     UIIntegration<React.ReactElement>
-  >(options.integrations ?? [], ctx);
-
-  let tree: React.ReactElement = React.createElement(
-    React.Fragment,
-    null,
-    node,
-  );
-
-  for (const { integration, state } of integrations) {
-    if (integration.wrapTree) {
-      tree = integration.wrapTree(tree, ctx, state);
-    }
-  }
-
-  const integrationHeadTags: FaceHeadTag[] = [];
-  const integrationStyleTags: FaceStyleTag[] = [];
-
-  for (const { integration, state } of integrations) {
-    if (!integration.contribute) continue;
-    const contribution = await integration.contribute(ctx, state);
-    if (contribution.headTags)
-      integrationHeadTags.push(...contribution.headTags);
-    if (contribution.styleTags)
-      integrationStyleTags.push(...contribution.styleTags);
-  }
-
-  const headTags = [...integrationHeadTags, ...(options.headTags ?? [])];
-  const styleTags = [...integrationStyleTags, ...(options.styleTags ?? [])];
-
-  const stream = new PassThrough();
-  const abortDelayMs = options.abortDelayMs ?? 5000;
-  const styleStrategy = options.styleStrategy ?? 'all-ready';
-  enforceReactStrictCspStreamingOptions({
-    adapterName: 'React adapter',
-    policy: options.csp,
-    styleStrategy,
-    hasFinalizeInlineStyleIntegration: integrations.some(
-      ({ integration }) => typeof integration.finalize === 'function',
-    ),
-  });
-  const startedAt = Date.now();
-  const requestId =
-    String(ctx.request.headers['x-request-id']?.[0] ?? '').trim() || null;
-
-  let didPipe = false;
-  let shellSettled = false;
-  let allReadySettled = false;
-
-  let resolveShell: (() => void) | null = null;
-  let rejectShell: ((err: unknown) => void) | null = null;
-  let resolveAllReady: (() => void) | null = null;
-  let rejectAllReady: ((err: unknown) => void) | null = null;
-
-  const shellReady = new Promise<void>((resolve, reject) => {
-    resolveShell = resolve;
-    rejectShell = reject;
-  });
-  const allReady = new Promise<void>((resolve, reject) => {
-    resolveAllReady = resolve;
-    rejectAllReady = reject;
-  });
-
-  if (styleStrategy === 'shell') {
-    void allReady.catch(() => undefined);
-  }
-
-  const settleShellReady = (): void => {
-    if (shellSettled) return;
-    shellSettled = true;
-    resolveShell?.();
-  };
-
-  const settleAllReady = (): void => {
-    if (allReadySettled) return;
-    allReadySettled = true;
-    resolveAllReady?.();
-  };
-
-  const rejectReadiness = (err: unknown): void => {
-    if (!shellSettled) {
-      shellSettled = true;
-      rejectShell?.(err);
-    }
-    if (!allReadySettled) {
-      allReadySettled = true;
-      rejectAllReady?.(err);
-    }
-  };
-
-  const pipeOnce = (pipe: (dest: NodeJS.WritableStream) => void): void => {
-    if (didPipe) return;
-    didPipe = true;
-    pipe(stream);
-  };
-
-  const { pipe, abort } = ReactDOMServer.renderToPipeableStream(tree, {
-    ...(ctx.request.cspNonce ? { nonce: ctx.request.cspNonce } : {}),
-    onShellReady: () => {
-      settleShellReady();
-      options.onReadiness?.({
-        phase: 'shell',
+  >({
+    ctx,
+    tree: React.createElement(React.Fragment, null, node),
+    options,
+    integrations: options.integrations ?? [],
+    renderTree: async (tree, pipelineContext) => {
+      const stream = new PassThrough();
+      const abortDelayMs = options.abortDelayMs ?? 5000;
+      const styleStrategy = options.styleStrategy ?? 'all-ready';
+      enforceReactStrictCspStreamingOptions({
+        adapterName: 'React adapter',
+        policy: options.csp,
         styleStrategy,
-        requestId,
-        ms: Math.max(0, Date.now() - startedAt),
+        hasFinalizeInlineStyleIntegration:
+          pipelineContext.preparedIntegrations.some(
+            ({ integration }) => typeof integration.finalize === 'function',
+          ),
       });
+      const startedAt = Date.now();
+      const requestId =
+        String(ctx.request.headers['x-request-id']?.[0] ?? '').trim() || null;
+
+      let didPipe = false;
+      let shellSettled = false;
+      let allReadySettled = false;
+
+      let resolveShell: (() => void) | null = null;
+      let rejectShell: ((err: unknown) => void) | null = null;
+      let resolveAllReady: (() => void) | null = null;
+      let rejectAllReady: ((err: unknown) => void) | null = null;
+
+      const shellReady = new Promise<void>((resolve, reject) => {
+        resolveShell = resolve;
+        rejectShell = reject;
+      });
+      const allReady = new Promise<void>((resolve, reject) => {
+        resolveAllReady = resolve;
+        rejectAllReady = reject;
+      });
+
       if (styleStrategy === 'shell') {
-        pipeOnce(pipe);
+        void allReady.catch(() => undefined);
       }
-    },
-    onAllReady: () => {
-      settleAllReady();
-      options.onReadiness?.({
-        phase: 'all-ready',
-        styleStrategy,
-        requestId,
-        ms: Math.max(0, Date.now() - startedAt),
+
+      const settleShellReady = (): void => {
+        if (shellSettled) return;
+        shellSettled = true;
+        resolveShell?.();
+      };
+
+      const settleAllReady = (): void => {
+        if (allReadySettled) return;
+        allReadySettled = true;
+        resolveAllReady?.();
+      };
+
+      const rejectReadiness = (err: unknown): void => {
+        if (!shellSettled) {
+          shellSettled = true;
+          rejectShell?.(err);
+        }
+        if (!allReadySettled) {
+          allReadySettled = true;
+          rejectAllReady?.(err);
+        }
+      };
+
+      const pipeOnce = (pipe: (dest: NodeJS.WritableStream) => void): void => {
+        if (didPipe) return;
+        didPipe = true;
+        pipe(stream);
+      };
+
+      const { pipe, abort } = ReactDOMServer.renderToPipeableStream(tree, {
+        ...(ctx.request.cspNonce ? { nonce: ctx.request.cspNonce } : {}),
+        onShellReady: () => {
+          settleShellReady();
+          options.onReadiness?.({
+            phase: 'shell',
+            styleStrategy,
+            requestId,
+            ms: Math.max(0, Date.now() - startedAt),
+          });
+          if (styleStrategy === 'shell') {
+            pipeOnce(pipe);
+          }
+        },
+        onAllReady: () => {
+          settleAllReady();
+          options.onReadiness?.({
+            phase: 'all-ready',
+            styleStrategy,
+            requestId,
+            ms: Math.max(0, Date.now() - startedAt),
+          });
+          if (styleStrategy === 'all-ready') {
+            pipeOnce(pipe);
+          }
+        },
+        onShellError: (err) => {
+          rejectReadiness(err);
+          stream.destroy(err as Error);
+        },
+        onError: (err) => {
+          // Preserve React's default error reporting; surface the error if the stream is consumed.
+          if (!stream.destroyed) {
+            stream.destroy(err as Error);
+          }
+          rejectReadiness(err);
+        },
       });
+
+      const abortTimer = setTimeout(() => abort(), abortDelayMs);
+      abortTimer.unref?.();
+      stream.on('close', () => clearTimeout(abortTimer));
+      stream.on('end', () => clearTimeout(abortTimer));
+      stream.on('error', () => clearTimeout(abortTimer));
+
+      // Ensure integrations can extract critical styles before FaceApp emits <head>.
       if (styleStrategy === 'all-ready') {
-        pipeOnce(pipe);
+        await allReady;
+      } else {
+        await shellReady;
       }
+
+      return stream as unknown as AsyncIterable<Uint8Array>;
     },
-    onShellError: (err) => {
-      rejectReadiness(err);
-      stream.destroy(err as Error);
-    },
-    onError: (err) => {
-      // Preserve React's default error reporting; surface the error if the stream is consumed.
-      if (!stream.destroyed) {
-        stream.destroy(err as Error);
-      }
-      rejectReadiness(err);
+    enforceStrictCsp: (out) => {
+      enforceAdapterStrictCspResult(out, {
+        adapterName: 'React adapter',
+        deferHydrationValidation:
+          validationOptions.deferStrictCspHydrationValidation === true,
+      });
     },
   });
-
-  const abortTimer = setTimeout(() => abort(), abortDelayMs);
-  abortTimer.unref?.();
-  stream.on('close', () => clearTimeout(abortTimer));
-  stream.on('end', () => clearTimeout(abortTimer));
-  stream.on('error', () => clearTimeout(abortTimer));
-
-  // Ensure integrations can extract critical styles before FaceApp emits <head>.
-  if (styleStrategy === 'all-ready') {
-    await allReady;
-  } else {
-    await shellReady;
-  }
-
-  let out: FaceRenderResult = {
-    html: stream as unknown as AsyncIterable<Uint8Array>,
-  };
-  if (options.status !== undefined) out.status = options.status;
-  if (options.headers !== undefined) out.headers = options.headers;
-  if (options.cookies !== undefined) out.cookies = options.cookies;
-  if (options.head !== undefined) out.head = options.head;
-  if (headTags.length) out.headTags = headTags;
-  if (styleTags.length) out.styleTags = styleTags;
-  if (options.hydration !== undefined) out.hydration = options.hydration;
-  if (options.csp !== undefined) out.csp = options.csp;
-
-  for (const { integration, state } of integrations) {
-    if (integration.finalize) {
-      out = await integration.finalize(out, ctx, state);
-    }
-  }
-
-  enforceAdapterStrictCspResult(out, {
-    adapterName: 'React adapter',
-    deferHydrationValidation:
-      validationOptions.deferStrictCspHydrationValidation === true,
-  });
-
-  return out;
-}
-
-function modeUsesRuntimeHydrationSidecars(mode: FaceMode): boolean {
-  return mode === 'ssr' || mode === 'isr' || mode === 'ssg';
 }
 
 export interface ReactFaceOptions<Data = unknown> {
