@@ -17,23 +17,26 @@ npm install --save-exact \
 `createVueFace.render` returns a Vue **VNode** (or a Promise of one) — not a component definition. Use the re-exported `h` to wrap your component:
 
 ```typescript
-import { createFaceApp, createLambdaUrlStreamingHandler } from '@theory-cloud/facetheory';
-import { createVueFace, h } from '@theory-cloud/facetheory/vue';
+import {
+  createFaceApp,
+  createLambdaUrlStreamingHandler,
+} from "@theory-cloud/facetheory";
+import { createVueFace, h } from "@theory-cloud/facetheory/vue";
 
 const Home = {
   setup() {
-    return () => h('h1', 'FaceTheory + Vue (SSR)');
+    return () => h("h1", "FaceTheory + Vue (SSR)");
   },
 };
 
 export const app = createFaceApp({
   faces: [
     createVueFace({
-      route: '/',
-      mode: 'ssr',
+      route: "/",
+      mode: "ssr",
       render: () => h(Home),
       renderOptions: {
-        headTags: [{ type: 'title', text: 'Home' }],
+        headTags: [{ type: "title", text: "Home" }],
       },
     }),
   ],
@@ -42,29 +45,70 @@ export const app = createFaceApp({
 export const handler = createLambdaUrlStreamingHandler({ app });
 ```
 
+## Streaming SSR
+
+Use `createVueStreamFace` (or `renderVueStream` for lower-level adapter calls) when a Vue Face should return a streamed body. The Vue adapter uses `@vue/server-renderer`'s streaming renderer and returns the same `AsyncIterable<Uint8Array>` body contract as React streaming. FaceTheory still owns the document wrapper: `<head>` and structured style tags are emitted before the first body chunk, and mid-stream body errors are converted to FaceTheory's safe stream-error marker before the document closes.
+
+```typescript
+import { createFaceApp } from "@theory-cloud/facetheory";
+import { createVueStreamFace, h } from "@theory-cloud/facetheory/vue";
+
+const Home = {
+  setup() {
+    return () => h("main", "FaceTheory + Vue (streaming SSR)");
+  },
+};
+
+export const app = createFaceApp({
+  faces: [
+    createVueStreamFace({
+      route: "/",
+      mode: "ssr",
+      render: () => h(Home),
+      renderOptions: {
+        headTags: [{ type: "title", text: "Vue streaming" }],
+      },
+    }),
+  ],
+});
+```
+
+For strict no-inline CSP routes (`inlineScripts:false`, `inlineStyles:false`, or `rawHead:false`), FaceTheory buffers and validates the full streamed document before returning it. That preserves the same strict-CSP nonce, sidecar, and fail-closed behavior as buffered Vue SSR.
+
 ## Vite integration
 
 For Vue + Vite SSR, use `viteAssetsForEntry` and `viteHydrationForEntry` from the core `vite.ts` module to pipe the dev/build manifest into your render options. The runnable shape is `ts/examples/vite-ssr-vue/src/entry-server.ts`:
 
 ```typescript
-import { createFaceApp } from '@theory-cloud/facetheory';
-import { viteAssetsForEntry, viteHydrationForEntry } from '@theory-cloud/facetheory';
-import { createVueFace, h } from '@theory-cloud/facetheory/vue';
+import { createFaceApp } from "@theory-cloud/facetheory";
+import {
+  viteAssetsForEntry,
+  viteHydrationForEntry,
+} from "@theory-cloud/facetheory";
+import { createVueFace, h } from "@theory-cloud/facetheory/vue";
 
-import { App } from './app.js';
+import { App } from "./app.js";
 
 export function createApp(manifest) {
   return createFaceApp({
     faces: [
       createVueFace({
-        route: '/',
-        mode: 'ssr',
-        load: async () => ({ message: 'from server' }),
+        route: "/",
+        mode: "ssr",
+        load: async () => ({ message: "from server" }),
         render: (_ctx, data) =>
-          h('div', { id: 'root' }, [h(App, { message: data.message })]),
+          h("div", { id: "root" }, [h(App, { message: data.message })]),
         renderOptions: async (_ctx, data) => {
-          const { headTags } = viteAssetsForEntry(manifest, 'src/entry-client.ts', { includeAssets: true });
-          const hydration = viteHydrationForEntry(manifest, 'src/entry-client.ts', data);
+          const { headTags } = viteAssetsForEntry(
+            manifest,
+            "src/entry-client.ts",
+            { includeAssets: true },
+          );
+          const hydration = viteHydrationForEntry(
+            manifest,
+            "src/entry-client.ts",
+            data,
+          );
           return { headTags, hydration };
         },
       }),
@@ -81,6 +125,7 @@ export function createApp(manifest) {
 ## Examples in the repo
 
 - `ts/examples/vite-ssr-vue/` — Vue + Vite SSR with hydration
+- `ts/examples/vue-ssr-streaming/` — Vue streaming SSR
 
 ## Related docs
 

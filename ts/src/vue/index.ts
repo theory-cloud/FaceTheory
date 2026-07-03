@@ -1,5 +1,5 @@
 import { createSSRApp, h, type App, type VNode } from 'vue';
-import { renderToString } from '@vue/server-renderer';
+import { renderToSimpleStream, renderToString } from '@vue/server-renderer';
 
 import { enforceAdapterStrictCspResult } from '../adapter-csp.js';
 import {
@@ -38,12 +38,22 @@ export interface RenderVueOptions {
   integrations?: Array<VueUIIntegration>;
 }
 
+export type RenderVueStreamOptions = RenderVueOptions;
+
 export async function renderVue(
   ctx: FaceContext,
   vnode: VNode,
   options: RenderVueOptions = {},
 ): Promise<FaceRenderResult> {
   return renderVueInternal(ctx, vnode, options);
+}
+
+export async function renderVueStream(
+  ctx: FaceContext,
+  vnode: VNode,
+  options: RenderVueStreamOptions = {},
+): Promise<FaceRenderResult> {
+  return renderVueStreamInternal(ctx, vnode, options);
 }
 
 interface VueRenderValidationOptions {
@@ -63,7 +73,10 @@ async function renderVueInternal(
     integrations: options.integrations ?? [],
     renderTree: async (tree, pipelineContext) => {
       const app = createSSRApp({ render: () => tree });
-      for (const { integration, state } of pipelineContext.preparedIntegrations) {
+      for (const {
+        integration,
+        state,
+      } of pipelineContext.preparedIntegrations) {
         if (!integration.wrapApp) continue;
         await integration.wrapApp(app, ctx, state);
       }
@@ -77,6 +90,108 @@ async function renderVueInternal(
       });
     },
   });
+}
+
+async function renderVueStreamInternal(
+  ctx: FaceContext,
+  vnode: VNode,
+  options: RenderVueStreamOptions,
+  validationOptions: VueRenderValidationOptions = {},
+): Promise<FaceRenderResult> {
+  return runAdapterRenderPipeline<VNode, VueUIIntegration>({
+    ctx,
+    tree: vnode,
+    options,
+    integrations: options.integrations ?? [],
+    renderTree: async (tree, pipelineContext) => {
+      const app = createSSRApp({ render: () => tree });
+      for (const {
+        integration,
+        state,
+      } of pipelineContext.preparedIntegrations) {
+        if (!integration.wrapApp) continue;
+        await integration.wrapApp(app, ctx, state);
+      }
+      return renderVueAppToAsyncIterable(app);
+    },
+    enforceStrictCsp: (out) => {
+      enforceAdapterStrictCspResult(out, {
+        adapterName: 'Vue adapter',
+        deferHydrationValidation:
+          validationOptions.deferStrictCspHydrationValidation === true,
+      });
+    },
+  });
+}
+
+type VueStreamQueueItem =
+  | { kind: 'chunk'; chunk: Uint8Array }
+  | { kind: 'done' }
+  | { kind: 'error'; error: unknown };
+
+function renderVueAppToAsyncIterable(app: App): AsyncIterable<Uint8Array> {
+  const encoder = new TextEncoder();
+  const queue: VueStreamQueueItem[] = [];
+  let wake: (() => void) | null = null;
+  let settled = false;
+
+  const enqueue = (item: VueStreamQueueItem): void => {
+    queue.push(item);
+    wake?.();
+    wake = null;
+  };
+
+  const finish = (): void => {
+    if (settled) return;
+    settled = true;
+    enqueue({ kind: 'done' });
+  };
+
+  const fail = (error: unknown): void => {
+    if (settled) return;
+    settled = true;
+    enqueue({ kind: 'error', error });
+  };
+
+  try {
+    renderToSimpleStream(
+      app,
+      {},
+      {
+        push(chunk) {
+          if (chunk === null) {
+            finish();
+            return;
+          }
+          if (settled) return;
+          enqueue({ kind: 'chunk', chunk: encoder.encode(chunk) });
+        },
+        destroy(error) {
+          fail(error);
+        },
+      },
+    );
+  } catch (error) {
+    fail(error);
+  }
+
+  return (async function* () {
+    for (;;) {
+      while (queue.length === 0) {
+        await new Promise<void>((resolve) => {
+          wake = resolve;
+        });
+      }
+
+      const item = queue.shift()!;
+      if (item.kind === 'chunk') {
+        yield item.chunk;
+        continue;
+      }
+      if (item.kind === 'error') throw item.error;
+      return;
+    }
+  })();
 }
 
 export interface VueFaceOptions<Data = unknown> {
@@ -105,6 +220,48 @@ export function createVueFace<Data = unknown>(
           ? await options.renderOptions(ctx, data as Data)
           : (options.renderOptions ?? {});
       return renderVueInternal(ctx, vnode, renderOptions, {
+        deferStrictCspHydrationValidation: modeUsesRuntimeHydrationSidecars(
+          options.mode,
+        ),
+      });
+    },
+  };
+
+  if (options.load) {
+    mod.load = options.load as unknown as (
+      ctx: FaceContext,
+    ) => Promise<unknown>;
+  }
+
+  return mod;
+}
+
+export interface VueStreamFaceOptions<Data = unknown> {
+  route: string;
+  mode: FaceMode;
+  load?: (ctx: FaceContext) => Promise<Data>;
+  render: (ctx: FaceContext, data: Data) => VNode | Promise<VNode>;
+  renderOptions?:
+    | RenderVueStreamOptions
+    | ((
+        ctx: FaceContext,
+        data: Data,
+      ) => RenderVueStreamOptions | Promise<RenderVueStreamOptions>);
+}
+
+export function createVueStreamFace<Data = unknown>(
+  options: VueStreamFaceOptions<Data>,
+): FaceModule {
+  const mod: FaceModule = {
+    route: options.route,
+    mode: options.mode,
+    render: async (ctx, data) => {
+      const vnode = await options.render(ctx, data as Data);
+      const renderOptions =
+        typeof options.renderOptions === 'function'
+          ? await options.renderOptions(ctx, data as Data)
+          : (options.renderOptions ?? {});
+      return renderVueStreamInternal(ctx, vnode, renderOptions, {
         deferStrictCspHydrationValidation: modeUsesRuntimeHydrationSidecars(
           options.mode,
         ),
