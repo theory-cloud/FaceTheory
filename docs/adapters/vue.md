@@ -117,6 +117,66 @@ export function createApp(manifest) {
 }
 ```
 
+## Style extraction position
+
+The supported Vue default is **build-time CSS through Vite**. Import component and library CSS in the client/Vite graph, then emit Vite's manifest-derived stylesheet tags with `viteAssetsForEntry(...)` so SSR, SSG, ISR, and hydration all see the same deterministic assets. This is the recommended path for Vue SFC scoped styles and application CSS.
+
+FaceTheory does not ship a Vue-specific runtime CSS-in-JS extractor. If a Vue CSS-in-JS library needs SSR setup, integrate it through the adapter integration hooks:
+
+1. `wrapApp(app, ctx, state)` installs the Vue plugin/provider for the request-local render.
+2. The Vue render records styles into that request-local state.
+3. `contribute(ctx, state)` returns structured `styleTags` (or external stylesheet `headTags`) for FaceTheory to serialize, nonce, order, and validate.
+
+```typescript
+import type { App, InjectionKey } from "vue";
+import { inject } from "vue";
+import {
+  createVueFace,
+  h,
+  type VueUIIntegration,
+} from "@theory-cloud/facetheory/vue";
+
+const registerStyleKey: InjectionKey<(cssText: string) => void> =
+  Symbol("register-style");
+
+const cssInJsIntegration: VueUIIntegration<{ styles: string[] }> = {
+  name: "example-vue-css-in-js",
+  createState: () => ({ styles: [] }),
+  wrapApp(app: App, _ctx, state) {
+    app.provide(registerStyleKey, (cssText: string) => {
+      state.styles.push(cssText);
+    });
+  },
+  contribute(_ctx, state) {
+    return {
+      styleTags: state.styles.map((cssText, index) => ({
+        cssText,
+        attrs: { id: `example-vue-css-${index}` },
+      })),
+    };
+  },
+};
+
+const StyledPanel = {
+  setup() {
+    const registerStyle = inject(registerStyleKey);
+    registerStyle?.(".panel{color:rgb(12,34,56);}");
+    return () => h("section", { class: "panel" }, "Styled by wrapApp");
+  },
+};
+
+createVueFace({
+  route: "/",
+  mode: "ssr",
+  render: () => h(StyledPanel),
+  renderOptions: {
+    integrations: [cssInJsIntegration],
+  },
+});
+```
+
+Do not inject raw `<style>` strings through component HTML or `head.html`. Use `styleTags`/structured head tags so FaceTheory can preserve deterministic head ordering and strict-CSP behavior. For strict no-inline CSP, prefer external CSS assets over inline `styleTags`.
+
 ## Sub-entry points
 
 - `@theory-cloud/facetheory/stitch-tokens` — shared Stitch token utilities used by all adapters.

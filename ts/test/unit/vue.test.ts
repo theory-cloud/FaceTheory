@@ -5,6 +5,8 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+import { inject, type InjectionKey } from 'vue';
+
 import { assertDocumentTagNonces } from '../helpers/csp.js';
 
 import { createFaceApp } from '../../src/app.js';
@@ -207,6 +209,66 @@ test('vue adapter: integration hooks provide deterministic head/style ordering a
   assert.ok(secondBody.includes('/integration-a-2.css'));
   assert.ok(secondBody.includes('/integration-b-2.css'));
   assert.ok(secondBody.includes('id="style-int-2"'));
+});
+
+test('vue adapter: wrapApp can provide deterministic style contribution', async () => {
+  const registerStyleKey: InjectionKey<(cssText: string) => void> = Symbol(
+    'facetheory-vue-wrap-style',
+  );
+
+  const StyledByWrapApp = {
+    setup() {
+      const registerStyle = inject(registerStyleKey);
+      assert.ok(registerStyle, 'expected wrapApp style provider');
+      registerStyle('.wrap-app-style{color:rgb(12,34,56);}');
+      return () => h('main', { class: 'wrap-app-style' }, 'WrapApp CSS');
+    },
+  };
+
+  const app = createFaceApp({
+    faces: [
+      createVueFace({
+        route: '/',
+        mode: 'ssr',
+        render: () => h(StyledByWrapApp),
+        renderOptions: {
+          integrations: [
+            {
+              name: 'wrap-app-style-provider',
+              createState: () => ({ styles: [] as string[] }),
+              wrapApp: (vueApp, _ctx, state) => {
+                vueApp.provide(registerStyleKey, (cssText: string) => {
+                  (state as { styles: string[] }).styles.push(cssText);
+                });
+              },
+              contribute: (_ctx, state) => ({
+                styleTags: (state as { styles: string[] }).styles.map(
+                  (cssText, index) => ({
+                    cssText,
+                    attrs: { id: `wrap-app-style-${String(index)}` },
+                  }),
+                ),
+              }),
+            },
+          ],
+        },
+      }),
+    ],
+  });
+
+  const nonce = 'nonce-vue-wrap-style';
+  const resp = await app.handle({ method: 'GET', path: '/', cspNonce: nonce });
+  const body = new TextDecoder().decode(resp.body as Uint8Array);
+
+  const styleIndex = body.indexOf('id="wrap-app-style-0"');
+  const bodyIndex = body.indexOf(
+    '<main class="wrap-app-style">WrapApp CSS</main>',
+  );
+  assert.ok(styleIndex >= 0, body);
+  assert.ok(bodyIndex >= 0, body);
+  assert.ok(styleIndex < bodyIndex);
+  assert.ok(body.includes('.wrap-app-style{color:rgb(12,34,56);}'));
+  assertDocumentTagNonces(body, nonce, 1, 0);
 });
 
 test('vue adapter: strict CSP emits external hydration without inline data', async () => {
