@@ -1,5 +1,8 @@
 import { defineComponent, h } from 'vue';
 
+import { resolveAuthPageBackground } from '../../stitch-hosted-auth/index.js';
+import type { AuthPageBackground } from '../../stitch-hosted-auth/index.js';
+
 import {
   renderDefaultSlot,
   renderPropContent,
@@ -11,22 +14,16 @@ export const AuthPageLayout = defineComponent({
   props: {
     brand: vnodeChildProp,
     background: {
-      type: String as () => 'surface' | 'gradient',
+      type: String as () => AuthPageBackground,
       default: 'surface',
     },
     footer: vnodeChildProp,
   },
   setup(props, { slots }) {
     return () => {
-      const backgroundStyle =
-        props.background === 'gradient'
-          ? {
-              background:
-                'linear-gradient(135deg, var(--stitch-color-primary, #1f108e) 0%, var(--stitch-color-primary-container, #3730a3) 100%)',
-            }
-          : {
-              background: 'var(--stitch-color-surface, #faf8ff)',
-            };
+      const backgroundStyle = {
+        background: resolveAuthPageBackground(props.background),
+      };
 
       return h(
         'div',

@@ -1,10 +1,10 @@
 <script lang="ts">
-  export let background: 'surface' | 'gradient' = 'surface';
+  import { resolveAuthPageBackground } from '../../stitch-hosted-auth/index.js';
+  import type { AuthPageBackground } from '../../stitch-hosted-auth/index.js';
 
-  $: backgroundStyle =
-    background === 'gradient'
-      ? 'linear-gradient(135deg, var(--stitch-color-primary, #1f108e) 0%, var(--stitch-color-primary-container, #3730a3) 100%)'
-      : 'var(--stitch-color-surface, #faf8ff)';
+  export let background: AuthPageBackground = 'surface';
+
+  $: backgroundStyle = resolveAuthPageBackground(background);
 </script>
 
 <div

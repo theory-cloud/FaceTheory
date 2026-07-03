@@ -1,4 +1,10 @@
 <script lang="ts">
+  import {
+    authOtpInputClassName,
+    splitAuthOtpValue,
+    updateAuthOtpValueAtIndex,
+  } from '../../stitch-hosted-auth/index.js';
+
   export let length = 6;
   export let value: string | undefined = undefined;
   export let onChange: ((value: string) => void) | undefined = undefined;
@@ -11,16 +17,13 @@
 
   $: currentValue = value ?? internalValue;
 
-  function splitValue(raw: string): string[] {
-    const chars = raw.slice(0, length).split('');
-    while (chars.length < length) chars.push('');
-    return chars;
-  }
-
   function updateIndex(index: number, nextChar: string): void {
-    const chars = splitValue(currentValue);
-    chars[index] = nextChar.slice(-1);
-    const nextValue = chars.join('').slice(0, length).trimEnd();
+    const nextValue = updateAuthOtpValueAtIndex(
+      currentValue,
+      length,
+      index,
+      nextChar,
+    );
     internalValue = nextValue;
     onChange?.(nextValue);
     if (nextValue.length === length) onComplete?.(nextValue);
@@ -28,11 +31,10 @@
 </script>
 
 <div
-  class:facetheory-stitch-otp-input={true}
-  class:facetheory-stitch-otp-input-invalid={invalid}
+  class={authOtpInputClassName(invalid)}
   style="display:flex;gap:8px;"
 >
-  {#each splitValue(currentValue) as char, index (index)}
+  {#each splitAuthOtpValue(currentValue, length) as char, index (index)}
     <input
       value={char}
       maxlength="1"

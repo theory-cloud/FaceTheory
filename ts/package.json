@@ -75,6 +75,10 @@
       "types": "./dist/stitch-shell/index.d.ts",
       "import": "./dist/stitch-shell/index.js"
     },
+    "./stitch-hosted-auth": {
+      "types": "./dist/stitch-hosted-auth/index.d.ts",
+      "import": "./dist/stitch-hosted-auth/index.js"
+    },
     "./stitch-admin": {
       "types": "./dist/stitch-admin/index.d.ts",
       "import": "./dist/stitch-admin/index.js"

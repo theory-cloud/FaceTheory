@@ -1,42 +1,21 @@
 <script lang="ts">
-  export type AuthStateVariant = 'info' | 'success' | 'warning' | 'error';
+  import {
+    authStateClassName,
+    authStateRole,
+    authStateVariantPalette,
+  } from '../../stitch-hosted-auth/index.js';
+  import type { AuthStateVariant } from '../../stitch-hosted-auth/index.js';
 
   export let variant: AuthStateVariant = 'info';
   export let title: unknown;
   export let description: unknown = undefined;
 
-  const variantPalette: Record<
-    AuthStateVariant,
-    { accent: string; surface: string; text: string }
-  > = {
-    info: {
-      accent: 'var(--stitch-color-primary, #1f108e)',
-      surface: 'var(--stitch-color-surface-container-lowest, #ffffff)',
-      text: 'var(--stitch-color-on-surface, #131b2e)',
-    },
-    success: {
-      accent: 'var(--stitch-color-tertiary, #00332e)',
-      surface: 'var(--stitch-color-surface-container-lowest, #ffffff)',
-      text: 'var(--stitch-color-on-surface, #131b2e)',
-    },
-    warning: {
-      accent: 'var(--stitch-color-error, #ba1a1a)',
-      surface: 'var(--stitch-color-surface-container-lowest, #ffffff)',
-      text: 'var(--stitch-color-on-surface, #131b2e)',
-    },
-    error: {
-      accent: 'var(--stitch-color-error, #ba1a1a)',
-      surface: 'var(--stitch-color-error-container, #ffdad6)',
-      text: 'var(--stitch-color-on-error-container, #93000a)',
-    },
-  };
-
-  $: palette = variantPalette[variant];
+  $: palette = authStateVariantPalette(variant);
 </script>
 
 <div
-  class={`facetheory-stitch-auth-state facetheory-stitch-auth-state-${variant}`}
-  role={variant === 'error' || variant === 'warning' ? 'alert' : undefined}
+  class={authStateClassName(variant)}
+  role={authStateRole(variant)}
   style={`width:100%;max-width:440px;background:${palette.surface};color:${palette.text};border-radius:var(--stitch-radius-xl, 16px);padding:40px;display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;box-shadow:0 24px 48px -12px rgba(19, 27, 46, 0.04);`}
 >
   <div

@@ -1,4 +1,9 @@
 <script lang="ts">
+  import {
+    authConsentItemBackground,
+    authConsentItemOpacity,
+  } from '../../stitch-hosted-auth/index.js';
+
   export let label: unknown;
   export let description: unknown = undefined;
   export let granted = false;
@@ -6,11 +11,7 @@
 
 <li
   class="facetheory-stitch-consent-item"
-  style={`display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:${
-    granted
-      ? 'var(--stitch-color-surface-container-low, #f2f3ff)'
-      : 'var(--stitch-color-surface-container-lowest, #ffffff)'
-  };border-radius:var(--stitch-radius-md, 6px);opacity:${granted ? 0.7 : 1};`}
+  style={`display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:${authConsentItemBackground(granted)};border-radius:var(--stitch-radius-md, 6px);opacity:${authConsentItemOpacity(granted)};`}
 >
   <span
     aria-hidden="true"

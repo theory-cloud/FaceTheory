@@ -1,6 +1,11 @@
 import { defineComponent, h } from 'vue';
 
 import {
+  authConsentItemBackground,
+  authConsentItemOpacity,
+} from '../../stitch-hosted-auth/index.js';
+
+import {
   renderDefaultSlot,
   renderPropContent,
   vnodeChildProp,
@@ -25,11 +30,9 @@ export const ConsentItem = defineComponent({
             alignItems: 'flex-start',
             gap: '12px',
             padding: '12px 16px',
-            background: props.granted
-              ? 'var(--stitch-color-surface-container-low, #f2f3ff)'
-              : 'var(--stitch-color-surface-container-lowest, #ffffff)',
+            background: authConsentItemBackground(props.granted),
             borderRadius: 'var(--stitch-radius-md, 6px)',
-            opacity: props.granted ? 0.7 : 1,
+            opacity: authConsentItemOpacity(props.granted),
           },
         },
         [
