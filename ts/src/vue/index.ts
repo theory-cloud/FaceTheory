@@ -2,7 +2,10 @@ import { createSSRApp, h, type App, type VNode } from 'vue';
 import { renderToString } from '@vue/server-renderer';
 
 import { enforceAdapterStrictCspResult } from '../adapter-csp.js';
-import { prepareUIIntegrations } from '../types.js';
+import {
+  modeUsesRuntimeHydrationSidecars,
+  runAdapterRenderPipeline,
+} from '../adapter-pipeline.js';
 import type {
   FaceContext,
   FaceCspPolicy,
@@ -53,65 +56,27 @@ async function renderVueInternal(
   options: RenderVueOptions,
   validationOptions: VueRenderValidationOptions = {},
 ): Promise<FaceRenderResult> {
-  const integrations = await prepareUIIntegrations<VNode, VueUIIntegration>(
-    options.integrations ?? [],
+  return runAdapterRenderPipeline<VNode, VueUIIntegration>({
     ctx,
-  );
-
-  let tree = vnode;
-  for (const { integration, state } of integrations) {
-    if (!integration.wrapTree) continue;
-    tree = integration.wrapTree(tree, ctx, state);
-  }
-
-  const app = createSSRApp({ render: () => tree });
-  for (const { integration, state } of integrations) {
-    if (!integration.wrapApp) continue;
-    await integration.wrapApp(app, ctx, state);
-  }
-
-  const integrationHeadTags: FaceHeadTag[] = [];
-  const integrationStyleTags: FaceStyleTag[] = [];
-  for (const { integration, state } of integrations) {
-    if (!integration.contribute) continue;
-    const contribution = await integration.contribute(ctx, state);
-    if (contribution.headTags)
-      integrationHeadTags.push(...contribution.headTags);
-    if (contribution.styleTags)
-      integrationStyleTags.push(...contribution.styleTags);
-  }
-
-  const html = await renderToString(app);
-
-  const headTags = [...integrationHeadTags, ...(options.headTags ?? [])];
-  const styleTags = [...integrationStyleTags, ...(options.styleTags ?? [])];
-
-  let out: FaceRenderResult = { html };
-  if (options.status !== undefined) out.status = options.status;
-  if (options.headers !== undefined) out.headers = options.headers;
-  if (options.cookies !== undefined) out.cookies = options.cookies;
-  if (options.head !== undefined) out.head = options.head;
-  if (headTags.length) out.headTags = headTags;
-  if (styleTags.length) out.styleTags = styleTags;
-  if (options.hydration !== undefined) out.hydration = options.hydration;
-  if (options.csp !== undefined) out.csp = options.csp;
-
-  for (const { integration, state } of integrations) {
-    if (!integration.finalize) continue;
-    out = await integration.finalize(out, ctx, state);
-  }
-
-  enforceAdapterStrictCspResult(out, {
-    adapterName: 'Vue adapter',
-    deferHydrationValidation:
-      validationOptions.deferStrictCspHydrationValidation === true,
+    tree: vnode,
+    options,
+    integrations: options.integrations ?? [],
+    renderTree: async (tree, pipelineContext) => {
+      const app = createSSRApp({ render: () => tree });
+      for (const { integration, state } of pipelineContext.preparedIntegrations) {
+        if (!integration.wrapApp) continue;
+        await integration.wrapApp(app, ctx, state);
+      }
+      return renderToString(app);
+    },
+    enforceStrictCsp: (out) => {
+      enforceAdapterStrictCspResult(out, {
+        adapterName: 'Vue adapter',
+        deferHydrationValidation:
+          validationOptions.deferStrictCspHydrationValidation === true,
+      });
+    },
   });
-
-  return out;
-}
-
-function modeUsesRuntimeHydrationSidecars(mode: FaceMode): boolean {
-  return mode === 'ssr' || mode === 'isr' || mode === 'ssg';
 }
 
 export interface VueFaceOptions<Data = unknown> {
