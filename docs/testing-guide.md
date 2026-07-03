@@ -38,6 +38,72 @@ Expected result:
 - Type checking completes with no errors.
 - The unit suite passes.
 
+## Test Your Faces With `@theory-cloud/facetheory/testing`
+
+Consumer apps can unit-test a Face without constructing Lambda Function URL events or copying repository-only harnesses. The testing subpath is Node test tooling and is intentionally separate from the browser client helper surface:
+
+```ts
+import {
+  assertHydrationEquivalent,
+  buildFaceRequest,
+  renderFace,
+} from "@theory-cloud/facetheory/testing";
+
+const request = buildFaceRequest({
+  url: "https://checkout.example.test/checkout?cart=cart_test",
+  headers: { cookie: "session=test-session" },
+  cspNonce: "nonce-test",
+});
+
+const rendered = await renderFace(checkoutFace, { request });
+
+assert.equal(rendered.status, 200);
+assert.match(rendered.html, /Checkout/);
+
+await assertHydrationEquivalent({
+  html: rendered.html,
+  selector: "#root",
+  hydrate: async ({ document }) => {
+    // Wire the same framework hydrate call your client bootstrap uses.
+    // React example: hydrateRoot(document.getElementById("root")!, <App />)
+  },
+});
+```
+
+`buildFaceRequest()` returns a deterministic `FaceRequest` with a stable `x-request-id` and parses URL query strings for you. `renderFace()` accepts a `FaceModule`, an array of Faces, or an app-like object with `handle(request)` and returns the collected response body as `html`/`text` so tests can assert against complete documents.
+
+`assertHydrationEquivalent()` uses a jsdom-backed browser harness, installs browser globals for the duration of the assertion, captures `console.error`/`console.warn`, fails on framework hydration-mismatch messages, and compares the selected DOM subtree before and after the consumer-provided hydrate callback. It fails closed on unexpected `fetch()` by default; pass a fixture fetcher when a strict-CSP route intentionally loads external hydration data:
+
+```ts
+import {
+  assertHydrationEquivalent,
+  createStrictCspFixtureFetch,
+} from "@theory-cloud/facetheory/testing";
+
+const { fetcher } = createStrictCspFixtureFetch({
+  "/_facetheory/data/page.json": { cartId: "cart_test" },
+});
+
+await assertHydrationEquivalent({
+  html,
+  selector: "#root",
+  fetcher,
+  hydrate: async (ctx) => {
+    // Load external hydration data, then call the framework hydrate primitive.
+  },
+});
+```
+
+Strict-CSP test helpers are also exported for application suites that need the same no-inline assertions FaceTheory uses internally:
+
+```ts
+import { assertStrictCspDocument } from "@theory-cloud/facetheory/testing";
+
+await assertStrictCspDocument(rendered.html);
+```
+
+The DOM helpers dynamically load `jsdom`. Keep `jsdom` in the consuming test workspace's dev dependencies; it is not part of FaceTheory's browser/runtime contract.
+
 ## Focused Verification Paths
 
 Run these targeted flows when a change touches one delivery mode or adapter more than the rest of the runtime.
