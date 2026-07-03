@@ -230,6 +230,34 @@ If a route still needs FaceTheory-owned inline scripts or styles, use the nonce-
 HTML only: pass `FaceRequest.cspNonce`, include the matching nonce in your CSP header, and do not cache that HTML as
 SSG/ISR unless the header and cached nonce stay identical for every request.
 
+## Run The Vite SSR Dev Loop
+
+The Vite middleware dev server is a development loop only. It does not create a
+second production deploy path and does not replace the production
+`viteAssetsForEntry(manifest, ...)` manifest flow used by SSG, SSR, ISR, or
+Lambda deployments.
+
+The React/Vite SSR example has a ready dev script:
+
+```bash
+cd ts/examples/vite-ssr-react
+npm run dev
+```
+
+Open `http://localhost:5174/`. The server is created with
+`vite.createServer({ server: { middlewareMode: true }, appType: "custom" })`;
+Vite handles `/@vite/client`, `/src/*`, CSS, and module HMR while FaceTheory
+mounts the FaceApp for application routes. The server render uses
+`vite.ssrLoadModule()` for the SSR entry on each request, so an edit to
+`src/app.tsx` is reflected by refreshing the page without a manual rebuild. In
+production, keep using the build + manifest path:
+
+```bash
+cd ts
+npm run example:vite:ssr:build
+npm run example:vite:ssr:serve
+```
+
 ## Add An OAC-Safe Mutating SSR Form
 
 When a FaceTheory app is deployed through `AppTheorySsrSite` with Lambda Function URL OAC and `AWS_IAM`, native browser

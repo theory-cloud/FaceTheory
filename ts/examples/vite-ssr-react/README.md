@@ -28,3 +28,18 @@ npm run example:vite:ssr:serve
 ```
 
 Then open `http://localhost:4174/`.
+
+## Develop
+
+From `ts/examples/vite-ssr-react/`:
+
+```bash
+npm run dev
+```
+
+This starts the FaceTheory Vite middleware dev server on
+`http://localhost:5174/`. Vite serves `/@vite/client` and `/src/*` client
+assets directly for HMR while FaceTheory handles application routes through the
+SSR FaceApp. The server entry is loaded through Vite's module graph on each
+request, so edits to `src/app.tsx` are reflected by refreshing the page without
+running a build.

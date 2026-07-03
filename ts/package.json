@@ -30,6 +30,9 @@
   "files": [
     "dist"
   ],
+  "bin": {
+    "facetheory-dev": "./dist/dev-cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -62,6 +65,10 @@
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "import": "./dist/testing/index.js"
+    },
+    "./dev": {
+      "types": "./dist/dev.d.ts",
+      "import": "./dist/dev.js"
     },
     "./aws-s3": {
       "types": "./dist/aws-s3/index.d.ts",
@@ -208,6 +215,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-svelte-sources.mjs",
+    "dev": "npm run example:vite:ssr:dev",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
@@ -222,6 +230,7 @@
     "example:streaming:serve": "tsx examples/react-ssr-streaming/node-server.ts",
     "example:vue:streaming:serve": "tsx examples/vue-ssr-streaming/node-server.ts",
     "example:vite:ssr:build": "vite build --config examples/vite-ssr-react/vite.config.ts && vite build --ssr src/entry-server.tsx --config examples/vite-ssr-react/vite.config.ts",
+    "example:vite:ssr:dev": "node --import tsx src/dev-cli.ts --root examples/vite-ssr-react --entry src/entry-server.tsx --factory createViteSSRExampleDevApp --port 5174",
     "example:vite:ssr:serve": "tsx examples/vite-ssr-react/node-server.ts",
     "example:vite:vue:build": "vite build --config examples/vite-ssr-vue/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-vue/vite.config.ts",
     "example:vite:vue:serve": "tsx examples/vite-ssr-vue/node-server.ts",
