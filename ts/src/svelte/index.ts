@@ -1,5 +1,8 @@
 import { enforceAdapterStrictCspResult } from '../adapter-csp.js';
-import { prepareUIIntegrations } from '../types.js';
+import {
+  modeUsesRuntimeHydrationSidecars,
+  runAdapterRenderPipeline,
+} from '../adapter-pipeline.js';
 import type {
   FaceContext,
   FaceCspPolicy,
@@ -67,96 +70,46 @@ async function renderSvelteInternal<Props extends Record<string, unknown>>(
   options: RenderSvelteOptions,
   validationOptions: SvelteRenderValidationOptions = {},
 ): Promise<FaceRenderResult> {
-  const integrations = await prepareUIIntegrations<
+  return runAdapterRenderPipeline<
     SvelteRenderInput<Props>,
     SvelteUIIntegration<Props>
-  >((options.integrations ?? []) as Array<SvelteUIIntegration<Props>>, ctx);
+  >({
+    ctx,
+    tree: input,
+    options,
+    integrations: (options.integrations ?? []) as Array<
+      SvelteUIIntegration<Props>
+    >,
+    renderTree: async (currentInput) => {
+      const rendered = await renderSvelteInput(currentInput);
+      const headTags: FaceHeadTag[] = [];
+      const styleTags: FaceStyleTag[] = [];
 
-  let currentInput: SvelteRenderInput<Props> = input;
-  for (const { integration, state } of integrations) {
-    if (!integration.wrapTree) continue;
-    currentInput = integration.wrapTree(currentInput, ctx, state);
-  }
+      if (rendered.head) {
+        headTags.push({ type: 'raw', html: rendered.head });
+      }
+      const cssText = rendered.css?.code ?? currentInput.cssText;
+      if (cssText) {
+        styleTags.push({
+          cssText,
+          attrs: { 'data-svelte': 'true' },
+        });
+      }
 
-  const integrationHeadTags: FaceHeadTag[] = [];
-  const integrationStyleTags: FaceStyleTag[] = [];
-  for (const { integration, state } of integrations) {
-    if (!integration.contribute) continue;
-    const contribution = await integration.contribute(ctx, state);
-    if (contribution.headTags)
-      integrationHeadTags.push(...contribution.headTags);
-    if (contribution.styleTags)
-      integrationStyleTags.push(...contribution.styleTags);
-  }
-
-  let rendered: SvelteSSRRenderResult;
-
-  const maybeLegacy = currentInput.component as Partial<
-    SvelteLegacySSRComponent<Props>
-  >;
-  if (typeof maybeLegacy.render === 'function') {
-    try {
-      rendered = maybeLegacy.render(currentInput.props);
-    } catch (err) {
-      if (!isSvelte5DeprecatedRenderError(err)) throw err;
-      rendered = await renderWithSvelteServer(
-        currentInput.component,
-        currentInput.props,
-      );
-    }
-  } else {
-    rendered = await renderWithSvelteServer(
-      currentInput.component,
-      currentInput.props,
-    );
-  }
-
-  const headTags: FaceHeadTag[] = [
-    ...integrationHeadTags,
-    ...(options.headTags ?? []),
-  ];
-  const styleTags: FaceStyleTag[] = [
-    ...integrationStyleTags,
-    ...(options.styleTags ?? []),
-  ];
-
-  if (rendered.head) {
-    headTags.push({ type: 'raw', html: rendered.head });
-  }
-  const cssText = rendered.css?.code ?? currentInput.cssText;
-  if (cssText) {
-    styleTags.push({
-      cssText,
-      attrs: { 'data-svelte': 'true' },
-    });
-  }
-
-  let out: FaceRenderResult = { html: rendered.html };
-  if (options.status !== undefined) out.status = options.status;
-  if (options.headers !== undefined) out.headers = options.headers;
-  if (options.cookies !== undefined) out.cookies = options.cookies;
-  if (options.head !== undefined) out.head = options.head;
-  if (headTags.length) out.headTags = headTags;
-  if (styleTags.length) out.styleTags = styleTags;
-  if (options.hydration !== undefined) out.hydration = options.hydration;
-  if (options.csp !== undefined) out.csp = options.csp;
-
-  for (const { integration, state } of integrations) {
-    if (!integration.finalize) continue;
-    out = await integration.finalize(out, ctx, state);
-  }
-
-  enforceAdapterStrictCspResult(out, {
-    adapterName: 'Svelte adapter',
-    deferHydrationValidation:
-      validationOptions.deferStrictCspHydrationValidation === true,
+      return {
+        html: rendered.html,
+        headTags,
+        styleTags,
+      };
+    },
+    enforceStrictCsp: (out) => {
+      enforceAdapterStrictCspResult(out, {
+        adapterName: 'Svelte adapter',
+        deferHydrationValidation:
+          validationOptions.deferStrictCspHydrationValidation === true,
+      });
+    },
   });
-
-  return out;
-}
-
-function modeUsesRuntimeHydrationSidecars(mode: FaceMode): boolean {
-  return mode === 'ssr' || mode === 'isr' || mode === 'ssg';
 }
 
 function isSvelte5DeprecatedRenderError(err: unknown): boolean {
@@ -164,6 +117,24 @@ function isSvelte5DeprecatedRenderError(err: unknown): boolean {
   return err.message.includes(
     'Component.render(...) is no longer valid in Svelte 5',
   );
+}
+
+async function renderSvelteInput<Props extends Record<string, unknown>>(
+  input: SvelteRenderInput<Props>,
+): Promise<SvelteSSRRenderResult> {
+  const maybeLegacy = input.component as Partial<
+    SvelteLegacySSRComponent<Props>
+  >;
+  if (typeof maybeLegacy.render === 'function') {
+    try {
+      return maybeLegacy.render(input.props);
+    } catch (err) {
+      if (!isSvelte5DeprecatedRenderError(err)) throw err;
+      return renderWithSvelteServer(input.component, input.props);
+    }
+  }
+
+  return renderWithSvelteServer(input.component, input.props);
 }
 
 async function renderWithSvelteServer<Props extends Record<string, unknown>>(
