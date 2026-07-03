@@ -23,6 +23,7 @@ export interface BuildSsgSiteOptions {
   faces: FaceModule[];
   outDir: string;
   clean?: boolean;
+  concurrency?: number;
   trailingSlash?: SsgTrailingSlashPolicy;
   write404Fallback?: boolean;
   emitHydrationData?: boolean;
@@ -38,6 +39,13 @@ export interface SsgPageEntry {
   status: number;
   contentType: string;
   hydrationDataFile?: string;
+}
+
+export interface SsgFailedRoute {
+  routePattern: string;
+  path: string;
+  message: string;
+  status?: number;
 }
 
 export interface SsgManifest {
@@ -58,6 +66,7 @@ export interface BuildSsgSiteResult {
   manifestFile: string;
   pages: SsgPageEntry[];
   notFoundFile?: string;
+  failedRoutes?: SsgFailedRoute[];
 }
 
 interface SsgRouteSegment {
@@ -74,7 +83,45 @@ interface SsgHydrationSidecar {
   data: unknown;
 }
 
+type FaceApp = ReturnType<typeof createFaceApp>;
+
+type SsgPageBuildOutcome =
+  | {
+      ok: true;
+      entry: SsgPageEntry;
+      html: string;
+    }
+  | {
+      ok: false;
+      failure: SsgFailedRoute;
+    };
+
+class SsgRouteBuildError extends Error {
+  readonly status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'SsgRouteBuildError';
+    if (status !== undefined) {
+      this.status = status;
+    }
+  }
+}
+
+export class SsgBuildFailedError extends Error {
+  readonly failedRoutes: SsgFailedRoute[];
+  readonly result: BuildSsgSiteResult & { failedRoutes: SsgFailedRoute[] };
+
+  constructor(result: BuildSsgSiteResult & { failedRoutes: SsgFailedRoute[] }) {
+    super(formatSsgBuildFailureMessage(result.failedRoutes));
+    this.name = 'SsgBuildFailedError';
+    this.failedRoutes = result.failedRoutes;
+    this.result = result;
+  }
+}
+
 const DEFAULT_ASSET_MANIFEST_PATH = '.vite/manifest.json';
+const SSG_MANIFEST_FILE = '.facetheory/ssg-manifest.json';
 const DEFAULT_404_HTML = renderHTMLDocument({
   head: '<title>Not Found</title>',
   body: '<h1>Not Found</h1><template data-facetheory-ssg-404="true"></template>',
@@ -88,6 +135,7 @@ export async function buildSsgSite(
   const trailingSlash = options.trailingSlash ?? 'always';
   const write404Fallback = options.write404Fallback ?? true;
   const emitHydrationData = options.emitHydrationData ?? false;
+  const concurrency = normalizeSsgConcurrency(options.concurrency ?? 1);
   const assetManifestPath =
     options.assetManifestPath ?? DEFAULT_ASSET_MANIFEST_PATH;
   const allowNetwork = options.allowNetwork ?? false;
@@ -108,74 +156,40 @@ export async function buildSsgSite(
   const plannedPages = await planSsgPages(options.faces);
 
   const builtPages: SsgPageEntry[] = [];
+  const failedRoutes: SsgFailedRoute[] = [];
   const htmlByPath = new Map<string, string>();
 
-  await withFetchGuard(
+  const buildOutcomes = await withFetchGuard(
     {
       allowNetwork,
       ...(fetchImpl !== undefined ? { fetch: fetchImpl } : {}),
     },
-    async () => {
-      for (const page of plannedPages) {
-        const response = await app.handle({ method: 'GET', path: page.path });
-        if (response.status >= 500) {
-          const networkHint =
-            !allowNetwork && fetchImpl === undefined
-              ? ' Network access is disabled by default during SSG; mock fetch or set allowNetwork:true.'
-              : '';
-          throw new Error(
-            `SSG route "${page.path}" returned status ${response.status}; build aborted.${networkHint}`,
-          );
-        }
-        if (response.isBase64) {
-          throw new Error(
-            `SSG route "${page.path}" returned isBase64=true; only text/html responses are supported`,
-          );
-        }
-
-        const body = await collectBody(response.body);
-        const html = new TextDecoder().decode(body);
-        const file = ssgFilePathForRoute(page.path, trailingSlash);
-        const contentType =
-          firstHeaderValue(response.headers, 'content-type') ??
-          'text/html; charset=utf-8';
-
-        await writeOutFile(outDir, file, html);
-
-        const strictHydrationSidecar = strictHydrationSidecars.get(page.path);
-        let hydrationDataFile: string | undefined;
-        if (strictHydrationSidecar !== undefined) {
-          hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
-          await writeOutFile(
-            outDir,
-            hydrationDataFile,
-            `${safeJson(strictHydrationSidecar.data)}\n`,
-          );
-        } else if (emitHydrationData) {
-          const hydrationJson = extractHydrationDataJson(html);
-          if (hydrationJson !== null) {
-            hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
-            await writeOutFile(outDir, hydrationDataFile, `${hydrationJson}\n`);
-          }
-        }
-
-        const entry: SsgPageEntry = {
-          routePattern: page.routePattern,
-          path: page.path,
-          file,
-          status: response.status,
-          contentType,
-        };
-        if (hydrationDataFile !== undefined) {
-          entry.hydrationDataFile = hydrationDataFile;
-        }
-        builtPages.push(entry);
-        htmlByPath.set(page.path, html);
-      }
-    },
+    async () =>
+      mapWithConcurrency(plannedPages, concurrency, (page) =>
+        buildSsgPage({
+          app,
+          page,
+          outDir,
+          trailingSlash,
+          emitHydrationData,
+          strictHydrationSidecars,
+          allowNetwork,
+          hasFetchOverride: fetchImpl !== undefined,
+        }),
+      ),
   );
 
+  for (const outcome of buildOutcomes) {
+    if (outcome.ok) {
+      builtPages.push(outcome.entry);
+      htmlByPath.set(outcome.entry.path, outcome.html);
+      continue;
+    }
+    failedRoutes.push(outcome.failure);
+  }
+
   builtPages.sort((left, right) => left.path.localeCompare(right.path));
+  failedRoutes.sort((left, right) => left.path.localeCompare(right.path));
 
   let notFoundFile: string | undefined;
   if (write404Fallback) {
@@ -199,19 +213,31 @@ export async function buildSsgSite(
     manifest.notFoundFile = notFoundFile;
   }
 
-  const manifestFile = '.facetheory/ssg-manifest.json';
+  const manifestFile = SSG_MANIFEST_FILE;
   await writeOutFile(
     outDir,
     manifestFile,
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
 
-  return {
+  const result: BuildSsgSiteResult = {
     outDir,
     manifestFile,
     pages: builtPages,
     ...(notFoundFile !== undefined ? { notFoundFile } : {}),
   };
+
+  if (failedRoutes.length > 0) {
+    const failedResult: BuildSsgSiteResult & {
+      failedRoutes: SsgFailedRoute[];
+    } = {
+      ...result,
+      failedRoutes,
+    };
+    throw new SsgBuildFailedError(failedResult);
+  }
+
+  return result;
 }
 
 export async function planSsgPages(
@@ -278,6 +304,95 @@ export async function planSsgPages(
   return planned;
 }
 
+async function buildSsgPage(options: {
+  app: FaceApp;
+  page: PlannedPage;
+  outDir: string;
+  trailingSlash: SsgTrailingSlashPolicy;
+  emitHydrationData: boolean;
+  strictHydrationSidecars: Map<string, SsgHydrationSidecar>;
+  allowNetwork: boolean;
+  hasFetchOverride: boolean;
+}): Promise<SsgPageBuildOutcome> {
+  const {
+    app,
+    page,
+    outDir,
+    trailingSlash,
+    emitHydrationData,
+    strictHydrationSidecars,
+    allowNetwork,
+    hasFetchOverride,
+  } = options;
+
+  try {
+    const response = await app.handle({ method: 'GET', path: page.path });
+    if (response.status >= 500) {
+      const networkHint =
+        !allowNetwork && !hasFetchOverride
+          ? ' Network access is disabled by default during SSG; mock fetch or set allowNetwork:true.'
+          : '';
+      throw new SsgRouteBuildError(
+        `SSG route "${page.path}" returned status ${response.status}.${networkHint}`,
+        response.status,
+      );
+    }
+    if (response.isBase64) {
+      throw new SsgRouteBuildError(
+        `SSG route "${page.path}" returned isBase64=true; only text/html responses are supported`,
+      );
+    }
+
+    const body = await collectBody(response.body);
+    const html = new TextDecoder().decode(body);
+    const file = ssgFilePathForRoute(page.path, trailingSlash);
+    const contentType =
+      firstHeaderValue(response.headers, 'content-type') ??
+      'text/html; charset=utf-8';
+
+    await writeOutFile(outDir, file, html);
+
+    const strictHydrationSidecar = strictHydrationSidecars.get(page.path);
+    let hydrationDataFile: string | undefined;
+    if (strictHydrationSidecar !== undefined) {
+      hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
+      await writeOutFile(
+        outDir,
+        hydrationDataFile,
+        `${safeJson(strictHydrationSidecar.data)}\n`,
+      );
+    } else if (emitHydrationData) {
+      const hydrationJson = extractHydrationDataJson(html);
+      if (hydrationJson !== null) {
+        hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
+        await writeOutFile(outDir, hydrationDataFile, `${hydrationJson}\n`);
+      }
+    }
+
+    const entry: SsgPageEntry = {
+      routePattern: page.routePattern,
+      path: page.path,
+      file,
+      status: response.status,
+      contentType,
+    };
+    if (hydrationDataFile !== undefined) {
+      entry.hydrationDataFile = hydrationDataFile;
+    }
+
+    return {
+      ok: true,
+      entry,
+      html,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      failure: failedRouteForError(page, error),
+    };
+  }
+}
+
 function withSsgStrictHydrationSidecars(
   faces: FaceModule[],
   sidecars: Map<string, SsgHydrationSidecar>,
@@ -327,6 +442,35 @@ function externalizeSsgHydration(
     dataUrl,
     bootstrapModule: hydration.bootstrapModule,
   };
+}
+
+function failedRouteForError(
+  page: PlannedPage,
+  error: unknown,
+): SsgFailedRoute {
+  const failure: SsgFailedRoute = {
+    routePattern: page.routePattern,
+    path: page.path,
+    message: errorMessage(error),
+  };
+  if (error instanceof SsgRouteBuildError && error.status !== undefined) {
+    failure.status = error.status;
+  }
+  return failure;
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function formatSsgBuildFailureMessage(failedRoutes: SsgFailedRoute[]): string {
+  const routeWord = failedRoutes.length === 1 ? 'route' : 'routes';
+  const routeList = failedRoutes.map((route) => route.path).join(', ');
+  const routeMessages = failedRoutes
+    .map((route) => `${route.path}: ${route.message}`)
+    .join('\n');
+  return `SSG build failed for ${failedRoutes.length} ${routeWord}: ${routeList}\n${routeMessages}`;
 }
 
 export function ssgFilePathForRoute(
@@ -496,10 +640,44 @@ function extractHydrationDataJson(html: string): string | null {
   return json.length > 0 ? json : null;
 }
 
-async function withFetchGuard(
+function normalizeSsgConcurrency(value: number): number {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error('SSG concurrency must be a positive integer');
+  }
+  return value;
+}
+
+async function mapWithConcurrency<T, U>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<U>,
+): Promise<U[]> {
+  if (items.length === 0) return [];
+
+  const results = new Array<U>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index] as T, index);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      await worker();
+    }),
+  );
+  return results;
+}
+
+async function withFetchGuard<T>(
   options: { allowNetwork: boolean; fetch?: typeof fetch },
-  fn: () => Promise<void>,
-): Promise<void> {
+  fn: () => Promise<T>,
+): Promise<T> {
   const globalRef = globalThis as { fetch?: typeof fetch };
   const originalFetch = globalRef.fetch;
 
@@ -524,7 +702,7 @@ async function withFetchGuard(
   }
 
   try {
-    await fn();
+    return await fn();
   } finally {
     if (originalFetch !== undefined) {
       globalRef.fetch = originalFetch;

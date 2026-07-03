@@ -42,15 +42,35 @@ Use `generateStaticParams` for parameterized routes:
 
 ```typescript
 import { buildSsgSite } from '@theory-cloud/facetheory';
-import { app } from './app.js';
+import { faces } from './app.js';
 
 await buildSsgSite({
-  app,
+  faces,
   outDir: './dist-static',
 });
 ```
 
 The CLI form is `npm run ssg` (defined in `ts/package.json` as `tsx src/ssg-cli.ts`). See `ts/examples/ssg-basic/` for a working end-to-end build + serve.
+
+## Throughput and route failures
+
+SSG builds are serial by default (`concurrency: 1`) to preserve the historical build shape. Raise the bounded route-render concurrency when a build has many independent pages:
+
+```typescript
+await buildSsgSite({
+  faces,
+  outDir: './dist-static',
+  concurrency: 4,
+});
+```
+
+The CLI equivalent is:
+
+```bash
+npm run ssg -- --entry ./ssg.config.ts --out ./dist-static --concurrency 4
+```
+
+When one route fails, FaceTheory continues rendering the remaining planned routes. Successful pages and the manifest for those pages are still written, then the build reports the failed routes and exits non-zero (or `buildSsgSite` rejects with `SsgBuildFailedError` for programmatic callers).
 
 ## Related helpers
 
