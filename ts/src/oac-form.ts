@@ -9,6 +9,7 @@ import {
   type FaceNavigationSnapshot,
   type FaceNavigationBootstrapModule,
 } from './spa.js';
+import { isHTMLElement, isHTMLElementWithTag } from './dom-guards.js';
 
 export const AWS_OAC_CONTENT_SHA256_HEADER = 'x-amz-content-sha256';
 export const AWS_OAC_FORM_MARKER_ATTRIBUTE = 'data-facetheory-oac-form';
@@ -691,7 +692,7 @@ function resolveFetch(
 
 function readSubmitForm(event: SubmitEvent): HTMLFormElement | null {
   const target = event.target;
-  if (isHtmlFormElement(target)) return target;
+  if (isHTMLElementWithTag(target, 'form')) return target as HTMLFormElement;
   return null;
 }
 
@@ -768,19 +769,6 @@ function passesConstraintValidation(
   if (typeof form.reportValidity === 'function') return form.reportValidity();
   if (typeof form.checkValidity === 'function') return form.checkValidity();
   return true;
-}
-
-function isHtmlFormElement(value: unknown): value is HTMLFormElement {
-  return isHTMLElement(value) && value.tagName.toLowerCase() === 'form';
-}
-
-function isHTMLElement(value: unknown): value is HTMLElement {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { tagName?: unknown }).tagName === 'string' &&
-    typeof (value as { hasAttribute?: unknown }).hasAttribute === 'function'
-  );
 }
 
 function copyArrayBuffer(bytes: Uint8Array): ArrayBuffer {

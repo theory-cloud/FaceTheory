@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { utf8 } from './bytes.js';
+import { escapeJsonForHtml } from './html.js';
 import type { HtmlStore } from './isr.js';
 import { trimOuterSlashes, trimTrailingSlashes } from './types.js';
 
@@ -169,12 +170,7 @@ export function serializeSsrHydrationSidecarJson(data: unknown): string {
     );
   }
 
-  return serialized
-    .replaceAll('<', '\\u003c')
-    .replaceAll('>', '\\u003e')
-    .replaceAll('&', '\\u0026')
-    .replaceAll('\u2028', '\\u2028')
-    .replaceAll('\u2029', '\\u2029');
+  return escapeJsonForHtml(serialized);
 }
 
 export function buildSsrHydrationSidecarDataUrl(

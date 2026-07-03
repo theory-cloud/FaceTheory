@@ -10,7 +10,11 @@ export function escapeHTML(value: string): string {
 }
 
 export function safeJson(value: unknown): string {
-  return JSON.stringify(value)
+  return escapeJsonForHtml(JSON.stringify(value));
+}
+
+export function escapeJsonForHtml(serialized: string): string {
+  return serialized
     .replaceAll('<', '\\u003c')
     .replaceAll('>', '\\u003e')
     .replaceAll('&', '\\u0026')
@@ -26,7 +30,7 @@ export interface HTMLDocumentParts {
   body: string;
 }
 
-function renderAttributes(attrs: FaceAttributes | undefined): string {
+export function renderAttributes(attrs: FaceAttributes | undefined): string {
   if (!attrs) return '';
 
   const keys = Object.keys(attrs).sort();

@@ -1,4 +1,5 @@
 import { utf8 } from './bytes.js';
+import { escapeJsonForHtml } from './html.js';
 import type {
   FaceResponse,
   FaceResponseHeaders,
@@ -251,10 +252,5 @@ function safeResourceJson(value: unknown): string {
 
   // Mirrors html.safeJson so resource responses are safe beside HTML delivery
   // contexts such as hydration sidecars and script-adjacent fetch payloads.
-  return serialized
-    .replaceAll('<', '\\u003c')
-    .replaceAll('>', '\\u003e')
-    .replaceAll('&', '\\u0026')
-    .replaceAll('\u2028', '\\u2028')
-    .replaceAll('\u2029', '\\u2029');
+  return escapeJsonForHtml(serialized);
 }

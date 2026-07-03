@@ -1,4 +1,4 @@
-import { escapeHTML, safeJson } from './html.js';
+import { escapeHTML, renderAttributes, safeJson } from './html.js';
 import type {
   FaceAttributes,
   FaceCspPolicy,
@@ -200,25 +200,6 @@ function validateStrictHeadTags(
         break;
     }
   }
-}
-
-function renderAttributes(attrs: FaceAttributes | undefined): string {
-  if (!attrs) return '';
-  const keys = Object.keys(attrs).sort();
-  let out = '';
-
-  for (const key of keys) {
-    const value = attrs[key];
-    if (value === undefined || value === null || value === false) continue;
-    const name = escapeHTML(key);
-    if (value === true) {
-      out += ` ${name}`;
-      continue;
-    }
-    out += ` ${name}="${escapeHTML(String(value))}"`;
-  }
-
-  return out;
 }
 
 function isCharsetMeta(tag: FaceHeadTag): boolean {
