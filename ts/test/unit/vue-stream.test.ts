@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { inject, type InjectionKey } from 'vue';
+
+import { assertDocumentTagNonces } from '../helpers/csp.js';
+
 import { createFaceApp } from '../../src/app.js';
 import {
   createVueStreamFace,
@@ -98,6 +102,88 @@ test('vue adapter: renderVueStream returns the AsyncIterable body contract', asy
   assert.notEqual(typeof out.html, 'string');
   const html = await collect(out.html as FaceBody);
   assert.ok(html.includes('<main>Direct Vue stream</main>'));
+});
+
+test('vue adapter: streaming waits for async wrapApp style contribution before head assembly', async () => {
+  const registerStyleKey: InjectionKey<(cssText: string) => void> = Symbol(
+    'facetheory-vue-stream-wrap-style',
+  );
+
+  const AsyncStyledByWrapApp = {
+    async setup() {
+      const registerStyle = inject(registerStyleKey);
+      assert.ok(registerStyle, 'expected wrapApp style provider');
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      registerStyle('.async-wrap-app-style{color:rgb(22,44,66);}');
+      return () =>
+        h('main', { class: 'async-wrap-app-style' }, 'Async WrapApp CSS');
+    },
+  };
+
+  const app = createFaceApp({
+    faces: [
+      createVueStreamFace({
+        route: '/',
+        mode: 'ssr',
+        render: () => h(AsyncStyledByWrapApp),
+        renderOptions: {
+          integrations: [
+            {
+              name: 'stream-wrap-app-style-provider',
+              createState: () => ({ styles: [] as string[] }),
+              wrapApp: (vueApp, _ctx, state) => {
+                vueApp.provide(registerStyleKey, (cssText: string) => {
+                  (state as { styles: string[] }).styles.push(cssText);
+                });
+              },
+              contribute: (_ctx, state) => ({
+                styleTags: (state as { styles: string[] }).styles.map(
+                  (cssText, index) => ({
+                    cssText,
+                    attrs: { id: `async-wrap-app-style-${String(index)}` },
+                  }),
+                ),
+              }),
+            },
+          ],
+        },
+      }),
+    ],
+  });
+
+  const nonce = 'nonce-vue-stream-wrap-style';
+  const resp = await app.handle({ method: 'GET', path: '/', cspNonce: nonce });
+  assert.ok(!(resp.body instanceof Uint8Array));
+
+  const iterator = resp.body[Symbol.asyncIterator]();
+  const firstChunk = await iterator.next();
+  assert.equal(firstChunk.done, false);
+  const first = new TextDecoder().decode(firstChunk.value);
+  assert.ok(first.includes('id="async-wrap-app-style-0"'), first);
+  assert.ok(
+    first.includes('.async-wrap-app-style{color:rgb(22,44,66);}'),
+    first,
+  );
+  assert.ok(!first.includes('Async WrapApp CSS'));
+
+  const remainder = await collect({
+    async *[Symbol.asyncIterator]() {
+      for (;;) {
+        const next = await iterator.next();
+        if (next.done) return;
+        yield next.value;
+      }
+    },
+  });
+  const html = `${first}${remainder}`;
+  const styleIndex = html.indexOf('id="async-wrap-app-style-0"');
+  const bodyIndex = html.indexOf(
+    '<main class="async-wrap-app-style">Async WrapApp CSS</main>',
+  );
+  assert.ok(styleIndex >= 0, html);
+  assert.ok(bodyIndex >= 0, html);
+  assert.ok(styleIndex < bodyIndex);
+  assertDocumentTagNonces(html, nonce, 1, 0);
 });
 
 test('vue adapter: strict CSP streaming buffers safe output', async () => {

@@ -75,6 +75,8 @@ export const app = createFaceApp({
 
 For strict no-inline CSP routes (`inlineScripts:false`, `inlineStyles:false`, or `rawHead:false`), FaceTheory buffers and validates the full streamed document before returning it. That preserves the same strict-CSP nonce, sidecar, and fail-closed behavior as buffered Vue SSR.
 
+When a Vue streaming Face uses an integration with `contribute` or `finalize`, FaceTheory waits for Vue's server renderer to finish before assembling `<head>` and structured style tags. This keeps request-local styles registered by async component trees through `wrapApp` visible to `contribute`, while the response body still uses the `AsyncIterable<Uint8Array>` contract after head/style assembly is complete.
+
 ## Vite integration
 
 For Vue + Vite SSR, use `viteAssetsForEntry` and `viteHydrationForEntry` from the core `vite.ts` module to pipe the dev/build manifest into your render options. The runnable shape is `ts/examples/vite-ssr-vue/src/entry-server.ts`:
@@ -125,7 +127,7 @@ FaceTheory does not ship a Vue-specific runtime CSS-in-JS extractor. If a Vue CS
 
 1. `wrapApp(app, ctx, state)` installs the Vue plugin/provider for the request-local render.
 2. The Vue render records styles into that request-local state.
-3. `contribute(ctx, state)` returns structured `styleTags` (or external stylesheet `headTags`) for FaceTheory to serialize, nonce, order, and validate.
+3. `contribute(ctx, state)` returns structured `styleTags` (or external stylesheet `headTags`) for FaceTheory to serialize, nonce, order, and validate. In streaming mode, FaceTheory waits for async Vue render completion before calling `contribute` when an integration can contribute or finalize, so async setup/render style records are not omitted from the document head.
 
 ```typescript
 import type { App, InjectionKey } from "vue";

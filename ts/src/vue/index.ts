@@ -112,7 +112,20 @@ async function renderVueStreamInternal(
         if (!integration.wrapApp) continue;
         await integration.wrapApp(app, ctx, state);
       }
-      return renderVueAppToAsyncIterable(app);
+      const stream = renderVueAppToAsyncIterable(app);
+      const requiresAllReady = pipelineContext.preparedIntegrations.some(
+        ({ integration }) =>
+          typeof integration.contribute === 'function' ||
+          typeof integration.finalize === 'function',
+      );
+
+      if (requiresAllReady) {
+        await stream.completed;
+      } else {
+        void stream.completed.catch(() => undefined);
+      }
+
+      return stream.body;
     },
     enforceStrictCsp: (out) => {
       enforceAdapterStrictCspResult(out, {
@@ -129,11 +142,23 @@ type VueStreamQueueItem =
   | { kind: 'done' }
   | { kind: 'error'; error: unknown };
 
-function renderVueAppToAsyncIterable(app: App): AsyncIterable<Uint8Array> {
+interface VueAppStream {
+  body: AsyncIterable<Uint8Array>;
+  completed: Promise<void>;
+}
+
+function renderVueAppToAsyncIterable(app: App): VueAppStream {
   const encoder = new TextEncoder();
   const queue: VueStreamQueueItem[] = [];
   let wake: (() => void) | null = null;
   let settled = false;
+  let resolveCompleted: (() => void) | null = null;
+  let rejectCompleted: ((error: unknown) => void) | null = null;
+
+  const completed = new Promise<void>((resolve, reject) => {
+    resolveCompleted = resolve;
+    rejectCompleted = reject;
+  });
 
   const enqueue = (item: VueStreamQueueItem): void => {
     queue.push(item);
@@ -145,12 +170,14 @@ function renderVueAppToAsyncIterable(app: App): AsyncIterable<Uint8Array> {
     if (settled) return;
     settled = true;
     enqueue({ kind: 'done' });
+    resolveCompleted?.();
   };
 
   const fail = (error: unknown): void => {
     if (settled) return;
     settled = true;
     enqueue({ kind: 'error', error });
+    rejectCompleted?.(error);
   };
 
   try {
@@ -175,23 +202,26 @@ function renderVueAppToAsyncIterable(app: App): AsyncIterable<Uint8Array> {
     fail(error);
   }
 
-  return (async function* () {
-    for (;;) {
-      while (queue.length === 0) {
-        await new Promise<void>((resolve) => {
-          wake = resolve;
-        });
-      }
+  return {
+    body: (async function* () {
+      for (;;) {
+        while (queue.length === 0) {
+          await new Promise<void>((resolve) => {
+            wake = resolve;
+          });
+        }
 
-      const item = queue.shift()!;
-      if (item.kind === 'chunk') {
-        yield item.chunk;
-        continue;
+        const item = queue.shift()!;
+        if (item.kind === 'chunk') {
+          yield item.chunk;
+          continue;
+        }
+        if (item.kind === 'error') throw item.error;
+        return;
       }
-      if (item.kind === 'error') throw item.error;
-      return;
-    }
-  })();
+    })(),
+    completed,
+  };
 }
 
 export interface VueFaceOptions<Data = unknown> {
