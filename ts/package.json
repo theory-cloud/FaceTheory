@@ -301,5 +301,6 @@
     "@theory-cloud/apptheory": {
       "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz"
     }
-  }
+  },
+  "sideEffects": false
 }

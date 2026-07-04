@@ -17,6 +17,14 @@ Install the peers that match your adapter surface:
 - Vue: `npm install vue @vue/server-renderer`
 - Svelte: `npm install svelte@^5.55.7`
 
+## Packaging Posture
+
+FaceTheory is ESM-only. Import it from ESM Lambda handlers, Vite SSR entries, or bundlers; CommonJS `require()` callers should expect `ERR_REQUIRE_ESM` and should migrate to ESM or use dynamic `import()` at the boundary.
+
+The package declares `sideEffects: false`. The published import subpaths were audited for top-level work: module evaluation defines exports only and does not start listeners, mutate globals, read AWS credentials, open sockets, deploy infrastructure, or register Lambda handlers. Runtime side effects happen after explicit caller invocation (for example `startFaceNavigation()`, `startAwsOacFormTransport()`, CLI entrypoints, or handler factories).
+
+The Svelte peer range is `>=4 <5.46.0 || >=5.55.7` by design. The excluded Svelte 5 band is outside FaceTheory's verified SSR/hydration adapter contract; new Svelte consumers should prefer `svelte@^5.55.7`.
+
 Optional companion packages:
 
 - AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.13.2/theory-cloud-apptheory-1.13.2.tgz`

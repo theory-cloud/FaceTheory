@@ -61,6 +61,14 @@ npm install --save-exact \
 - Vue: `npm install vue @vue/server-renderer`
 - Svelte: `npm install svelte@^5.55.7`
 
+### Packaging posture
+
+FaceTheory publishes an **ESM-only** package through immutable GitHub Release tarballs. Use `import` syntax (or dynamic `import()`) from Node, bundlers, and Lambda handlers. A CommonJS `require("@theory-cloud/facetheory")` host will fail with `ERR_REQUIRE_ESM`; migrate that host to ESM or isolate FaceTheory behind an ESM bridge rather than expecting a CommonJS export map.
+
+The package declares `sideEffects: false` after auditing the published import subpaths: importing FaceTheory modules defines types, constants, and functions, but it does not start servers, register browser listeners, mutate globals, read AWS credentials, or deploy cloud resources. Side-effecting operations such as `createLambdaUrlStreamingHandler()`, `startFaceNavigation()`, `startAwsOacFormTransport()`, the SSG CLI, and the dev server happen only when the caller invokes them.
+
+The Svelte peer range is intentionally narrower than “any Svelte 5”: FaceTheory supports Svelte `>=4 <5.46.0 || >=5.55.7` because SSR/hydration behavior in the excluded Svelte 5 band is not part of the verified adapter contract. New Svelte apps should install `svelte@^5.55.7` unless they are pinned to a validated Svelte 4 stack.
+
 ### Step 3: Install optional companion packages
 
 These are only required if your application uses the corresponding integration surface:
