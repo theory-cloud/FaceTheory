@@ -1,4 +1,4 @@
-// Example sketch: blocking ISR with in-memory stores.
+// Example: blocking ISR with in-memory stores.
 //
 // Replace the in-memory stores with `S3HtmlStore` + a TableTheory-backed `IsrMetaStore`
 // (for DynamoDB use TableTheory `FaceTheoryIsrMetaStore`) in production.
@@ -8,8 +8,14 @@
 // configure an explicit `tenantKey` or custom `cacheKey`; otherwise FaceTheory
 // fails closed when known tenant boundary headers reach the ISR runtime.
 
-import { createFaceApp } from '@theory-cloud/facetheory';
-import { InMemoryHtmlStore, InMemoryIsrMetaStore } from '@theory-cloud/facetheory';
+import {
+  createFaceApp,
+  handleLambdaUrlEvent,
+  InMemoryHtmlStore,
+  InMemoryIsrMetaStore,
+  type LambdaUrlEvent,
+  type LambdaUrlResult,
+} from '@theory-cloud/facetheory';
 
 const htmlStore = new InMemoryHtmlStore();
 const metaStore = new InMemoryIsrMetaStore();
@@ -40,10 +46,11 @@ export const faceApp = createFaceApp({
   },
 });
 
-export async function handler(event: any): Promise<any> {
-  return faceApp.handle({
-    method: event?.requestContext?.http?.method ?? 'GET',
-    path: event?.rawPath ?? '/news/home',
-    headers: event?.headers ? { ...event.headers } : {},
+export async function handler(
+  event: LambdaUrlEvent,
+): Promise<LambdaUrlResult> {
+  return handleLambdaUrlEvent(faceApp, {
+    rawPath: '/news/home',
+    ...event,
   });
 }

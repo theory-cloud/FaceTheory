@@ -29,13 +29,13 @@ export const faceApp = createFaceApp({
   ],
 });
 
-const app = createApp();
+export const appTheoryApp = createApp();
 const faceHandler = createAppTheoryFaceHandler({ app: faceApp });
 
 // Lambda Function URL always hits the same handler; AppTheory routes by path.
-app.get('/', faceHandler);
-app.get('/{proxy+}', faceHandler);
-app.handle('HEAD', '/', faceHandler);
-app.handle('HEAD', '/{proxy+}', faceHandler);
+appTheoryApp.get('/', faceHandler);
+appTheoryApp.get('/{proxy+}', faceHandler);
+appTheoryApp.handle('HEAD', '/', faceHandler);
+appTheoryApp.handle('HEAD', '/{proxy+}', faceHandler);
 
-export const handler = createLambdaFunctionURLStreamingHandler(app);
+export const handler = createLambdaFunctionURLStreamingHandler(appTheoryApp);
