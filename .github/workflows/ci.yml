@@ -129,6 +129,7 @@ jobs:
           make ts-typecheck
           make ts-lint
           make ts-examples-readmes
+          make docs-export-map
           make ts-test
 
   ts-pack:

@@ -259,13 +259,46 @@ import {
   InMemoryHtmlStore,
   viteAssetsForEntry,
   viteHydrationForEntry,
+  type FaceModule,
+  type ViteManifest,
 } from "@theory-cloud/facetheory";
+
+declare const manifest: ViteManifest;
 
 const strictCsp = {
   inlineScripts: false,
   inlineStyles: false,
   rawHead: false,
 } as const;
+
+const faces: FaceModule<{ message: string }>[] = [
+  {
+    route: "/",
+    mode: "ssr",
+    load: async () => ({ message: "Hello strict CSP" }),
+    render: async (_ctx, data) => {
+      const { headTags } = viteAssetsForEntry(
+        manifest,
+        "src/entry-client.ts",
+        { includeAssets: true },
+      );
+
+      return {
+        csp: strictCsp,
+        headers: {
+          "content-security-policy": buildStrictCspHeader(),
+        },
+        headTags,
+        html: `<main>${data.message}</main>`,
+        hydration: viteHydrationForEntry(
+          manifest,
+          "src/entry-client.ts",
+          data,
+        ),
+      };
+    },
+  },
+];
 
 const app = createFaceApp({
   ssrHydrationSidecars: {
@@ -275,21 +308,6 @@ const app = createFaceApp({
   },
   faces,
 });
-
-renderOptions: async (_ctx, data) => {
-  const { headTags } = viteAssetsForEntry(manifest, "src/entry-client.ts", {
-    includeAssets: true,
-  });
-
-  return {
-    csp: strictCsp,
-    headers: {
-      "content-security-policy": buildStrictCspHeader(),
-    },
-    headTags,
-    hydration: viteHydrationForEntry(manifest, "src/entry-client.ts", data),
-  };
-};
 ```
 
 When `ssrHydrationSidecars` is configured, strict SSR writes the render-time

@@ -52,26 +52,40 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 ## Public Exports
 
-- `@theory-cloud/facetheory` core runtime, SSG helpers, Lambda Function URL adapter, and ISR stores
+Every public subpath below is declared in `ts/package.json` and mirrored in `docs/api-reference.md`:
+
+- `@theory-cloud/facetheory` core runtime, resource routes, SSG helpers, Lambda Function URL adapter, ISR stores, strict-CSP/head helpers, Vite helpers, SPA/OAC helpers, and hydration primitives
+- `@theory-cloud/facetheory/spa` SPA navigation client runtime
+- `@theory-cloud/facetheory/oac-form` CloudFront OAC URL-encoded form transport helpers
+- `@theory-cloud/facetheory/navigation-pending` pending-state UI helpers for same-document navigation
+- `@theory-cloud/facetheory/control-plane` host-owned control-plane presets and contracts
+- `@theory-cloud/facetheory/responsive-primitives` shared responsive primitive contracts and sanitizers
+- `@theory-cloud/facetheory/client` browser hydration data loaders
+- `@theory-cloud/facetheory/testing` consumer test harness helpers
+- `@theory-cloud/facetheory/dev` local Vite middleware development helpers
 - `@theory-cloud/facetheory/apptheory` AppTheory request/response adapter
 - `@theory-cloud/facetheory/aws-s3` AWS SDK S3 HTML store adapter
-- `@theory-cloud/facetheory/stitch-tokens` shared Stitch design-token helpers for React, Vue, and Svelte apps
+- `@theory-cloud/facetheory/stitch-tokens` shared Stitch design-token helpers
 - `@theory-cloud/facetheory/stitch-shell` shared Stitch navigation contracts and active-route resolution
-- `@theory-cloud/facetheory/stitch-admin` shared Stitch dense-admin contracts
+- `@theory-cloud/facetheory/stitch-hosted-auth` shared hosted-auth contracts
+- `@theory-cloud/facetheory/stitch-admin` shared dense-admin contracts
 - `@theory-cloud/facetheory/react` React buffered and streaming helpers
 - `@theory-cloud/facetheory/react/antd` Ant Design integration
 - `@theory-cloud/facetheory/react/emotion` Emotion integration
 - `@theory-cloud/facetheory/react/antd-emotion` AntD token integration
-- `@theory-cloud/facetheory/react/stitch-tokens` React AntD theme bridge plus the shared token helpers
-- `@theory-cloud/facetheory/react/stitch-shell` React shell/layout primitives built on the shared Stitch navigation helpers
+- `@theory-cloud/facetheory/react/stitch-tokens` React AntD theme bridge plus shared token helpers
+- `@theory-cloud/facetheory/react/stitch-shell` React shell/layout primitives
 - `@theory-cloud/facetheory/react/stitch-hosted-auth` React hosted-auth primitives
 - `@theory-cloud/facetheory/react/stitch-admin` React dense-admin primitives
+- `@theory-cloud/facetheory/react/responsive-primitives` React responsive primitives
 - `@theory-cloud/facetheory/vue` Vue adapter
-- `@theory-cloud/facetheory/vue/stitch-shell` Vue shell/layout primitives built on the shared Stitch navigation helpers
+- `@theory-cloud/facetheory/vue/responsive-primitives` Vue responsive primitives
+- `@theory-cloud/facetheory/vue/stitch-shell` Vue shell/layout primitives
 - `@theory-cloud/facetheory/vue/stitch-hosted-auth` Vue hosted-auth primitives
 - `@theory-cloud/facetheory/vue/stitch-admin` Vue dense-admin primitives
 - `@theory-cloud/facetheory/svelte` Svelte adapter
-- `@theory-cloud/facetheory/svelte/stitch-shell` Svelte shell/layout primitives built on the shared Stitch navigation helpers
+- `@theory-cloud/facetheory/svelte/responsive-primitives` Svelte responsive primitives
+- `@theory-cloud/facetheory/svelte/stitch-shell` Svelte shell/layout primitives
 - `@theory-cloud/facetheory/svelte/stitch-hosted-auth` Svelte hosted-auth primitives
 - `@theory-cloud/facetheory/svelte/stitch-admin` Svelte dense-admin primitives
 - `@theory-cloud/facetheory/tabletheory` TableTheory ISR metadata adapter
