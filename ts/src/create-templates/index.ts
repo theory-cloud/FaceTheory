@@ -537,14 +537,8 @@ import type { HomeData } from './types.js';
 const data = (await loadFaceHydrationData<HomeData>()) ?? {
   message: 'Hello from the client fallback.',
 };
-const root = document.getElementById('root');
-
-if (!root) {
-  throw new Error('FaceTheory Svelte starter could not find #root to hydrate');
-}
-
 hydrate(App, {
-  target: root,
+  target: document.body,
   props: { message: data.message },
 });
 `),

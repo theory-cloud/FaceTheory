@@ -151,6 +151,13 @@ async function linkTypecheckDependencies(appDir: string): Promise<void> {
     ['constructs', installedPackagePath('constructs')],
     ['react', installedPackagePath('react')],
     ['react-dom', installedPackagePath('react-dom')],
+    ['vue', installedPackagePath('vue')],
+    ['@vue/server-renderer', installedPackagePath('@vue/server-renderer')],
+    ['svelte', installedPackagePath('svelte')],
+    [
+      '@sveltejs/vite-plugin-svelte',
+      installedPackagePath('@sveltejs/vite-plugin-svelte'),
+    ],
     ['vite', installedPackagePath('vite')],
   ];
 
@@ -225,7 +232,7 @@ test('facetheory create emits a React starter that typechecks', async () => {
   }
 });
 
-test('facetheory create emits per-adapter hydrate entries', async () => {
+test('facetheory create emits Vue and Svelte starters that typecheck', async () => {
   const tempRoot = await mkdtemp(
     path.join(tmpdir(), 'facetheory-create-adapters-'),
   );
@@ -255,7 +262,15 @@ test('facetheory create emits per-adapter hydrate entries', async () => {
       'utf8',
     );
     assert.match(svelteClient, /hydrate\(App/);
+    assert.match(svelteClient, /target:\s*document\.body/);
+    assert.doesNotMatch(svelteClient, /getElementById\(['"]root['"]\)/);
     assert.match(svelteClient, /loadFaceHydrationData<HomeData>/);
+
+    for (const adapter of ['vue', 'svelte'] as const) {
+      const appDir = path.resolve(tempRoot, `${adapter}-app`);
+      await linkTypecheckDependencies(appDir);
+      await runGeneratedTypecheck(appDir);
+    }
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
