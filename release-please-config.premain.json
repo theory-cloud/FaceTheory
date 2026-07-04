@@ -9,6 +9,7 @@
   "prerelease": true,
   "packages": {
     ".": {
+      "changelog-path": "CHANGELOG.prerelease.md",
       "extra-files": [
         { "type": "generic", "path": "VERSION" },
         { "type": "json", "path": "ts/package.json", "jsonpath": "$.version" },
