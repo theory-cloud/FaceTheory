@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import {
     skeletonClassName,
     type SkeletonAnimation,
@@ -7,29 +8,44 @@
     type SkeletonWidthPreset,
   } from '../../responsive-primitives/index.js';
 
-  export let animation: SkeletonAnimation = 'pulse';
-  export let decorative = true;
-  export let height: SkeletonHeightPreset | undefined = undefined;
-  export let loading = true;
-  export let variant: SkeletonVariant = 'text';
-  export let width: SkeletonWidthPreset | undefined = undefined;
-  let className = '';
-  export { className as class };
+  let {
+    animation = 'pulse',
+    decorative = true,
+    height = undefined,
+    loading = true,
+    variant = 'text',
+    width = undefined,
+    class: className = '',
+    children,
+    ...rest
+  }: {
+    animation?: SkeletonAnimation;
+    decorative?: boolean;
+    height?: SkeletonHeightPreset | undefined;
+    loading?: boolean;
+    variant?: SkeletonVariant;
+    width?: SkeletonWidthPreset | undefined;
+    class?: string;
+    children?: Snippet;
+    [key: string]: unknown;
+  } = $props();
 
-  $: resolvedClass = skeletonClassName({
-    animation,
-    className,
-    decorative,
-    height,
-    loading,
-    variant,
-    width,
-  });
+  const resolvedClass = $derived(
+    skeletonClassName({
+      animation,
+      className,
+      decorative,
+      height,
+      loading,
+      variant,
+      width,
+    }),
+  );
 </script>
 
 {#if loading}
   <div
-    {...$$restProps}
+    {...rest}
     class={resolvedClass}
     aria-hidden={decorative ? 'true' : undefined}
     role={decorative ? undefined : 'status'}
@@ -38,5 +54,5 @@
     data-loading="true"
   ></div>
 {:else}
-  <slot />
+  {@render children?.()}
 {/if}

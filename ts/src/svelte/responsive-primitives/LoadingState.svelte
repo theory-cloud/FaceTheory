@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import {
     loadingStateClassName,
     spinnerClassName,
@@ -6,20 +7,41 @@
     type LoadingStateSize,
   } from '../../responsive-primitives/index.js';
 
-  export let fullscreen = false;
-  export let label = 'Loading';
-  export let message: unknown = undefined;
-  export let size: LoadingStateSize = 'md';
-  let className = '';
-  export { className as class };
+  let {
+    fullscreen = false,
+    label = 'Loading',
+    message = undefined,
+    size = 'md',
+    class: className = '',
+    spinner,
+    children,
+    ...rest
+  }: {
+    fullscreen?: boolean;
+    label?: string;
+    message?: unknown;
+    size?: LoadingStateSize;
+    class?: string;
+    spinner?: Snippet;
+    children?: Snippet;
+    [key: string]: unknown;
+  } = $props();
 
-  $: resolvedClass = loadingStateClassName({ className, fullscreen, label, message: String(message ?? ''), size });
-  $: pixelSize = spinnerSvgSize(size);
-  $: embeddedSpinnerClass = spinnerClassName({ size, tone: 'primary' });
+  const resolvedClass = $derived(
+    loadingStateClassName({
+      className,
+      fullscreen,
+      label,
+      message: String(message ?? ''),
+      size,
+    }),
+  );
+  const pixelSize = $derived(spinnerSvgSize(size));
+  const embeddedSpinnerClass = $derived(spinnerClassName({ size, tone: 'primary' }));
 </script>
 
 <div
-  {...$$restProps}
+  {...rest}
   class={resolvedClass}
   role="status"
   aria-live="polite"
@@ -27,10 +49,10 @@
   data-fullscreen={fullscreen ? 'true' : undefined}
 >
   <div class="facetheory-rcp-loading-state__content">
-    {#if $$slots.default}
-      <slot />
-    {:else if $$slots.spinner}
-      <slot name="spinner" />
+    {#if children}
+      {@render children()}
+    {:else if spinner}
+      {@render spinner()}
     {:else}
       <span class={embeddedSpinnerClass} role="status" aria-label={label} data-size={size} data-tone="primary">
         <svg
@@ -52,8 +74,8 @@
       </span>
     {/if}
 
-    {#if $$slots.message || message !== undefined}
-      <p class="facetheory-rcp-loading-state__message"><slot name="message">{message}</slot></p>
+    {#if message !== undefined}
+      <p class="facetheory-rcp-loading-state__message">{message}</p>
     {/if}
   </div>
 </div>
