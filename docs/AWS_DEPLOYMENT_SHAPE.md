@@ -28,6 +28,13 @@ SSR/SSG/ISR.
 AppTheory CDK ships `AppTheorySsrSite`, which implements this topology and wires recommended environment variables onto
 your SSR Lambda function.
 
+FaceTheory's SSG/ISR reference stack (`infra/apptheory-ssg-isr-site/`) uses `AppTheorySsrSite` with
+`mode: AppTheorySsrSiteMode.SSG_ISR` for the CloudFront distribution, Lambda Function URL origin, generated edge
+rewrite/request-id functions, and ISR runtime env wiring. The stack keeps explicit FaceTheory-owned `BucketDeployment`
+resources for immutable assets, the Vite manifest, and SSG HTML because AppTheory v1.13.2 does not yet expose
+per-deployment `distributionPaths` invalidation controls for those uploads. Treat that as the remaining AppTheory
+coordination item; it is not permission to hand-roll the CloudFront distribution or origin group in FaceTheory.
+
 When using `AppTheorySsrSite` in `ssg-isr` mode:
 - use `staticPathPatterns` for cacheable extensionless HTML sections that should stay on S3
 - use `directS3PathPatterns` for raw object/data paths such as `/.vite/*` and `/_facetheory/data/*`
@@ -54,7 +61,7 @@ Function URLs durable.
 
 Reference example (FaceTheory repo):
 - `infra/apptheory-ssr-site/`
-- `infra/apptheory-ssg-isr-site/` (SSG origin-group + ISR example)
+- `infra/apptheory-ssg-isr-site/` (`AppTheorySsrSite` `SSG_ISR` mode with S3-primary HTML origin group + ISR example)
 
 When `wireRuntimeEnv:true` (default), the SSR function will receive:
 - `APPTHEORY_ASSETS_BUCKET`
@@ -177,7 +184,8 @@ Cons:
 - requires explicit URI rewrite discipline
 
 Reference stack:
-- `infra/apptheory-ssg-isr-site/`
+- `infra/apptheory-ssg-isr-site/`, which uses `AppTheorySsrSiteMode.SSG_ISR` for the origin group and generated edge
+  rewrite/request-id functions.
 
 ### Strategy B: explicit behaviors for known SSG routes (small route sets)
 
