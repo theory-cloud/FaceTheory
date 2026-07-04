@@ -48,8 +48,20 @@ const ISR_HTML_METADATA_CONTENT_TYPE = 'facetheory-content-type';
 const ISR_STATE_STALE_METADATA_ERROR = 'stale-metadata-error';
 const DEFAULT_LAST_KNOWN_ISR_RECORD_LIMIT = 128;
 
+/**
+ * Policy for metadata/storage failures: either serve the last known stale entry when
+ * safe or surface the error through FaceTheory's deterministic 500 path.
+ */
 export type IsrFailurePolicy = 'serve-stale' | 'error';
+/**
+ * Policy for concurrent ISR regeneration when another Lambda owns the lease: wait for
+ * the fresh entry or serve stale immediately when allowed.
+ */
 export type IsrLockContentionPolicy = 'wait' | 'serve-stale';
+/**
+ * Cache-state label emitted in ISR cache headers and observability for miss, hit,
+ * stale, wait-hit, and degraded metadata-error paths.
+ */
 export type IsrCacheState =
   | 'miss'
   | 'hit'
@@ -57,6 +69,10 @@ export type IsrCacheState =
   | 'wait-hit'
   | typeof ISR_STATE_STALE_METADATA_ERROR;
 
+/**
+ * Payload written to the ISR HTML object store, including body bytes and metadata
+ * needed to rebuild cached responses deterministically.
+ */
 export interface HtmlStoreWriteInput {
   key: string;
   body: Uint8Array;
@@ -65,21 +81,35 @@ export interface HtmlStoreWriteInput {
   metadata?: Record<string, string>;
 }
 
+/**
+ * Result returned by the ISR HTML object store after a successful write.
+ */
 export interface HtmlStoreWriteResult {
   etag?: string | null;
 }
 
+/**
+ * Cached HTML object returned by an ISR HTML store read.
+ */
 export interface HtmlStoreReadResult {
   body: Uint8Array;
   etag?: string | null;
   metadata?: Record<string, string>;
 }
 
+/**
+ * Storage abstraction for ISR-rendered HTML bodies; production deployments should use
+ * AWS-shaped storage while metadata/leases stay in TableTheory.
+ */
 export interface HtmlStore {
   read: (key: string) => Promise<HtmlStoreReadResult | null>;
   write: (input: HtmlStoreWriteInput) => Promise<HtmlStoreWriteResult>;
 }
 
+/**
+ * Metadata record for one ISR cache key, including freshness timestamps, response
+ * metadata, and the active regeneration lease fields.
+ */
 export interface IsrMetaRecord {
   cacheKey: string;
   htmlPointer: string | null;
@@ -95,6 +125,9 @@ export interface IsrMetaRecord {
   leaseExpiresAt: number;
 }
 
+/**
+ * Request to acquire or renew an ISR regeneration lease for a cache key.
+ */
 export interface TryAcquireIsrLeaseInput {
   cacheKey: string;
   leaseOwner: string;
@@ -103,12 +136,20 @@ export interface TryAcquireIsrLeaseInput {
   fallbackRevalidateSeconds: number;
 }
 
+/**
+ * Lease acquisition result with the current metadata record and an owned token only
+ * when acquisition succeeded.
+ */
 export interface TryAcquireIsrLeaseResult {
   acquired: boolean;
   record: IsrMetaRecord;
   leaseToken: string | null;
 }
 
+/**
+ * Commit payload for a completed ISR regeneration, guarded by the lease owner/token
+ * that produced the HTML pointer.
+ */
 export interface CommitIsrGenerationInput {
   cacheKey: string;
   leaseOwner: string;
@@ -123,12 +164,19 @@ export interface CommitIsrGenerationInput {
   etag?: string | null;
 }
 
+/**
+ * Payload used to release a held ISR lease after regeneration fails or is abandoned.
+ */
 export interface ReleaseIsrLeaseInput {
   cacheKey: string;
   leaseOwner: string;
   leaseToken: string;
 }
 
+/**
+ * Metadata and lease store contract for blocking ISR; TableTheory-backed stores own
+ * production persistence and optimistic lease semantics.
+ */
 export interface IsrMetaStore {
   get: (cacheKey: string) => Promise<IsrMetaRecord | null>;
   invalidate: (cacheKey: string) => Promise<void>;
@@ -139,6 +187,10 @@ export interface IsrMetaStore {
   releaseLease: (input: ReleaseIsrLeaseInput) => Promise<void>;
 }
 
+/**
+ * Inputs used to derive an ISR cache key from route, params, query, tenant, and
+ * allowlisted request variants without exposing raw secrets.
+ */
 export interface IsrCacheKeyInput {
   tenant: string;
   routePattern: string;
@@ -149,18 +201,29 @@ export interface IsrCacheKeyInput {
   varyCookies?: readonly string[];
 }
 
+/**
+ * Options for building the Cache-Control header emitted with ISR cached responses.
+ */
 export interface IsrCacheControlOptions {
   browserMaxAgeSeconds?: number;
   sharedMaxAgeSeconds?: number;
   staleIfErrorSeconds?: number;
 }
 
+/**
+ * Inputs supplied to an ISR cache-control callback for state-aware response caching
+ * headers.
+ */
 export interface IsrCacheHeaderInput {
   revalidateSeconds: number;
   state: IsrCacheState;
   isFresh: boolean;
 }
 
+/**
+ * Internal runtime request to handle one ISR Face, including the route context and
+ * callback that performs a fresh server render under lease.
+ */
 export interface HandleIsrFaceInput {
   face: FaceModule;
   ctx: FaceContext;
@@ -168,20 +231,36 @@ export interface HandleIsrFaceInput {
   renderFresh: (options?: IsrRenderFreshOptions) => Promise<FaceResponse>;
 }
 
+/**
+ * External hydration data pointer generated during strict ISR regeneration so cached
+ * HTML can reference a matching same-origin JSON sidecar.
+ */
 export interface IsrHydrationSidecar {
   data: unknown;
   dataUrl: string;
 }
 
+/**
+ * Options passed into a fresh ISR render to coordinate strict external hydration
+ * sidecar URLs and capture sidecar data.
+ */
 export interface IsrRenderFreshOptions {
   strictExternalHydrationDataUrl?: string;
   onHydrationSidecar?: (sidecar: IsrHydrationSidecar) => void;
 }
 
+/**
+ * Blocking ISR runtime that serves fresh hits, coordinates regeneration leases, and
+ * returns deterministic Face responses for one ISR Face request.
+ */
 export interface IsrRuntime {
   handleFace: (input: HandleIsrFaceInput) => Promise<FaceResponse>;
 }
 
+/**
+ * Public ISR configuration for stores, timers, failure policies, tenant partitioning,
+ * cache keys, cookie variance, cache headers, and observability.
+ */
 export interface FaceIsrOptions {
   htmlStore?: HtmlStore;
   metaStore?: IsrMetaStore;
@@ -231,6 +310,10 @@ interface PreparedFreshResponse {
   etag: string | null;
 }
 
+/**
+ * Subset of strict CSP policy persisted with cached ISR HTML so no-inline validation
+ * can be enforced before re-serving stored bytes.
+ */
 export interface IsrCachedStrictCspPolicy {
   inlineScripts?: false | undefined;
   inlineStyles?: false | undefined;
@@ -243,6 +326,10 @@ class IsrLeaseConflictError extends Error {
   }
 }
 
+/**
+ * Process-local HTML store for tests and examples; it is not a durable production ISR
+ * cache.
+ */
 export class InMemoryHtmlStore implements HtmlStore {
   private readonly objects = new Map<
     string,
@@ -274,6 +361,10 @@ export class InMemoryHtmlStore implements HtmlStore {
   }
 }
 
+/**
+ * Process-local ISR metadata and lease store for tests and examples; production ISR
+ * metadata should be routed through TableTheory.
+ */
 export class InMemoryIsrMetaStore implements IsrMetaStore {
   private readonly records = new Map<string, IsrMetaRecord>();
 
@@ -380,6 +471,10 @@ export class InMemoryIsrMetaStore implements IsrMetaStore {
   }
 }
 
+/**
+ * Minimal AWS S3-shaped client contract used by `S3HtmlStore` without coupling core
+ * ISR to a concrete AWS SDK version.
+ */
 export interface S3HtmlStoreClient {
   getObject: (input: { bucket: string; key: string }) => Promise<{
     body: Uint8Array | string | AsyncIterable<Uint8Array> | null;
@@ -396,12 +491,20 @@ export interface S3HtmlStoreClient {
   }) => Promise<{ etag?: string | null }>;
 }
 
+/**
+ * Configuration for storing ISR HTML objects in a specific S3 bucket and optional key
+ * prefix.
+ */
 export interface S3HtmlStoreOptions {
   client: S3HtmlStoreClient;
   bucket: string;
   keyPrefix?: string;
 }
 
+/**
+ * HTML object store backed by an S3-shaped client; it stores rendered bytes only and
+ * does not replace TableTheory metadata or leases.
+ */
 export class S3HtmlStore implements HtmlStore {
   private readonly client: S3HtmlStoreClient;
   private readonly bucket: string;
@@ -451,6 +554,11 @@ export class S3HtmlStore implements HtmlStore {
   }
 }
 
+/**
+ * Creates the blocking ISR runtime that derives cache keys, serves fresh/stale
+ * entries, acquires regeneration leases, writes HTML, and fails closed according to
+ * policy.
+ */
 export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
   const runtimeOptions = normalizeRuntimeOptions(options);
   const lastKnownRecords = new Map<string, IsrMetaRecord>();
@@ -663,6 +771,10 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
   };
 }
 
+/**
+ * Builds the default ISR cache key from tenant, normalized route, sorted params/query,
+ * and digests of auth headers/cookies so raw secrets never appear in the key.
+ */
 export function defaultIsrCacheKey(input: IsrCacheKeyInput): string {
   const routePattern = normalizePath(input.routePattern);
   const paramParts = Object.keys(input.params)
@@ -756,6 +868,9 @@ export function tenantKeyFromTrustedHeader(
     normalized ? firstHeaderValue(ctx.request.headers, normalized) : null;
 }
 
+/**
+ * Builds the default stale-if-error Cache-Control value for blocking ISR responses.
+ */
 export function blockingIsrCacheControl(
   revalidateSeconds: number,
   options: IsrCacheControlOptions = {},
@@ -773,6 +888,10 @@ export function blockingIsrCacheControl(
   return `public, max-age=${browserMaxAge}, s-maxage=${sharedMaxAge}, stale-if-error=${staleIfError}, must-revalidate`;
 }
 
+/**
+ * Returns whether an ISR metadata record still points to HTML whose generated time is
+ * within its revalidation TTL.
+ */
 export function isFresh(record: IsrMetaRecord, nowMs: number): boolean {
   if (!record.htmlPointer) return false;
   return nowMs < record.generatedAt + record.revalidateSeconds * 1_000;

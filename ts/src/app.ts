@@ -66,6 +66,11 @@ import {
   parseQueryString,
 } from './types.js';
 
+/**
+ * Options for constructing a FaceTheory app: Faces define render-mode routes,
+ * resources define raw endpoints, and optional runtimes wire ISR, strict CSP,
+ * hydration sidecars, observability, and trailing-slash policy.
+ */
 export interface FaceAppOptions {
   faces: FaceModule[];
   resources?: FaceResourceRoute[];
@@ -76,14 +81,26 @@ export interface FaceAppOptions {
   trailingSlash?: TrailingSlashPolicy;
 }
 
+/**
+ * Structured log record emitted by a FaceApp for request completion, stream errors,
+ * and construction-time contract warnings.
+ */
 export type FaceAppLogRecord =
   | FaceRequestCompletedLogRecord
   | FaceStreamErrorLogRecord
   | (FaceContractWarningLogRecord &
       Partial<Omit<FaceRequestCompletedLogRecord, 'event'>>);
 
+/**
+ * Observer callback for FaceApp structured logs; implementations must avoid mutating
+ * render output or request context.
+ */
 export type FaceAppLogHook = (record: FaceAppLogRecord) => void;
 
+/**
+ * Observability callbacks used by FaceApp without changing emitted HTML bytes or
+ * hydration behavior.
+ */
 export interface FaceAppObservabilityHooks extends Omit<
   FaceObservabilityHooks,
   'log'
@@ -96,6 +113,10 @@ export interface FaceAppObservabilityHooks extends Omit<
   log?: FaceAppLogHook;
 }
 
+/**
+ * Configuration for strict SSR hydration sidecars that externalize render data into
+ * signed, same-origin resources instead of inline script data.
+ */
 export interface FaceSsrHydrationSidecarOptions extends Pick<
   SsrHydrationSidecarStoreOptions,
   | 'htmlStore'
@@ -120,10 +141,18 @@ export interface FaceSsrHydrationSidecarOptions extends Pick<
   requestVariant?: FaceSsrHydrationSidecarVariantCallback;
 }
 
+/**
+ * Computes a reproducible request variant for SSR hydration sidecars; only stable
+ * request fields present on both HTML and sidecar fetches should be included.
+ */
 export type FaceSsrHydrationSidecarVariantCallback = (
   request: Readonly<Required<FaceRequest>>,
 ) => SsrHydrationSidecarVariantInput | Promise<SsrHydrationSidecarVariantInput>;
 
+/**
+ * Strict CSP runtime limits applied when no-inline policies require buffering streamed
+ * HTML for whole-document validation.
+ */
 export interface FaceStrictCspOptions {
   /**
    * Maximum raw stream bytes FaceTheory will collect for strict no-inline CSP
@@ -134,6 +163,10 @@ export interface FaceStrictCspOptions {
 }
 
 const HTML_CONTENT_TYPE = 'text/html; charset=utf-8';
+/**
+ * Default maximum buffered body size for strict CSP streaming validation, chosen to
+ * fail closed rather than collect unbounded Lambda memory.
+ */
 export const DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES = 5 * 1024 * 1024;
 const SAFE_INTERNAL_ERROR_HTML = renderHTMLDocument({
   head: '<title>Internal Server Error</title>',
@@ -184,6 +217,11 @@ interface FaceAppSsrHydrationSidecarRuntime {
   requestVariant: FaceSsrHydrationSidecarVariantCallback;
 }
 
+/**
+ * Framework-neutral FaceTheory application that routes resources and Faces, executes
+ * `load`/`render` according to the Face mode, wraps deterministic HTML documents, and
+ * returns handler-agnostic responses.
+ */
 export class FaceApp {
   private readonly router: Router;
   private readonly faceByPattern: Map<string, FaceModule>;
@@ -513,10 +551,18 @@ export class FaceApp {
   }
 }
 
+/**
+ * Creates the canonical FaceTheory application instance from a bounded list of Faces
+ * and optional resource/runtime configuration.
+ */
 export function createFaceApp(options: FaceAppOptions): FaceApp {
   return new FaceApp(options);
 }
 
+/**
+ * Identity helper that preserves typed `load` data inference for a FaceModule while
+ * returning the runtime Face contract unchanged.
+ */
 export function defineFace<TData = unknown>(
   face: FaceModule<TData>,
 ): FaceModule<TData> {

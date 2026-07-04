@@ -14,6 +14,10 @@ export function createCspNonce(bytes = 16): string {
   return randomBytes(size).toString('base64');
 }
 
+/**
+ * Options for constructing FaceTheory's strict CSP header, including the per-response
+ * nonce and bounded directive extensions.
+ */
 export interface StrictCspHeaderOptions {
   /**
    * Optional nonce for callers that intentionally allow FaceTheory-owned
@@ -29,15 +33,30 @@ export interface StrictCspHeaderOptions {
   directives?: StrictCspDirectiveExtensions;
 }
 
+/**
+ * Single CSP source expression accepted as an extension value after unsafe token and
+ * injection checks.
+ */
 export type StrictCspDirectiveValue = string;
+/**
+ * One or more CSP source expressions for a directive extension.
+ */
 export type StrictCspDirectiveValues =
   | StrictCspDirectiveValue
   | readonly StrictCspDirectiveValue[];
+/**
+ * Map of CSP directive names to additional source expressions appended to FaceTheory's
+ * strict same-origin defaults.
+ */
 export type StrictCspDirectiveExtensions = Record<
   string,
   StrictCspDirectiveValues | null | undefined
 >;
 
+/**
+ * Options for whole-document strict CSP validation, including the expected request
+ * nonce for nonce-carried JSON-LD head scripts.
+ */
 export interface StrictCspDocumentValidationOptions {
   policy?: FaceCspPolicy | undefined;
   /**

@@ -7,17 +7,32 @@ import type {
   FaceRenderResult,
 } from './types.js';
 
+/**
+ * Options for rendering the complete deterministic head string, including the
+ * per-request CSP nonce and allowed origin for strict same-origin URL checks.
+ */
 export interface RenderFaceHeadOptions {
   cspNonce?: string | null;
   allowedOrigin?: string | URL;
 }
 
+/**
+ * Options applied while ordering and deduplicating structured head tags before
+ * rendering.
+ */
 export interface NormalizeHeadTagsOptions {
   cspNonce?: string | null;
 }
 
+/**
+ * Title template contract for `titleTag`: either a string containing `%s` or a
+ * function that receives normalized title text.
+ */
 export type HeadTitleTemplate = string | ((title: string) => string);
 
+/**
+ * Options for constructing deterministic `<title>` tags through the head primitive.
+ */
 export interface TitleTagOptions {
   /**
    * Template applied to the title before emission. String templates must contain
@@ -26,15 +41,31 @@ export interface TitleTagOptions {
   template?: HeadTitleTemplate;
 }
 
+/**
+ * Primitive value accepted for meta content helpers before normalization to a string
+ * attribute.
+ */
 export type HeadMetaContent = string | number | boolean;
 
+/**
+ * Additional meta attributes allowed by helper functions after reserving
+ * identity/content attributes for deterministic helper output.
+ */
 export type HeadMetaExtraAttributes = Omit<
   FaceAttributes,
   'charset' | 'content' | 'http-equiv' | 'name' | 'property'
 >;
 
+/**
+ * Additional link attributes allowed by link helpers after reserving `href` and `rel`
+ * for deterministic helper output.
+ */
 export type HeadLinkExtraAttributes = Omit<FaceAttributes, 'href' | 'rel'>;
 
+/**
+ * Input for generating sorted Open Graph meta tags with optional additional `og:*`
+ * fields.
+ */
 export interface OpenGraphOptions {
   title?: HeadMetaContent;
   type?: HeadMetaContent;
@@ -48,6 +79,10 @@ export interface OpenGraphOptions {
   attrs?: HeadMetaExtraAttributes;
 }
 
+/**
+ * Input for generating sorted Twitter Card meta tags with optional additional
+ * `twitter:*` fields.
+ */
 export interface TwitterCardOptions {
   card: HeadMetaContent;
   site?: HeadMetaContent;
@@ -60,6 +95,10 @@ export interface TwitterCardOptions {
   attrs?: HeadMetaExtraAttributes;
 }
 
+/**
+ * Options for safe JSON-LD script tags; nonce values must match the request CSP nonce
+ * when strict no-inline CSP validation is active.
+ */
 export interface JsonLdOptions {
   /**
    * Optional request CSP nonce. `renderFaceHead(..., { cspNonce })` also applies
@@ -386,10 +425,18 @@ function appendAdditionalMetaValues(
   }
 }
 
+/**
+ * Creates a structured title tag whose template replacement is deterministic and
+ * treats dollar sequences in caller titles as literal text.
+ */
 export function titleTag(title: string, options: TitleTagOptions = {}): FaceHeadTag {
   return { type: 'title', text: applyTitleTemplate(title, options.template) };
 }
 
+/**
+ * Creates a structured named meta tag with deterministic content normalization and
+ * caller-supplied safe extra attributes.
+ */
 export function metaTag(
   name: string,
   content: HeadMetaContent,
@@ -405,6 +452,10 @@ export function metaTag(
   };
 }
 
+/**
+ * Creates deterministic Open Graph meta tags ordered by the helper contract rather
+ * than caller object iteration side effects.
+ */
 export function openGraph(options: OpenGraphOptions): FaceHeadTag[] {
   const tags: FaceHeadTag[] = [];
   const attrs = options.attrs;
@@ -427,6 +478,10 @@ export function openGraph(options: OpenGraphOptions): FaceHeadTag[] {
   return tags;
 }
 
+/**
+ * Creates deterministic Twitter Card meta tags ordered by the helper contract rather
+ * than caller object iteration side effects.
+ */
 export function twitterCard(options: TwitterCardOptions): FaceHeadTag[] {
   const tags: FaceHeadTag[] = [];
   const attrs = options.attrs;
@@ -448,6 +503,9 @@ export function twitterCard(options: TwitterCardOptions): FaceHeadTag[] {
   return tags;
 }
 
+/**
+ * Creates a canonical link tag after requiring an http(s) or same-origin URL shape.
+ */
 export function canonical(
   href: string,
   attrs: HeadLinkExtraAttributes = {},
@@ -462,6 +520,10 @@ export function canonical(
   };
 }
 
+/**
+ * Creates a safe JSON-LD script tag whose serialized data is escaped and carried
+ * through the structured head primitive for nonce-aware rendering.
+ */
 export function jsonLd(data: unknown, options: JsonLdOptions = {}): FaceHeadTag {
   const attrs: FaceAttributes = {
     ...(options.attrs ?? {}),
@@ -574,6 +636,10 @@ function dedupeHeadTags(tags: FaceHeadTag[]): FaceHeadTag[] {
   return out;
 }
 
+/**
+ * Applies CSP nonces, stable deduplication, and canonical charset/title ordering
+ * before head tags are rendered.
+ */
 export function normalizeHeadTags(
   tags: FaceHeadTag[],
   options: NormalizeHeadTagsOptions = {},
@@ -601,6 +667,10 @@ export function normalizeHeadTags(
   return [...charset, ...title, ...rest];
 }
 
+/**
+ * Renders one structured head tag to HTML, escaping text/style/script bodies except
+ * for the explicit raw escape hatch.
+ */
 export function renderHeadTag(tag: FaceHeadTag): string {
   switch (tag.type) {
     case 'raw':
@@ -623,6 +693,10 @@ export function renderHeadTag(tag: FaceHeadTag): string {
   }
 }
 
+/**
+ * Assembles the full head HTML for a FaceRenderResult, preserving structured tag
+ * order, applying request nonces, and enforcing strict CSP URL/body checks.
+ */
 export function renderFaceHead(
   out: FaceRenderResult,
   options: RenderFaceHeadOptions = {},
