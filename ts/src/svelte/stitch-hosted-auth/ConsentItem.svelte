@@ -1,12 +1,21 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import {
     authConsentItemBackground,
     authConsentItemOpacity,
   } from '../../stitch-hosted-auth/index.js';
 
-  export let label: unknown;
-  export let description: unknown = undefined;
-  export let granted = false;
+  let {
+    label,
+    description = undefined,
+    granted = false,
+    icon,
+  }: {
+    label?: unknown;
+    description?: unknown;
+    granted?: boolean;
+    icon?: Snippet;
+  } = $props();
 </script>
 
 <li
@@ -17,7 +26,7 @@
     aria-hidden="true"
     style="font-size:18px;color:var(--stitch-color-primary, #1f108e);flex-shrink:0;margin-top:2px;"
   >
-    <slot name="icon" />
+    {@render icon?.()}
   </span>
 
   <div style="display:flex;flex-direction:column;gap:2px;flex:1;">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import {
     authStateClassName,
     authStateRole,
@@ -6,11 +7,21 @@
   } from '../../stitch-hosted-auth/index.js';
   import type { AuthStateVariant } from '../../stitch-hosted-auth/index.js';
 
-  export let variant: AuthStateVariant = 'info';
-  export let title: unknown;
-  export let description: unknown = undefined;
+  let {
+    variant = 'info',
+    title,
+    description = undefined,
+    icon,
+    actions,
+  }: {
+    variant?: AuthStateVariant;
+    title?: unknown;
+    description?: unknown;
+    icon?: Snippet;
+    actions?: Snippet;
+  } = $props();
 
-  $: palette = authStateVariantPalette(variant);
+  const palette = $derived(authStateVariantPalette(variant));
 </script>
 
 <div
@@ -22,7 +33,7 @@
     aria-hidden="true"
     style={`width:48px;height:48px;border-radius:9999px;background:var(--stitch-color-surface-container-low, #f2f3ff);color:${palette.accent};display:flex;align-items:center;justify-content:center;font-size:22px;`}
   >
-    <slot name="icon" />
+    {@render icon?.()}
   </div>
 
   <h1
@@ -39,6 +50,6 @@
     class="facetheory-stitch-auth-state-actions"
     style="display:flex;gap:12px;margin-top:8px;justify-content:center;flex-wrap:wrap;"
   >
-    <slot name="actions" />
+    {@render actions?.()}
   </div>
 </div>

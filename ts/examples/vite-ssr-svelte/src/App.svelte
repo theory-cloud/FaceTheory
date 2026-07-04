@@ -33,7 +33,7 @@
     Tabs,
   } from '@theory-cloud/facetheory/svelte/stitch-admin';
 
-  export let message: string;
+  let { message }: { message: string } = $props();
 
   const nav = [
     { key: '/dashboard', label: 'Dashboard', path: '/dashboard' },
@@ -84,8 +84,8 @@
 
     <Section title="Hosted auth" description="Passkey-first primitives">
       <AuthCard title="Sign in to Autheory" description="Use your passkey or password">
-        <a slot="headerAction" href="/signup">Sign up</a>
-        <a slot="footer" href="/reset">Trouble signing in?</a>
+        {#snippet headerAction()}<a href="/signup">Sign up</a>{/snippet}
+        {#snippet footer()}<a href="/reset">Trouble signing in?</a>{/snippet}
 
         <AuthFlowStepper
           steps={[
@@ -110,7 +110,7 @@
             label="Read your profile"
             description="Name, email, and tenant memberships"
           >
-            <span slot="icon">◈</span>
+            {#snippet icon()}<span>◈</span>{/snippet}
           </ConsentItem>
           <ConsentItem label="Manage API clients" granted={true} />
         </ConsentList>
@@ -120,8 +120,8 @@
           title="Account locked"
           description="Too many failed attempts"
         >
-          <span slot="icon">!</span>
-          <button slot="actions" type="button">Contact support</button>
+          {#snippet icon()}<span>!</span>{/snippet}
+          {#snippet actions()}<button type="button">Contact support</button>{/snippet}
         </AuthStateCard>
       </AuthCard>
     </Section>

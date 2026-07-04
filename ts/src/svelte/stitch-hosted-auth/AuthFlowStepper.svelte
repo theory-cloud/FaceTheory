@@ -2,8 +2,13 @@
   import { resolveAuthFlowStepState } from '../../stitch-hosted-auth/index.js';
   import type { AuthFlowStep } from '../../stitch-hosted-auth/index.js';
 
-  export let steps: AuthFlowStep[] = [];
-  export let currentIndex: number;
+  let {
+    steps = [],
+    currentIndex,
+  }: {
+    steps?: AuthFlowStep[];
+    currentIndex: number;
+  } = $props();
 
   function stepAriaCurrent(index: number): 'step' | undefined {
     return resolveAuthFlowStepState(index, currentIndex).ariaCurrent;

@@ -5,17 +5,27 @@
     updateAuthOtpValueAtIndex,
   } from '../../stitch-hosted-auth/index.js';
 
-  export let length = 6;
-  export let value: string | undefined = undefined;
-  export let onChange: ((value: string) => void) | undefined = undefined;
-  export let onComplete: ((value: string) => void) | undefined = undefined;
-  export let disabled = false;
-  export let invalid = false;
-  export let autoFocus = true;
+  let {
+    length = 6,
+    value = undefined,
+    onChange = undefined,
+    onComplete = undefined,
+    disabled = false,
+    invalid = false,
+    autoFocus = true,
+  }: {
+    length?: number;
+    value?: string | undefined;
+    onChange?: ((value: string) => void) | undefined;
+    onComplete?: ((value: string) => void) | undefined;
+    disabled?: boolean;
+    invalid?: boolean;
+    autoFocus?: boolean;
+  } = $props();
 
-  let internalValue = value ?? '';
+  let internalValue = $state(value ?? '');
 
-  $: currentValue = value ?? internalValue;
+  const currentValue = $derived(value ?? internalValue);
 
   function updateIndex(index: number, nextChar: string): void {
     const nextValue = updateAuthOtpValueAtIndex(
@@ -43,7 +53,7 @@
       disabled={disabled}
       autofocus={autoFocus && index === 0}
       aria-invalid={invalid ? 'true' : undefined}
-      on:input={(event) => updateIndex(index, (event.currentTarget as HTMLInputElement).value)}
+      oninput={(event) => updateIndex(index, (event.currentTarget as HTMLInputElement).value)}
       style={`width:44px;height:48px;text-align:center;border-radius:var(--stitch-radius-md, 6px);border:${
         invalid
           ? '1px solid var(--stitch-color-error, #ba1a1a)'

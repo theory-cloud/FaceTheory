@@ -4,7 +4,7 @@
     Shell,
   } from '@theory-cloud/facetheory/svelte/stitch-shell';
 
-  export let message: string;
+  let { message }: { message: string } = $props();
 
   const nav = [
     { key: '/dashboard', label: 'Dashboard', path: '/dashboard' },

@@ -1,6 +1,19 @@
 <script lang="ts">
-  export let title: unknown;
-  export let description: unknown = undefined;
+  import type { Snippet } from 'svelte';
+
+  let {
+    title,
+    description = undefined,
+    headerAction,
+    footer,
+    children,
+  }: {
+    title?: unknown;
+    description?: unknown;
+    headerAction?: Snippet;
+    footer?: Snippet;
+    children?: Snippet;
+  } = $props();
 </script>
 
 <div
@@ -27,7 +40,7 @@
     </div>
 
     <div style="flex-shrink:0;">
-      <slot name="headerAction" />
+      {@render headerAction?.()}
     </div>
   </header>
 
@@ -35,13 +48,13 @@
     class="facetheory-stitch-auth-card-body"
     style="display:flex;flex-direction:column;gap:16px;"
   >
-    <slot />
+    {@render children?.()}
   </div>
 
   <div
     class="facetheory-stitch-auth-card-footer"
     style="display:flex;justify-content:center;font-size:13px;"
   >
-    <slot name="footer" />
+    {@render footer?.()}
   </div>
 </div>

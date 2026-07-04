@@ -876,9 +876,9 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
       description: 'Use a passkey to continue.',
     },
     wrapperMarkup: `<Target {...fixtureProps}>
-  <svelte:fragment slot="headerAction">Help</svelte:fragment>
+  {#snippet headerAction()}Help{/snippet}
   <p>Hosted auth fixture body</p>
-  <svelte:fragment slot="footer">Privacy · Terms</svelte:fragment>
+  {#snippet footer()}Privacy · Terms{/snippet}
 </Target>`,
   },
   {
@@ -906,9 +906,9 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
     componentPath: 'src/svelte/stitch-hosted-auth/AuthPageLayout.svelte',
     props: { background: 'gradient' },
     wrapperMarkup: `<Target {...fixtureProps}>
-  <svelte:fragment slot="brand">Fixture Auth</svelte:fragment>
+  {#snippet brand()}Fixture Auth{/snippet}
   <section>Hosted auth page body</section>
-  <svelte:fragment slot="footer">Fixture footer</svelte:fragment>
+  {#snippet footer()}Fixture footer{/snippet}
 </Target>`,
   },
   {
@@ -919,7 +919,7 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
       description: 'Fixture auth state requires review.',
     },
     wrapperMarkup:
-      '<Target {...fixtureProps}><svelte:fragment slot="icon">!</svelte:fragment><svelte:fragment slot="actions">Retry</svelte:fragment></Target>',
+      '<Target {...fixtureProps}>{#snippet icon()}!{/snippet}{#snippet actions()}Retry{/snippet}</Target>',
   },
   {
     componentPath: 'src/svelte/stitch-hosted-auth/ConsentItem.svelte',
@@ -929,7 +929,7 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
       granted: true,
     },
     wrapperMarkup:
-      '<Target {...fixtureProps}><svelte:fragment slot="icon">✓</svelte:fragment></Target>',
+      '<Target {...fixtureProps}>{#snippet icon()}✓{/snippet}</Target>',
   },
   {
     componentPath: 'src/svelte/stitch-hosted-auth/ConsentList.svelte',
@@ -950,7 +950,7 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
     componentPath: 'src/svelte/stitch-hosted-auth/PasskeyCTA.svelte',
     props: { loading: false, disabled: false, type: 'button' },
     wrapperMarkup:
-      '<Target {...fixtureProps}><svelte:fragment slot="icon">🔐</svelte:fragment>Continue with passkey</Target>',
+      '<Target {...fixtureProps}>{#snippet icon()}🔐{/snippet}Continue with passkey</Target>',
   },
   {
     componentPath: 'src/svelte/stitch-shell/BrandHeader.svelte',
