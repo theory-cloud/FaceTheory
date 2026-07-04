@@ -54,7 +54,7 @@ npm install react react-dom
 # Vue peer set
 npm install vue @vue/server-renderer
 
-# Svelte peer set; FaceTheory excludes Svelte 5.46.0 through 5.55.6.
+# Svelte peer set; FaceTheory requires Svelte >=5.55.7 (Svelte 4 and 5.46.0-5.55.6 unsupported).
 npm install svelte@^5.55.7
 ```
 

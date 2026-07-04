@@ -18,7 +18,7 @@ const FACE_PACKAGE = {
     antd: '>=5',
     react: '>=18',
     'react-dom': '>=18',
-    svelte: '>=4 <5.46.0 || >=5.55.7',
+    svelte: '>=5.55.7',
     vue: '>=3',
   },
 };
@@ -134,13 +134,13 @@ test('facetheory doctor reads the Node floor from package engines', async () => 
   }
 });
 
-test('facetheory doctor explains the Svelte exclusion band', async () => {
+test('facetheory doctor explains the Svelte version floor', async () => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-doctor-svelte-'));
   const stdout = new CaptureStream();
   try {
     const appDir = path.resolve(tempRoot, 'app');
     await writeJson(path.resolve(appDir, 'package.json'), {
-      name: 'doctor-svelte-band',
+      name: 'doctor-svelte-floor',
       private: true,
       dependencies: { svelte: '5.50.0' },
     });
@@ -157,7 +157,7 @@ test('facetheory doctor explains the Svelte exclusion band', async () => {
 
     assert.equal(exitCode, 1);
     assert.match(stdout.text, /svelte 5\.50\.0 does not satisfy/);
-    assert.match(stdout.text, /Svelte 5\.46\.0 through 5\.55\.6 are excluded/);
+    assert.match(stdout.text, /FaceTheory requires Svelte >=5\.55\.7/);
     assert.match(stdout.text, /npm install svelte@\^5\.55\.7/);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });

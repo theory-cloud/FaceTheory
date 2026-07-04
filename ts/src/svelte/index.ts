@@ -22,6 +22,13 @@ export interface SvelteSSRRenderResult {
   head?: string;
 }
 
+/**
+ * A synchronous "bring-your-own-HTML" render input: any object exposing a
+ * `render(props)` that returns pre-rendered `{ html, head?, css? }`. This is not
+ * a Svelte-4 compiled component (FaceTheory requires Svelte >=5.55.7); it is the
+ * escape hatch for callers supplying externally/hand-rendered markup. Compiled
+ * Svelte 5 components have no `.render()` and go through `svelte/server` instead.
+ */
 export interface SvelteLegacySSRComponent<Props = Record<string, unknown>> {
   render: (props?: Props) => SvelteSSRRenderResult;
 }
@@ -112,26 +119,21 @@ async function renderSvelteInternal<Props extends Record<string, unknown>>(
   });
 }
 
-function isSvelte5DeprecatedRenderError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  return err.message.includes(
-    'Component.render(...) is no longer valid in Svelte 5',
-  );
-}
-
 async function renderSvelteInput<Props extends Record<string, unknown>>(
   input: SvelteRenderInput<Props>,
 ): Promise<SvelteSSRRenderResult> {
+  // FaceTheory requires Svelte >=5.55.7. Compiled Svelte 5 components expose no
+  // static `.render()`, so they render through `svelte/server` below. The
+  // synchronous `.render()` fast path is retained only for
+  // `SvelteLegacySSRComponent` inputs (pre-rendered `{ html, head?, css? }`).
+  // The former Svelte 4->5 `.render()` deprecation-error fallback is removed
+  // with Svelte 4 support: under Svelte 5-only there is no legacy compiled
+  // component whose `.render()` would throw and need bridging to `svelte/server`.
   const maybeLegacy = input.component as Partial<
     SvelteLegacySSRComponent<Props>
   >;
   if (typeof maybeLegacy.render === 'function') {
-    try {
-      return maybeLegacy.render(input.props);
-    } catch (err) {
-      if (!isSvelte5DeprecatedRenderError(err)) throw err;
-      return renderWithSvelteServer(input.component, input.props);
-    }
+    return maybeLegacy.render(input.props);
   }
 
   return renderWithSvelteServer(input.component, input.props);

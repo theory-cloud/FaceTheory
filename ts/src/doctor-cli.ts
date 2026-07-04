@@ -59,7 +59,7 @@ const ADAPTER_GROUPS: ReadonlyArray<{
 ];
 
 const SVELTE_EXCLUSION_RATIONALE =
-  'Svelte 5.46.0 through 5.55.6 are excluded because FaceTheory has not validated that band for deterministic Svelte SSR/hydration; use <5.46.0 or >=5.55.7.';
+  'FaceTheory requires Svelte >=5.55.7; Svelte 4 and Svelte 5 through 5.55.6 are unsupported because they are not validated for deterministic Svelte SSR/hydration.';
 
 function write(stream: Writable, message: string): void {
   stream.write(message);

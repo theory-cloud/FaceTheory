@@ -125,6 +125,36 @@ test('svelte adapter: renders component + extracts css', async () => {
   }
 });
 
+test('svelte adapter: renders a synchronous pre-rendered SvelteLegacySSRComponent input', async () => {
+  // Svelte >=5.55.7 compiled components render through svelte/server; the
+  // synchronous `.render()` input remains a supported "bring-your-own-HTML"
+  // escape hatch. This exercises that path directly, without the strict-CSP
+  // rejection wiring, so the modernized adapter internals stay covered.
+  const app = createFaceApp({
+    faces: [
+      createSvelteFace({
+        route: '/',
+        mode: 'ssr',
+        render: () => ({
+          component: {
+            render: (props?: { label?: string }) => ({
+              html: `<main>Prerendered ${props?.label ?? ''}</main>`,
+            }),
+          },
+          props: { label: 'Svelte 5' },
+        }),
+        renderOptions: { headTags: [{ type: 'title', text: 'Prerendered' }] },
+      }),
+    ],
+  });
+
+  const resp = await app.handle({ method: 'GET', path: '/' });
+  assert.equal(resp.status, 200);
+  const body = decodeBody(resp.body as Uint8Array);
+  assert.ok(body.includes('<title>Prerendered</title>'));
+  assert.ok(body.includes('<main>Prerendered Svelte 5</main>'));
+});
+
 test('svelte adapter: integration hooks provide deterministic head/style ordering and nonce coverage', async () => {
   let nextStateId = 0;
   const source = `

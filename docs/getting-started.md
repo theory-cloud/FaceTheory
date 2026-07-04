@@ -67,7 +67,7 @@ FaceTheory publishes an **ESM-only** package through immutable GitHub Release ta
 
 The package declares `sideEffects: false` after auditing the published import subpaths: importing FaceTheory modules defines types, constants, and functions, but it does not start servers, register browser listeners, mutate globals, read AWS credentials, or deploy cloud resources. Side-effecting operations such as `createLambdaUrlStreamingHandler()`, `startFaceNavigation()`, `startAwsOacFormTransport()`, the SSG CLI, and the dev server happen only when the caller invokes them.
 
-The Svelte peer range is intentionally narrower than “any Svelte 5”: FaceTheory supports Svelte `>=4 <5.46.0 || >=5.55.7` because SSR/hydration behavior in the excluded Svelte 5 band is not part of the verified adapter contract. New Svelte apps should install `svelte@^5.55.7` unless they are pinned to a validated Svelte 4 stack.
+FaceTheory requires Svelte `>=5.55.7`: v4.0.0 dropped Svelte 4 support and the components are authored with Svelte 5 runes. SSR/hydration behavior below `5.55.7` — including Svelte 4 and the `5.46.0`–`5.55.6` band — is not part of the verified adapter contract. Install `svelte@^5.55.7`.
 
 ### Step 3: Install optional companion packages
 

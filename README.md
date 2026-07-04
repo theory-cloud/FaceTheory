@@ -70,7 +70,7 @@ Add the framework peers that match your adapter surface:
 | Vue          | `npm install vue @vue/server-renderer`                           |
 | Svelte       | `npm install svelte@^5.55.7`                                     |
 
-Packaging posture: FaceTheory is ESM-only, declares `sideEffects: false` after auditing published import subpaths, and supports Svelte `>=4 <5.46.0 || >=5.55.7` with `svelte@^5.55.7` recommended for new apps. CommonJS hosts should migrate to ESM or use dynamic `import()` at the boundary instead of `require()`.
+Packaging posture: FaceTheory is ESM-only, declares `sideEffects: false` after auditing published import subpaths, and requires Svelte `>=5.55.7` (Svelte 4 support was dropped in v4.0.0). CommonJS hosts should migrate to ESM or use dynamic `import()` at the boundary instead of `require()`.
 
 Optional companion packages from pinned GitHub releases:
 

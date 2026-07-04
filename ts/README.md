@@ -23,7 +23,7 @@ FaceTheory is ESM-only. Import it from ESM Lambda handlers, Vite SSR entries, or
 
 The package declares `sideEffects: false`. The published import subpaths were audited for top-level work: module evaluation defines exports only and does not start listeners, mutate globals, read AWS credentials, open sockets, deploy infrastructure, or register Lambda handlers. Runtime side effects happen after explicit caller invocation (for example `startFaceNavigation()`, `startAwsOacFormTransport()`, CLI entrypoints, or handler factories).
 
-The Svelte peer range is `>=4 <5.46.0 || >=5.55.7` by design. The excluded Svelte 5 band is outside FaceTheory's verified SSR/hydration adapter contract; new Svelte consumers should prefer `svelte@^5.55.7`.
+The Svelte peer range is `>=5.55.7`. FaceTheory v4.0.0 dropped Svelte 4 support and requires Svelte 5 (components are authored with runes); Svelte releases below `5.55.7` — including Svelte 4 and the `5.46.0`–`5.55.6` band — are outside FaceTheory's verified SSR/hydration adapter contract.
 
 Optional companion packages:
 

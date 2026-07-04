@@ -24,6 +24,7 @@ Use this index to find the migration path by release line. Release Please update
 | SSR-only FaceTheory apps                | Current 3.x | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr)                      | Reclassify routes into the three server `FaceMode` values before adding SPA navigation.                                            |
 | ISR routes without tenant partitioning  | Current 3.x | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                                 |
 | Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                          |
+| Svelte 4 adapter consumers              | v4.0.0      | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                      |
 | Deprecated 3.x APIs                     | Next major  | [Deprecation Policy](./deprecation-policy.md)                                             | `Headers` and tag emission through `head.html` are retained through 3.x and scheduled for removal in the planned v4 curation pass. |
 
 ## Scope Guardrails
@@ -262,6 +263,32 @@ Rollback:
   claim it is strict no-inline
 - do not weaken the deployment CSP or publish a strict-CSP release claim without matching runtime, RC, and deployment
   evidence
+
+## Migration 8: Svelte 4 To Svelte 5 (v4.0.0)
+
+Use this path when upgrading a Svelte consumer from a FaceTheory 3.x line to v4.0.0. **v4.0.0 is a breaking release for the Svelte adapter: it requires Svelte `>=5.55.7` and drops Svelte 4 support.** The peer range moved from `>=4 <5.46.0 || >=5.55.7` to `>=5.55.7`. FaceTheory's bundled Stitch Svelte primitives (`stitch-shell`, `stitch-admin`, `stitch-hosted-auth`, `responsive-primitives`) are authored with Svelte 5 runes and no longer contain legacy `export let`, `$:`, `<slot>`, `$$slots`, `$$restProps`, or `on:` directives.
+
+1. Upgrade the app's Svelte peer to `>=5.55.7`:
+
+   ```bash
+   npm install svelte@^5.55.7
+   ```
+
+   The excluded `5.46.0`–`5.55.6` band and Svelte 4 are unsupported because they are not validated for deterministic Svelte SSR/hydration; `facetheory doctor` fails closed with a floor message if the installed Svelte is below `5.55.7`.
+
+2. Migrate your own Svelte components to runes (`$props`/`$state`/`$derived`, snippets and `{@render}` in place of `<slot>`, and `onclick=`-style event attributes). Svelte 5 compiles your components; FaceTheory renders them through `svelte/server`. Components that still use legacy syntax compile under Svelte 5's compatibility mode, but new authoring should use runes.
+
+3. **Named-slot authoring change.** If a template fills a FaceTheory Stitch primitive's named slot (for example the Stitch `Shell`/`Topbar`/`PageFrame` slots), Svelte 5 still accepts legacy `slot="name"` fill syntax against the migrated snippet props, so existing markup keeps rendering. New authoring should prefer `{#snippet name()}…{/snippet}`. The SSR output of the migrated primitives is held byte-for-byte against the v3.12 fixture baseline; any intentional difference is recorded in the release notes.
+
+4. Re-run local verification and rebuild the Svelte example:
+
+   ```bash
+   cd ts
+   npm run check
+   npm run example:vite:svelte:build
+   ```
+
+The `.render()` synchronous "bring-your-own-HTML" input to `createSvelteFace` (the `SvelteLegacySSRComponent` shape) is unchanged; only the Svelte 4 compiled-component path and its `svelte/server` deprecation-error fallback were removed.
 
 ## Rollback Notes
 
