@@ -18,6 +18,30 @@ Optional:
 - AWS familiarity if you plan to use the reference deployment stacks
 - AppTheory and TableTheory if you want the documented AWS-first integration path
 
+## Scaffold A Starter App
+
+Use the CLI from the pinned GitHub Release tarball to create an adapter-specific starter before hand-writing any hydration code:
+
+```bash
+export FACETHEORY_VERSION=3.8.1 # x-release-please-version
+npx --package \
+  "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz" \
+  facetheory create my-app --adapter react
+
+cd my-app
+npm install
+npm run check
+```
+
+Use `--adapter vue` or `--adapter svelte` for the other first-class adapters. The generated starter includes:
+
+- pinned FaceTheory, AppTheory, AppTheory CDK, and TableTheory GitHub Release tarball dependencies;
+- the npm `overrides` block that keeps AppTheory aligned to the same TableTheory tarball;
+- a framework-specific client entry with a real hydrate call (`hydrateRoot`, `createSSRApp(...).mount(...)`, or `hydrate(...)`) wired through `loadFaceHydrationData()`;
+- an `AppTheorySsrSite` CDK stack that deploys the Vite client output to S3 and routes SSR through AppTheory's Lambda Function URL path.
+
+The scaffold is a local developer onboarding aid only: it writes files under the target directory and never deploys, mutates AWS, or reads credentials.
+
 ## Install The Published Package
 
 Use the exact GitHub release asset so your application stays pinned to the published FaceTheory contract.

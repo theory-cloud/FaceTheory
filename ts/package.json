@@ -31,6 +31,8 @@
     "dist"
   ],
   "bin": {
+    "facetheory": "./dist/create-cli.js",
+    "facetheory-create": "./dist/create-cli.js",
     "facetheory-dev": "./dist/dev-cli.js"
   },
   "exports": {
