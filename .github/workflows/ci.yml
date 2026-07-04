@@ -128,6 +128,7 @@ jobs:
         run: |
           make ts-typecheck
           make ts-lint
+          make ts-examples-readmes
           make ts-test
 
   ts-pack:

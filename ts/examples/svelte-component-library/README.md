@@ -13,7 +13,7 @@ npm run example:vite:svelte:library:build
 npm run example:vite:svelte:library:serve
 ```
 
-The library itself is typechecked by `npm run typecheck` through the examples include list.
+The library package entry is typechecked by `npm run typecheck` through the examples include list; the `.svelte` component source is covered by the Vite Svelte library build.
 
 ## Backs
 
