@@ -128,9 +128,18 @@ jobs:
         run: |
           make ts-typecheck
           make ts-lint
+          make ts-format-check
           make ts-examples-readmes
           make docs-export-map
           make ts-test
+          make ts-coverage
+      - name: Upload TypeScript coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: facetheory-ts-coverage
+          path: ts/coverage/
+          if-no-files-found: warn
 
   ts-pack:
     name: TypeScript (npm pack)

@@ -12,27 +12,31 @@ edit_on_github: false
     <span class="dot"></span>
     Theory Cloud · {{ site.tabletheory.framework_name }}
   </div>
-  <h1>
-    The <span class="grad">AWS-first</span> client-delivery framework.
-  </h1>
+  <h1>The <span class="grad">AWS-first</span> client-delivery framework.</h1>
   <p>
-    Three server render modes plus the SPA client runtime. Three adapter surfaces. {{ site.tabletheory.framework_name }} renders
-    HTML for end users — server-side, build-time, incrementally, or as a hydrated shell —
-    with deterministic head and style emission so the server-rendered HTML matches the
-    client-hydrated DOM exactly.
+    Three server render modes plus the SPA client runtime. Three adapter
+    surfaces. {{ site.tabletheory.framework_name }} renders HTML for end users —
+    server-side, build-time, incrementally, or as a hydrated shell — with
+    deterministic head and style emission so the server-rendered HTML matches
+    the client-hydrated DOM exactly.
   </p>
   <div class="hero__actions">
     <a class="btn btn--primary" href="{{ '/getting-started/' | relative_url }}">
-      {% include icon.html name="play" size="14" %}
-      Get started
+      {% include icon.html name="play" size="14" %} Get started
     </a>
-    <a class="btn btn--ghost" href="{{ '/reference/face-module/' | relative_url }}">
-      {% include icon.html name="list-checks" size="14" %}
-      FaceModule API
+    <a
+      class="btn btn--ghost"
+      href="{{ '/reference/face-module/' | relative_url }}"
+    >
+      {% include icon.html name="list-checks" size="14" %} FaceModule API
     </a>
-    <a class="btn btn--ghost" href="https://github.com/{{ site.tabletheory.repo }}" target="_blank" rel="noopener">
-      {% include icon.html name="github" size="14" %}
-      View on GitHub
+    <a
+      class="btn btn--ghost"
+      href="https://github.com/{{ site.tabletheory.repo }}"
+      target="_blank"
+      rel="noopener"
+    >
+      {% include icon.html name="github" size="14" %} View on GitHub
     </a>
   </div>
 </section>
@@ -45,7 +49,10 @@ edit_on_github: false
 <div class="section-head">
   <div>
     <h2>Where FaceTheory shows up</h2>
-    <p>Three delivery surfaces in the Theory Cloud stack — one rendering contract behind all of them.</p>
+    <p>
+      Three delivery surfaces in the Theory Cloud stack — one rendering contract
+      behind all of them.
+    </p>
   </div>
   <a class="section-head__link" href="{{ '/architecture/' | relative_url }}">
     Architecture {% include icon.html name="chevron-right" size="12" %}
@@ -54,20 +61,24 @@ edit_on_github: false
 
 <div class="surface-map">
   {% for s in site.tabletheory.surfaces %}
-    <a class="surface-tile" href="{{ s.url | relative_url }}" data-surface-tile="{{ s.id }}">
-      <div class="surface-tile__head">
-        <span class="surface-tile__name">{{ s.name }}</span>
-        <span class="surface-chip surface-chip--{{ s.id }}">
-          <span class="dot"></span>{{ s.id | upcase }}
-        </span>
-      </div>
-      <div class="surface-tile__domain">{{ s.domain }}</div>
-      <p class="surface-tile__desc">{{ s.desc }}</p>
-      <div class="surface-tile__foot">
-        <span>{{ s.cta | default: "Read more" }}</span>
-        {% include icon.html name="chevron-right" size="12" %}
-      </div>
-    </a>
+  <a
+    class="surface-tile"
+    href="{{ s.url | relative_url }}"
+    data-surface-tile="{{ s.id }}"
+  >
+    <div class="surface-tile__head">
+      <span class="surface-tile__name">{{ s.name }}</span>
+      <span class="surface-chip surface-chip--{{ s.id }}">
+        <span class="dot"></span>{{ s.id | upcase }}
+      </span>
+    </div>
+    <div class="surface-tile__domain">{{ s.domain }}</div>
+    <p class="surface-tile__desc">{{ s.desc }}</p>
+    <div class="surface-tile__foot">
+      <span>{{ s.cta | default: "Read more" }}</span>
+      {% include icon.html name="chevron-right" size="12" %}
+    </div>
+  </a>
   {% endfor %}
 </div>
 
@@ -75,7 +86,7 @@ edit_on_github: false
      ADAPTER TABS — React / Vue / Svelte install + minimal Face
      ============================================================= -->
 <div class="runtime-block">
-  <div class="section-head" style="border-bottom: 0; margin-bottom: 8px;">
+  <div class="section-head" style="border-bottom: 0; margin-bottom: 8px">
     <div>
       <h2>One framework. Three adapters.</h2>
       <p>Pick an adapter and ship the same render contract.</p>
@@ -84,34 +95,48 @@ edit_on_github: false
 
   <div class="runtime-block__head" role="tablist" aria-label="Adapter">
     {% for r in site.data.runtimes %}
-      <button class="runtime-block__tab {% if forloop.first %}active{% endif %}"
-              data-runtime-tab="{{ r.id }}" role="tab"
-              aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
-        {% include icon.html name=r.icon size="14" %}
-        {{ r.label }}
-      </button>
+    <button
+      class="runtime-block__tab {% if forloop.first %}active{% endif %}"
+      data-runtime-tab="{{ r.id }}"
+      role="tab"
+      aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+    >
+      {% include icon.html name=r.icon size="14" %} {{ r.label }}
+    </button>
     {% endfor %}
   </div>
 
   {% for r in site.data.runtimes %}
-    <div class="runtime-block__pane" data-runtime-pane="{{ r.id }}" {% unless forloop.first %}hidden{% endunless %}>
+  <div
+    class="runtime-block__pane"
+    data-runtime-pane="{{ r.id }}"
+    {%
+    unless
+    forloop.first
+    %}hidden{%
+    endunless
+    %}
+  >
+    <p
+      class="tc-body-sm"
+      style="
+        color: var(--tc-fg-dim);
+        font-family: var(--tc-font-mono);
+        margin: 4px 0 12px;
+      "
+    >
+      {{ r.install }}
+    </p>
 
-  <p class="tc-body-sm" style="color: var(--tc-fg-dim); font-family: var(--tc-font-mono); margin: 4px 0 12px;">
-    {{ r.install }}
-  </p>
-
-```{{ r.lang }}
-{{ r.snippet }}
-```
-
-    </div>
+    ```{{ r.lang }} {{ r.snippet }} ```
+  </div>
   {% endfor %}
 </div>
 
 <script>
   // Local adapter-tab switcher — small enough to inline.
   (function () {
-    const tabs  = document.querySelectorAll("[data-runtime-tab]");
+    const tabs = document.querySelectorAll("[data-runtime-tab]");
     const panes = document.querySelectorAll("[data-runtime-pane]");
     tabs.forEach((t) => {
       t.addEventListener("click", () => {
@@ -121,7 +146,9 @@ edit_on_github: false
           b.classList.toggle("active", on);
           b.setAttribute("aria-selected", on ? "true" : "false");
         });
-        panes.forEach((p) => { p.hidden = p.dataset.runtimePane !== id; });
+        panes.forEach((p) => {
+          p.hidden = p.dataset.runtimePane !== id;
+        });
       });
     });
   })();
@@ -132,11 +159,11 @@ edit_on_github: false
      ============================================================= -->
 <div class="stats-strip" aria-label="At a glance">
   {% for s in site.tabletheory.stats %}
-    <div class="stats-strip__cell">
-      <div class="stats-strip__label">{{ s.label }}</div>
-      <div class="stats-strip__value">{{ s.value }}</div>
-      <div class="stats-strip__sub">{{ s.sub }}</div>
-    </div>
+  <div class="stats-strip__cell">
+    <div class="stats-strip__label">{{ s.label }}</div>
+    <div class="stats-strip__value">{{ s.value }}</div>
+    <div class="stats-strip__sub">{{ s.sub }}</div>
+  </div>
   {% endfor %}
 </div>
 
@@ -146,7 +173,10 @@ edit_on_github: false
 <div class="section-head">
   <div>
     <h2>Quick starts</h2>
-    <p>The deepest-value sections, ranked by how often new consumers reach for them.</p>
+    <p>
+      The deepest-value sections, ranked by how often new consumers reach for
+      them.
+    </p>
   </div>
   <a class="section-head__link" href="{{ '/getting-started/' | relative_url }}">
     All guides {% include icon.html name="chevron-right" size="12" %}
@@ -155,27 +185,40 @@ edit_on_github: false
 
 <div class="qs-grid">
   {% for q in site.data.site-meta.quick_start %}
-    <a class="qs-card" href="{{ q.url | relative_url }}">
-      <span class="qs-card__icon">{% include icon.html name=q.icon size="14" %}</span>
-      <div class="qs-card__title">{{ q.title }}</div>
-      <p class="qs-card__desc">{{ q.desc }}</p>
-    </a>
+  <a class="qs-card" href="{{ q.url | relative_url }}">
+    <span class="qs-card__icon"
+      >{% include icon.html name=q.icon size="14" %}</span
+    >
+    <div class="qs-card__title">{{ q.title }}</div>
+    <p class="qs-card__desc">{{ q.desc }}</p>
+  </a>
   {% endfor %}
 </div>
 
 <!-- =============================================================
      CLOSING CALL-OUT BAR
      ============================================================= -->
-<div class="doc-feedback" style="margin-top: 24px;">
+<div class="doc-feedback" style="margin-top: 24px">
   <div class="doc-feedback__text">
     <strong>{{ site.tabletheory.framework_name }} is open source.</strong>
-    Apache-2.0, published through immutable GitHub Releases, used in production for the Pay Theory checkout page.
+    Apache-2.0, published through immutable GitHub Releases, used in production
+    for the Pay Theory checkout page.
   </div>
   <div class="doc-feedback__actions">
-    <a class="doc-feedback__btn" href="https://github.com/{{ site.tabletheory.repo }}" target="_blank" rel="noopener">
+    <a
+      class="doc-feedback__btn"
+      href="https://github.com/{{ site.tabletheory.repo }}"
+      target="_blank"
+      rel="noopener"
+    >
       {% include icon.html name="github" size="13" %} Star on GitHub
     </a>
-    <a class="doc-feedback__btn" href="https://github.com/{{ site.tabletheory.repo }}/releases" target="_blank" rel="noopener">
+    <a
+      class="doc-feedback__btn"
+      href="https://github.com/{{ site.tabletheory.repo }}/releases"
+      target="_blank"
+      rel="noopener"
+    >
       {% include icon.html name="tag" size="13" %} Releases
     </a>
   </div>

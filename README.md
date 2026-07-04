@@ -63,12 +63,12 @@ npm install --save-exact \
 
 Add the framework peers that match your adapter surface:
 
-| Adapter | Peer install |
-|---------|--------------|
-| React          | `npm install react react-dom` |
-| React + AntD   | `npm install antd @emotion/react @emotion/cache @emotion/server` |
-| Vue            | `npm install vue @vue/server-renderer` |
-| Svelte         | `npm install svelte@^5.55.7` |
+| Adapter      | Peer install                                                     |
+| ------------ | ---------------------------------------------------------------- |
+| React        | `npm install react react-dom`                                    |
+| React + AntD | `npm install antd @emotion/react @emotion/cache @emotion/server` |
+| Vue          | `npm install vue @vue/server-renderer`                           |
+| Svelte       | `npm install svelte@^5.55.7`                                     |
 
 Optional companion packages from pinned GitHub releases:
 
@@ -116,14 +116,14 @@ The `v3.8.1` GitHub release also ships the matching `facetheory-reference-${FACE
 
 ## At a glance
 
-| Surface | Count | Contract |
-| ------- | ----- | -------- |
-| Server render modes | 3 | SSR · SSG · blocking ISR |
-| SPA client runtime | 1 | Same-origin navigation layered on a server-rendered shell |
-| Adapters | 3 | React · Vue · Svelte |
-| Distribution | GitHub Releases | immutable, pinned |
-| Runtime | Node ≥24 | TypeScript-only |
-| License | Apache-2.0 | open source |
+| Surface             | Count           | Contract                                                  |
+| ------------------- | --------------- | --------------------------------------------------------- |
+| Server render modes | 3               | SSR · SSG · blocking ISR                                  |
+| SPA client runtime  | 1               | Same-origin navigation layered on a server-rendered shell |
+| Adapters            | 3               | React · Vue · Svelte                                      |
+| Distribution        | GitHub Releases | immutable, pinned                                         |
+| Runtime             | Node ≥24        | TypeScript-only                                           |
+| License             | Apache-2.0      | open source                                               |
 
 ## Resource Routes And Hydration Sidecars
 

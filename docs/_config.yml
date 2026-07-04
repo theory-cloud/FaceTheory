@@ -54,13 +54,13 @@ exclude:
   - .jekyll-metadata
   - _site
   - node_modules
-  - "README.md"                  # repo-facing index; site landing is index.html
+  - "README.md" # repo-facing index; site landing is index.html
   - "_concepts.yaml"
   - "_contract.yaml"
   - "_decisions.yaml"
   - "_patterns.yaml"
-  - "UPSTREAM_RELEASE_PINS.md"   # release-internal pin metadata
-  - "wizard-primitives.md"       # internal authoring guide; not public docs
+  - "UPSTREAM_RELEASE_PINS.md" # release-internal pin metadata
+  - "wizard-primitives.md" # internal authoring guide; not public docs
   - "planning"
 
 # Apply the default docs layout to every markdown page automatically,
@@ -95,14 +95,14 @@ defaults:
 # VALUES below describe FaceTheory's identity.
 # =============================================================
 tabletheory:
-  surface: core                 # core | mcp | auth | journal
+  surface: core # core | mcp | auth | journal
   framework_name: FaceTheory
   framework_short: facetheory
   repo: theory-cloud/FaceTheory
   repo_branch: staging
   docs_root: docs
   version_pill: "v3.x"
-  version_status: stable        # FaceTheory is on the post-1.0 3.x release line
+  version_status: stable # FaceTheory is on the post-1.0 3.x release line
   # `runtimes` is the keyed name the chrome (sidebar groups, landing tabs,
   # install pills) expects. For FaceTheory it lists ADAPTER surfaces.
   runtimes:

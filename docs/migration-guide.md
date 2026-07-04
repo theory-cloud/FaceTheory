@@ -9,22 +9,22 @@ This guide focuses on the supported migration paths into the current FaceTheory 
 ## When To Use This Guide
 
 Use this guide when you are:
+
 - replacing an ad hoc SSR handler with FaceTheory entrypoints
 - introducing SSG or ISR into an SSR-only FaceTheory app
 - updating AppTheory or TableTheory dependency pins
-
 
 ## Versioned Migration Index
 
 Use this index to find the migration path by release line. Release Please updates version markers automatically; do not hand-edit `x-release-please-version` comments when adding migration notes.
 
-| From | To | Migration path | Notes |
-| --- | --- | --- | --- |
-| App-local SSR glue | Current 3.x | [Migration 1](#migration-1-ad-hoc-handler-to-canonical-aws-entrypoint) | Move request translation into `createFaceApp()` and the Lambda/AppTheory entrypoints. |
-| SSR-only FaceTheory apps | Current 3.x | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr) | Reclassify routes into the three server `FaceMode` values before adding SPA navigation. |
-| ISR routes without tenant partitioning | Current 3.x | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults) | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR. |
-| Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets. |
-| Deprecated 3.x APIs | Next major | [Deprecation Policy](./deprecation-policy.md) | `Headers` and tag emission through `head.html` are retained through 3.x and scheduled for removal in the planned v4 curation pass. |
+| From                                    | To          | Migration path                                                                            | Notes                                                                                                                              |
+| --------------------------------------- | ----------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| App-local SSR glue                      | Current 3.x | [Migration 1](#migration-1-ad-hoc-handler-to-canonical-aws-entrypoint)                    | Move request translation into `createFaceApp()` and the Lambda/AppTheory entrypoints.                                              |
+| SSR-only FaceTheory apps                | Current 3.x | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr)                      | Reclassify routes into the three server `FaceMode` values before adding SPA navigation.                                            |
+| ISR routes without tenant partitioning  | Current 3.x | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                                 |
+| Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                          |
+| Deprecated 3.x APIs                     | Next major  | [Deprecation Policy](./deprecation-policy.md)                                             | `Headers` and tag emission through `head.html` are retained through 3.x and scheduled for removal in the planned v4 curation pass. |
 
 ## Scope Guardrails
 
@@ -87,6 +87,7 @@ curl -I https://<cloudfront-domain>/isr-demo
 ```
 
 Expected:
+
 - `x-facetheory-isr: miss|hit|wait-hit|stale`
 
 ## Migration 4: Adopt ISR Tenant Fail-Closed Defaults
@@ -123,12 +124,14 @@ curl -I -H 'x-tenant-id: tenant-b' https://<cloudfront-domain>/tenant-isr-demo
 ```
 
 Expected:
+
 - tenant-invariant ISR returns `x-facetheory-isr: miss` and then `hit` or `wait-hit` on repeat requests
 - unpartitioned ISR with tenant boundary headers returns a deterministic server error and does not write ISR metadata
   or HTML cache entries
 - explicitly partitioned ISR keeps tenants separated and still reports normal `x-facetheory-isr` transitions
 
 Rollback:
+
 - switch affected tenant-varying routes back to `mode: 'ssr'`, or
 - strip tenant-like headers for routes proven to be tenant-invariant before they reach FaceTheory.
 

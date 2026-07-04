@@ -277,11 +277,9 @@ const faces: FaceModule<{ message: string }>[] = [
     mode: "ssr",
     load: async () => ({ message: "Hello strict CSP" }),
     render: async (_ctx, data) => {
-      const { headTags } = viteAssetsForEntry(
-        manifest,
-        "src/entry-client.ts",
-        { includeAssets: true },
-      );
+      const { headTags } = viteAssetsForEntry(manifest, "src/entry-client.ts", {
+        includeAssets: true,
+      });
 
       return {
         csp: strictCsp,
@@ -290,11 +288,7 @@ const faces: FaceModule<{ message: string }>[] = [
         },
         headTags,
         html: `<main>${data.message}</main>`,
-        hydration: viteHydrationForEntry(
-          manifest,
-          "src/entry-client.ts",
-          data,
-        ),
+        hydration: viteHydrationForEntry(manifest, "src/entry-client.ts", data),
       };
     },
   },
@@ -403,9 +397,7 @@ import {
 const oacBootstrapModule = "/assets/oac-form-bootstrap.js";
 
 function formDocument(message = "") {
-  const alert = message
-    ? `<p role="alert">${escapeHTML(message)}</p>`
-    : "";
+  const alert = message ? `<p role="alert">${escapeHTML(message)}</p>` : "";
 
   return `
     <main>

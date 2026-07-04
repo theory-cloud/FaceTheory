@@ -221,8 +221,8 @@
     "dev": "npm run example:vite:ssr:dev",
     "typecheck": "npm run build && tsc -p tsconfig.json --noEmit",
     "lint": "eslint . --max-warnings=0",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "prettier --write package.json README.md ../README.md ../docs/README.md ../docs/api-reference.md ../docs/getting-started.md ../docs/deprecation-policy.md ../docs/migration-guide.md ../docs/reference/render-modes.md ../docs/index.html ../docs/integrations/autheory.md ../docs/wizard-primitives.md ../docs/_config.yml ../docs/_data/nav.yml ../.github/workflows/ci.yml",
+    "format:check": "prettier --check package.json README.md ../README.md ../docs/README.md ../docs/api-reference.md ../docs/getting-started.md ../docs/deprecation-policy.md ../docs/migration-guide.md ../docs/reference/render-modes.md ../docs/index.html ../docs/integrations/autheory.md ../docs/wizard-primitives.md ../docs/_config.yml ../docs/_data/nav.yml ../.github/workflows/ci.yml",
     "check": "npm run lint && npm run typecheck && npm run verify:examples:readmes && npm run test:unit",
     "test": "npm run build && npm run test:unit",
     "test:unit": "tsx test/run-unit.ts",
@@ -260,7 +260,8 @@
     "example:control-plane:client-fill:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=client-fill",
     "example:control-plane:streaming:relaxed": "tsx examples/control-plane-preset/render.ts --mode=relaxed --delivery=streaming",
     "example:control-plane:streaming:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=streaming",
-    "verify:examples:readmes": "node scripts/verify-example-readmes.mjs"
+    "verify:examples:readmes": "node scripts/verify-example-readmes.mjs",
+    "coverage": "npm run build && c8 --reporter=text --reporter=lcov npm run test:unit"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",
@@ -281,6 +282,7 @@
     "@vue/server-renderer": "^3.5.34",
     "antd": "^6.4.3",
     "aws-cdk-lib": "2.257.0",
+    "c8": "^11.0.0",
     "constructs": "10.6.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.4.0",

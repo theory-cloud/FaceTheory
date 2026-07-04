@@ -16,10 +16,10 @@ FaceTheory is on the 3.x release line, so post-1.0 SemVer discipline applies eve
 
 ## Current 3.x deprecations
 
-| Surface | Replacement | Earliest removal | Notes |
-| --- | --- | --- | --- |
-| `Headers` type alias | `FaceHeaders` | v4.0.0 | The alias remains in the 3.x train to avoid colliding with the browser `Headers` class while consumers migrate imports. |
-| `FaceRenderResult.head.html` for tag emission | Structured `headTags` / `styleTags` | v4.0.0 | `head.html` remains escaped legacy text. Use structured head/style tags for deterministic ordering, CSP nonce handling, and adapter parity. |
+| Surface                                       | Replacement                         | Earliest removal | Notes                                                                                                                                       |
+| --------------------------------------------- | ----------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Headers` type alias                          | `FaceHeaders`                       | v4.0.0           | The alias remains in the 3.x train to avoid colliding with the browser `Headers` class while consumers migrate imports.                     |
+| `FaceRenderResult.head.html` for tag emission | Structured `headTags` / `styleTags` | v4.0.0           | `head.html` remains escaped legacy text. Use structured head/style tags for deterministic ordering, CSP nonce handling, and adapter parity. |
 
 ## Consumer obligations
 

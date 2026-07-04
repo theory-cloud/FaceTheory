@@ -6,16 +6,16 @@ title: Render modes compared
 
 FaceTheory supports three server render modes. All three are `FaceMode` values declared on each `FaceModule`; SPA navigation is a client-side runtime layered on top of a server-rendered shell, not a fourth `FaceMode`.
 
-|                       | SSR                            | SSG                              | Blocking ISR                       | SPA navigation                          |
-|-----------------------|--------------------------------|----------------------------------|------------------------------------|-----------------------------------------|
-| `FaceMode` value      | `'ssr'`                        | `'ssg'`                          | `'isr'`                            | n/a — client runtime                    |
-| Render timing         | every request                  | build time                       | first request + on expiry          | server render once + client navigation  |
-| Delivery              | Lambda streaming               | S3 + CloudFront                  | TableTheory cache + S3 + CloudFront | inherits the SSR/SSG/ISR shell          |
-| Freshness             | always fresh                   | redeploy only                    | TTL-driven (`revalidateSeconds`)   | inherits the underlying mode            |
-| Per-request data      | yes                            | no                               | only during regeneration           | yes, via client fetch                   |
-| Personalization safe? | yes                            | no                               | only with tenant-aware cache key   | yes, with deterministic shell           |
-| Cold-start sensitive? | yes                            | no                               | regen requests are                 | shell inherits underlying mode          |
-| Document              | [`modes/ssr`](../modes/ssr.md) | [`modes/ssg`](../modes/ssg.md)   | [`modes/isr`](../modes/isr.md)     | [`modes/spa`](../modes/spa.md)          |
+|                       | SSR                            | SSG                            | Blocking ISR                        | SPA navigation                         |
+| --------------------- | ------------------------------ | ------------------------------ | ----------------------------------- | -------------------------------------- |
+| `FaceMode` value      | `'ssr'`                        | `'ssg'`                        | `'isr'`                             | n/a — client runtime                   |
+| Render timing         | every request                  | build time                     | first request + on expiry           | server render once + client navigation |
+| Delivery              | Lambda streaming               | S3 + CloudFront                | TableTheory cache + S3 + CloudFront | inherits the SSR/SSG/ISR shell         |
+| Freshness             | always fresh                   | redeploy only                  | TTL-driven (`revalidateSeconds`)    | inherits the underlying mode           |
+| Per-request data      | yes                            | no                             | only during regeneration            | yes, via client fetch                  |
+| Personalization safe? | yes                            | no                             | only with tenant-aware cache key    | yes, with deterministic shell          |
+| Cold-start sensitive? | yes                            | no                             | regen requests are                  | shell inherits underlying mode         |
+| Document              | [`modes/ssr`](../modes/ssr.md) | [`modes/ssg`](../modes/ssg.md) | [`modes/isr`](../modes/isr.md)      | [`modes/spa`](../modes/spa.md)         |
 
 ## Choosing
 
