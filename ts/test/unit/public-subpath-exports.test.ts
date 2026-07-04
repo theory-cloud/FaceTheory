@@ -18,6 +18,14 @@ import type {
   PackageSourceInputPanelProps as SveltePackageSourceInputPanelProps,
   WizardReconciliationPlanPanelProps as SvelteWizardReconciliationPlanPanelProps,
 } from '@theory-cloud/facetheory/svelte/stitch-admin';
+import type {
+  AsyncStateBoundaryProps as SvelteAsyncStateBoundaryProps,
+  ButtonProps as SvelteResponsiveButtonProps,
+  LinkProps as SvelteResponsiveLinkProps,
+  LoadingStateProps as SvelteLoadingStateProps,
+  SkeletonProps as SvelteSkeletonProps,
+  SpinnerProps as SvelteSpinnerProps,
+} from '@theory-cloud/facetheory/svelte/responsive-primitives';
 
 import type {
   BrandHeaderProps as VueBrandHeaderProps,
@@ -77,6 +85,28 @@ type _SveltePublicStitchSubpathSmoke = [
   SvelteWizardReconciliationPlanPanelProps,
 ];
 
+type _SvelteResponsivePrimitivesSubpathSmoke = [
+  Expect<
+    SvelteComponentExport<
+      ValueExport<
+        typeof import('@theory-cloud/facetheory/svelte/responsive-primitives'),
+        | 'Spinner'
+        | 'Skeleton'
+        | 'LoadingState'
+        | 'AsyncStateBoundary'
+        | 'Button'
+        | 'Link'
+      >
+    >
+  >,
+  SvelteSpinnerProps,
+  SvelteSkeletonProps,
+  SvelteLoadingStateProps,
+  SvelteAsyncStateBoundaryProps,
+  SvelteResponsiveButtonProps,
+  SvelteResponsiveLinkProps,
+];
+
 type _VuePublicStitchSubpathSmoke = [
   ValueExport<
     typeof import('@theory-cloud/facetheory/vue/stitch-shell'),
@@ -103,6 +133,9 @@ type _VuePublicStitchSubpathSmoke = [
 
 const publicSubpathExportsResolve = true satisfies
   | (_SveltePublicStitchSubpathSmoke extends readonly unknown[] ? true : never)
+  | (_SvelteResponsivePrimitivesSubpathSmoke extends readonly unknown[]
+      ? true
+      : never)
   | (_VuePublicStitchSubpathSmoke extends readonly unknown[] ? true : never);
 
 test('public package subpaths expose Vue and Svelte stitch modules to TypeScript consumers', () => {
