@@ -240,4 +240,3 @@ local synth/tests/docs-build proof unless it actually deployed with authorized A
 - `infra/apptheory-ssr-site/` — SSR-only CloudFront + S3 assets + Lambda Function URL using a real FaceApp handler.
 - `infra/apptheory-ssg-isr-site/` — `AppTheorySsrSiteMode.SSG_ISR`, S3-primary HTML origin group, Lambda fallback, and
   TableTheory-backed ISR metadata wiring.
-
