@@ -1,10 +1,17 @@
 <script lang="ts">
   import type { WizardCapability, WizardCapabilityIntent, WizardCapabilityReview } from './types.js';
 
-  export let title: unknown = 'Capability review';
-  export let description: unknown = undefined;
-  export let review: WizardCapabilityReview;
-  export let emptyLabel: unknown = 'No capabilities to review.';
+  let {
+    title = 'Capability review',
+    description = undefined,
+    review,
+    emptyLabel = 'No capabilities to review.',
+  }: {
+    title?: unknown;
+    description?: unknown;
+    review: WizardCapabilityReview;
+    emptyLabel?: unknown;
+  } = $props();
 
   const REDACTED_MARKER = '[redacted]';
   const INTENT_LABEL: Record<WizardCapabilityIntent, string> = {

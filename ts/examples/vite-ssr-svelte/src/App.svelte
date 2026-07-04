@@ -59,8 +59,8 @@
 </script>
 
 <Shell {nav} activeKey="/dashboard">
-  <span slot="brand">Autheory</span>
-  <span slot="topbarRight">Jane Doe</span>
+  {#snippet brand()}<span>Autheory</span>{/snippet}
+  {#snippet topbarRight()}<span>Jane Doe</span>{/snippet}
 
   <PageFrame
     breadcrumbs={[
@@ -70,7 +70,7 @@
     title="Svelte SSR Example"
     description={`Hello ${message}`}
   >
-    <button slot="actions" type="button">Edit</button>
+    {#snippet actions()}<button type="button">Edit</button>{/snippet}
 
     <SummaryStrip>
       <StatCard label="Active users" value="1,204" delta={{ value: '+8%', trend: 'up' }} />
@@ -78,8 +78,8 @@
     </SummaryStrip>
 
     <Callout variant="warning" title="Stale manifest">
+      {#snippet actions()}<button type="button">Refresh</button>{/snippet}
       Incoming policy changes have not been redeployed to the regional edge fleet yet.
-      <button slot="actions" type="button">Refresh</button>
     </Callout>
 
     <Section title="Hosted auth" description="Passkey-first primitives">
@@ -143,7 +143,7 @@
           { key: 'manifest', label: 'manifest: stale', count: 2 },
         ]}
       >
-        <a slot="trailing" href="#clear">Clear all</a>
+        {#snippet trailing()}<a href="#clear">Clear all</a>{/snippet}
       </FilterChipGroup>
 
       <DetailPanel
@@ -154,14 +154,14 @@
           { key: 'plan', label: 'Plan', value: 'Enterprise' },
         ]}
       >
-        <button slot="actions" type="button">Edit</button>
+        {#snippet actions()}<button type="button">Edit</button>{/snippet}
       </DetailPanel>
 
       <DataTable rowKey="key" dataSource={partnerRows} columns={partnerColumns}>
-        <span slot="toolbar-left">2 partners</span>
-        <input slot="toolbar-center" placeholder="Search" />
-        <button slot="toolbar-right" type="button">New partner</button>
-        <button slot="rowActions" let:record data-key={record.key} type="button">Edit</button>
+        {#snippet toolbarLeft()}<span>2 partners</span>{/snippet}
+        {#snippet toolbarCenter()}<input placeholder="Search" />{/snippet}
+        {#snippet toolbarRight()}<button type="button">New partner</button>{/snippet}
+        {#snippet rowActions(record)}<button data-key={record.key} type="button">Edit</button>{/snippet}
       </DataTable>
 
       <InlineKeyValueList

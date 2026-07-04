@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type {
     ConfidenceLevel,
     MetadataBadgeProps,
@@ -7,11 +8,17 @@
     StalenessState,
   } from './types.js';
 
-  export let title: unknown = 'Non-authoritative data';
-  export let description: unknown =
-    'This view reflects imported or observed data until an authority gate confirms it.';
-  export let metadata: OperatorVisibilityMetadata | undefined = undefined;
-  export let actions: unknown = undefined;
+  let {
+    title = 'Non-authoritative data',
+    description = 'This view reflects imported or observed data until an authority gate confirms it.',
+    metadata = undefined,
+    actions = undefined,
+  }: {
+    title?: unknown;
+    description?: unknown;
+    metadata?: OperatorVisibilityMetadata | undefined;
+    actions?: unknown;
+  } = $props();
 
   const palette: Record<MetadataBadgeTone, { background: string; color: string }> = {
     neutral: {
@@ -36,7 +43,13 @@
     },
   };
 
-  $: badges = metadata !== undefined ? metadataToBadges(metadata) : [];
+  const badges = $derived(
+    metadata !== undefined ? metadataToBadges(metadata) : [],
+  );
+  // `actions` accepts a value (text) or a snippet (markup, e.g. a button).
+  const actionsNode = $derived(
+    typeof actions === 'function' ? (actions as Snippet) : undefined,
+  );
 
   function metadataToBadges(source: OperatorVisibilityMetadata): MetadataBadgeProps[] {
     const out: MetadataBadgeProps[] = [];
@@ -167,12 +180,12 @@
     </div>
   {/if}
 
-  {#if $$slots.actions || actions !== undefined}
+  {#if actions !== undefined}
     <div
       class="facetheory-stitch-non-authoritative-banner-actions"
       style="display:flex;gap:8px;flex-wrap:wrap;"
     >
-      <slot name="actions">{actions}</slot>
+      {#if actionsNode}{@render actionsNode()}{:else}{actions}{/if}
     </div>
   {/if}
 </section>

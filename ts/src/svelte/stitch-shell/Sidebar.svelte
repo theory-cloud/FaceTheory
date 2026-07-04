@@ -1,12 +1,25 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import SidebarItems from './SidebarItems.svelte';
   import type { NavItem } from './nav-types.js';
 
-  export let nav: NavItem[] = [];
-  export let activeKey: string | undefined = undefined;
-  export let openKeys: string[] | undefined = undefined;
-  export let collapsed = false;
-  export let onNavigate: ((path: string, key: string) => void) | undefined = undefined;
+  let {
+    nav = [],
+    activeKey = undefined,
+    openKeys = undefined,
+    collapsed = false,
+    onNavigate = undefined,
+    brand,
+    footer,
+  }: {
+    nav?: NavItem[];
+    activeKey?: string | undefined;
+    openKeys?: string[] | undefined;
+    collapsed?: boolean;
+    onNavigate?: ((path: string, key: string) => void) | undefined;
+    brand?: Snippet;
+    footer?: Snippet;
+  } = $props();
 </script>
 
 <aside
@@ -14,7 +27,7 @@
   style={`width:${collapsed ? '72px' : '264px'};display:flex;flex-direction:column;min-height:100vh;padding:16px 8px;gap:12px;background:var(--stitch-color-surface-container-low, #f2f3ff);`}
 >
   <div class="facetheory-stitch-sidebar-brand" style="padding:8px 12px;">
-    <slot name="brand" />
+    {@render brand?.()}
   </div>
 
   <div class="facetheory-stitch-sidebar-menu" style="flex:1;overflow-y:auto;">
@@ -24,6 +37,6 @@
   </div>
 
   <div class="facetheory-stitch-sidebar-footer" style="padding:8px 12px;">
-    <slot name="footer" />
+    {@render footer?.()}
   </div>
 </aside>

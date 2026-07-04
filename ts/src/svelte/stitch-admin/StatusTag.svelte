@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { StatusVariant } from './types.js';
 
-  export let variant: StatusVariant;
-  export let label: unknown = undefined;
+  let { variant, label = undefined }: { variant: StatusVariant; label?: unknown } = $props();
 
   const palette: Record<StatusVariant, { background: string; color: string; label: string }> = {
     active: {
@@ -47,7 +46,7 @@
     },
   };
 
-  $: current = palette[variant];
+  const current = $derived(palette[variant]);
 </script>
 
 <span

@@ -1,9 +1,15 @@
 <script lang="ts">
   import type { WizardProgressState, WizardStep, WizardStepStatus } from './types.js';
 
-  export let title: unknown = 'Wizard progress';
-  export let description: unknown = undefined;
-  export let state: WizardProgressState;
+  let {
+    title = 'Wizard progress',
+    description = undefined,
+    state,
+  }: {
+    title?: unknown;
+    description?: unknown;
+    state?: WizardProgressState;
+  } = $props();
 
   const STEP_LABEL: Record<WizardStepStatus, string> = {
     pending: 'Pending',
@@ -13,9 +19,9 @@
     skipped: 'Skipped',
   };
 
-  $: totalCount = state.steps.length;
-  $: completedCount = state.steps.filter((step) => step.status === 'complete').length;
-  $: progressLabel = state.progressLabel ?? `${completedCount} of ${totalCount} complete`;
+  const totalCount = $derived(state.steps.length);
+  const completedCount = $derived(state.steps.filter((step) => step.status === 'complete').length);
+  const progressLabel = $derived(state.progressLabel ?? `${completedCount} of ${totalCount} complete`);
   function isActive(step: WizardStep, currentStepKey?: string): boolean {
     return step.active === true || (currentStepKey !== undefined && currentStepKey === step.key);
   }

@@ -13,20 +13,19 @@
 
 <!--
   Minimal positive fixture for the Shell -> Topbar `topbarLogo` /
-  `topbarSurfaceLabel` slot-forwarding path. Used alongside App.svelte so the
+  `topbarSurfaceLabel` snippet-forwarding path. Used alongside App.svelte so the
   example test can assert both the omission (App.svelte, no topbar brand
-  slots) and the forwarding (AppBrand.svelte, topbar brand slots filled)
-  behaviors of the Svelte adapter.
+  snippets) and the forwarding (AppBrand.svelte, topbar brand snippets filled)
+  behaviors of the Svelte adapter. Svelte 5 runes: named content is passed with
+  `{#snippet name()}...{/snippet}` in place of the legacy `slot="name"` syntax.
 -->
 <Shell {nav} activeKey="/dashboard">
-  <div slot="topbarLogo" data-testid="topbar-logo">
-    <BrandHeader
-      logo="◆"
-      wordmark="Theory Cloud"
-      surfaceTone="tertiary"
-    />
-  </div>
-  <span slot="topbarSurfaceLabel" data-testid="topbar-surface">[Auth]</span>
-  <span slot="topbarRight">Jane Doe</span>
+  {#snippet topbarLogo()}
+    <div data-testid="topbar-logo">
+      <BrandHeader logo="◆" wordmark="Theory Cloud" surfaceTone="tertiary" />
+    </div>
+  {/snippet}
+  {#snippet topbarSurfaceLabel()}<span data-testid="topbar-surface">[Auth]</span>{/snippet}
+  {#snippet topbarRight()}<span>Jane Doe</span>{/snippet}
   <p>Hello {message}</p>
 </Shell>

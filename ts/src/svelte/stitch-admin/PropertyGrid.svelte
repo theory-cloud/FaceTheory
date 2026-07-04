@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { PropertyItem } from './types.js';
 
-  export let items: PropertyItem[] = [];
-  export let columns = 2;
+  let { items = [], columns = 2 }: { items?: PropertyItem[]; columns?: number } = $props();
 </script>
 
 <dl

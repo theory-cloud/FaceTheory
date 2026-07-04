@@ -581,10 +581,10 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
       ],
     },
     wrapperMarkup: `<Target {...fixtureProps}>
-  <svelte:fragment slot="toolbar-left">Fixture toolbar left</svelte:fragment>
-  <svelte:fragment slot="toolbar-center">Fixture toolbar center</svelte:fragment>
-  <svelte:fragment slot="toolbar-right">Fixture toolbar right</svelte:fragment>
-  <svelte:fragment slot="rowActions" let:record let:index>{index}:{record.name}</svelte:fragment>
+  {#snippet toolbarLeft()}Fixture toolbar left{/snippet}
+  {#snippet toolbarCenter()}Fixture toolbar center{/snippet}
+  {#snippet toolbarRight()}Fixture toolbar right{/snippet}
+  {#snippet rowActions(record, index)}{index}:{record.name}{/snippet}
 </Target>`,
   },
   {
@@ -610,7 +610,7 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
       ],
     },
     wrapperMarkup:
-      '<Target {...fixtureProps}><svelte:fragment slot="actions">Edit fixture</svelte:fragment></Target>',
+      '<Target {...fixtureProps}>{#snippet actions()}Edit fixture{/snippet}</Target>',
   },
   {
     componentPath: 'src/svelte/stitch-admin/DisclosurePanel.svelte',
@@ -637,7 +637,7 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
       ],
     },
     wrapperMarkup:
-      '<Target {...fixtureProps}><svelte:fragment slot="trailing">Clear filters</svelte:fragment></Target>',
+      '<Target {...fixtureProps}>{#snippet trailing()}Clear filters{/snippet}</Target>',
   },
   {
     componentPath: 'src/svelte/stitch-admin/FormRow.svelte',
@@ -984,7 +984,7 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
       breadcrumbs,
     },
     wrapperMarkup:
-      '<Target {...fixtureProps}><svelte:fragment slot="actions">Edit page</svelte:fragment><p>Fixture page content</p></Target>',
+      '<Target {...fixtureProps}>{#snippet actions()}Edit page{/snippet}<p>Fixture page content</p></Target>',
   },
   {
     componentPath: 'src/svelte/stitch-shell/PageTitle.svelte',
@@ -1001,7 +1001,7 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
     componentPath: 'src/svelte/stitch-shell/Section.svelte',
     props: { title: 'Fixture section', description: 'Section copy.' },
     wrapperMarkup:
-      '<Target {...fixtureProps}><svelte:fragment slot="actions">Refresh</svelte:fragment><p>Fixture section body</p></Target>',
+      '<Target {...fixtureProps}>{#snippet actions()}Refresh{/snippet}<p>Fixture section body</p></Target>',
   },
   {
     componentPath: 'src/svelte/stitch-shell/Shell.svelte',
@@ -1012,13 +1012,13 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
       collapsed: false,
     },
     wrapperMarkup: `<Target {...fixtureProps}>
-  <svelte:fragment slot="brand">Fixture brand</svelte:fragment>
-  <svelte:fragment slot="sidebarFooter">Fixture footer</svelte:fragment>
-  <svelte:fragment slot="topbarLogo">FT</svelte:fragment>
-  <svelte:fragment slot="topbarSurfaceLabel">Admin</svelte:fragment>
-  <svelte:fragment slot="topbarLeft">Dashboard</svelte:fragment>
-  <svelte:fragment slot="topbarCenter">Center tools</svelte:fragment>
-  <svelte:fragment slot="topbarRight">Operator</svelte:fragment>
+  {#snippet brand()}Fixture brand{/snippet}
+  {#snippet sidebarFooter()}Fixture footer{/snippet}
+  {#snippet topbarLogo()}FT{/snippet}
+  {#snippet topbarSurfaceLabel()}Admin{/snippet}
+  {#snippet topbarLeft()}Dashboard{/snippet}
+  {#snippet topbarCenter()}Center tools{/snippet}
+  {#snippet topbarRight()}Operator{/snippet}
   <section>Shell fixture content</section>
 </Target>`,
   },
@@ -1031,7 +1031,7 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
       collapsed: false,
     },
     wrapperMarkup:
-      '<Target {...fixtureProps}><svelte:fragment slot="brand">Fixture brand</svelte:fragment><svelte:fragment slot="footer">Fixture footer</svelte:fragment></Target>',
+      '<Target {...fixtureProps}>{#snippet brand()}Fixture brand{/snippet}{#snippet footer()}Fixture footer{/snippet}</Target>',
   },
   {
     componentPath: 'src/svelte/stitch-shell/SidebarItems.svelte',
@@ -1049,7 +1049,7 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
       delta: { value: '+8%', trend: 'up' },
     },
     wrapperMarkup:
-      '<Target {...fixtureProps}><svelte:fragment slot="icon">↗</svelte:fragment></Target>',
+      '<Target {...fixtureProps}>{#snippet icon()}↗{/snippet}</Target>',
   },
   {
     componentPath: 'src/svelte/stitch-shell/SummaryStrip.svelte',
@@ -1061,11 +1061,11 @@ export const svelteSsrFixtureDefinitions: SvelteSsrFixtureDefinition[] = [
     componentPath: 'src/svelte/stitch-shell/Topbar.svelte',
     props: { showLogo: true, showSurfaceLabel: true },
     wrapperMarkup: `<Target {...fixtureProps}>
-  <svelte:fragment slot="logo">FT</svelte:fragment>
-  <svelte:fragment slot="surfaceLabel">Fixture</svelte:fragment>
-  <svelte:fragment slot="left">Left</svelte:fragment>
-  <svelte:fragment slot="center">Center</svelte:fragment>
-  <svelte:fragment slot="right">Right</svelte:fragment>
+  {#snippet logo()}FT{/snippet}
+  {#snippet surfaceLabel()}Fixture{/snippet}
+  {#snippet left()}Left{/snippet}
+  {#snippet center()}Center{/snippet}
+  {#snippet right()}Right{/snippet}
 </Target>`,
   },
 ];

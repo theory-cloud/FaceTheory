@@ -1,11 +1,19 @@
 <script lang="ts">
   import type { MetadataBadgeTone } from './types.js';
 
-  export let label: unknown;
-  export let detail: unknown = undefined;
-  export let tone: MetadataBadgeTone = 'neutral';
-  export let href: string | undefined = undefined;
-  export let title: string | undefined = undefined;
+  let {
+    label,
+    detail = undefined,
+    tone = 'neutral',
+    href = undefined,
+    title = undefined,
+  }: {
+    label?: unknown;
+    detail?: unknown;
+    tone?: MetadataBadgeTone;
+    href?: string | undefined;
+    title?: string | undefined;
+  } = $props();
 
   const safeHrefBase = 'https://facetheory.invalid';
   const palette: Record<MetadataBadgeTone, { background: string; color: string }> = {
@@ -31,9 +39,9 @@
     },
   };
 
-  $: current = palette[tone];
-  $: safeHref = sanitizeHref(href);
-  $: badgeStyle = `display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 10px;border-radius:9999px;font-size:12px;font-weight:500;line-height:1.4;background:${current.background};color:${current.color};`;
+  const current = $derived(palette[tone]);
+  const safeHref = $derived(sanitizeHref(href));
+  const badgeStyle = $derived(`display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 10px;border-radius:9999px;font-size:12px;font-weight:500;line-height:1.4;background:${current.background};color:${current.color};`);
 
   function sanitizeHref(value: string | undefined): string | undefined {
     const normalized = String(value ?? '').trim();

@@ -1,23 +1,36 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { TabItem } from './types.js';
 
-  export let items: TabItem[] = [];
-  export let activeKey: string | undefined = undefined;
-  export let defaultActiveKey: string | undefined = undefined;
-  export let onChange: ((key: string) => void) | undefined = undefined;
-  export let variant: 'line' | 'card' = 'line';
+  let {
+    items = [],
+    activeKey = undefined,
+    defaultActiveKey = undefined,
+    onChange = undefined,
+    variant = 'line',
+    children,
+  }: {
+    items?: TabItem[];
+    activeKey?: string | undefined;
+    defaultActiveKey?: string | undefined;
+    onChange?: ((key: string) => void) | undefined;
+    variant?: 'line' | 'card';
+    children?: Snippet;
+  } = $props();
 
-  let internalActiveKey = defaultActiveKey;
+  let internalActiveKey = $state(defaultActiveKey);
 
-  $: visibleItems = items.filter((item) => item.hidden !== true);
-  $: if (
-    activeKey === undefined &&
-    internalActiveKey === undefined &&
-    visibleItems.length > 0
-  ) {
-    internalActiveKey = visibleItems[0].key;
-  }
-  $: resolvedActiveKey = activeKey ?? internalActiveKey;
+  const visibleItems = $derived(items.filter((item) => item.hidden !== true));
+  // Legacy Tabs used a reactive `$: if` to seed `internalActiveKey` from the
+  // first visible tab. `$effect` does not run during SSR, so instead fold the
+  // first-visible fallback into the derived resolved key (which is what the
+  // template renders); `internalActiveKey` remains mutable state for uncontrolled
+  // user selection via selectTab().
+  const resolvedActiveKey = $derived(
+    activeKey ??
+      internalActiveKey ??
+      (visibleItems.length > 0 ? visibleItems[0].key : undefined),
+  );
 
   function selectTab(item: TabItem): void {
     if (item.disabled) return;
@@ -42,7 +55,7 @@
         aria-selected={item.key === resolvedActiveKey}
         disabled={item.disabled === true}
         class="facetheory-stitch-tabs-trigger"
-        on:click={() => selectTab(item)}
+        onclick={() => selectTab(item)}
         style={`display:inline-flex;align-items:center;gap:8px;padding:${variant === 'card' ? '8px 12px' : '10px 0 12px'};${variant === 'line' ? 'margin-bottom:-1px;' : ''}${variant === 'card' ? 'border:1px solid var(--stitch-color-outline-variant, #c8c4d5);border-radius:var(--stitch-radius-md, 8px);' : 'border:none;'}${variant === 'line' ? `border-bottom:2px solid ${item.key === resolvedActiveKey ? 'var(--stitch-color-primary, #3a48c8)' : 'transparent'};` : ''}background:${variant === 'card' && item.key === resolvedActiveKey ? 'var(--stitch-color-surface-container-low, #f2f3ff)' : 'transparent'};color:${item.disabled ? 'var(--stitch-color-on-surface-variant, #868391)' : item.key === resolvedActiveKey ? 'var(--stitch-color-on-surface, #131b2e)' : 'var(--stitch-color-on-surface-variant, #464553)'};font:inherit;cursor:${item.disabled ? 'default' : 'pointer'};`}
       >
         <span
@@ -71,9 +84,9 @@
     {/each}
   </div>
 
-  {#if resolvedActiveKey !== undefined && $$slots.default}
+  {#if resolvedActiveKey !== undefined && children}
     <div class="facetheory-stitch-tabs-panel">
-      <slot />
+      {@render children()}
     </div>
   {/if}
 </div>

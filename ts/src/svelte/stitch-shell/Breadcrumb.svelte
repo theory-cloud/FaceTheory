@@ -1,8 +1,13 @@
 <script lang="ts">
   import type { BreadcrumbNode } from './nav-types.js';
 
-  export let items: BreadcrumbNode[] = [];
-  export let onNavigate: ((node: BreadcrumbNode) => void) | undefined = undefined;
+  let {
+    items = [],
+    onNavigate = undefined,
+  }: {
+    items?: BreadcrumbNode[];
+    onNavigate?: ((node: BreadcrumbNode) => void) | undefined;
+  } = $props();
 </script>
 
 {#if items.length > 0}
@@ -19,7 +24,7 @@
       {#if node.path}
         <a
           href={node.path}
-          on:click={(event) => {
+          onclick={(event) => {
             if (!onNavigate) return;
             event.preventDefault();
             onNavigate(node);

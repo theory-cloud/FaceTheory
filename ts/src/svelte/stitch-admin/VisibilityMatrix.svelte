@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type {
     ConfidenceLevel,
     MetadataBadgeTone,
@@ -10,13 +11,23 @@
     VisibilityMatrixRow,
   } from './types.js';
 
-  export let title: unknown = 'Operator visibility';
-  export let description: unknown = undefined;
-  export let dimensions: VisibilityMatrixDimension[];
-  export let rows: VisibilityMatrixRow[];
-  export let actions: unknown = undefined;
-  export let emptyLabel: unknown = 'No visibility matrix data available.';
-  export let emptyCellLabel: unknown = 'No visibility record';
+  let {
+    title = 'Operator visibility',
+    description = undefined,
+    dimensions,
+    rows,
+    actions = undefined,
+    emptyLabel = 'No visibility matrix data available.',
+    emptyCellLabel = 'No visibility record',
+  }: {
+    title?: unknown;
+    description?: unknown;
+    dimensions: VisibilityMatrixDimension[];
+    rows: VisibilityMatrixRow[];
+    actions?: unknown;
+    emptyLabel?: unknown;
+    emptyCellLabel?: unknown;
+  } = $props();
 
   interface CellPalette {
     label: string;
@@ -99,14 +110,20 @@
     },
   };
 
-  $: hasMatrix = dimensions.length > 0 && rows.length > 0;
-  $: renderedRows = rows.map<RenderedRow>((row) => ({
-    row,
-    cells: dimensions.map((dimension) => ({
-      dimension,
-      cell: findCell(row, dimension),
+  const hasMatrix = $derived(dimensions.length > 0 && rows.length > 0);
+  // `actions` accepts a value (text) or a snippet (markup, e.g. a button).
+  const actionsNode = $derived(
+    typeof actions === 'function' ? (actions as Snippet) : undefined,
+  );
+  const renderedRows = $derived(
+    rows.map<RenderedRow>((row) => ({
+      row,
+      cells: dimensions.map((dimension) => ({
+        dimension,
+        cell: findCell(row, dimension),
+      })),
     })),
-  }));
+  );
 
   function findCell(
     row: VisibilityMatrixRow,
@@ -261,12 +278,12 @@
         </p>
       {/if}
     </div>
-    {#if $$slots.actions || actions !== undefined}
+    {#if actions !== undefined}
       <div
         class="facetheory-stitch-visibility-matrix-actions"
         style="display:flex;gap:8px;flex-wrap:wrap;"
       >
-        <slot name="actions">{actions}</slot>
+        {#if actionsNode}{@render actionsNode()}{:else}{actions}{/if}
       </div>
     {/if}
   </header>

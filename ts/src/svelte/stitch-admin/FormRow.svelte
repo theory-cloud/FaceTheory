@@ -1,8 +1,19 @@
 <script lang="ts">
-  export let label: unknown;
-  export let description: unknown = undefined;
-  export let required = false;
-  export let error: unknown = undefined;
+  import type { Snippet } from 'svelte';
+
+  let {
+    label,
+    description = undefined,
+    required = false,
+    error = undefined,
+    children,
+  }: {
+    label?: unknown;
+    description?: unknown;
+    required?: boolean;
+    error?: unknown;
+    children?: Snippet;
+  } = $props();
 </script>
 
 <div
@@ -33,7 +44,7 @@
   </div>
 
   <div style="display:flex;flex-direction:column;gap:6px;">
-    <slot />
+    {@render children?.()}
     {#if error !== undefined}
       <span role="alert" style="font-size:12px;color:var(--stitch-color-error, #ba1a1a);">
         {error}

@@ -7,8 +7,13 @@
   } from './types.js';
   import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
-  export let card: ChoiceCardProps;
-  export let onChange: ((selected: boolean) => void) | undefined = undefined;
+  let {
+    card,
+    onChange = undefined,
+  }: {
+    card?: ChoiceCardProps;
+    onChange?: ((selected: boolean) => void) | undefined;
+  } = $props();
 
   function isOptionDisabled(option: SelectableCardOption): boolean {
     return option.blocked === true || option.disabledReason !== undefined;
@@ -45,15 +50,17 @@
     }
   }
 
-  $: option = card.option;
-  $: selected = card.selected;
-  $: cardId = card.cardId;
-  $: safetyPolicy = card.safetyPolicy;
-  $: selection = card.selection as SelectableCardGridSelection;
-  $: disabled = isOptionDisabled(option);
-  $: role = selection === 'single' ? 'radio' : 'checkbox';
-  $: reasonId = option.disabledReason !== undefined ? `${cardId}-reason` : undefined;
-  $: tone = option.tone ?? 'neutral';
+  const option = $derived(card.option);
+  const selected = $derived(card.selected);
+  const cardId = $derived(card.cardId);
+  const safetyPolicy = $derived(card.safetyPolicy);
+  const selection = $derived(card.selection as SelectableCardGridSelection);
+  const disabled = $derived(isOptionDisabled(option));
+  const role = $derived(selection === 'single' ? 'radio' : 'checkbox');
+  const reasonId = $derived(
+    option.disabledReason !== undefined ? `${cardId}-reason` : undefined,
+  );
+  const tone = $derived(option.tone ?? 'neutral');
 </script>
 
 <div
@@ -72,8 +79,8 @@
   data-option-blocked={option.blocked === true ? 'true' : 'false'}
   data-option-recommended={option.recommended === true ? 'true' : 'false'}
   data-selection-family={selection}
-  on:click={handleClick}
-  on:keydown={handleKey}
+  onclick={handleClick}
+  onkeydown={handleKey}
 >
   <div class="facetheory-stitch-selectable-card-header">
     {#if option.icon !== undefined}
