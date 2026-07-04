@@ -1,6 +1,6 @@
 # FaceTheory
 
-`@theory-cloud/facetheory` is a TypeScript runtime for three AWS-first server render modes (SSR, SSG, and blocking ISR) plus the SPA client runtime on Node.js `>=24`, with package exports for React, Vue, and Svelte adapters plus AppTheory and TableTheory integration surfaces.
+`@theory-cloud/facetheory` is a TypeScript runtime for three AWS-first server render modes (SSR, SSG, and blocking ISR) plus the SPA client runtime on Node.js `>=20`, with package exports for React, Vue, and Svelte adapters plus AppTheory and TableTheory integration surfaces.
 
 ## Install v3.8.1 <!-- x-release-please-version -->
 

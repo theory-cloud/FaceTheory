@@ -1,14 +1,14 @@
 concepts:
   facetheory_runtime:
     type: library-runtime
-    language: TypeScript (Node.js >=24)
+    language: TypeScript (Node.js >=20)
     purpose: "SSR, SSG, and blocking ISR runtime for AWS Lambda Function URL deployments."
     provides:
       - "A `createFaceApp({ faces })` application runtime with route modes `ssr`, `ssg`, and `isr`."
       - "Deterministic request normalization, response header ordering, and cookie handling."
       - "Framework adapters for React, Vue, and Svelte through published package subpaths."
     requires:
-      - "Node.js >=24 and npm."
+      - "Node.js >=20 and npm."
       - "Optional peer frameworks depending on adapter usage."
     use_when:
       - "You want one runtime contract for AWS-first HTML delivery across React, Vue, or Svelte."

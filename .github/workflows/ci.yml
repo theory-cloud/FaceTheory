@@ -115,13 +115,17 @@ jobs:
         run: scripts/verify-version-alignment.sh
 
   ts:
-    name: TypeScript (typecheck + lint + test)
+    name: TypeScript (typecheck + lint + test, Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20", "24"]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: "24"
+          node-version: ${{ matrix.node-version }}
       - name: Install dependencies
         run: cd ts && npm ci
       - name: Run TypeScript gates
@@ -137,18 +141,22 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: facetheory-ts-coverage
+          name: facetheory-ts-coverage-node-${{ matrix.node-version }}
           path: ts/coverage/
           if-no-files-found: warn
 
   ts-pack:
-    name: TypeScript (npm pack)
+    name: TypeScript (npm pack, Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20", "24"]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
-          node-version: "24"
+          node-version: ${{ matrix.node-version }}
       - name: Verify tarball
         run: scripts/verify-ts-pack.sh
 

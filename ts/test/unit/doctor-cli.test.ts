@@ -9,7 +9,7 @@ import { runDoctorCli } from '../../src/doctor-cli.js';
 
 const FACE_PACKAGE = {
   version: '3.8.1',
-  engines: { node: '>=24' },
+  engines: { node: '>=20' },
   peerDependencies: {
     '@emotion/cache': '>=11',
     '@emotion/react': '>=11',
@@ -98,7 +98,7 @@ test('facetheory doctor passes for aligned React starter dependencies', async ()
     });
 
     assert.equal(exitCode, 0, stderr.text);
-    assert.match(stdout.text, /Node\.js 24\.12\.4 satisfies >=24/);
+    assert.match(stdout.text, /Node\.js 24\.12\.4 satisfies >=20/);
     assert.match(stdout.text, /React adapter peers are installed/);
     assert.match(stdout.text, /AppTheory\/TableTheory override aligns/);
     assert.match(stdout.text, /FaceTheory doctor passed/);

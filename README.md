@@ -124,7 +124,7 @@ The `v3.8.1` GitHub release also ships the matching `facetheory-reference-${FACE
 | SPA client runtime  | 1               | Same-origin navigation layered on a server-rendered shell |
 | Adapters            | 3               | React · Vue · Svelte                                      |
 | Distribution        | GitHub Releases | immutable, pinned                                         |
-| Runtime             | Node ≥24        | TypeScript-only                                           |
+| Runtime             | Node ≥20        | TypeScript-only                                           |
 | License             | Apache-2.0      | open source                                               |
 
 ## Resource Routes And Hydration Sidecars

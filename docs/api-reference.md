@@ -14,7 +14,7 @@ Package:
 
 Runtime:
 
-- Node.js `>=24`
+- Node.js `>=20`
 
 Primary package exports are defined in `ts/package.json`. The repository also includes a local SSG CLI entrypoint used by `npm run ssg`.
 

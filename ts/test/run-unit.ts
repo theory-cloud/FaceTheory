@@ -1,16 +1,30 @@
 import { spawn } from 'node:child_process';
-import { glob } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { readdir } from 'node:fs/promises';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const testRoot = dirname(fileURLToPath(import.meta.url));
-const unitTestFiles: string[] = [];
 
-for await (const testFile of glob('unit/**/*.test.ts', { cwd: testRoot })) {
-  unitTestFiles.push(testFile);
+async function discoverUnitTests(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files: string[] = [];
+
+  for (const entry of entries.sort((left, right) =>
+    left.name.localeCompare(right.name),
+  )) {
+    const fullPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await discoverUnitTests(fullPath)));
+      continue;
+    }
+    if (!entry.isFile() || !entry.name.endsWith('.test.ts')) continue;
+    files.push(relative(testRoot, fullPath).split(sep).join('/'));
+  }
+
+  return files;
 }
 
-unitTestFiles.sort();
+const unitTestFiles = (await discoverUnitTests(join(testRoot, 'unit'))).sort();
 
 console.log(`FaceTheory unit test files discovered: ${unitTestFiles.length}`);
 

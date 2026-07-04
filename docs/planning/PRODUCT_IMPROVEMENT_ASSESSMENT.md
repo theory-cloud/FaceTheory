@@ -182,7 +182,7 @@ Migration 5. Recommended, in order of leverage:
 2. A **single end-to-end "deploy hello-world" walkthrough** built on `AppTheorySsrSite` (§5.1) — today
    `docs/cdk/README.md` is a 21-line stub and reaching a live URL requires assembling the topology from
    fragments.
-3. An **install doctor** (`npx facetheory doctor`) that checks Node ≥24, peer versions (including the
+3. An **install doctor** (`npx facetheory doctor`) that checks Node ≥20, peer versions (including the
    Svelte exclusion band), and override alignment — cheap to build, kills the most common support load.
 
 ### 3.4 A dev loop: currently full-rebuild-and-restart
@@ -455,7 +455,7 @@ export table from `package.json` in CI so it cannot drift again.
 
 - Add `"sideEffects": false` (with an audit) so bundlers can tree-shake the barrel; document the
   ESM-only stance and the `ERR_REQUIRE_ESM` failure a CJS consumer will hit.
-- Document the Node ≥24 floor prominently at install time, not just in troubleshooting.
+- Document the Node ≥20 floor prominently at install time, not just in troubleshooting.
 - Add `prettier --check` and coverage tooling (c8) to CI — neither runs today, and coverage is currently
   unmeasurable; ~13 of the 53 test files are Stitch UI tests, so raw counts overstate runtime coverage.
 

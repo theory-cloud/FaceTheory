@@ -4,13 +4,13 @@ title: Getting Started
 
 # Getting Started with FaceTheory
 
-FaceTheory is a TypeScript runtime for SSR, SSG, and blocking ISR on Node.js `>=24`, with published adapters for React, Vue, and Svelte.
+FaceTheory is a TypeScript runtime for SSR, SSG, and blocking ISR on Node.js `>=20`, with published adapters for React, Vue, and Svelte.
 
 ## Prerequisites
 
 Required:
 
-- Node.js `>=24`
+- Node.js `>=20`
 - npm
 
 Optional:
