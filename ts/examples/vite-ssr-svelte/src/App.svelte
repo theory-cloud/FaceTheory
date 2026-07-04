@@ -7,7 +7,7 @@
     Shell,
     StatCard,
     SummaryStrip,
-  } from '../../../src/svelte/stitch-shell/index.js';
+  } from '@theory-cloud/facetheory/svelte/stitch-shell';
   import {
     AuthCard,
     AuthFlowSection,
@@ -17,7 +17,7 @@
     ConsentList,
     OTPInput,
     PasskeyCTA,
-  } from '../../../src/svelte/stitch-hosted-auth/index.js';
+  } from '@theory-cloud/facetheory/svelte/stitch-hosted-auth';
   import {
     CopyableCode,
     DataTable,
@@ -31,7 +31,7 @@
     SplitForm,
     StatusTag,
     Tabs,
-  } from '../../../src/svelte/stitch-admin/index.js';
+  } from '@theory-cloud/facetheory/svelte/stitch-admin';
 
   export let message: string;
 

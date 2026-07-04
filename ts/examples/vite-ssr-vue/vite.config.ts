@@ -5,6 +5,10 @@ import { defineConfig } from 'vite';
 export default defineConfig(({ isSsrBuild }) => {
   const root = path.resolve(__dirname);
   const ssr = Boolean(isSsrBuild);
+  const entry = path.resolve(
+    root,
+    ssr ? 'src/entry-server.ts' : 'src/entry-client.ts',
+  );
 
   return {
     root,
@@ -14,18 +18,18 @@ export default defineConfig(({ isSsrBuild }) => {
       emptyOutDir: false,
       assetsInlineLimit: 0,
       manifest: !ssr,
-      ssr: ssr ? path.resolve(root, 'src/entry-server.ts') : undefined,
+      ...(ssr ? { ssr: entry } : {}),
       rollupOptions: {
-        input: ssr
-          ? path.resolve(root, 'src/entry-server.ts')
-          : path.resolve(root, 'src/entry-client.ts'),
-        output: ssr
+        input: entry,
+        ...(ssr
           ? {
-              entryFileNames: '[name].js',
-              chunkFileNames: 'chunks/[name]-[hash].js',
-              assetFileNames: 'assets/[name]-[hash][extname]',
+              output: {
+                entryFileNames: '[name].js',
+                chunkFileNames: 'chunks/[name]-[hash].js',
+                assetFileNames: 'assets/[name]-[hash][extname]',
+              },
             }
-          : undefined,
+          : {}),
       },
     },
   };

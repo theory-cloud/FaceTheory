@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 
 import * as React from 'react';
 
-import { createFaceApp } from '../../src/app.js';
-import { createReactFace } from '../../src/adapters/react.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createReactFace } from '@theory-cloud/facetheory/react';
 import {
   AsyncStateBoundary,
   Button,
@@ -11,8 +11,8 @@ import {
   LoadingState,
   Skeleton,
   Spinner,
-} from '../../src/react/responsive-primitives/index.js';
-import { RESPONSIVE_PRIMITIVES_CSS } from '../../src/responsive-primitives/index.js';
+} from '@theory-cloud/facetheory/react/responsive-primitives';
+import { RESPONSIVE_PRIMITIVES_CSS } from '@theory-cloud/facetheory/responsive-primitives';
 
 const app = createFaceApp({
   faces: [

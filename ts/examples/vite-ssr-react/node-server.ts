@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import type { ViteManifest } from '../../src/vite.js';
+import type { FaceApp, ViteManifest } from '@theory-cloud/facetheory';
 
 async function loadManifest(): Promise<ViteManifest> {
   const manifestPath = path.resolve(
@@ -62,7 +62,9 @@ async function main() {
   const serverEntryPath = path.resolve(
     'examples/vite-ssr-react/dist/server/entry-server.js',
   );
-  const serverMod = await import(pathToFileURL(serverEntryPath).href);
+  const serverMod = (await import(pathToFileURL(serverEntryPath).href)) as {
+    createViteSSRExampleApp: (manifest: ViteManifest) => FaceApp;
+  };
 
   const app = serverMod.createViteSSRExampleApp(manifest);
 

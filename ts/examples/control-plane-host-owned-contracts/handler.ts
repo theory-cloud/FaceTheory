@@ -2,9 +2,9 @@ import {
   createControlPlaneApp,
   type ControlPlaneGate,
   type ControlPlaneSectionReadContract,
-} from '../../src/control-plane.js';
-import type { FaceApp, FaceContext } from '../../src/index.js';
-import type { OperatorGuardStatus } from '../../src/stitch-admin/index.js';
+} from '@theory-cloud/facetheory/control-plane';
+import type { FaceApp, FaceContext } from '@theory-cloud/facetheory';
+import type { OperatorGuardStatus } from '@theory-cloud/facetheory/stitch-admin';
 
 interface HostResolvedControlPlaneAuth {
   readonly guard: OperatorGuardStatus;

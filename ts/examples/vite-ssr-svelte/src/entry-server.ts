@@ -1,7 +1,7 @@
-import { createFaceApp } from '../../../src/app.js';
-import { createSvelteFace } from '../../../src/svelte/index.js';
-import type { ViteManifest } from '../../../src/vite.js';
-import { viteAssetsForEntry, viteHydrationForEntry } from '../../../src/vite.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createSvelteFace } from '@theory-cloud/facetheory/svelte';
+import type { ViteManifest } from '@theory-cloud/facetheory';
+import { viteAssetsForEntry, viteHydrationForEntry } from '@theory-cloud/facetheory';
 
 import App from './App.svelte';
 import AppBrand from './AppBrand.svelte';

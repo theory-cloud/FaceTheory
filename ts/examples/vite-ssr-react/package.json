@@ -2,6 +2,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --import tsx ../../src/dev-cli.ts --entry src/entry-server.tsx --factory createViteSSRExampleDevApp --port 5174"
+    "dev": "facetheory-dev --entry src/entry-server.tsx --factory createViteSSRExampleDevApp --port 5174"
   }
 }

@@ -1,9 +1,8 @@
 // Example sketch: Vue streaming SSR Face (body streamed, document wrapper handled by FaceApp).
 //
-// This is not included in `tsc` builds (examples are excluded from tsconfig).
 
-import { createFaceApp } from '../../src/app.js';
-import { createVueStreamFace, h } from '../../src/vue/index.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createVueStreamFace, h } from '@theory-cloud/facetheory/vue';
 
 const Home = {
   setup() {

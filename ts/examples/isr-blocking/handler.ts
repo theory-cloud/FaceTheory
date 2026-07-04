@@ -8,8 +8,8 @@
 // configure an explicit `tenantKey` or custom `cacheKey`; otherwise FaceTheory
 // fails closed when known tenant boundary headers reach the ISR runtime.
 
-import { createFaceApp } from '../../src/app.js';
-import { InMemoryHtmlStore, InMemoryIsrMetaStore } from '../../src/isr.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { InMemoryHtmlStore, InMemoryIsrMetaStore } from '@theory-cloud/facetheory';
 
 const htmlStore = new InMemoryHtmlStore();
 const metaStore = new InMemoryIsrMetaStore();

@@ -2,7 +2,7 @@
   import {
     BrandHeader,
     Shell,
-  } from '../../../src/svelte/stitch-shell/index.js';
+  } from '@theory-cloud/facetheory/svelte/stitch-shell';
 
   export let message: string;
 

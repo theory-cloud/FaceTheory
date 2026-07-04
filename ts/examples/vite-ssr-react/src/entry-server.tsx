@@ -1,14 +1,14 @@
 import * as React from 'react';
 
-import { createFaceApp } from '../../../src/app.js';
-import { createReactFace } from '../../../src/adapters/react.js';
-import type { ViteManifest } from '../../../src/vite.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createReactFace } from '@theory-cloud/facetheory/react';
+import type { ViteManifest } from '@theory-cloud/facetheory';
 import {
   viteAssetsForEntry,
   viteDevAssetsForEntry,
   viteDevHydrationForEntry,
   viteHydrationForEntry,
-} from '../../../src/vite.js';
+} from '@theory-cloud/facetheory';
 
 import { App } from './app.js';
 
