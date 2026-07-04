@@ -223,7 +223,7 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run lint && npm run typecheck && npm run test:unit",
+    "check": "npm run lint && npm run typecheck && npm run verify:examples:readmes && npm run test:unit",
     "test": "npm run build && npm run test:unit",
     "test:unit": "tsx test/run-unit.ts",
     "ssg": "tsx src/ssg-cli.ts",
@@ -252,7 +252,8 @@
     "example:control-plane:client-fill:relaxed": "tsx examples/control-plane-preset/render.ts --mode=relaxed --delivery=client-fill",
     "example:control-plane:client-fill:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=client-fill",
     "example:control-plane:streaming:relaxed": "tsx examples/control-plane-preset/render.ts --mode=relaxed --delivery=streaming",
-    "example:control-plane:streaming:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=streaming"
+    "example:control-plane:streaming:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=streaming",
+    "verify:examples:readmes": "node scripts/verify-example-readmes.mjs"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",

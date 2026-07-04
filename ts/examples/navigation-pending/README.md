@@ -1,21 +1,20 @@
-# FaceTheory Navigation Pending Example
+# Navigation Pending Example
 
-This example shows the Tier A Responsive Control Plane helper as a neutral browser
-ESM module. A control plane can re-serve FaceTheory's built
-`dist/navigation-pending.js` same-origin (for example,
-`/control-plane/assets/facetheory/navigation-pending.js`) and load a small entry
-module that starts the helper.
+## Demonstrates
 
-The helper observes accepted same-origin link clicks and form submissions only for
-pending presentation. It does not prevent native navigation, and it does not take
-over form submit authority from `startAwsOacFormTransport`.
+This example shows the navigation-pending browser helper as a neutral ESM entry. It starts `startNavigationPending()` for accepted same-origin link clicks and form submissions without taking over native navigation or mutating-form authority.
 
-```html
-<link rel="stylesheet" href="/assets/navigation-pending.css">
-<script type="module" src="/assets/navigation-pending-entry.js"></script>
+## Run
+
+From `ts/`, typecheck the entry with the standard example compilation gate:
+
+```bash
+npm run typecheck
 ```
 
-`navigation-pending-entry.ts` demonstrates a bundled/package-specifier import for
-apps that build their client entry. A server that re-serves the FaceTheory build
-artifact directly can use the same call after importing from the same-origin asset
-URL instead.
+A host can bundle `navigation-pending-entry.ts`, or re-serve FaceTheory's built `dist/navigation-pending.js` same-origin and call `startNavigationPending()` from its own module.
+
+## Backs
+
+- `docs/getting-started.md` — control-plane navigation and pending-state guidance.
+- Public package surface: `@theory-cloud/facetheory/navigation-pending`.
