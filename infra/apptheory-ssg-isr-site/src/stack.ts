@@ -49,8 +49,6 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.resolve(__dirname, './ssr-handler.ts'),
       handler: 'handler',
-      // Don't rely on the Lambda runtime shipping AWS SDK v3 modules. Bundle them.
-      bundleAwsSDK: true,
       timeout: Duration.seconds(10),
       memorySize: 512,
       environment: {
