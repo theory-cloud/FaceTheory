@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { App } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 
 import { FaceTheoryAppTheorySsrSiteStack } from '../../src/stack.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 interface CacheBehaviorTemplate {
   readonly PathPattern?: string;
@@ -59,11 +63,49 @@ function findOrigin(distribution: DistributionTemplate, behavior: CacheBehaviorT
   return origin;
 }
 
+function buildFaceTheoryDist(): void {
+  const repoRoot = path.resolve(__dirname, '../../../..');
+  execFileSync('npm', ['--prefix', path.resolve(repoRoot, 'ts'), 'run', 'build'], {
+    stdio: 'inherit',
+  });
+}
+
+function findSsrFunction(template: Record<string, unknown>): {
+  readonly Properties?: { readonly Code?: Record<string, unknown>; readonly Handler?: string };
+} {
+  const resources = template.Resources as
+    | Record<string, { Type?: string; Properties?: { Code?: Record<string, unknown>; Handler?: string } }>
+    | undefined;
+  assert.ok(resources, 'template should include resources');
+
+  const entry = Object.entries(resources).find(
+    ([logicalId, resource]) =>
+      logicalId.includes('SsrFunction') && resource.Type === 'AWS::Lambda::Function',
+  );
+  assert.ok(entry, 'template should include the reference SSR Lambda function');
+  return entry[1];
+}
+
 test('H2: AppTheorySsrSite stack synth is snapshotted', async () => {
+  // NodejsFunction bundles the SSR handler, which imports FaceTheory from ts/dist.
+  // Ensure dist exists so synth is deterministic and succeeds in clean checkouts.
+  buildFaceTheoryDist();
+
+  const handlerSource = await readFile(path.resolve(__dirname, '../../src/handler.ts'), 'utf8');
+  assert.match(handlerSource, /createFaceApp/, 'SSR reference handler must build a real FaceTheory app');
+  assert.match(
+    handlerSource,
+    /createAppTheoryFaceHandler/,
+    'SSR reference handler must cross the FaceTheory/AppTheory adapter boundary',
+  );
+
   const app = new App();
   const stack = new FaceTheoryAppTheorySsrSiteStack(app, 'FaceTheoryAppTheorySsrSite');
 
   const template = Template.fromStack(stack).toJSON();
+  const ssrFunction = findSsrFunction(template);
+  assert.ok(!ssrFunction.Properties?.Code?.ZipFile, 'SSR Lambda must not be an inline HTML string');
+
   const distribution = findDistribution(template);
   const ssgSidecarOrigin = findOrigin(distribution, findBehavior(distribution, '_facetheory/data/*'));
   const ssrSidecarOrigin = findOrigin(distribution, findBehavior(distribution, '_facetheory/ssr-data/*'));
