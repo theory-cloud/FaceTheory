@@ -21,6 +21,63 @@ Use this guide for recurring setup, build, and runtime failures that already hav
 | Browser receives 404 or HTML for an SSR hydration sidecar             | `/_facetheory/ssr-data/...` was not routed to the same FaceApp/Lambda handler as the SSR page | `ssrHydrationSidecars` and Lambda URL routing                            |
 | Browser logs hydration mismatch warnings after SSR                    | Client hydrate output differs from server HTML or hydration data was refetched/recomputed     | `@theory-cloud/facetheory/testing` and the affected adapter hydrate path |
 | Form POST behind AppTheorySsrSite OAC returns 403 before Lambda       | Native browser form cannot provide `x-amz-content-sha256` for the Lambda URL OAC signing path | `startAwsOacFormTransport()` and `docs/core-patterns.md`                 |
+| `facetheory doctor` reports install failures                         | Node, peer package, or AppTheory/TableTheory override drift in the local app                  | `facetheory doctor` output and the fixes below                           |
+
+## Issue: `facetheory doctor` Reports Install Failures
+
+Symptoms:
+
+- `facetheory doctor` exits non-zero
+- output includes `[fail]` rows for Node.js, adapter peers, Svelte, or AppTheory/TableTheory overrides
+
+Cause:
+
+- the local app is not on the Node.js floor declared by the installed FaceTheory package `engines.node`
+- or the selected adapter peer set is incomplete / outside the FaceTheory peer ranges
+- or the app declares AppTheory and TableTheory tarballs but the npm `overrides` block does not force AppTheory to the same TableTheory tarball
+
+Solution:
+
+```bash
+npx facetheory doctor
+```
+
+Apply each printed `Fix:` line. Common fixes are:
+
+```bash
+# Node floor: switch to the version range printed from FaceTheory's package engines.
+node --version
+
+# React peer set
+npm install react react-dom
+
+# Vue peer set
+npm install vue @vue/server-renderer
+
+# Svelte peer set; FaceTheory excludes Svelte 5.46.0 through 5.55.6.
+npm install svelte@^5.55.7
+```
+
+For AppTheory/TableTheory alignment, make the app's `package.json` use the same TableTheory GitHub Release tarball in both places:
+
+```json
+{
+  "dependencies": {
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.13.2/theory-cloud-apptheory-1.13.2.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz"
+  },
+  "overrides": {
+    "@theory-cloud/apptheory": {
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz"
+    }
+  }
+}
+```
+
+Verification:
+
+- `facetheory doctor` exits zero and prints `FaceTheory doctor passed.`
+- `npm run check` still passes in the app
 
 ## Issue: Node.js Version Mismatch
 

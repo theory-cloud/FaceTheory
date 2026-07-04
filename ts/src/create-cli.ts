@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Writable } from 'node:stream';
 
+import { runDoctorCli } from './doctor-cli.js';
 import {
   renderCreateTemplate,
   type CreateAdapter,
@@ -89,7 +90,7 @@ function parseCreateArgs(rawArgs: readonly string[]): ParsedCreateArgs {
   const args = [...rawArgs];
   if (args[0] === 'create') args.shift();
 
-  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+  if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
     throw new Error(USAGE);
   }
 
@@ -294,6 +295,24 @@ function isDirectCli(metaUrl: string, argv1: string | undefined): boolean {
   return fileURLToPath(metaUrl) === path.resolve(argv1);
 }
 
+export async function runFaceTheoryCli(args: readonly string[]): Promise<number> {
+  if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
+    write(process.stdout, `Usage: facetheory <command> [options]
+
+Commands:
+  create <directory> [--adapter react|vue|svelte]
+  doctor
+
+Run \`facetheory <command> --help\` for command-specific usage.
+`);
+    return 0;
+  }
+
+  const [command, ...rest] = args;
+  if (command === 'doctor') return runDoctorCli(rest);
+  return runCreateCli(args);
+}
+
 if (isDirectCli(import.meta.url, process.argv[1])) {
-  process.exitCode = await runCreateCli(process.argv.slice(2));
+  process.exitCode = await runFaceTheoryCli(process.argv.slice(2));
 }

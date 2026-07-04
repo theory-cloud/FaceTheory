@@ -33,7 +33,8 @@
   "bin": {
     "facetheory": "./dist/create-cli.js",
     "facetheory-create": "./dist/create-cli.js",
-    "facetheory-dev": "./dist/dev-cli.js"
+    "facetheory-dev": "./dist/dev-cli.js",
+    "facetheory-doctor": "./dist/doctor-cli.js"
   },
   "exports": {
     ".": {
