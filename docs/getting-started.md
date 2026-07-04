@@ -138,6 +138,90 @@ runtime.get("/{proxy+}", createAppTheoryFaceHandler({ app }));
 export const handler = createLambdaFunctionURLStreamingHandler(runtime);
 ```
 
+## Deploy With `AppTheorySsrSite`
+
+For AWS deployment, keep the same FaceTheory app and let AppTheory own the CloudFront + S3 + Lambda Function URL shape.
+The deploy reference is not a second render path: `createFaceApp(...)` still renders the document, and
+`createAppTheoryFaceHandler({ app })` still adapts it into AppTheory.
+
+Minimal SSR stack shape:
+
+```ts
+import { CfnOutput, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import { AppTheorySsrSite } from "@theory-cloud/apptheory-cdk";
+
+const assetsBucket = new s3.Bucket(this, "AssetsBucket", {
+  blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+  encryption: s3.BucketEncryption.S3_MANAGED,
+  enforceSSL: true,
+  removalPolicy: RemovalPolicy.RETAIN,
+});
+
+const ssrFunction = new NodejsFunction(this, "SsrFunction", {
+  runtime: lambda.Runtime.NODEJS_20_X,
+  entry: "src/handler.ts",
+  handler: "handler",
+  timeout: Duration.seconds(10),
+});
+
+const site = new AppTheorySsrSite(this, "Site", {
+  ssrFunction,
+  ssrUrlAuthType: lambda.FunctionUrlAuthType.AWS_IAM,
+  assetsBucket,
+  assetsKeyPrefix: "assets",
+  assetsManifestKey: ".vite/manifest.json",
+  domainName: "app.example.com", // optional custom domain
+  certificateArn: "arn:aws:acm:us-east-1:111122223333:certificate/...", // optional, CloudFront requires us-east-1
+  webAclId: "arn:aws:wafv2:us-east-1:111122223333:global/webacl/...", // optional WAF
+});
+
+new CfnOutput(this, "CloudFrontDomainName", {
+  value: site.distribution.distributionDomainName,
+});
+```
+
+For SSG + blocking ISR, switch to `AppTheorySsrSiteMode.SSG_ISR` and pass ISR resources:
+
+```ts
+import { AppTheorySsrSiteMode } from "@theory-cloud/apptheory-cdk";
+
+new AppTheorySsrSite(this, "Site", {
+  mode: AppTheorySsrSiteMode.SSG_ISR,
+  ssrFunction,
+  ssrUrlAuthType: lambda.FunctionUrlAuthType.AWS_IAM,
+  assetsBucket,
+  assetsKeyPrefix: "assets",
+  assetsManifestKey: ".vite/manifest.json",
+  htmlStoreBucket: isrBucket,
+  htmlStoreKeyPrefix: "isr",
+  isrMetadataTable: cacheTable.table,
+  directS3PathPatterns: ["/.vite/*"],
+  ssrPathPatterns: ["/actions/*"],
+});
+```
+
+Validate locally before deploying:
+
+```bash
+cd infra/apptheory-ssr-site && npm ci && npm test
+cd ../apptheory-ssg-isr-site && npm ci && npm test
+```
+
+Then an AWS operator can run the app's CDK deploy and curl the CloudFront output:
+
+```bash
+npx cdk deploy FaceTheoryHelloWorld --outputs-file cdk-outputs.json
+CLOUDFRONT_DOMAIN=$(jq -r '.FaceTheoryHelloWorld.CloudFrontDomainName' cdk-outputs.json)
+curl -I "https://${CLOUDFRONT_DOMAIN}/"
+curl -sS "https://${CLOUDFRONT_DOMAIN}/" | grep "Hello FaceTheory"
+```
+
+Do not treat local synth/tests/docs builds as live deployment proof. The full walkthrough, including domain, WAF, ISR
+wiring, SSG sidecars, invalidation notes, and post-deploy curl checks, lives in [CDK And AWS Notes](./cdk/README.md).
+
 ## Add Strict No-Inline CSP Hydration
 
 Use this path when a route must run without inline scripts, inline styles, or raw head HTML. The server render still owns

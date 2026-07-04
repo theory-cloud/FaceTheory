@@ -105,6 +105,13 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
+For the paved AWS deployment path, wrap the same `FaceApp` in AppTheory's `AppTheorySsrSite`: the SSR reference stack
+bundles a real `createFaceApp(...)` + `createAppTheoryFaceHandler({ app })` Lambda handler, and the SSG/ISR reference
+stack uses `AppTheorySsrSiteMode.SSG_ISR` for S3-primary HTML with Lambda fallback and TableTheory-backed ISR wiring.
+See the [CDK deployment walkthrough](https://facetheory.theorycloud.ai/cdk/) for scaffold → build → props → deploy →
+curl steps. Local synth/tests are deployment-shape proof only; do not claim live CloudFront proof without an authorized
+AWS deploy.
+
 The `v3.8.1` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
 
 ## At a glance

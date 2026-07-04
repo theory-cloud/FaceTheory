@@ -62,6 +62,22 @@ from `src/handler.ts`, creates a `FaceApp` with `createFaceApp(...)`, adapts it 
 `createAppTheoryFaceHandler({ app })`, and lets `AppTheorySsrSite` own the CloudFront + S3 + Lambda Function URL
 topology. It is intentionally not an inline HTML-string Lambda example.
 
+The [CDK guide](./README.md) contains the hello-world-to-CloudFront walkthrough. The core `AppTheorySsrSite` property
+map is:
+
+| Need | Prop |
+|---|---|
+| SSR Lambda | `ssrFunction` |
+| CloudFront-signed Lambda URL | `ssrUrlAuthType: lambda.FunctionUrlAuthType.AWS_IAM` |
+| Static assets | `assetsBucket`, `assetsKeyPrefix`, `assetsManifestKey` |
+| SSG/ISR origin-group mode | `mode: AppTheorySsrSiteMode.SSG_ISR` |
+| SSG raw sidecar/object paths | `directS3PathPatterns` (AppTheory adds `/_facetheory/data/*` in `SSG_ISR`) |
+| Dynamic Lambda-only paths | `ssrPathPatterns` (AppTheory adds `/_facetheory/ssr-data/*` in `SSG_ISR`) |
+| ISR HTML storage | `htmlStoreBucket`, `htmlStoreKeyPrefix` |
+| ISR metadata/lease table | `isrMetadataTable` |
+| Custom domain | `domainName` plus `certificateArn` or `hostedZone` |
+| WAF | `webAclId` |
+
 ### Mutating Forms Behind Lambda Function URL OAC
 
 `AppTheorySsrSite` keeps the Lambda Function URL origin protected by `AWS_IAM` and CloudFront Lambda URL OAC. Browser
