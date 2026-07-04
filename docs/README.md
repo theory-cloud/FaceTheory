@@ -12,6 +12,7 @@ This is the official documentation index for the canonical `docs/` surface.
 - [Testing Guide](./testing-guide.md)
 - [Troubleshooting](./troubleshooting.md)
 - [Migration Guide](./migration-guide.md)
+- [Deprecation Policy](./deprecation-policy.md)
 - [Development Guidelines](./development-guidelines.md)
 - [Concepts](./_concepts.yaml)
 - [Patterns](./_patterns.yaml)
@@ -36,6 +37,7 @@ Fixed ingestible docs:
 - `docs/testing-guide.md`
 - `docs/troubleshooting.md`
 - `docs/migration-guide.md`
+- `docs/deprecation-policy.md`
 
 Fixed contract-only docs:
 
@@ -59,7 +61,7 @@ Roadmap and checklist material lives under `docs/planning/` so the root of `docs
 
 ## What FaceTheory Covers
 
-FaceTheory is a TypeScript runtime for AWS-first SSR, SSG, and blocking ISR with package exports for React, Vue, and Svelte adapters, plus AppTheory and TableTheory integration points.
+FaceTheory is a TypeScript runtime for three AWS-first server render modes (SSR, SSG, and blocking ISR) plus the SPA client runtime, with package exports for React, Vue, and Svelte adapters plus AppTheory and TableTheory integration points.
 
 Use this doc set for supported interfaces, setup, verification, troubleshooting, and deployment guidance. Keep roadmap or planning material out of this navigation path.
 

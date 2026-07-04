@@ -4,10 +4,10 @@
 # =============================================================
 
 title: FaceTheory
-tagline: Deterministic SSR, SSG, ISR, and SPA for the AWS-first Theory Cloud stack.
+tagline: Deterministic SSR, SSG, ISR, and SPA client navigation for the AWS-first Theory Cloud stack.
 description: >-
   The AWS-first TypeScript client-delivery framework of the Theory Cloud stack.
-  SSR, SSG, blocking ISR, and SPA — with React, Vue, and Svelte adapters and
+  SSR, SSG, and blocking ISR plus the SPA client runtime — with React, Vue, and Svelte adapters and
   deterministic head/style emission so server-rendered HTML matches the
   client-hydrated DOM exactly.
 
@@ -102,7 +102,7 @@ tabletheory:
   repo_branch: staging
   docs_root: docs
   version_pill: "v3.x"
-  version_status: prerelease    # FaceTheory is pre-1.0 contract-wise
+  version_status: stable        # FaceTheory is on the post-1.0 3.x release line
   # `runtimes` is the keyed name the chrome (sidebar groups, landing tabs,
   # install pills) expects. For FaceTheory it lists ADAPTER surfaces.
   runtimes:

@@ -13,6 +13,19 @@ Use this guide when you are:
 - introducing SSG or ISR into an SSR-only FaceTheory app
 - updating AppTheory or TableTheory dependency pins
 
+
+## Versioned Migration Index
+
+Use this index to find the migration path by release line. Release Please updates version markers automatically; do not hand-edit `x-release-please-version` comments when adding migration notes.
+
+| From | To | Migration path | Notes |
+| --- | --- | --- | --- |
+| App-local SSR glue | Current 3.x | [Migration 1](#migration-1-ad-hoc-handler-to-canonical-aws-entrypoint) | Move request translation into `createFaceApp()` and the Lambda/AppTheory entrypoints. |
+| SSR-only FaceTheory apps | Current 3.x | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr) | Reclassify routes into the three server `FaceMode` values before adding SPA navigation. |
+| ISR routes without tenant partitioning | Current 3.x | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults) | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR. |
+| Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets. |
+| Deprecated 3.x APIs | Next major | [Deprecation Policy](./deprecation-policy.md) | `Headers` and tag emission through `head.html` are retained through 3.x and scheduled for removal in the planned v4 curation pass. |
+
 ## Scope Guardrails
 
 - Keep migration steps user-facing and task-oriented.

@@ -32,7 +32,7 @@ See [Operator visibility dashboards](../features/operator-visibility.md) for the
 
 Changes to FaceTheory's Stitch shell, hosted-auth, or admin primitives that would break Autheory's bindings are coordination events. The simplest path is:
 
-1. Open a FaceTheory PR with a `feat!:` or `fix!:` commit subject (Conventional Commits — pre-1.0 still flags breaking changes explicitly).
+1. Open a FaceTheory PR with a `feat!:` or `fix!:` commit subject (Conventional Commits — the 3.x line flags breaking changes explicitly).
 2. Notify Autheory's steward through the user.
 3. Land matching changes in Autheory against the new FaceTheory version.
 

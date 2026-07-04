@@ -4,7 +4,7 @@ title: Render modes compared
 
 # Render modes compared
 
-FaceTheory supports four render shapes. Three are `FaceMode` values (declared on each `FaceModule`); the fourth — SPA navigation — is a client-side runtime layered on top of any of them.
+FaceTheory supports three server render modes. All three are `FaceMode` values declared on each `FaceModule`; SPA navigation is a client-side runtime layered on top of a server-rendered shell, not a fourth `FaceMode`.
 
 |                       | SSR                            | SSG                              | Blocking ISR                       | SPA navigation                          |
 |-----------------------|--------------------------------|----------------------------------|------------------------------------|-----------------------------------------|
@@ -29,7 +29,7 @@ Pick **SPA navigation** on top of any of the above when the application is inter
 
 ## What you do not pick
 
-- A "fifth" render mode (edge rendering, React Server Components, island hydration, etc.). The four shapes above are the framework's shape; growth happens through new options on existing modes, not by adding modes.
+- A fourth server render mode (edge rendering, React Server Components, island hydration, etc.). The three server modes plus SPA runtime are the framework's shape; growth happens through new options on existing modes, not by adding modes.
 - A client-only mode with no server pass. The SPA mode is a server-rendered shell with client-side routing on top — the server pass is the determinism contract.
 
 ## Related docs

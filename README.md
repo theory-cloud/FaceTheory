@@ -8,7 +8,7 @@
 
 <p align="center">
   <strong>The AWS-first TypeScript client-delivery framework for the Theory Cloud stack.</strong><br>
-  Deterministic SSR, SSG, blocking ISR, and SPA — across React, Vue, and Svelte.
+  Three deterministic server render modes (SSR, SSG, blocking ISR) plus the SPA client runtime — across React, Vue, and Svelte.
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@ FaceTheory is the **client-delivery layer** of the Theory Cloud stack. It render
 
 ## Status
 
-FaceTheory is pre-1.0 and under active development. The runtime covers SSR, SSG, and blocking ISR with adapter support for React, Vue, and Svelte. First production use is underway at [Pay Theory](https://paytheory.com) (checkout page). See [CHANGELOG](CHANGELOG.md) for release history.
+FaceTheory is a post-1.0 3.x runtime under active development. Post-1.0 SemVer discipline applies: breaking changes require explicit `feat!:` / `fix!:` commits, `BREAKING CHANGE:` notes, and migration guidance; deprecations follow the published [Deprecation Policy](docs/deprecation-policy.md). The runtime covers SSR, SSG, and blocking ISR with a SPA client runtime and adapter support for React, Vue, and Svelte. First production use is underway at [Pay Theory](https://paytheory.com) (checkout page). See [CHANGELOG](CHANGELOG.md) for release history.
 
 ## Install v3.8.1 <!-- x-release-please-version -->
 
@@ -116,12 +116,14 @@ The `v3.8.1` GitHub release also ships the matching `facetheory-reference-${FACE
 
 ## At a glance
 
-| Render modes | 4 | SSR · SSG · blocking ISR · SPA |
-| ------------ | - | ------------------------------ |
-| Adapters     | 3 | React · Vue · Svelte |
+| Surface | Count | Contract |
+| ------- | ----- | -------- |
+| Server render modes | 3 | SSR · SSG · blocking ISR |
+| SPA client runtime | 1 | Same-origin navigation layered on a server-rendered shell |
+| Adapters | 3 | React · Vue · Svelte |
 | Distribution | GitHub Releases | immutable, pinned |
-| Runtime      | Node ≥24 | TypeScript-only |
-| License      | Apache-2.0 | open source |
+| Runtime | Node ≥24 | TypeScript-only |
+| License | Apache-2.0 | open source |
 
 ## Resource Routes And Hydration Sidecars
 
