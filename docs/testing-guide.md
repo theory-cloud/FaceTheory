@@ -235,6 +235,39 @@ For documentation reviews, explicitly check the unsafe-claim boundary: these tes
 example wiring, not that a release has been published, a Simulacrum RC has been validated, or an AWS/customer deployment
 has succeeded.
 
+### Svelte SSR Fixture Harness
+
+```bash
+cd ts
+node --import tsx test/unit/svelte-ssr-fixtures.test.ts
+```
+
+Use this when changing:
+
+- Svelte Stitch or responsive primitive components
+- `createSvelteFace()` or Svelte adapter SSR behavior
+- fixture definitions or stored snapshots under `ts/test/fixtures/svelte-ssr/`
+- the Svelte compiler floor or lockfile version
+
+Local expected result:
+
+- every Svelte component in the fixture roots has exactly one definition and one stored snapshot
+- SSR, SSG, and ISR render the same body for each fixture
+- repeated SSR renders are byte-identical for the current fixture baseline
+
+These snapshots are tied to the current `svelte/compiler` output shape pinned by `ts/package-lock.json`. They are a
+baseline for FaceTheory's adapter/mode determinism and for reviewing the Svelte 5 runes migration; they are not a
+portable proof that legacy-Svelte and runes-compiled components emit byte-identical HTML forever. When snapshots are
+regenerated with `FACETHEORY_UPDATE_SVELTE_SSR_FIXTURES=1`, review compiler-owned comment/anchor marker drift
+separately from visible HTML drift and record intentional output changes in the migration or release notes.
+
+The harness uses a direct `svelte/compiler` path with a temporary `.mjs` module tree so wrapper fixtures can exercise
+default and named snippets through FaceTheory's adapter without depending on Vite/Rollup bundling. That direct path has
+narrow import rewrites for the current compiler output; if those assertions fail, update the harness before accepting a
+snapshot change. Production bundler behavior remains covered by the Vite Svelte example builds. Scratch directories use
+the ignored `.tmp-facetheory-svelte-ssr-fixtures-*` prefix so an interrupted run cannot accidentally stage generated
+modules.
+
 ### React SSR And Streaming
 
 ```bash

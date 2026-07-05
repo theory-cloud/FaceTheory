@@ -28,6 +28,18 @@ export const SVELTE_SSR_FIXTURE_COMPONENT_ROOTS = [
 
 export const SVELTE_SSR_FIXTURE_ROOT = 'test/fixtures/svelte-ssr';
 
+const SVELTE_SSR_FIXTURE_TEMP_PREFIX = '.tmp-facetheory-svelte-ssr-fixtures-';
+
+/*
+ * These fixtures are compiler-shape snapshots for the Svelte version pinned by
+ * the workspace lockfile, not a portable proof that two Svelte compiler
+ * generations emit identical bytes. The harness intentionally compiles wrapper
+ * components with svelte/compiler so every component flows through
+ * createSvelteFace across SSR/SSG/ISR without depending on Vite/Rollup's bundle
+ * graph. Production bundler coverage still lives in the Vite Svelte example
+ * tests; the assertions below make this direct-compiler path fail closed if the
+ * current Svelte output/import shape moves beyond the narrow rewrites used here.
+ */
 export interface SvelteSsrFixtureDefinition {
   componentPath: string;
   props?: Record<string, unknown>;
@@ -87,16 +99,14 @@ export async function readSnapshotPaths(
 export async function withSvelteSsrFixtureRenderer<T>(
   fn: (renderer: SvelteSsrFixtureRenderer) => Promise<T>,
 ): Promise<T> {
-  const tempRoot = await mkdtemp(
-    path.resolve(`.tmp-facetheory-svelte-ssr-fixtures-${process.pid}-`),
-  );
+  const tempRoot = await createSvelteSsrFixtureTempRoot();
   const renderer = new SvelteSsrFixtureRenderer(tempRoot);
 
   try {
     await renderer.compileComponents(await listSvelteSsrFixtureComponents());
     return await fn(renderer);
   } finally {
-    await rm(tempRoot, { recursive: true, force: true });
+    await removeSvelteSsrFixtureTempRoot(tempRoot);
   }
 }
 
@@ -171,6 +181,8 @@ export class SvelteSsrFixtureRenderer {
       '$1$2.mjs$1',
     );
     code = rewriteRelativeRuntimeTsImports(code, absoluteSourcePath);
+    assertNoUnresolvedSvelteImports(code, normalized);
+    assertNoUnrewrittenRuntimeTsImports(code, absoluteSourcePath);
 
     const outputPath = path.join(
       this.tempRoot,
@@ -336,6 +348,68 @@ function rewriteRelativeRuntimeTsImports(
       if (!existsSync(tsPath)) return full as string;
       return `from ${quote}${pathToFileURL(tsPath).href}${quote}`;
     },
+  );
+}
+
+function assertNoUnresolvedSvelteImports(
+  code: string,
+  componentPath: string,
+): void {
+  const unresolved = Array.from(
+    code.matchAll(/from\s+['"]([^'"]+\.svelte)['"]/g),
+    (match) => match[1],
+  ).filter((specifier): specifier is string => specifier !== undefined);
+  assert.deepEqual(
+    unresolved,
+    [],
+    `Svelte SSR fixture compiler output for ${componentPath} still contains .svelte imports; update the harness rewrite before trusting snapshots`,
+  );
+}
+
+function assertNoUnrewrittenRuntimeTsImports(
+  code: string,
+  sourcePath: string,
+): void {
+  const sourceDir = path.dirname(sourcePath);
+  const unresolved = Array.from(
+    code.matchAll(/from\s+['"](\.{1,2}\/[^'"]+\.js)['"]/g),
+    (match) => match[1],
+  ).filter((specifier): specifier is string => {
+    if (specifier === undefined) return false;
+    const jsPath = path.resolve(sourceDir, specifier);
+    return existsSync(jsPath.replace(/\.js$/, '.ts'));
+  });
+  assert.deepEqual(
+    unresolved,
+    [],
+    `Svelte SSR fixture compiler output for ${path.relative(
+      process.cwd(),
+      sourcePath,
+    )} still contains repo-local relative .js imports that map to .ts sources; update the harness rewrite before trusting snapshots`,
+  );
+}
+
+async function createSvelteSsrFixtureTempRoot(): Promise<string> {
+  const tempRoot = await mkdtemp(
+    path.resolve(`${SVELTE_SSR_FIXTURE_TEMP_PREFIX}${process.pid}-`),
+  );
+  assertSvelteSsrFixtureTempRoot(tempRoot);
+  return tempRoot;
+}
+
+async function removeSvelteSsrFixtureTempRoot(tempRoot: string): Promise<void> {
+  assertSvelteSsrFixtureTempRoot(tempRoot);
+  await rm(tempRoot, { recursive: true, force: true });
+}
+
+function assertSvelteSsrFixtureTempRoot(tempRoot: string): void {
+  const relative = path.relative(process.cwd(), tempRoot);
+  assert.ok(
+    relative !== '' &&
+      !relative.startsWith('..') &&
+      !path.isAbsolute(relative) &&
+      path.basename(relative).startsWith(SVELTE_SSR_FIXTURE_TEMP_PREFIX),
+    `refusing to use Svelte SSR fixture temp root outside the ignored ${SVELTE_SSR_FIXTURE_TEMP_PREFIX}* pattern: ${tempRoot}`,
   );
 }
 
