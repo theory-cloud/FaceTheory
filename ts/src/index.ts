@@ -221,7 +221,6 @@ export type {
   FaceResponseHeaders,
   FaceResponseHeaderValue,
   FaceStyleTag,
-  Headers,
   PreparedUIIntegration,
   Query,
   TrailingSlashPolicy,

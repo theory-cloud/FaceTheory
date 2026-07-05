@@ -311,23 +311,18 @@ function validateStrictHeadTags(
   policy: FaceCspPolicy | undefined,
   options: {
     allowedOrigin?: string | URL;
-    allowedEscapedRawHtml?: string | null;
     cspNonce?: string | null;
   } = {},
 ): void {
   if (!policy) return;
 
   const allowedOrigin = normalizeAllowedOrigin(options.allowedOrigin);
-  const allowedEscapedRawHtml = options.allowedEscapedRawHtml ?? null;
   const expectedNonce = normalizeOptionalNonce(options.cspNonce);
 
   for (const tag of tags) {
     switch (tag.type) {
       case 'raw':
-        if (
-          isCspDisabled(policy, 'rawHead') &&
-          tag.html !== allowedEscapedRawHtml
-        ) {
+        if (isCspDisabled(policy, 'rawHead')) {
           throw new Error('FaceTheory strict CSP rejects raw head HTML');
         }
         break;
@@ -566,12 +561,14 @@ function dedupeKey(tag: FaceHeadTag): string | null {
       const httpEquiv = attrs['http-equiv'];
       if (typeof httpEquiv === 'string')
         return `meta:http-equiv:${httpEquiv.toLowerCase()}`;
-      return null;
+      return `meta:struct:${renderHeadTag(tag)}`;
     }
     case 'link': {
       const rel = tag.attrs.rel;
       const href = tag.attrs.href;
-      if (typeof rel !== 'string' || typeof href !== 'string') return null;
+      if (typeof rel !== 'string' || typeof href !== 'string') {
+        return `link:struct:${renderHeadTag(tag)}`;
+      }
       const as = tag.attrs.as;
       const asKey = typeof as === 'string' ? as.toLowerCase() : '';
       return `link:${rel.toLowerCase()}:${href}:${asKey}`;
@@ -585,7 +582,7 @@ function dedupeKey(tag: FaceHeadTag): string | null {
       }
       const id = tag.attrs.id;
       if (typeof id === 'string') return `script:id:${id}`;
-      return null;
+      return `script:struct:${renderHeadTag(tag)}`;
     }
     case 'style': {
       const id = tag.attrs?.id;
@@ -593,7 +590,7 @@ function dedupeKey(tag: FaceHeadTag): string | null {
       const dataEmotion = tag.attrs?.['data-emotion'];
       if (typeof dataEmotion === 'string')
         return `style:data-emotion:${dataEmotion}`;
-      return null;
+      return `style:struct:${renderHeadTag(tag)}`;
     }
     case 'raw':
       return null;
@@ -702,9 +699,6 @@ export function renderFaceHead(
   options: RenderFaceHeadOptions = {},
 ): string {
   const tags: FaceHeadTag[] = [];
-  const escapedLegacyHeadHtml = out.head?.html
-    ? escapeHTML(out.head.html)
-    : null;
 
   if (out.headTags) tags.push(...out.headTags);
 
@@ -720,9 +714,6 @@ export function renderFaceHead(
 
   if (out.head?.title) {
     tags.push({ type: 'title', text: out.head.title });
-  }
-  if (escapedLegacyHeadHtml) {
-    tags.push({ type: 'raw', html: escapedLegacyHeadHtml });
   }
 
   if (out.hydration) {
@@ -763,9 +754,8 @@ export function renderFaceHead(
 
   const validationOptions: {
     allowedOrigin?: string | URL;
-    allowedEscapedRawHtml?: string | null;
     cspNonce?: string | null;
-  } = { allowedEscapedRawHtml: escapedLegacyHeadHtml };
+  } = {};
   if (options.allowedOrigin !== undefined) {
     validationOptions.allowedOrigin = options.allowedOrigin;
   }

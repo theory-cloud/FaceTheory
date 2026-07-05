@@ -211,12 +211,13 @@ test('head helpers: strict JSON-LD fails closed without matching request nonce',
   );
 });
 
-test('head helpers: keyless JSON-LD tags remain dedup exempt', () => {
+test('head helpers: structurally dedupe identical keyless JSON-LD tags', () => {
   const firstJsonLd = jsonLd({ '@type': 'BreadcrumbList', position: 1 });
   const head = renderFaceHead({
     html: '<main>jsonld</main>',
     headTags: [
       firstJsonLd,
+      jsonLd({ '@type': 'BreadcrumbList', position: 1 }),
       jsonLd({ '@type': 'NewsArticle', headline: 'Two' }),
     ],
   });
@@ -226,6 +227,27 @@ test('head helpers: keyless JSON-LD tags remain dedup exempt', () => {
     (head.match(/type="application\/ld\+json"/g) ?? []).length,
     2,
   );
+});
+
+test('head: structurally dedupes keyless meta link script and style tags', () => {
+  const head = renderFaceHead({
+    html: '<main>keyless</main>',
+    headTags: [
+      { type: 'meta', attrs: { content: 'one' } },
+      { type: 'meta', attrs: { content: 'one' } },
+      { type: 'link', attrs: { title: 'preconnect' } },
+      { type: 'link', attrs: { title: 'preconnect' } },
+      { type: 'script', attrs: { type: 'application/json' }, body: '{"a":1}' },
+      { type: 'script', attrs: { type: 'application/json' }, body: '{"a":1}' },
+      { type: 'style', cssText: '.a{color:red}' },
+      { type: 'style', cssText: '.a{color:red}' },
+    ],
+  });
+
+  assert.equal((head.match(/<meta content="one">/g) ?? []).length, 1);
+  assert.equal((head.match(/<link title="preconnect">/g) ?? []).length, 1);
+  assert.equal((head.match(/<script type="application\/json">/g) ?? []).length, 1);
+  assert.equal((head.match(/<style>/g) ?? []).length, 1);
 });
 
 test('head: applies CSP nonce to inline styles and hydration scripts', () => {
@@ -347,7 +369,6 @@ test('head: strict CSP allows external hydration with same-origin URLs', () => {
       },
       head: {
         title: 'Strict',
-        html: '<meta name="escaped">',
       },
       headTags: [{ type: 'link', attrs: { rel: 'stylesheet', href: '/assets/app.css' } }],
       hydration: {
@@ -361,7 +382,6 @@ test('head: strict CSP allows external hydration with same-origin URLs', () => {
   );
 
   assert.ok(head.includes('<title>Strict</title>'));
-  assert.ok(head.includes('&lt;meta name=&quot;escaped&quot;&gt;'));
   assert.ok(head.includes('href="/_facetheory/hydration/strict.json"'));
   assert.equal(head.includes('__FACETHEORY_DATA__'), false);
 });
@@ -626,13 +646,13 @@ test('head: strict CSP rejects backslash-normalized external hydration URLs', ()
   );
 });
 
-test('head: escapes legacy head fields and blocks unsafe hydration module URLs', () => {
+test('head: escapes title and blocks unsafe hydration module URLs', () => {
   const head = renderFaceHead({
     html: '<div>ok</div>',
     head: {
       title: '</title><script>alert("title")</script>',
-      html: '<meta name="unsafe" content="</head><script>alert(1)</script>">',
-    },
+      html: '<meta name="legacy" content="ignored">',
+    } as unknown as { title?: string },
     hydration: {
       data: { safe: true },
       bootstrapModule: 'javascript:alert(1)',
@@ -644,12 +664,7 @@ test('head: escapes legacy head fields and blocks unsafe hydration module URLs',
       '<title>&lt;/title&gt;&lt;script&gt;alert(&quot;title&quot;)&lt;/script&gt;</title>',
     ),
   );
-  assert.ok(
-    head.includes(
-      '&lt;meta name=&quot;unsafe&quot; content=&quot;&lt;/head&gt;&lt;script&gt;alert(1)&lt;/script&gt;&quot;&gt;',
-    ),
-  );
+  assert.equal(head.includes('legacy'), false);
   assert.equal(head.includes('<script>alert("title")</script>'), false);
-  assert.equal(head.includes('<script>alert(1)</script>'), false);
   assert.equal(head.includes('javascript:alert(1)'), false);
 });

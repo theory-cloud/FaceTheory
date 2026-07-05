@@ -25,7 +25,7 @@ Use this index to find the migration path by release line. Release Please update
 | ISR routes without tenant partitioning  | Current 3.x | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                                 |
 | Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                          |
 | Svelte 4 adapter consumers              | v4.0.0      | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                      |
-| Deprecated 3.x public surface            | v4.0.0      | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated to the core runtime; optional surfaces move to subpaths and source guardrails leave the runtime package. |
+| Deprecated 3.x public surface            | v4.0.0      | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated; `Headers` and `head.html` are removed; optional surfaces move to subpaths.                              |
 
 ## Scope Guardrails
 
@@ -310,7 +310,15 @@ reachable through documented package subpaths.
 3. Stop importing low-level head serialization helpers from the root barrel. Use structured `headTags`, helper
    constructors such as `titleTag()`, `metaTag()`, `canonical()`, and `jsonLd()`, and the full `renderFaceHead()`
    primitive when a test needs to inspect final head HTML.
-4. Remove any runtime import of control-plane guardrail scanners. The guardrail scanner is repository build/test
+4. Replace the deprecated `Headers` type alias with `FaceHeaders`. The browser `Headers` class remains available from
+   the DOM runtime; FaceTheory's canonical request/response header map is only `FaceHeaders`.
+5. Replace `head.html` with the supported head channels:
+   - use `head: { title }` for the document title
+   - use structured `headTags` for meta/link/script/style/raw declarations
+   - use `styleTags` for adapter or integration style output
+6. Review any duplicate keyless head tags. v4 de-dupes keyless meta/link/script/style tags by their rendered
+   structure, so identical duplicates collapse while distinct JSON-LD blocks remain distinct.
+7. Remove any runtime import of control-plane guardrail scanners. The guardrail scanner is repository build/test
    tooling and is no longer shipped as runtime API.
 
 Validation:

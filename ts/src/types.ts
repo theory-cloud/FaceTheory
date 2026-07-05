@@ -4,12 +4,6 @@
  * serialization.
  */
 export type FaceHeaders = Record<string, string[]>;
-
-/**
- * @deprecated Use `FaceHeaders`. The legacy `Headers` alias remains for 3.x
- * compatibility and will be removed in v4.0.0.
- */
-export type Headers = FaceHeaders;
 /**
  * Caller-facing response header value accepted from a Face render result before
  * FaceTheory canonicalizes it into `FaceHeaders`.
@@ -64,7 +58,7 @@ export type FaceHeadTag =
 export interface FaceStyleTag {
   /**
    * Raw CSS text for a framework-safe `<style>` tag path. Prefer this over
-   * injecting `<style>...</style>` through `head.html`.
+   * caller-owned raw head HTML.
    */
   cssText: string;
   attrs?: FaceAttributes;
@@ -221,18 +215,12 @@ export interface FaceResourceRoute {
 }
 
 /**
- * Legacy high-level head fields accepted by `FaceRenderResult`; prefer `headTags` and
- * `styleTags` for deterministic structured head emission.
+ * High-level title field accepted by `FaceRenderResult`. Use `head.title` for
+ * page titles and `headTags` / `styleTags` for deterministic structured head
+ * emission.
  */
 export interface FaceHead {
   title?: string;
-  /**
-   * Legacy head text inserted into `<head>` after HTML escaping. Use
-   * structured `headTags` / `styleTags` for actual tags. The explicit
-   * `headTags: [{ type: 'raw', html }]` escape hatch remains available only
-   * for caller-owned HTML.
-   */
-  html?: string;
 }
 
 /**
