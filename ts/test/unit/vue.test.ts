@@ -461,28 +461,29 @@ test('vue adapter: ISR strict CSP lets runtime externalize legacy hydration side
   const secret = 'VUE_ISR_HYDRATION_SECRET';
   let renderCount = 0;
 
-  const app = createFaceApp({
-    faces: [
-      createVueFace({
-        route: '/vue-isr',
-        mode: 'isr',
-        render: () => h('main', null, `Vue ISR ${++renderCount}`),
-        renderOptions: {
-          csp: {
-            inlineScripts: false,
-            inlineStyles: false,
-            rawHead: false,
-          },
-          hydration: {
-            data: {
-              secret,
-              terminator: '</script>',
-            },
-            bootstrapModule: '/assets/vue-entry.js',
-          },
+  const face = createVueFace({
+    route: '/vue-isr',
+    mode: 'isr',
+    render: () => h('main', null, `Vue ISR ${++renderCount}`),
+    renderOptions: {
+      csp: {
+        inlineScripts: false,
+        inlineStyles: false,
+        rawHead: false,
+      },
+      hydration: {
+        data: {
+          secret,
+          terminator: '</script>',
         },
-      }),
-    ],
+        bootstrapModule: '/assets/vue-entry.js',
+      },
+    },
+  });
+  face.revalidateSeconds = 60;
+
+  const app = createFaceApp({
+    faces: [face],
     isr: {
       htmlStore,
       metaStore,

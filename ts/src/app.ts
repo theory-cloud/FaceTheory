@@ -45,7 +45,6 @@ import {
 } from './ssr-hydration.js';
 import type {
   FaceContext,
-  FaceContractWarningLogRecord,
   FaceExternalHydration,
   FaceHydration,
   FaceMode,
@@ -82,14 +81,13 @@ export interface FaceAppOptions {
 }
 
 /**
- * Structured log record emitted by a FaceApp for request completion, stream errors,
- * and construction-time contract warnings.
+ * Structured log record emitted by a FaceApp for request completion and stream
+ * errors. Invalid Face contracts fail during construction before a log record can
+ * be emitted.
  */
 export type FaceAppLogRecord =
   | FaceRequestCompletedLogRecord
-  | FaceStreamErrorLogRecord
-  | (FaceContractWarningLogRecord &
-      Partial<Omit<FaceRequestCompletedLogRecord, 'event'>>);
+  | FaceStreamErrorLogRecord;
 
 /**
  * Observer callback for FaceApp structured logs; implementations must avoid mutating
@@ -106,9 +104,7 @@ export interface FaceAppObservabilityHooks extends Omit<
   'log'
 > {
   /**
-   * Structured request completion records and construction-time contract
-   * warnings. Contract warnings remain warnings until the planned v4 contract
-   * escalation.
+   * Structured request completion and stream-error records.
    */
   log?: FaceAppLogHook;
 }
@@ -247,19 +243,17 @@ export class FaceApp {
       ? createFaceAppSsrHydrationSidecarRuntime(options.ssrHydrationSidecars)
       : null;
 
-    const constructionWarnings: FaceContractWarningLogRecord[] = [];
-
     for (const face of options.faces) {
       const pattern = canonicalizePathForTrailingSlashPolicy(
         validateFaceContract(face),
         this.trailingSlash,
       );
+      validateFaceModeContract(face, pattern);
       if (this.faceByPattern.has(pattern)) {
         throw new Error(`duplicate face route: ${pattern}`);
       }
       this.router.add(pattern);
       this.faceByPattern.set(pattern, face);
-      constructionWarnings.push(...faceContractWarnings(face, pattern));
     }
 
     const resources = this.ssrHydrationSidecarRuntime
@@ -319,7 +313,6 @@ export class FaceApp {
       });
     }
 
-    emitFaceContractWarnings(this.observability, constructionWarnings);
   }
 
   async handle(request: FaceRequest): Promise<FaceResponse> {
@@ -589,23 +582,12 @@ function validateFaceContract(face: FaceModule): string {
   return normalizePath(route);
 }
 
-function faceContractWarnings(
-  face: FaceModule,
-  routePattern: string,
-): FaceContractWarningLogRecord[] {
-  const warnings: FaceContractWarningLogRecord[] = [];
-
+function validateFaceModeContract(face: FaceModule, routePattern: string): void {
   if (face.mode === 'isr' && face.revalidateSeconds === undefined) {
-    warnings.push({
-      level: 'warn',
-      event: 'facetheory.app.contract.warning',
-      warningCode: 'isr.revalidate_seconds_missing',
-      routePattern,
-      mode: face.mode,
-      message:
-        `ISR face "${routePattern}" does not declare revalidateSeconds; ` +
-        'this remains a construction warning until the v4 contract escalation.',
-    });
+    throw new Error(
+      `ISR face "${routePattern}" must declare revalidateSeconds before createFaceApp(); ` +
+        'add a revalidateSeconds value or change the Face to mode "ssr" for per-request rendering',
+    );
   }
 
   if (
@@ -613,19 +595,11 @@ function faceContractWarnings(
     routePatternHasParams(routePattern) &&
     typeof face.generateStaticParams !== 'function'
   ) {
-    warnings.push({
-      level: 'warn',
-      event: 'facetheory.app.contract.warning',
-      warningCode: 'ssg.generate_static_params_missing',
-      routePattern,
-      mode: face.mode,
-      message:
-        `SSG param face "${routePattern}" does not declare generateStaticParams; ` +
-        'this remains a construction warning until the v4 contract escalation.',
-    });
+    throw new Error(
+      `SSG param face "${routePattern}" must declare generateStaticParams() before createFaceApp(); ` +
+        'return every static params object or change the Face to mode "ssr"/"isr"',
+    );
   }
-
-  return warnings;
 }
 
 function routePatternHasParams(routePattern: string): boolean {
@@ -635,16 +609,6 @@ function routePatternHasParams(routePattern: string): boolean {
       trimmed.startsWith('{') && trimmed.endsWith('}') && trimmed.length > 2
     );
   });
-}
-
-function emitFaceContractWarnings(
-  hooks: FaceAppObservabilityHooks | null,
-  warnings: readonly FaceContractWarningLogRecord[],
-): void {
-  const log = hooks?.log as FaceAppLogHook | undefined;
-  for (const warning of warnings) {
-    log?.(warning);
-  }
 }
 
 function createFaceAppSsrHydrationSidecarRuntime(

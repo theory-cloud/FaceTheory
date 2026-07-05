@@ -90,7 +90,12 @@ Why this is correct:
 ```ts
 const app = createFaceApp({
   faces: [
-    { route: "/blog/{id}", mode: "isr", render: async () => ({ html: "..." }) },
+    {
+      route: "/blog/{id}",
+      mode: "isr",
+      revalidateSeconds: 60,
+      render: async () => ({ html: "..." }),
+    },
   ],
 });
 ```

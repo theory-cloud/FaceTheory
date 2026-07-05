@@ -202,8 +202,6 @@ export type {
   FaceAttributes,
   FaceBody,
   FaceContext,
-  FaceContractWarningCode,
-  FaceContractWarningLogRecord,
   FaceCspPolicy,
   FaceExternalHydration,
   FaceHead,

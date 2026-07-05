@@ -332,29 +332,30 @@ test('react adapter: ISR strict CSP lets runtime externalize legacy hydration si
   const secret = 'REACT_ISR_HYDRATION_SECRET';
   let renderCount = 0;
 
-  const app = createFaceApp({
-    faces: [
-      createReactFace({
-        route: '/react-isr',
-        mode: 'isr',
-        render: () =>
-          React.createElement('main', null, `React ISR ${++renderCount}`),
-        renderOptions: {
-          csp: {
-            inlineScripts: false,
-            inlineStyles: false,
-            rawHead: false,
-          },
-          hydration: {
-            data: {
-              secret,
-              terminator: '</script>',
-            },
-            bootstrapModule: '/assets/react-entry.js',
-          },
+  const face = createReactFace({
+    route: '/react-isr',
+    mode: 'isr',
+    render: () =>
+      React.createElement('main', null, `React ISR ${++renderCount}`),
+    renderOptions: {
+      csp: {
+        inlineScripts: false,
+        inlineStyles: false,
+        rawHead: false,
+      },
+      hydration: {
+        data: {
+          secret,
+          terminator: '</script>',
         },
-      }),
-    ],
+        bootstrapModule: '/assets/react-entry.js',
+      },
+    },
+  });
+  face.revalidateSeconds = 60;
+
+  const app = createFaceApp({
+    faces: [face],
     isr: {
       htmlStore,
       metaStore,

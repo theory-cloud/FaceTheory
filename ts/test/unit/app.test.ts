@@ -191,62 +191,54 @@ test('FaceApp: validates face contracts at construction', () => {
   );
 });
 
-test('FaceApp: warns for soft face contract gaps at construction', () => {
-  const records: Array<Record<string, unknown>> = [];
-
-  createFaceApp({
-    faces: [
-      {
-        route: '/news/{slug}',
-        mode: 'ssg',
-        render: () => ({ html: '<div>news</div>' }),
-      },
-      {
-        route: '/preview',
-        mode: 'isr',
-        render: () => ({ html: '<div>preview</div>' }),
-      },
-      {
-        route: '/docs/{slug}',
-        mode: 'ssg',
-        generateStaticParams: async () => [{ slug: 'intro' }],
-        render: () => ({ html: '<div>docs</div>' }),
-      },
-    ],
-    observability: {
-      log: (record) => records.push(record as unknown as Record<string, unknown>),
-    },
-  });
-
-  assert.deepEqual(
-    records.map((record) => ({
-      event: record.event,
-      level: record.level,
-      warningCode: record.warningCode,
-      routePattern: record.routePattern,
-      mode: record.mode,
-    })),
-    [
-      {
-        event: 'facetheory.app.contract.warning',
-        level: 'warn',
-        warningCode: 'ssg.generate_static_params_missing',
-        routePattern: '/news/{slug}',
-        mode: 'ssg',
-      },
-      {
-        event: 'facetheory.app.contract.warning',
-        level: 'warn',
-        warningCode: 'isr.revalidate_seconds_missing',
-        routePattern: '/preview',
-        mode: 'isr',
-      },
-    ],
+test('FaceApp: enforces face contract gaps at construction', () => {
+  assert.throws(
+    () =>
+      createFaceApp({
+        faces: [
+          {
+            route: '/news/{slug}',
+            mode: 'ssg',
+            render: () => ({ html: '<div>news</div>' }),
+          },
+        ],
+      }),
+    /SSG param face "\/news\/{slug}" must declare generateStaticParams\(\).*return every static params object/i,
   );
-  assert.match(String(records[0]?.message ?? ''), /generateStaticParams/);
-  assert.match(String(records[1]?.message ?? ''), /revalidateSeconds/);
-});
 
+  assert.throws(
+    () =>
+      createFaceApp({
+        faces: [
+          {
+            route: '/preview',
+            mode: 'isr',
+            render: () => ({ html: '<div>preview</div>' }),
+          },
+        ],
+      }),
+    /ISR face "\/preview" must declare revalidateSeconds.*mode "ssr"/i,
+  );
+
+  assert.doesNotThrow(() =>
+    createFaceApp({
+      faces: [
+        {
+          route: '/docs/{slug}',
+          mode: 'ssg',
+          generateStaticParams: async () => [{ slug: 'intro' }],
+          render: () => ({ html: '<div>docs</div>' }),
+        },
+        {
+          route: '/preview',
+          mode: 'isr',
+          revalidateSeconds: 60,
+          render: () => ({ html: '<div>preview</div>' }),
+        },
+      ],
+    }),
+  );
+});
 
 test('FaceApp: strict trailing-slash policy preserves current 404 behavior', async () => {
   const app = createFaceApp({

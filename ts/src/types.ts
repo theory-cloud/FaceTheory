@@ -166,27 +166,6 @@ export type FaceMode = 'ssr' | 'ssg' | 'isr';
 export type TrailingSlashPolicy = 'strict' | 'redirect' | 'normalize';
 
 /**
- * Construction-time warning code emitted for soft contract gaps that remain warnings
- * in 3.x and are candidates for stricter enforcement in v4.
- */
-export type FaceContractWarningCode =
-  | 'isr.revalidate_seconds_missing'
-  | 'ssg.generate_static_params_missing';
-
-/**
- * Structured observability record describing a Face contract warning discovered while
- * constructing a FaceApp.
- */
-export interface FaceContractWarningLogRecord {
-  level: 'warn';
-  event: 'facetheory.app.contract.warning';
-  warningCode: FaceContractWarningCode;
-  routePattern: string;
-  mode: FaceMode;
-  message: string;
-}
-
-/**
  * Per-request render context supplied to resource handlers, `load`, and `render`;
  * `proxy` is the catch-all route suffix captured by `{name+}`/`{name*}` patterns, or
  * `null` for non-proxy matches.

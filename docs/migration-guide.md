@@ -26,6 +26,7 @@ Use this index to find the migration path by release line. Release Please update
 | Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                          |
 | Svelte 4 adapter consumers              | v4.0.0      | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                      |
 | Deprecated 3.x public surface            | v4.0.0      | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated; `Headers` and `head.html` are removed; optional surfaces move to subpaths.                              |
+| Invalid 3.x Face contracts              | v4.0.0      | [Migration 10](#migration-10-v4-face-contract-construction-errors)                        | ISR Faces must set `revalidateSeconds` and parameterized SSG Faces must set `generateStaticParams()` before `createFaceApp()`.      |
 
 ## Scope Guardrails
 
@@ -320,6 +321,8 @@ reachable through documented package subpaths.
    structure, so identical duplicates collapse while distinct JSON-LD blocks remain distinct.
 7. Remove any runtime import of control-plane guardrail scanners. The guardrail scanner is repository build/test
    tooling and is no longer shipped as runtime API.
+8. Remove imports of `FaceContractWarningCode` and `FaceContractWarningLogRecord`. v4 no longer emits
+   `facetheory.app.contract.warning`; invalid Face contracts throw during `createFaceApp()` instead.
 
 Validation:
 
@@ -333,6 +336,35 @@ Rollback:
 - keep the previous pinned 3.x FaceTheory release tarball until all root imports have been migrated
 - do not add app-local re-export barrels that recreate the removed internal surface; they reintroduce the drift the v4
   curation removes
+
+## Migration 10: v4 Face Contract Construction Errors
+
+Use this path when upgrading a 3.x app that relied on construction-time Face contract warnings. v4 makes those
+contracts fail-fast so an invalid render-mode declaration cannot reach deployment.
+
+1. Add `revalidateSeconds` to every `mode: 'isr'` Face. Choose a route-specific TTL that matches the rendered HTML's
+   freshness promise, or change the Face to `mode: 'ssr'` when it must render on every request.
+2. Add `generateStaticParams()` to every parameterized `mode: 'ssg'` Face. The function must enumerate every static
+   params object the build should emit.
+3. If a parameterized route cannot be enumerated at build time, change it to `mode: 'ssr'` for per-request rendering or
+   `mode: 'isr'` with an explicit `revalidateSeconds` value when blocking regeneration is safe.
+4. Remove observability handling for `facetheory.app.contract.warning`, `FaceContractWarningCode`, and
+   `FaceContractWarningLogRecord`. These names/events were v3 warning scaffolding; v4 reports the affected route in the
+   thrown `createFaceApp()` error message.
+
+Validation:
+
+```bash
+cd ts
+npm run typecheck
+npm test
+```
+
+Rollback:
+
+- keep the previous pinned 3.x FaceTheory release tarball until every Face satisfies the v4 contract
+- do not suppress construction errors in app-local factories; changing a mode or adding the missing contract field is
+  the migration
 
 
 ## Rollback Notes

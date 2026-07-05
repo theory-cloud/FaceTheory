@@ -51,7 +51,14 @@ patterns:
         why: "Blocking ISR correctness depends on coordinated HTML storage plus lease metadata."
         incorrect_example: |
           const app = createFaceApp({
-            faces: [{ route: '/blog/{id}', mode: 'isr', render: async () => ({ html: '...' }) }],
+            faces: [
+              {
+                route: '/blog/{id}',
+                mode: 'isr',
+                revalidateSeconds: 60,
+                render: async () => ({ html: '...' }),
+              },
+            ],
           });
         consequences:
           - Regeneration cannot be coordinated correctly in production

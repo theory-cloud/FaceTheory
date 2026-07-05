@@ -1745,6 +1745,7 @@ test('isr: invalid strict sidecar tokens fail closed without rendering', async (
       {
         route: '/',
         mode: 'isr',
+        revalidateSeconds: 60,
         render: () => {
           renderCount += 1;
           return { html: '<main>should-not-render</main>' };
