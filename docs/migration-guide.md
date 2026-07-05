@@ -18,15 +18,15 @@ Use this guide when you are:
 
 Use this index to find the migration path by release line. Release Please updates version markers automatically; do not hand-edit `x-release-please-version` comments when adding migration notes.
 
-| From                                    | To          | Migration path                                                                            | Notes                                                                                                                              |
-| --------------------------------------- | ----------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| App-local SSR glue                      | Current 3.x | [Migration 1](#migration-1-ad-hoc-handler-to-canonical-aws-entrypoint)                    | Move request translation into `createFaceApp()` and the Lambda/AppTheory entrypoints.                                              |
-| SSR-only FaceTheory apps                | Current 3.x | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr)                      | Reclassify routes into the three server `FaceMode` values before adding SPA navigation.                                            |
-| ISR routes without tenant partitioning  | Current 3.x | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                                 |
-| Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                          |
-| Svelte 4 adapter consumers              | v4.0.0      | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                      |
-| Deprecated 3.x public surface            | v4.0.0      | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated; `Headers` and `head.html` are removed; optional surfaces move to subpaths.                              |
-| Invalid 3.x Face contracts              | v4.0.0      | [Migration 10](#migration-10-v4-face-contract-construction-errors)                        | ISR Faces must set `revalidateSeconds` and parameterized SSG Faces must set `generateStaticParams()` before `createFaceApp()`.      |
+| From                                    | To          | Migration path                                                                            | Notes                                                                                                                          |
+| --------------------------------------- | ----------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| App-local SSR glue                      | Current 3.x | [Migration 1](#migration-1-ad-hoc-handler-to-canonical-aws-entrypoint)                    | Move request translation into `createFaceApp()` and the Lambda/AppTheory entrypoints.                                          |
+| SSR-only FaceTheory apps                | Current 3.x | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr)                      | Reclassify routes into the three server `FaceMode` values before adding SPA navigation.                                        |
+| ISR routes without tenant partitioning  | Current 3.x | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                             |
+| Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                      |
+| Svelte 4 adapter consumers              | v4.0.0      | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                  |
+| Deprecated 3.x public surface           | v4.0.0      | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated; `Headers` and `head.html` are removed; optional surfaces move to subpaths.                         |
+| Invalid 3.x Face contracts              | v4.0.0      | [Migration 10](#migration-10-v4-face-contract-construction-errors)                        | ISR Faces must set `revalidateSeconds` and parameterized SSG Faces must set `generateStaticParams()` before `createFaceApp()`. |
 
 ## Scope Guardrails
 
@@ -291,7 +291,6 @@ Use this path when upgrading a Svelte consumer from a FaceTheory 3.x line to v4.
 
 The `.render()` synchronous "bring-your-own-HTML" input to `createSvelteFace` (the `SvelteLegacySSRComponent` shape) is unchanged; only the Svelte 4 compiled-component path and its `svelte/server` deprecation-error fallback were removed.
 
-
 ## Migration 9: v4 Public Surface Curation
 
 Use this path when upgrading a 3.x consumer that imported optional helpers or internal utilities from the root
@@ -365,7 +364,6 @@ Rollback:
 - keep the previous pinned 3.x FaceTheory release tarball until every Face satisfies the v4 contract
 - do not suppress construction errors in app-local factories; changing a mode or adding the missing contract field is
   the migration
-
 
 ## Rollback Notes
 
