@@ -9,7 +9,7 @@ import { promisify } from 'node:util';
 
 import { JSDOM } from 'jsdom';
 
-import type { ViteManifest } from '../../src/vite.js';
+import type { ViteManifest } from '@theory-cloud/facetheory';
 import { assertStrictCspDocument } from '../helpers/strict-csp.js';
 
 const execFileAsync = promisify(execFile);

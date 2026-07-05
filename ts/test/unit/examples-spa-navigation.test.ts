@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { JSDOM } from 'jsdom';
 
-import { DEFAULT_FACE_VIEW_SELECTOR } from '../../src/spa.js';
+import { DEFAULT_FACE_VIEW_SELECTOR } from '@theory-cloud/facetheory/spa';
 
 import { createSpaNavigationExampleApp } from '../../examples/spa-navigation/server.js';
 
