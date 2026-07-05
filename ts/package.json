@@ -69,6 +69,10 @@
       "types": "./dist/testing/index.d.ts",
       "import": "./dist/testing/index.js"
     },
+    "./adapter-csp": {
+      "types": "./dist/adapter-csp.d.ts",
+      "import": "./dist/adapter-csp.js"
+    },
     "./dev": {
       "types": "./dist/dev.d.ts",
       "import": "./dist/dev.js"

@@ -8,12 +8,14 @@ import { performance } from 'node:perf_hooks';
 import {
   CONTROL_PLANE_BOOTSTRAP_MODULE_PATH,
   CONTROL_PLANE_RESPONSIVE_PRIMITIVES_STYLESHEET_PATH,
-  assertControlPlaneBoundaryGuardrails,
-  assertControlPlaneDeliveryGuardrails,
   createControlPlaneApp,
   createControlPlanePresetDescriptor,
   type ControlPlaneSectionReadContract,
-} from '../../src/index.js';
+} from '../../src/control-plane.js';
+import {
+  assertControlPlaneBoundaryGuardrails,
+  assertControlPlaneDeliveryGuardrails,
+} from '../../scripts/control-plane-guardrails.js';
 import { handleLambdaUrlEvent } from '../../src/lambda-url.js';
 import type { FaceBody } from '../../src/types.js';
 

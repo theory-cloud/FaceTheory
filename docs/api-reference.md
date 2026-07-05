@@ -41,7 +41,7 @@ Use this table as the public entrypoint map for package consumers. It reflects t
 
 | Export                                                  | Surface                        | Primary interfaces                                                                                                                                      |
 | ------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@theory-cloud/facetheory`                              | Core runtime                   | `createFaceApp`, `defineFace`, `FaceApp`, Face/resource contracts, SSG, Lambda URL, ISR, strict-CSP, head, Vite, SPA, OAC, and hydration helpers.       |
+| `@theory-cloud/facetheory`                              | Core runtime                   | `createFaceApp`, `defineFace`, `FaceApp`, Face/resource contracts, SSG, Lambda URL, ISR, strict-CSP, head, Vite, and hydration helpers.                 |
 | `@theory-cloud/facetheory/spa`                          | SPA client runtime             | `parseFaceNavigationSnapshot`, `fetchFaceNavigationSnapshot`, `applyFaceNavigationSnapshot`, `loadFaceNavigationModule`, and `startFaceNavigation`.     |
 | `@theory-cloud/facetheory/oac-form`                     | OAC form transport             | `startAwsOacFormTransport`, `createAwsOacUrlEncodedFormPayload`, and URL-encoded form hashing helpers for AppTheory OAC deployments.                    |
 | `@theory-cloud/facetheory/navigation-pending`           | Navigation pending UI          | `startNavigationPending`, link classification, and pending-state helpers for same-document navigation.                                                  |
@@ -49,6 +49,7 @@ Use this table as the public entrypoint map for package consumers. It reflects t
 | `@theory-cloud/facetheory/responsive-primitives`        | Shared responsive primitives   | Framework-neutral responsive primitive contracts, link/button sanitizers, selection helpers, and CSS contracts.                                         |
 | `@theory-cloud/facetheory/client`                       | Browser hydration helpers      | `loadFaceHydrationData`, inline/external hydration readers, fetch helper, and same-origin URL resolver.                                                 |
 | `@theory-cloud/facetheory/testing`                      | Consumer test helpers          | `buildFaceRequest`, `renderFace`, hydration-equivalence assertions, strict-CSP assertions, and fixture fetch helpers.                                   |
+| `@theory-cloud/facetheory/adapter-csp`                  | Adapter-author CSP guards      | `enforceAdapterStrictCspResult` and `enforceReactStrictCspStreamingOptions` for adapter implementations.                                                |
 | `@theory-cloud/facetheory/dev`                          | Development helpers            | Vite middleware development helpers and dev-server wiring for local FaceTheory SSR loops.                                                               |
 | `@theory-cloud/facetheory/aws-s3`                       | AWS SDK S3 adapter             | `createAwsSdkS3HtmlStoreClient` for S3-backed SSG/ISR HTML object reads and writes.                                                                     |
 | `@theory-cloud/facetheory/apptheory`                    | AppTheory adapter              | `createAppTheoryFaceHandler`, `appTheoryContextToFaceRequest`, and `faceResponseToAppTheoryResponse`.                                                   |
@@ -78,6 +79,8 @@ Use this table as the public entrypoint map for package consumers. It reflects t
 | `@theory-cloud/facetheory/tabletheory`                  | TableTheory ISR adapter        | `TableTheoryIsrMetaStoreAdapter` and `createTableTheoryIsrMetaStore`.                                                                                   |
 
 The shared Stitch foundation lives under the framework-neutral `stitch-tokens`, `stitch-shell`, `stitch-hosted-auth`, and `stitch-admin` subpaths so React, Vue, and Svelte applications can consume the same token, navigation, hosted-auth, and dense-admin contracts. Responsive primitives also ship through shared, React, Vue, and Svelte subpaths so each adapter consumes the same conceptual surface without falling back to React-only wrappers.
+
+The root `@theory-cloud/facetheory` barrel is curated to the core runtime contract. Optional browser helpers and product surfaces use their documented subpaths: import SPA navigation from `/spa`, OAC form transport from `/oac-form`, navigation-pending UI from `/navigation-pending`, control-plane presets from `/control-plane`, and adapter strict-CSP helpers from `/adapter-csp`. The control-plane guardrail source scanner is build/test tooling, not a runtime package export.
 
 Operator visibility contracts in `@theory-cloud/facetheory/stitch-admin` are framework-neutral data shapes for guarded operator dashboards. They describe caller-supplied authorization state, authority/provenance/confidence/staleness/correlation metadata, health rows, entity × dimension visibility matrix rows/cells, and explicit empty states. Keep timestamps, age labels, confidence labels, staleness copy, and correlation IDs stable in `load()` or serialized hydration data; do not compute freshness or derive correlation from ambient time, browser/session state, or lookups during render.
 
@@ -683,7 +686,13 @@ Client navigation:
 
 AppTheorySsrSite deployments that use Lambda Function URL OAC keep the SSR origin protected with `AWS_IAM`. Native browser form POSTs cannot add the `x-amz-content-sha256` header that CloudFront must sign for mutating Lambda URL requests, so FaceTheory provides an opt-in browser helper for same-origin URL-encoded forms.
 
-Core exports:
+Import OAC helpers from the dedicated subpath:
+
+```ts
+import { startAwsOacFormTransport } from "@theory-cloud/facetheory/oac-form";
+```
+
+OAC exports:
 
 - `AWS_OAC_FORM_MARKER_ATTRIBUTE` is the default opt-in marker, `data-facetheory-oac-form`.
 - `AWS_OAC_CONTENT_SHA256_HEADER` is the required `x-amz-content-sha256` header name.
@@ -697,7 +706,7 @@ Core exports:
 Example client bootstrap:
 
 ```ts
-import { startAwsOacFormTransport } from "@theory-cloud/facetheory";
+import { startAwsOacFormTransport } from "@theory-cloud/facetheory/oac-form";
 
 const oacForms = startAwsOacFormTransport();
 

@@ -25,7 +25,7 @@ Use this index to find the migration path by release line. Release Please update
 | ISR routes without tenant partitioning  | Current 3.x | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                                 |
 | Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                          |
 | Svelte 4 adapter consumers              | v4.0.0      | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                      |
-| Deprecated 3.x APIs                     | Next major  | [Deprecation Policy](./deprecation-policy.md)                                             | `Headers` and tag emission through `head.html` are retained through 3.x and scheduled for removal in the planned v4 curation pass. |
+| Deprecated 3.x public surface            | v4.0.0      | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated to the core runtime; optional surfaces move to subpaths and source guardrails leave the runtime package. |
 
 ## Scope Guardrails
 
@@ -289,6 +289,43 @@ Use this path when upgrading a Svelte consumer from a FaceTheory 3.x line to v4.
    ```
 
 The `.render()` synchronous "bring-your-own-HTML" input to `createSvelteFace` (the `SvelteLegacySSRComponent` shape) is unchanged; only the Svelte 4 compiled-component path and its `svelte/server` deprecation-error fallback were removed.
+
+
+## Migration 9: v4 Public Surface Curation
+
+Use this path when upgrading a 3.x consumer that imported optional helpers or internal utilities from the root
+`@theory-cloud/facetheory` barrel. v4 curates the root barrel to the core runtime contract and keeps optional surfaces
+reachable through documented package subpaths.
+
+1. Replace root imports for optional surfaces with their subpaths:
+   - SPA navigation helpers: `@theory-cloud/facetheory/spa`
+   - OAC mutating-form transport helpers: `@theory-cloud/facetheory/oac-form`
+   - control-plane presets: `@theory-cloud/facetheory/control-plane`
+   - navigation-pending UI helpers: `@theory-cloud/facetheory/navigation-pending`
+   - adapter strict-CSP guards for adapter authors: `@theory-cloud/facetheory/adapter-csp`
+2. Stop importing internal routing and request-normalization helpers from the root barrel. `Router`, `RouterOptions`,
+   `normalizePath`, slash-trimming helpers, header canonicalization helpers, query parsers/cloners, and cookie
+   parsers/cloners were implementation details; applications should pass normal `FaceModule` routes and let
+   `createFaceApp()` / the Lambda or AppTheory entrypoint normalize requests.
+3. Stop importing low-level head serialization helpers from the root barrel. Use structured `headTags`, helper
+   constructors such as `titleTag()`, `metaTag()`, `canonical()`, and `jsonLd()`, and the full `renderFaceHead()`
+   primitive when a test needs to inspect final head HTML.
+4. Remove any runtime import of control-plane guardrail scanners. The guardrail scanner is repository build/test
+   tooling and is no longer shipped as runtime API.
+
+Validation:
+
+```bash
+cd ts
+npm run typecheck
+```
+
+Rollback:
+
+- keep the previous pinned 3.x FaceTheory release tarball until all root imports have been migrated
+- do not add app-local re-export barrels that recreate the removed internal surface; they reintroduce the drift the v4
+  curation removes
+
 
 ## Rollback Notes
 
