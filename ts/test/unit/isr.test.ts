@@ -485,6 +485,47 @@ test('isr: custom tenant boundary headers extend fail-closed defaults', async ()
 
 for (const variant of [
   {
+    label: 'tenantBoundaryHeaders non-array input',
+    isr: { tenantBoundaryHeaders: 'x-org-id' } as unknown as FaceIsrOptions,
+    expected: /isr\.tenantBoundaryHeaders must be an array of strings/,
+  },
+  {
+    label: 'tenantBoundaryHeaders non-string entry',
+    isr: {
+      tenantBoundaryHeaders: ['x-org-id', 42] as unknown as string[],
+    },
+    expected: /isr\.tenantBoundaryHeaders\[1\] must be a string/,
+  },
+  {
+    label: 'varyCookies non-array input',
+    isr: { varyCookies: 'session' } as unknown as FaceIsrOptions,
+    expected: /isr\.varyCookies must be an array of strings/,
+  },
+  {
+    label: 'varyCookies non-string entry',
+    isr: { varyCookies: ['session', false] as unknown as string[] },
+    expected: /isr\.varyCookies\[1\] must be a string/,
+  },
+]) {
+  test(`isr: malformed ${variant.label} fails loudly at construction`, () => {
+    assert.throws(() => {
+      createFaceApp({
+        faces: [
+          {
+            route: '/bad-isr-option',
+            mode: 'isr',
+            revalidateSeconds: 60,
+            render: async () => ({ html: '<main>bad option</main>' }),
+          },
+        ],
+        isr: variant.isr,
+      });
+    }, variant.expected);
+  });
+}
+
+for (const variant of [
+  {
     label: 'null tenantKey',
     isr: { tenantKey: null },
   },

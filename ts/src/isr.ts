@@ -1251,9 +1251,10 @@ function normalizeRuntimeOptions(
   const cacheKey =
     typeof input.cacheKey === 'function' ? input.cacheKey : defaultIsrCacheKey;
   const hasExplicitCacheKey = typeof input.cacheKey === 'function';
-  const varyCookies = Array.isArray(input.varyCookies)
-    ? normalizeVaryCookies(input.varyCookies)
-    : null;
+  const varyCookies =
+    input.varyCookies === undefined
+      ? null
+      : normalizeVaryCookies(input.varyCookies);
 
   return {
     htmlStore,
@@ -1293,27 +1294,45 @@ function normalizeRuntimeOptions(
   };
 }
 
-function normalizeVaryCookies(
-  varyCookies: readonly string[],
-): readonly string[] {
-  return [...new Set(varyCookies.map((name) => String(name).trim()))].filter(
-    (name) => name.length > 0,
-  );
+function normalizeVaryCookies(varyCookies: unknown): readonly string[] {
+  return [
+    ...new Set(normalizeStringListOption('varyCookies', varyCookies)),
+  ].filter((name) => name.length > 0);
 }
 
 function normalizeTenantBoundaryHeaders(
-  tenantBoundaryHeaders: readonly string[] | undefined,
+  tenantBoundaryHeaders: unknown,
 ): readonly string[] {
-  const configured = Array.isArray(tenantBoundaryHeaders)
-    ? tenantBoundaryHeaders
-    : [];
+  const configured =
+    tenantBoundaryHeaders === undefined
+      ? []
+      : normalizeStringListOption(
+          'tenantBoundaryHeaders',
+          tenantBoundaryHeaders,
+        );
   return [
     ...new Set(
       [...DEFAULT_TENANT_BOUNDARY_HEADERS, ...configured]
-        .map((name) => String(name).trim().toLowerCase())
+        .map((name) => name.trim().toLowerCase())
         .filter((name) => name.length > 0),
     ),
   ];
+}
+
+function normalizeStringListOption(
+  optionName: 'tenantBoundaryHeaders' | 'varyCookies',
+  input: unknown,
+): string[] {
+  if (!Array.isArray(input)) {
+    throw new TypeError(`isr.${optionName} must be an array of strings`);
+  }
+
+  return input.map((name, index) => {
+    if (typeof name !== 'string') {
+      throw new TypeError(`isr.${optionName}[${index}] must be a string`);
+    }
+    return name.trim();
+  });
 }
 
 function assertPartitionedTenantBoundary(
