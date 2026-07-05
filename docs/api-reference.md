@@ -82,6 +82,14 @@ The shared Stitch foundation lives under the framework-neutral `stitch-tokens`, 
 
 The root `@theory-cloud/facetheory` barrel is curated to the core runtime contract. Optional browser helpers and product surfaces use their documented subpaths: import SPA navigation from `/spa`, OAC form transport from `/oac-form`, navigation-pending UI from `/navigation-pending`, control-plane presets from `/control-plane`, and adapter strict-CSP helpers from `/adapter-csp`. The control-plane guardrail source scanner is build/test tooling, not a runtime package export.
 
+v4.0.0 also removes the old root re-export of internal router and request-normalization helpers. Do not import
+`Router`, `RouterOptions`, `RouteMatch`, `RoutePatternConflict`, `normalizeTrailingSlashPolicy`,
+`stripNonRootTrailingSlashes`, `canonicalizePathForTrailingSlashPolicy`, `redirectPathForTrailingSlashPolicy`,
+`routePatternConflict`, `normalizePath`, `trimLeadingSlashes`, `trimTrailingSlashes`, `trimOuterSlashes`,
+`canonicalizeHeaders`, `parseQueryString`, `cloneQuery`, `parseCookiesFromHeaders`, or `cloneCookies` from the package
+root; use normal `FaceModule` routes and the framework entrypoints instead. `prepareUIIntegrations` was also reachable
+through the old root barrel, but it is internal-only adapter-pipeline plumbing and is not a consumer package API.
+
 Operator visibility contracts in `@theory-cloud/facetheory/stitch-admin` are framework-neutral data shapes for guarded operator dashboards. They describe caller-supplied authorization state, authority/provenance/confidence/staleness/correlation metadata, health rows, entity × dimension visibility matrix rows/cells, and explicit empty states. Keep timestamps, age labels, confidence labels, staleness copy, and correlation IDs stable in `load()` or serialized hydration data; do not compute freshness or derive correlation from ambient time, browser/session state, or lookups during render.
 
 ## Operator Visibility Dashboard Boundary

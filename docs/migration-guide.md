@@ -303,24 +303,30 @@ reachable through documented package subpaths.
    - control-plane presets: `@theory-cloud/facetheory/control-plane`
    - navigation-pending UI helpers: `@theory-cloud/facetheory/navigation-pending`
    - adapter strict-CSP guards for adapter authors: `@theory-cloud/facetheory/adapter-csp`
-2. Stop importing internal routing and request-normalization helpers from the root barrel. `Router`, `RouterOptions`,
-   `normalizePath`, slash-trimming helpers, header canonicalization helpers, query parsers/cloners, and cookie
-   parsers/cloners were implementation details; applications should pass normal `FaceModule` routes and let
-   `createFaceApp()` / the Lambda or AppTheory entrypoint normalize requests.
+2. Stop importing internal routing and request-normalization helpers from the root barrel. The removed internal router
+   names are `Router`, `RouterOptions`, `RouteMatch`, `RoutePatternConflict`, `normalizeTrailingSlashPolicy`,
+   `stripNonRootTrailingSlashes`, `canonicalizePathForTrailingSlashPolicy`,
+   `redirectPathForTrailingSlashPolicy`, and `routePatternConflict`. The removed request-normalization helpers are
+   `normalizePath`, `trimLeadingSlashes`, `trimTrailingSlashes`, `trimOuterSlashes`, `canonicalizeHeaders`,
+   `parseQueryString`, `cloneQuery`, `parseCookiesFromHeaders`, and `cloneCookies`. Applications should pass normal
+   `FaceModule` routes and let `createFaceApp()` / the Lambda or AppTheory entrypoint normalize requests.
 3. Stop importing low-level head serialization helpers from the root barrel. Use structured `headTags`, helper
    constructors such as `titleTag()`, `metaTag()`, `canonical()`, and `jsonLd()`, and the full `renderFaceHead()`
    primitive when a test needs to inspect final head HTML.
-4. Replace the deprecated `Headers` type alias with `FaceHeaders`. The browser `Headers` class remains available from
+4. Stop importing `prepareUIIntegrations` from the package root. It was reachable through the old `export *` barrel but
+   is internal-only adapter-pipeline plumbing; v4 keeps that direct import inside FaceTheory and does not expose it as a
+   consumer package API.
+5. Replace the deprecated `Headers` type alias with `FaceHeaders`. The browser `Headers` class remains available from
    the DOM runtime; FaceTheory's canonical request/response header map is only `FaceHeaders`.
-5. Replace `head.html` with the supported head channels:
+6. Replace `head.html` with the supported head channels:
    - use `head: { title }` for the document title
    - use structured `headTags` for meta/link/script/style/raw declarations
    - use `styleTags` for adapter or integration style output
-6. Review any duplicate keyless head tags. v4 de-dupes keyless meta/link/script/style tags by their rendered
+7. Review any duplicate keyless head tags. v4 de-dupes keyless meta/link/script/style tags by their rendered
    structure, so identical duplicates collapse while distinct JSON-LD blocks remain distinct.
-7. Remove any runtime import of control-plane guardrail scanners. The guardrail scanner is repository build/test
+8. Remove any runtime import of control-plane guardrail scanners. The guardrail scanner is repository build/test
    tooling and is no longer shipped as runtime API.
-8. Remove imports of `FaceContractWarningCode` and `FaceContractWarningLogRecord`. v4 no longer emits
+9. Remove imports of `FaceContractWarningCode` and `FaceContractWarningLogRecord`. v4 no longer emits
    `facetheory.app.contract.warning`; invalid Face contracts throw during `createFaceApp()` instead.
 
 Validation:
