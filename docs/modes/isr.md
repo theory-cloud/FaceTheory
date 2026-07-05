@@ -91,7 +91,7 @@ export const app = createFaceApp({
 });
 ```
 
-With `varyCookies`, only listed cookies partition the default cache key; absent `varyCookies` keeps the all-cookies default.
+With `varyCookies`, only listed cookies partition the default cache key; absent `varyCookies` keeps the all-cookies default. The allowlist must contain at least one cookie name. `varyCookies: []` is rejected at app construction because it would remove cookie partitioning entirely.
 
 ## On-demand invalidation
 

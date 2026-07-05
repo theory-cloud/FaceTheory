@@ -506,6 +506,11 @@ for (const variant of [
     isr: { varyCookies: ['session', false] as unknown as string[] },
     expected: /isr\.varyCookies\[1\] must be a string/,
   },
+  {
+    label: 'varyCookies empty array',
+    isr: { varyCookies: [] },
+    expected: /isr\.varyCookies must include at least one cookie name/,
+  },
 ]) {
   test(`isr: malformed ${variant.label} fails loudly at construction`, () => {
     assert.throws(() => {

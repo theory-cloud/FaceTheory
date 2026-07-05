@@ -76,7 +76,7 @@ isr: {
 },
 ```
 
-Requests that differ only in non-listed cookies share the same cache entry; requests that differ in a listed cookie partition. Keep the list complete for every cookie that can affect the rendered HTML.
+Requests that differ only in non-listed cookies share the same cache entry; requests that differ in a listed cookie partition. Keep the list complete for every cookie that can affect the rendered HTML. The allowlist must be non-empty: omit `varyCookies` to keep the all-cookies fail-safe, and do not pass `varyCookies: []`.
 
 ## Migration
 

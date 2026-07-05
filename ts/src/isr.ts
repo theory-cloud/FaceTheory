@@ -273,6 +273,10 @@ export interface FaceIsrOptions {
   lockContentionPolicy?: IsrLockContentionPolicy;
   tenantKey?: (ctx: FaceContext) => string | null | undefined;
   cacheKey?: (input: IsrCacheKeyInput) => string;
+  /**
+   * Non-empty cookie-name allowlist for the default ISR cache key. Omit this
+   * option to keep the fail-safe all-cookies request variant.
+   */
   varyCookies?: string[];
   tenantBoundaryHeaders?: string[];
   htmlPointerPrefix?: string;
@@ -1295,9 +1299,13 @@ function normalizeRuntimeOptions(
 }
 
 function normalizeVaryCookies(varyCookies: unknown): readonly string[] {
-  return [
+  const normalized = [
     ...new Set(normalizeStringListOption('varyCookies', varyCookies)),
   ].filter((name) => name.length > 0);
+  if (normalized.length === 0) {
+    throw new TypeError('isr.varyCookies must include at least one cookie name');
+  }
+  return normalized;
 }
 
 function normalizeTenantBoundaryHeaders(
