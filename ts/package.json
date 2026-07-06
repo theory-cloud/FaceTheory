@@ -227,8 +227,8 @@
     "lint": "eslint . --max-warnings=0 && npm run verify:svelte:runes:self-test && npm run verify:svelte:runes",
     "verify:svelte:runes": "bash scripts/verify-svelte-runes.sh",
     "verify:svelte:runes:self-test": "bash scripts/verify-svelte-runes.sh --self-test",
-    "format": "prettier --write package.json README.md ../README.md ../docs/README.md ../docs/api-reference.md ../docs/getting-started.md ../docs/deprecation-policy.md ../docs/migration-guide.md ../docs/reference/render-modes.md ../docs/index.html ../docs/integrations/autheory.md ../docs/wizard-primitives.md ../docs/_config.yml ../docs/_data/nav.yml ../.github/workflows/ci.yml",
-    "format:check": "prettier --check package.json README.md ../README.md ../docs/README.md ../docs/api-reference.md ../docs/getting-started.md ../docs/deprecation-policy.md ../docs/migration-guide.md ../docs/reference/render-modes.md ../docs/index.html ../docs/integrations/autheory.md ../docs/wizard-primitives.md ../docs/_config.yml ../docs/_data/nav.yml ../.github/workflows/ci.yml",
+    "format": "prettier --write package.json README.md ../README.md ../docs/README.md ../docs/api-reference.md ../docs/getting-started.md ../docs/deprecation-policy.md ../docs/migration-guide.md ../docs/reference/render-modes.md ../docs/index.html ../docs/integrations/autheory.md ../docs/wizard-primitives.md ../docs/_config.yml ../docs/_data/nav.yml ../docs/_includes/toc.html ../.github/workflows/ci.yml && npm run verify:format-gate",
+    "format:check": "prettier --check package.json README.md ../README.md ../docs/README.md ../docs/api-reference.md ../docs/getting-started.md ../docs/deprecation-policy.md ../docs/migration-guide.md ../docs/reference/render-modes.md ../docs/index.html ../docs/integrations/autheory.md ../docs/wizard-primitives.md ../docs/_config.yml ../docs/_data/nav.yml ../docs/_includes/toc.html ../.github/workflows/ci.yml && npm run verify:format-gate",
     "check": "npm run lint && npm run typecheck && npm run verify:examples:readmes && npm run test:unit",
     "test": "npm run build && npm run test:unit",
     "test:unit": "tsx test/run-unit.ts",
@@ -267,7 +267,8 @@
     "example:control-plane:streaming:relaxed": "tsx examples/control-plane-preset/render.ts --mode=relaxed --delivery=streaming",
     "example:control-plane:streaming:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=streaming",
     "verify:examples:readmes": "node scripts/verify-example-readmes.mjs",
-    "coverage": "npm run build && c8 --reporter=text --reporter=lcov npm run test:unit"
+    "coverage": "npm run build && c8 --reporter=text --reporter=lcov npm run test:unit",
+    "verify:format-gate": "node scripts/verify-format-gate.mjs"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",
