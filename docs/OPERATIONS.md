@@ -73,7 +73,8 @@ FaceTheory `createFaceApp({ observability: ... })` supports:
 - `observability.onError(err, ctx)`:
   - Receives the original thrown value when FaceTheory converts an internal failure into a deterministic response, fallback fragment, sidecar miss, or degraded ISR state.
   - The hook is for telemetry only; rendered error HTML remains bounded and does not include the thrown message or stack.
-  - `ctx.phase` names the failure surface (`render`, `stream-preflight`, `resource`, `ssr-hydration-sidecar`, `control-plane-section`, or `isr-metadata`), and `ctx.errorClass` matches the request metric tag.
+  - `ctx.phase` names the failure surface (`render`, `stream-preflight`, `resource`, `ssr-hydration-sidecar`, `control-plane-section`, `control-plane-section-validation`, or `isr-metadata`), and `ctx.errorClass` matches the request metric tag.
+  - Face contract warnings are not emitted in v4: invalid ISR/SSG Face declarations throw during `createFaceApp()` before a request log record exists.
 
 ### Client hydration failure beacons
 

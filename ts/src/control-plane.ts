@@ -6,10 +6,7 @@ import {
   RESPONSIVE_PRIMITIVES_CSS,
   RESPONSIVE_PRIMITIVES_CLASS_PREFIX,
 } from './responsive-primitives/index.js';
-import {
-  reportFaceError,
-  type FaceObservabilityHooks,
-} from './ops.js';
+import { reportFaceError, type FaceObservabilityHooks } from './ops.js';
 import {
   jsonResourceResponse,
   methodNotAllowedResourceResponse,
@@ -516,12 +513,7 @@ async function* streamControlPlaneSections(
   }
 
   for (const section of normalized.sections) {
-    const html = await renderSectionDataHtml(
-      section,
-      ctx,
-      gate,
-      observability,
-    );
+    const html = await renderSectionDataHtml(section, ctx, gate, observability);
     yield utf8(
       `<section class="facetheory-control-plane-section facetheory-control-plane-section--streamed" data-facetheory-control-streamed-section="${escapeHTML(section.id)}" data-state="success"><div class="facetheory-control-plane-section__body">${html}</div></section>`,
     );
@@ -554,6 +546,9 @@ function createControlPlaneSectionRoutes(
             ctx.request.method === 'HEAD',
             options.cspMode,
             ctx.request.cspNonce,
+            options.observability,
+            section,
+            ctx,
           );
         },
       });
@@ -605,13 +600,22 @@ function sectionHtmlResponse(
   headOnly: boolean,
   cspMode: ControlPlaneCspMode,
   cspNonce: string | null,
+  observability: FaceObservabilityHooks | null,
+  section: NormalizedControlPlaneDataSection,
+  ctx: FaceContext,
 ): FaceResponse {
   const headers: Record<string, string> = { 'x-content-type-options': NOSNIFF };
   if (cspMode === 'strict') {
     headers['content-security-policy'] = buildStrictCspHeader({ cspNonce });
     try {
       validateStrictCspDocument(html, { policy: STRICT_CONTROL_PLANE_CSP });
-    } catch {
+    } catch (err) {
+      reportControlPlaneSectionValidationError(
+        observability,
+        err,
+        section,
+        ctx,
+      );
       return textResourceResponse('', {
         status: 500,
         contentType: HTML_FRAGMENT_CONTENT_TYPE,
@@ -625,6 +629,25 @@ function sectionHtmlResponse(
     headers,
   });
   return response;
+}
+
+function reportControlPlaneSectionValidationError<Data>(
+  observability: FaceObservabilityHooks | null,
+  err: unknown,
+  section: NormalizedControlPlaneDataSection<Data>,
+  ctx: FaceContext,
+): void {
+  reportFaceError(observability, err, {
+    requestId: String(ctx.request.headers['x-request-id']?.[0] ?? ''),
+    method: ctx.request.method,
+    path: ctx.request.path,
+    routePattern: section.endpoint,
+    mode: 'none',
+    phase: 'control-plane-section-validation',
+    status: 500,
+    isrState: null,
+    sectionId: section.id,
+  });
 }
 
 function deniedSectionResponse(gate: ControlPlaneGateRejected): FaceResponse {
@@ -759,7 +782,6 @@ function sortHeaderValues(
     sorted[key] = headers[key] ?? [];
   return sorted;
 }
-
 
 export const CONTROL_PLANE_STYLESHEET = `${RESPONSIVE_PRIMITIVES_CSS}
 .facetheory-control-plane-section {
