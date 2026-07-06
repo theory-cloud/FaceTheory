@@ -38,16 +38,17 @@ const entries = Object.entries(vulnerabilities);
 
 // Known-allowed audit exceptions for upstream AWS CDK bundled transitives.
 //
-// FaceTheory does not repackage AWS dependencies. The `infra/apptheory-*`
-// workspaces are reference / example deployment shapes that consumer
-// applications reproduce themselves; the `aws-cdk-lib` tarball bundles its
-// own `node_modules/` for some transitives, and FaceTheory cannot ship a
-// patched version of those without forking AWS CDK. Each exception below
-// is narrowly scoped to (a) one specific package name, (b) one nested path
-// inside `aws-cdk-lib/node_modules/`, (c) one set of advisory URLs that
-// upstream has classified as scoped to that bundled copy, and (d) the
-// `infra/apptheory-*` workspaces only. Anything outside those gates is
-// still treated as `FAIL`.
+// FaceTheory does not repackage AWS dependencies. The `ts` workspace keeps
+// `aws-cdk-lib@2.257.0` only to satisfy the exact `@theory-cloud/apptheory-cdk`
+// peer used by reference constructs, and the `infra/apptheory-*` workspaces are
+// reference / example deployment shapes that consumer applications reproduce
+// themselves. The `aws-cdk-lib` tarball bundles its own `node_modules/` for some
+// transitives, and FaceTheory cannot ship a patched version of those without
+// forking AWS CDK or breaking the AppTheory CDK peer. Each exception below is
+// narrowly scoped to (a) one specific package name, (b) one nested path inside
+// `aws-cdk-lib/node_modules/`, (c) one set of advisory URLs that upstream has
+// classified as scoped to that bundled copy, and (d) the explicitly named
+// workspaces. Anything outside those gates is still treated as `FAIL`.
 //
 // Cross-reference: `docs/UPSTREAM_RELEASE_PINS.md` — "Known Audit
 // Exception" section documents the same boundary in product terms.
@@ -61,7 +62,8 @@ const allowedFastUriAdvisories = new Set([
 // protection (moderate). Present transitively in aws-cdk-lib's bundled
 // node_modules. AWS CDK has not yet shipped a fix; FaceTheory cannot
 // repackage. Exception will be removed when an aws-cdk-lib release
-// vendors a patched brace-expansion (>= 5.0.6).
+// vendors a patched brace-expansion (>= 5.0.6) on the AppTheory-compatible CDK
+// line.
 const allowedBraceExpansionAdvisories = new Set([
   'https://github.com/advisories/GHSA-jxxr-4gwj-5jf2',
 ]);
@@ -71,9 +73,16 @@ function isAllowedAwsCdkBundled(
   vulnerability,
   expectedNode,
   allowedAdvisories,
+  allowedProjects,
 ) {
   if (vulnerability?.name !== packageName) return false;
-  if (!project.startsWith('infra/apptheory-')) return false;
+  const projectAllowed = allowedProjects.some((allowedProject) => {
+    if (allowedProject.endsWith('*')) {
+      return project.startsWith(allowedProject.slice(0, -1));
+    }
+    return project === allowedProject;
+  });
+  if (!projectAllowed) return false;
 
   const nodes = Array.isArray(vulnerability.nodes) ? vulnerability.nodes : [];
   if (nodes.length !== 1 || nodes[0] !== expectedNode) {
@@ -95,6 +104,7 @@ function isAllowedFastUri(name, vulnerability) {
     vulnerability,
     'node_modules/aws-cdk-lib/node_modules/fast-uri',
     allowedFastUriAdvisories,
+    ['infra/apptheory-*'],
   );
 }
 
@@ -105,6 +115,7 @@ function isAllowedBraceExpansion(name, vulnerability) {
     vulnerability,
     'node_modules/aws-cdk-lib/node_modules/brace-expansion',
     allowedBraceExpansionAdvisories,
+    ['ts', 'infra/apptheory-*'],
   );
 }
 

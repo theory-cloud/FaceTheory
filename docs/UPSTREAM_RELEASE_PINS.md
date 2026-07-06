@@ -42,25 +42,24 @@ and keep the single release lane intact.
 
 ## Known Audit Exceptions
 
-FaceTheory does not repackage AWS dependencies. The `infra/apptheory-ssr-site` and
-`infra/apptheory-ssg-isr-site` workspaces are reference / example deployment shapes that
-consumer applications reproduce themselves; the `aws-cdk-lib` tarball bundles its own
-`node_modules/` for some transitives, and FaceTheory cannot ship a patched version of those
-without forking AWS CDK. The exceptions below are narrowly scoped to one specific package
-name, one nested path inside `aws-cdk-lib/node_modules/`, one set of advisory URLs, and
-the `infra/apptheory-*` workspaces only. Anything outside those gates is still treated as
-`FAIL` by `scripts/verify-npm-audit.sh`.
+FaceTheory does not repackage AWS dependencies. The `ts` workspace keeps `aws-cdk-lib@2.257.0` only to satisfy the exact
+`@theory-cloud/apptheory-cdk@1.13.2` peer used by reference constructs, and the `infra/apptheory-ssr-site` /
+`infra/apptheory-ssg-isr-site` workspaces are reference / example deployment shapes that consumer applications reproduce
+themselves. The `aws-cdk-lib` tarball bundles its own `node_modules/` for some transitives, and FaceTheory cannot ship a
+patched version of those without forking AWS CDK or breaking the AppTheory CDK peer. The exceptions below are narrowly
+scoped to one specific package name, one nested path inside `aws-cdk-lib/node_modules/`, one set of advisory URLs, and
+the explicitly named workspaces. Anything outside those gates is still treated as `FAIL` by
+`scripts/verify-npm-audit.sh`.
 
 ### Active exceptions
 
 - **`brace-expansion`** — [GHSA-jxxr-4gwj-5jf2](https://github.com/advisories/GHSA-jxxr-4gwj-5jf2)
   ("Large numeric range defeats documented `max` DoS protection"), moderate severity.
-  Present transitively at `node_modules/aws-cdk-lib/node_modules/brace-expansion` in the
-  `infra/apptheory-*` workspaces because the `aws-cdk-lib` tarball bundles its own copy.
-  The FaceTheory package surface (`ts/`) was cleared in THE-1460 / PR #220 (transitive
-  `brace-expansion` upgraded `5.0.5` → `5.0.6` in `ts/package-lock.json`). The bundled
-  copy under `aws-cdk-lib` is upstream AWS's to ship; the exception will be removed once an
-  `aws-cdk-lib` release vendors a patched `brace-expansion` (≥ `5.0.6`).
+  Present transitively at `node_modules/aws-cdk-lib/node_modules/brace-expansion` in the `ts` and
+  `infra/apptheory-*` workspaces because the pinned `aws-cdk-lib@2.257.0` tarball bundles its own copy. FaceTheory's
+  published package tarball does not ship `aws-cdk-lib` runtime code; the vulnerable copy is a dev/reference construct
+  dependency held to preserve the AppTheory CDK peer baseline. The exception will be removed once the AppTheory-compatible
+  CDK line vendors a patched `brace-expansion` (≥ `5.0.6`).
 
 ### Recently cleared
 
