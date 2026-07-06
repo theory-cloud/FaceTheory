@@ -71,7 +71,9 @@ export interface AdapterRenderPipelineInput<
   ) => void | Promise<void>;
 }
 
-export function modeUsesRuntimeHydrationSidecars(mode: FaceMode): boolean {
+export function modeUsesRuntimeHydrationSidecars(
+  mode: FaceMode | 'spa',
+): boolean {
   return mode === 'ssr' || mode === 'isr' || mode === 'ssg';
 }
 
@@ -108,10 +110,10 @@ export async function runAdapterRenderPipeline<
 >(
   input: AdapterRenderPipelineInput<TTree, TIntegration>,
 ): Promise<FaceRenderResult> {
-  const preparedIntegrations = await prepareUIIntegrations<
-    TTree,
-    TIntegration
-  >(input.integrations ?? [], input.ctx);
+  const preparedIntegrations = await prepareUIIntegrations<TTree, TIntegration>(
+    input.integrations ?? [],
+    input.ctx,
+  );
   const context: AdapterRenderPipelineContext<TTree, TIntegration> = {
     ctx: input.ctx,
     preparedIntegrations,
@@ -171,8 +173,6 @@ function normalizeRenderTreeOutput(
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<Uint8Array> {
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    Symbol.asyncIterator in value
+    typeof value === 'object' && value !== null && Symbol.asyncIterator in value
   );
 }

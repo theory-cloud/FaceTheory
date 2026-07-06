@@ -23,23 +23,42 @@ export interface VueUIIntegration<TState = unknown> extends UIIntegration<
   VNode,
   TState
 > {
+  /**
+   * Optional Vue app hook that can install plugins/provide values before server
+   * rendering while sharing the request-local integration state.
+   */
   wrapApp?: (app: App, ctx: FaceContext, state: TState) => void | Promise<void>;
 }
 
 export interface RenderVueOptions {
+  /** HTTP status for the rendered Face response. */
   status?: number;
+  /** Additional response headers merged into the Face response. */
   headers?: Record<string, string | string[]>;
+  /** Set-Cookie header values emitted with the response. */
   cookies?: string[];
+  /** Structured document head shortcut, usually `{ title }`. */
   head?: FaceHead;
+  /** Deterministic head tags emitted through FaceTheory's head primitive. */
   headTags?: FaceHeadTag[];
+  /** Deterministic style tags emitted by adapter integrations. */
   styleTags?: FaceStyleTag[];
+  /** Hydration payload or external sidecar reference for the client bootstrap. */
   hydration?: FaceHydration;
+  /** Strict-CSP policy requested by this render. */
   csp?: FaceCspPolicy;
+  /** Vue UI integrations for wrapping the tree/app and contributing head/styles. */
   integrations?: Array<VueUIIntegration>;
 }
 
+/** Streaming Vue render options currently share the buffered Vue option shape. */
 export type RenderVueStreamOptions = RenderVueOptions;
 
+/**
+ * Render a Vue vnode through the buffered adapter path and return a FaceTheory
+ * `FaceRenderResult` with deterministic head, style, hydration, and strict-CSP
+ * validation.
+ */
 export async function renderVue(
   ctx: FaceContext,
   vnode: VNode,
@@ -48,6 +67,11 @@ export async function renderVue(
   return renderVueInternal(ctx, vnode, options);
 }
 
+/**
+ * Render a Vue vnode through FaceTheory's streaming adapter path. When an
+ * integration contributes or finalizes, FaceTheory waits for Vue SSR completion
+ * before assembling head/styles so async setup records are not dropped.
+ */
 export async function renderVueStream(
   ctx: FaceContext,
   vnode: VNode,
@@ -225,10 +249,15 @@ function renderVueAppToAsyncIterable(app: App): VueAppStream {
 }
 
 export interface VueFaceOptions<Data = unknown> {
+  /** Route pattern registered with `createFaceApp()`. */
   route: string;
+  /** FaceTheory render mode for this Vue Face. */
   mode: FaceMode;
+  /** Optional server-side data loader; cache behavior follows the selected mode. */
   load?: (ctx: FaceContext) => Promise<Data>;
+  /** Returns the Vue vnode rendered for the request/build. */
   render: (ctx: FaceContext, data: Data) => VNode | Promise<VNode>;
+  /** Static or request-derived render options passed to `renderVue()`. */
   renderOptions?:
     | RenderVueOptions
     | ((
@@ -237,6 +266,10 @@ export interface VueFaceOptions<Data = unknown> {
       ) => RenderVueOptions | Promise<RenderVueOptions>);
 }
 
+/**
+ * Create a buffered Vue `FaceModule` while preserving FaceTheory's mode,
+ * hydration, head/style, and strict-CSP contracts.
+ */
 export function createVueFace<Data = unknown>(
   options: VueFaceOptions<Data>,
 ): FaceModule {
@@ -267,10 +300,15 @@ export function createVueFace<Data = unknown>(
 }
 
 export interface VueStreamFaceOptions<Data = unknown> {
+  /** Route pattern registered with `createFaceApp()`. */
   route: string;
+  /** FaceTheory render mode for this streaming Vue Face. */
   mode: FaceMode;
+  /** Optional server-side data loader; cache behavior follows the selected mode. */
   load?: (ctx: FaceContext) => Promise<Data>;
+  /** Returns the Vue vnode rendered into a stream. */
   render: (ctx: FaceContext, data: Data) => VNode | Promise<VNode>;
+  /** Static or request-derived render options passed to `renderVueStream()`. */
   renderOptions?:
     | RenderVueStreamOptions
     | ((
@@ -279,6 +317,10 @@ export interface VueStreamFaceOptions<Data = unknown> {
       ) => RenderVueStreamOptions | Promise<RenderVueStreamOptions>);
 }
 
+/**
+ * Create a streaming Vue `FaceModule` with the same adapter pipeline semantics
+ * as buffered Vue rendering.
+ */
 export function createVueStreamFace<Data = unknown>(
   options: VueStreamFaceOptions<Data>,
 ): FaceModule {

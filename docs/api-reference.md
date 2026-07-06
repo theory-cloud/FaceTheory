@@ -90,6 +90,13 @@ v4.0.0 also removes the old root re-export of internal router and request-normal
 root; use normal `FaceModule` routes and the framework entrypoints instead. `prepareUIIntegrations` was also reachable
 through the old root barrel, but it is internal-only adapter-pipeline plumbing and is not a consumer package API.
 
+The root HTML helpers (`escapeHTML`, `escapeJsonForHtml`, `safeJson`, `renderAttributes`, `renderHTMLDocument`, and
+`streamHTMLDocument`) remain public because resource handlers, tests, and custom AWS entrypoints sometimes need the same
+escaping and document assembly primitives FaceTheory uses internally. They are not a second rendering pipeline: Faces
+should still return structured `FaceRenderResult` data and let `createFaceApp()` assemble deterministic head, style, CSP,
+and hydration output. FaceTheory does not export an `html`/`htmlStream` template helper; adding one would be a separate
+public API proposal with its own determinism review.
+
 Operator visibility contracts in `@theory-cloud/facetheory/stitch-admin` are framework-neutral data shapes for guarded operator dashboards. They describe caller-supplied authorization state, authority/provenance/confidence/staleness/correlation metadata, health rows, entity × dimension visibility matrix rows/cells, and explicit empty states. Keep timestamps, age labels, confidence labels, staleness copy, and correlation IDs stable in `load()` or serialized hydration data; do not compute freshness or derive correlation from ambient time, browser/session state, or lookups during render.
 
 ## Operator Visibility Dashboard Boundary
@@ -462,6 +469,11 @@ export const handler = createLambdaFunctionURLStreamingHandler(app);
 ## Framework Adapter Summary
 
 Each adapter keeps the same `FaceModule` contract while translating framework-specific rendering details into a shared runtime output.
+
+For all adapter integration hooks, FaceTheory runs `createState()` once per request, `wrapTree()` before the framework
+render, the framework render itself, `contribute()` after render, `finalize()` after FaceTheory assembles head/style tags,
+and strict-CSP enforcement last. `contribute()` runs after render so request-local style registries populated by the
+framework tree are complete before FaceTheory emits `<head>`.
 
 React:
 
@@ -838,9 +850,15 @@ Observability is optional, but the hook surface is part of the public runtime co
 - `observability.log(record)` for `facetheory.request.completed`
 - `observability.metric(record)` for request and render timing metrics
 - `observability.now()` to override the clock used for durations
+- `observability.onError(err, ctx)` for converted failures, including `ctx.phase === "control-plane-section-validation"`
+  when a strict control-plane section fragment is rejected before FaceTheory returns a deterministic 500 response
 
 Face contract gaps are construction errors, not observability events: `createFaceApp()` throws when an ISR Face omits
 `revalidateSeconds` or when a parameterized SSG Face omits `generateStaticParams()`.
+
+Upgrade note: v4 no longer exports `FaceContractWarningCode` or `FaceContractWarningLogRecord` and no longer emits
+`facetheory.app.contract.warning`. Keep log sinks typed against `FaceAppLogRecord` (or a wider local sink type) and remove
+the old warning-record case; invalid Face contracts fail during `createFaceApp()` before any request log can be emitted.
 
 React streaming also exposes `onReadiness` for `shell` and `all-ready` timing events.
 

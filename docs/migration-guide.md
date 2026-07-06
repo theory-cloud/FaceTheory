@@ -356,6 +356,9 @@ contracts fail-fast so an invalid render-mode declaration cannot reach deploymen
 4. Remove observability handling for `facetheory.app.contract.warning`, `FaceContractWarningCode`, and
    `FaceContractWarningLogRecord`. These names/events were v3 warning scaffolding; v4 reports the affected route in the
    thrown `createFaceApp()` error message.
+5. If your log sink was typed against a v3 union that included `FaceContractWarningLogRecord`, replace that import with
+   `FaceAppLogRecord` (or a host-owned wider record type) and delete the `facetheory.app.contract.warning` switch case.
+   FaceTheory will only call the sink with request-completed or stream-error records in v4.
 
 Validation:
 

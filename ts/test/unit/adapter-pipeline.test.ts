@@ -27,6 +27,7 @@ test('adapter pipeline: modeUsesRuntimeHydrationSidecars preserves current modes
   assert.equal(modeUsesRuntimeHydrationSidecars('ssr'), true);
   assert.equal(modeUsesRuntimeHydrationSidecars('ssg'), true);
   assert.equal(modeUsesRuntimeHydrationSidecars('isr'), true);
+  assert.equal(modeUsesRuntimeHydrationSidecars('spa'), false);
 });
 
 test('adapter pipeline: assembleFaceRenderResult preserves deterministic tag order', () => {

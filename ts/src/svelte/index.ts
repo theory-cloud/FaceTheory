@@ -17,8 +17,11 @@ import type {
 } from '../types.js';
 
 export interface SvelteSSRRenderResult {
+  /** Server-rendered body fragment produced by Svelte. */
   html: string;
+  /** Optional CSS emitted by legacy/pre-rendered Svelte inputs. */
   css?: { code: string };
+  /** Optional raw Svelte head output; strict CSP rejects this in no-raw-head mode. */
   head?: string;
 }
 
@@ -34,19 +37,30 @@ export interface SvelteLegacySSRComponent<Props = Record<string, unknown>> {
 }
 
 export interface RenderSvelteOptions {
+  /** HTTP status for the rendered Face response. */
   status?: number;
+  /** Additional response headers merged into the Face response. */
   headers?: Record<string, string | string[]>;
+  /** Set-Cookie header values emitted with the response. */
   cookies?: string[];
+  /** Structured document head shortcut, usually `{ title }`. */
   head?: FaceHead;
+  /** Deterministic head tags emitted through FaceTheory's head primitive. */
   headTags?: FaceHeadTag[];
+  /** Deterministic style tags emitted by adapter integrations. */
   styleTags?: FaceStyleTag[];
+  /** Hydration payload or external sidecar reference for the client bootstrap. */
   hydration?: FaceHydration;
+  /** Strict-CSP policy requested by this render. */
   csp?: FaceCspPolicy;
+  /** Svelte UI integrations for wrapping render input and contributing head/styles. */
   integrations?: Array<SvelteUIIntegration>;
 }
 
 export interface SvelteRenderInput<Props = Record<string, unknown>> {
+  /** Compiled Svelte 5 component, or a synchronous pre-rendered legacy input. */
   component: unknown;
+  /** Props passed to the component during server rendering. */
   props?: Props;
   /**
    * Optional CSS text emitted at build time (Svelte 5 emits CSS in compile output, not server render output).
@@ -54,11 +68,19 @@ export interface SvelteRenderInput<Props = Record<string, unknown>> {
   cssText?: string;
 }
 
+/**
+ * Adapter-neutral integration hook specialized to Svelte render inputs.
+ */
 export type SvelteUIIntegration<
   Props extends Record<string, unknown> = Record<string, unknown>,
   TState = unknown,
 > = UIIntegration<SvelteRenderInput<Props>, TState>;
 
+/**
+ * Render a Svelte component/input through the buffered adapter path and return a
+ * FaceTheory `FaceRenderResult` with deterministic head, style, hydration, and
+ * strict-CSP validation.
+ */
 export async function renderSvelte<Props extends Record<string, unknown>>(
   ctx: FaceContext,
   input: SvelteRenderInput<Props>,
@@ -173,13 +195,18 @@ export interface SvelteFaceOptions<
   Data = unknown,
   Props extends Record<string, unknown> = Record<string, unknown>,
 > {
+  /** Route pattern registered with `createFaceApp()`. */
   route: string;
+  /** FaceTheory render mode for this Svelte Face. */
   mode: FaceMode;
+  /** Optional server-side data loader; cache behavior follows the selected mode. */
   load?: (ctx: FaceContext) => Promise<Data>;
+  /** Returns the Svelte render input for the request/build. */
   render: (
     ctx: FaceContext,
     data: Data,
   ) => SvelteRenderInput<Props> | Promise<SvelteRenderInput<Props>>;
+  /** Static or request-derived render options passed to `renderSvelte()`. */
   renderOptions?:
     | RenderSvelteOptions
     | ((
@@ -188,6 +215,10 @@ export interface SvelteFaceOptions<
       ) => RenderSvelteOptions | Promise<RenderSvelteOptions>);
 }
 
+/**
+ * Create a Svelte `FaceModule` while preserving FaceTheory's mode, hydration,
+ * head/style, and strict-CSP contracts.
+ */
 export function createSvelteFace<
   Data = unknown,
   Props extends Record<string, unknown> = Record<string, unknown>,

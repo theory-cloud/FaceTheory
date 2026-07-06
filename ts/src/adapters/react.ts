@@ -25,14 +25,23 @@ import type {
 } from '../types.js';
 
 export interface RenderReactOptions {
+  /** HTTP status for the rendered Face response. */
   status?: number;
+  /** Additional response headers merged into the Face response. */
   headers?: Record<string, string | string[]>;
+  /** Set-Cookie header values emitted with the response. */
   cookies?: string[];
+  /** Structured document head shortcut, usually `{ title }`. */
   head?: FaceHead;
+  /** Deterministic head tags emitted through FaceTheory's head primitive. */
   headTags?: FaceHeadTag[];
+  /** Deterministic style tags emitted by adapter integrations. */
   styleTags?: FaceStyleTag[];
+  /** Hydration payload or external sidecar reference for the client bootstrap. */
   hydration?: FaceHydration;
+  /** Strict-CSP policy requested by this render. */
   csp?: FaceCspPolicy;
+  /** React UI integrations for wrapping the tree and contributing head/styles. */
   integrations?: Array<UIIntegration<React.ReactElement>>;
 }
 
@@ -69,6 +78,11 @@ export interface ReactStreamReadinessEvent {
   ms: number;
 }
 
+/**
+ * Render a React node through the buffered adapter path and return a
+ * FaceTheory `FaceRenderResult` with deterministic head, style, hydration, and
+ * strict-CSP validation.
+ */
 export async function renderReact(
   ctx: FaceContext,
   node: React.ReactNode,
@@ -106,6 +120,11 @@ async function renderReactInternal(
   });
 }
 
+/**
+ * Render a React node through FaceTheory's streaming adapter path. The response
+ * body remains an async iterable while head/style assembly and strict-CSP
+ * checks stay on the shared adapter pipeline.
+ */
 export async function renderReactStream(
   ctx: FaceContext,
   node: React.ReactNode,
@@ -261,13 +280,18 @@ async function renderReactStreamInternal(
 }
 
 export interface ReactFaceOptions<Data = unknown> {
+  /** Route pattern registered with `createFaceApp()`. */
   route: string;
+  /** FaceTheory render mode for this React Face. */
   mode: FaceMode;
+  /** Optional server-side data loader; cache behavior follows the selected mode. */
   load?: (ctx: FaceContext) => Promise<Data>;
+  /** Returns the React node rendered for the request/build. */
   render: (
     ctx: FaceContext,
     data: Data,
   ) => React.ReactNode | Promise<React.ReactNode>;
+  /** Static or request-derived render options passed to `renderReact()`. */
   renderOptions?:
     | RenderReactOptions
     | ((
@@ -276,6 +300,10 @@ export interface ReactFaceOptions<Data = unknown> {
       ) => RenderReactOptions | Promise<RenderReactOptions>);
 }
 
+/**
+ * Create a buffered React `FaceModule` while preserving FaceTheory's mode,
+ * hydration, head/style, and strict-CSP contracts.
+ */
 export function createReactFace<Data = unknown>(
   options: ReactFaceOptions<Data>,
 ): FaceModule {
@@ -306,13 +334,18 @@ export function createReactFace<Data = unknown>(
 }
 
 export interface ReactStreamFaceOptions<Data = unknown> {
+  /** Route pattern registered with `createFaceApp()`. */
   route: string;
+  /** FaceTheory render mode for this streaming React Face. */
   mode: FaceMode;
+  /** Optional server-side data loader; cache behavior follows the selected mode. */
   load?: (ctx: FaceContext) => Promise<Data>;
+  /** Returns the React node rendered into a stream. */
   render: (
     ctx: FaceContext,
     data: Data,
   ) => React.ReactNode | Promise<React.ReactNode>;
+  /** Static or request-derived render options passed to `renderReactStream()`. */
   renderOptions?:
     | RenderReactStreamOptions
     | ((
@@ -321,6 +354,11 @@ export interface ReactStreamFaceOptions<Data = unknown> {
       ) => RenderReactStreamOptions | Promise<RenderReactStreamOptions>);
 }
 
+/**
+ * Create a streaming React `FaceModule`. Use the default `all-ready` style
+ * strategy when strict-CSP validation or finalize-time style extraction must
+ * observe the complete React tree before response bytes are exposed.
+ */
 export function createReactStreamFace<Data = unknown>(
   options: ReactStreamFaceOptions<Data>,
 ): FaceModule {
