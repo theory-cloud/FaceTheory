@@ -222,7 +222,6 @@ test('ssg: static + param routes produce deterministic files and manifest', asyn
 test('ssg: incremental builds skip unchanged route outputs', async () => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-incremental-'));
   const outDir = path.resolve(tempRoot, 'out');
-  const indexPath = path.resolve(outDir, 'index.html');
   const markerPath = path.resolve(outDir, 'marker.txt');
   let content = 'first';
   let renderCount = 0;
