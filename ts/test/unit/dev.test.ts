@@ -110,3 +110,48 @@ test('vite dev server: loads the SSR entry through Vite for FaceApp requests', a
 
   assert.deepEqual(loadedEntries, ['/src/entry-server.tsx']);
 });
+
+test('vite dev server: sanitizes error responses without exposing stacks', async () => {
+  const renderError = new Error('load failed');
+  renderError.stack = 'SECRET_STACK\n    at /tmp/secret-entry.ts:1:1';
+  let fixedStacktrace = false;
+  const fakeVite: ViteMiddlewareDevServerLike = {
+    middlewares: (_req, _res, next) => {
+      next();
+    },
+    ssrLoadModule: async () => {
+      throw renderError;
+    },
+    ssrFixStacktrace: (err) => {
+      fixedStacktrace = err === renderError;
+    },
+    close: async () => {},
+  };
+
+  const devServer = await createViteMiddlewareDevServer({
+    entry: 'src/entry-server.tsx',
+    createServer: async () => fakeVite,
+    createApp: () =>
+      createFaceApp({
+        faces: [
+          {
+            route: '/',
+            mode: 'ssr',
+            render: () => ({ html: '<main>unreachable</main>' }),
+          },
+        ],
+      }),
+  });
+
+  const { url } = await devServer.listen({ port: 0 });
+  try {
+    const response = await fetchText(url);
+    assert.equal(response.status, 500);
+    assert.equal(response.body, 'Error: load failed');
+    assert.equal(response.body.includes('SECRET_STACK'), false);
+  } finally {
+    await devServer.close();
+  }
+
+  assert.equal(fixedStacktrace, true);
+});

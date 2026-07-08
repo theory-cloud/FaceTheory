@@ -340,11 +340,50 @@ function normalizeHydrationFailureLabel(
   value: unknown,
   fallback: string,
 ): string {
-  const normalized = String(value ?? '')
-    .trim()
-    .replace(/[^A-Za-z0-9_.:-]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+  const normalized = normalizeAsciiLabel(value);
   return normalized || fallback;
+}
+
+function normalizeAsciiLabel(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  const normalized: string[] = [];
+  let pendingSeparator = false;
+
+  for (const char of raw) {
+    if (isAsciiLabelChar(char)) {
+      if (pendingSeparator && normalized.length > 0) {
+        normalized.push('_');
+      }
+      pendingSeparator = false;
+
+      if (char === '_' && normalized.length === 0) {
+        continue;
+      }
+      normalized.push(char);
+      continue;
+    }
+
+    pendingSeparator = normalized.length > 0;
+  }
+
+  while (normalized[normalized.length - 1] === '_') {
+    normalized.pop();
+  }
+
+  return normalized.join('');
+}
+
+function isAsciiLabelChar(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    (code >= 48 && code <= 57) ||
+    char === '_' ||
+    char === '.' ||
+    char === ':' ||
+    char === '-'
+  );
 }
 
 function resolveGlobalNavigator(): Pick<Navigator, 'sendBeacon'> | null {

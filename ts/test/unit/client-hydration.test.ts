@@ -364,6 +364,49 @@ test('client hydration beacon: reports opted-in hydrate failures with same-origi
   }
 });
 
+test('client hydration beacon: normalizes labels without regex-sensitive trimming', () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'https://app.test/checkout',
+  });
+
+  try {
+    const beacons: Array<{ body: string; url: string }> = [];
+    Object.defineProperty(dom.window.navigator, 'sendBeacon', {
+      configurable: true,
+      value: (url: string | URL, data?: BodyInit | null) => {
+        beacons.push({ url: String(url), body: String(data ?? '') });
+        return true;
+      },
+    });
+
+    const report = reportHydrationFailure({
+      document: dom.window.document,
+      endpoint: '/ops/hydration-failure',
+      framework: ' __react app!! ',
+      navigator: dom.window.navigator,
+      tags: { ' __surface name!! ': 'checkout' },
+    });
+    const hydrationError = new Error('mismatch');
+    hydrationError.name = ' __Hydration failure!! ';
+
+    report(hydrationError, {});
+
+    assert.equal(beacons.length, 1);
+    const firstBeacon = beacons[0];
+    assert.ok(firstBeacon);
+    assert.deepEqual(JSON.parse(firstBeacon.body), {
+      errorClass: 'Hydration_failure',
+      event: 'facetheory.hydration_failure',
+      framework: 'react_app',
+      message: 'mismatch',
+      path: '/checkout',
+      tags: { surface_name: 'checkout' },
+    });
+  } finally {
+    dom.window.close();
+  }
+});
+
 test('client hydration beacon: falls back to same-origin keepalive fetch', async () => {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {
     url: 'https://app.test/account',

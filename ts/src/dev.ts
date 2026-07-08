@@ -184,9 +184,11 @@ async function handleFaceAppRequest(
 
 function devErrorBody(err: unknown): string {
   if (err instanceof Error) {
-    return err.stack ?? err.message;
+    const name = err.name.trim() || 'Error';
+    const message = err.message.trim() || 'FaceTheory dev server request failed';
+    return `${name}: ${message}`;
   }
-  return String(err);
+  return 'FaceTheory dev server request failed';
 }
 
 function sendDevError(

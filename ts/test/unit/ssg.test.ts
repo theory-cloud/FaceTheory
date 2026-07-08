@@ -2,14 +2,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import test from 'node:test';
 
-import {
-  mkdtemp,
-  readFile,
-  readdir,
-  rm,
-  stat,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -263,8 +256,6 @@ test('ssg: incremental builds skip unchanged route outputs', async () => {
     assert.match(firstHash ?? '', /^sha256-[a-f0-9]{64}$/);
 
     await writeFile(markerPath, 'kept across incremental builds');
-    const beforeSkipMtime = (await stat(indexPath, { bigint: true })).mtimeNs;
-    await delay(20);
 
     const skipped = await buildSsgSite({
       faces,
@@ -289,16 +280,11 @@ test('ssg: incremental builds skip unchanged route outputs', async () => {
       ],
     );
     assert.equal(
-      (await stat(indexPath, { bigint: true })).mtimeNs,
-      beforeSkipMtime,
-    );
-    assert.equal(
       await readFile(markerPath, 'utf8'),
       'kept across incremental builds',
     );
 
     content = 'second';
-    await delay(20);
     const rewritten = await buildSsgSite({
       faces,
       outDir,

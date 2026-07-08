@@ -2,6 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
+import { errorClassFor } from '../../src/ops.js';
+
+test('ops: error class normalization avoids regex-sensitive trimming', () => {
+  const err = new Error('boom');
+  err.name = ' __Hydration error!!class__ ';
+
+  assert.equal(errorClassFor(err), 'Hydration_error_class');
+});
 
 test('FaceApp: observability hooks receive request + ISR state + render duration', async () => {
   const logs: Array<Record<string, unknown>> = [];
