@@ -1,7 +1,7 @@
 import { hydrate } from 'svelte';
 
-import { loadFaceHydrationData } from '../../../src/client/index.js';
-import type { FaceNavigationBootstrapContext } from '../../../src/spa.js';
+import { loadFaceHydrationData } from '@theory-cloud/facetheory/client';
+import type { FaceNavigationBootstrapContext } from '@theory-cloud/facetheory/spa';
 
 import App from './App.svelte';
 import logoUrl from './logo.svg';
@@ -15,7 +15,7 @@ interface StrictCspSvelteExampleData {
 
 declare global {
   interface Window {
-    __FACETHEORY_STRICT_CSP_SVELTE_DATA__?: StrictCspSvelteExampleData;
+    __FACETHEORY_STRICT_CSP_SVELTE_DATA__?: unknown;
     __FACETHEORY_STRICT_CSP_SVELTE_HYDRATED__?: number;
     __FACETHEORY_STRICT_CSP_SVELTE_NAVIGATED__?: number;
   }

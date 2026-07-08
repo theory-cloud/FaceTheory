@@ -39,6 +39,39 @@ if grep -R -F 'googleapis/release-please-action@' .github/workflows | grep -Fv "
   fail "workflows must pin release-please-action to the reviewed node24 SHA"
 fi
 
+python3 - <<'PY' || fail "stable and RC release configs must keep changelog paths separate"
+import json
+from pathlib import Path
+
+
+def load(path: str) -> dict:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+stable = load("release-please-config.json")
+premain = load("release-please-config.premain.json")
+
+stable_package = stable.get("packages", {}).get(".", {})
+premain_package = premain.get("packages", {}).get(".", {})
+
+stable_changelog = stable_package.get("changelog-path", stable.get("changelog-path", "CHANGELOG.md"))
+premain_changelog = premain_package.get("changelog-path", premain.get("changelog-path", "CHANGELOG.md"))
+
+if stable.get("prerelease") is True:
+    raise SystemExit("stable config must not publish prereleases")
+if stable_changelog != "CHANGELOG.md":
+    raise SystemExit("stable config must keep CHANGELOG.md as the stable changelog")
+if premain.get("prerelease") is not True or premain.get("versioning") != "prerelease":
+    raise SystemExit("premain config must remain the RC/prerelease config")
+if premain_changelog != "CHANGELOG.prerelease.md":
+    raise SystemExit("premain config must write RC notes to CHANGELOG.prerelease.md")
+if premain_changelog == stable_changelog:
+    raise SystemExit("premain RC notes must not share the stable changelog path")
+PY
+
+grep -Fq 'CHANGELOG.prerelease.md' .github/workflows/prerelease-pr.yml ||
+  fail "prerelease-pr.yml must ignore RC changelog-only Release Please commits"
+
 if grep -R -F 'gh release create' .github/workflows scripts | grep -v 'scripts/test-release-workflow-changelog-preservation.sh'; then
   fail "release recovery must not create GitHub Releases outside Release Please"
 fi

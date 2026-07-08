@@ -6,6 +6,7 @@ on:
     paths-ignore:
       - ".release-please-manifest.premain.json"
       - "CHANGELOG.md"
+      - "CHANGELOG.prerelease.md"
       - "VERSION"
       - "README.md"
       - "docs/README.md"

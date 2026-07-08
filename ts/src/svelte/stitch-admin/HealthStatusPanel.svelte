@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type {
     ConfidenceLevel,
     MetadataBadgeTone,
@@ -8,11 +9,19 @@
     StalenessState,
   } from './types.js';
 
-  export let title: unknown = 'Operator health';
-  export let description: unknown = undefined;
-  export let rows: OperatorHealthRow[];
-  export let actions: unknown = undefined;
-  export let emptyLabel: unknown = 'No health observations available.';
+  let {
+    title = 'Operator health',
+    description = undefined,
+    rows,
+    actions = undefined,
+    emptyLabel = 'No health observations available.',
+  }: {
+    title?: unknown;
+    description?: unknown;
+    rows: OperatorHealthRow[];
+    actions?: unknown;
+    emptyLabel?: unknown;
+  } = $props();
 
   interface HealthPalette {
     label: string;
@@ -81,12 +90,18 @@
     },
   };
 
-  $: counts = countRows(rows);
-  $: summary = healthStatuses.map((status) => ({
-    status,
-    count: counts[status],
-    palette: healthPalette[status],
-  }));
+  const counts = $derived(countRows(rows));
+  const summary = $derived(
+    healthStatuses.map((status) => ({
+      status,
+      count: counts[status],
+      palette: healthPalette[status],
+    })),
+  );
+  // `actions` accepts a value (text) or a snippet (markup, e.g. a button).
+  const actionsNode = $derived(
+    typeof actions === 'function' ? (actions as Snippet) : undefined,
+  );
 
   function countRows(source: OperatorHealthRow[]): Record<OperatorHealthStatus, number> {
     return source.reduce<Record<OperatorHealthStatus, number>>(
@@ -227,12 +242,12 @@
         </p>
       {/if}
     </div>
-    {#if $$slots.actions || actions !== undefined}
+    {#if actions !== undefined}
       <div
         class="facetheory-stitch-health-status-panel-actions"
         style="display:flex;gap:8px;flex-wrap:wrap;"
       >
-        <slot name="actions">{actions}</slot>
+        {#if actionsNode}{@render actionsNode()}{:else}{actions}{/if}
       </div>
     {/if}
   </header>

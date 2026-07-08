@@ -30,6 +30,10 @@ This document describes production hardening guidance for FaceTheory apps and th
   - Emit structured, parseable JSON logs (one record per request minimum).
   - Emit minimal metrics (request count, render duration; ISR state counts; React shell/all-ready readiness timing if streaming).
 
+- Client hydration failure beacons:
+  - Wire `reportHydrationFailure({ endpoint })` from `@theory-cloud/facetheory/client` into framework hydrate error hooks only when the application has a same-origin collection route.
+  - The helper is opt-in and does nothing unless the consumer calls the returned reporter.
+
 ## Observability
 
 ### Request ID conventions
@@ -41,6 +45,7 @@ This document describes production hardening guidance for FaceTheory apps and th
   FaceTheory request as `x-request-id` to keep correlation consistent across both runtimes.
 
 AWS example (`infra/apptheory-ssg-isr-site/`) additionally:
+
 - Sets `x-request-id` in a CloudFront viewer-request function (defaulting to the CloudFront request ID).
 - Echoes `x-request-id` back to the viewer for S3 and SSR responses via a viewer-response function.
 
@@ -48,19 +53,57 @@ AWS example (`infra/apptheory-ssg-isr-site/`) additionally:
 
 - `x-request-id`: request correlation across edge/origin/logs.
 - `x-facetheory-ssr: 1`: marker for SSR responses in the infra examples.
-- `x-facetheory-isr`: ISR cache state (`hit` | `miss` | `stale` | `wait-hit`).
+- `x-facetheory-isr`: ISR cache state (`hit` | `miss` | `stale` | `wait-hit`; `stale-metadata-error` means stale HTML was served because the metadata store failed after a last-known pointer was available).
 
 ### Structured logs and minimal metrics
 
 FaceTheory `createFaceApp({ observability: ... })` supports:
+
 - `observability.log(record)`:
   - `event: "facetheory.request.completed"`
-  - `requestId`, `routePattern`, `mode`, `status`, `durationMs`, `renderMs`, `isrState`, `isStream`
+  - `requestId`, `routePattern`, `mode`, `status`, `durationMs`, `renderMs`, `isrState`, `isStream`, `errorClass`
 - `observability.metric(record)`:
-  - `facetheory.request` counter (tags include `route_pattern`, `mode`, `status`, `isr_state`)
+  - `facetheory.request` counter (tags include `route_pattern`, `mode`, `status`, `isr_state`, `error_class`, and `cold_start`; the first request handled by a FaceApp instance reports `cold_start: "1"`, later requests report `"0"`)
   - `facetheory.render_ms` timing for requests that actually rendered
+  - `facetheory.isr.cache` counter for ISR responses (tags include `state: hit|miss|stale|wait-hit|stale-metadata-error`, `route_pattern`, and `status`)
+  - `facetheory.isr.regeneration_ms` timing for ISR regeneration attempts, distinct from Face render timing and tagged with `outcome`
+  - `facetheory.isr.lease_contention` counter when an ISR request observes another active regeneration lease
+  - `facetheory.stream_error` counter when a non-strict streaming body fails after bytes have started
+- `observability.log(record)` also receives `event: "facetheory.stream_error"` when a non-strict streaming response emits the bounded `<template data-facetheory-stream-error="true">` marker after a body failure. This log is emitted in addition to the historical `console.error` and the response bytes remain unchanged by telemetry hooks.
+- `observability.onError(err, ctx)`:
+  - Receives the original thrown value when FaceTheory converts an internal failure into a deterministic response, fallback fragment, sidecar miss, or degraded ISR state.
+  - The hook is for telemetry only; rendered error HTML remains bounded and does not include the thrown message or stack.
+  - `ctx.phase` names the failure surface (`render`, `stream-preflight`, `resource`, `ssr-hydration-sidecar`, `control-plane-section`, `control-plane-section-validation`, or `isr-metadata`), and `ctx.errorClass` matches the request metric tag.
+  - Face contract warnings are not emitted in v4: invalid ISR/SSG Face declarations throw during `createFaceApp()` before a request log record exists.
+
+### Client hydration failure beacons
+
+FaceTheory does not install browser telemetry globally. Consumers that want client-side hydration visibility can opt in from their bootstrap module:
+
+```ts
+import { reportHydrationFailure } from "@theory-cloud/facetheory/client";
+
+const onRecoverableError = reportHydrationFailure({
+  endpoint: "/ops/hydration-failure",
+  framework: "react",
+  tags: { surface: "checkout" },
+});
+
+hydrateRoot(root, app, { onRecoverableError });
+```
+
+Operational contract:
+
+- `endpoint` must resolve to the same origin as the active document. Cross-origin endpoints throw before wiring.
+- The reporter first uses `navigator.sendBeacon(endpoint, payload)` and falls back to a `POST` with `credentials: "same-origin"`, `keepalive: true`, and `redirect: "error"` when `sendBeacon` is unavailable or returns `false`.
+- The JSON payload has `event: "facetheory.hydration_failure"`, `framework`, `message`, `errorClass`, `path`, optional React-style `componentStack`/`digest`, and caller-supplied string tags.
+- The helper is intentionally opt-in: importing `@theory-cloud/facetheory/client` or rendering a Face does not add listeners, patch console methods, or send network traffic.
+- The collection route is host-owned. Treat payloads as diagnostic telemetry, not as proof of root cause; correlate them with server `x-request-id`/route metrics and hydration-equivalence tests before changing render code.
+
+For React, wire the returned reporter to `hydrateRoot(..., { onRecoverableError })`. For Vue or Svelte, call the returned reporter from the framework error hook only for hydration/mount failures you intend to count.
 
 React streaming readiness (React adapter):
+
 - `renderReactStream(..., { onReadiness })` emits readiness timing for:
   - `phase: "shell"` (React `onShellReady`)
   - `phase: "all-ready"` (React `onAllReady`)
@@ -70,15 +113,18 @@ React streaming readiness (React adapter):
 ### CSP nonce conventions (SSR only)
 
 FaceTheory supports CSP nonces via `FaceRequest.cspNonce`:
+
 - `renderFaceHead(...)` applies `nonce="..."` to inline `<script>`/`<style>` tags (including hydration data scripts).
 - React streaming passes the nonce to React’s streaming renderer.
 
 Important constraint:
+
 - A per-request nonce must not be baked into cached HTML (SSG/ISR). If an ISR/SSG HTML document contains a nonce,
   your CSP header must match the cached nonce value for every request, which is not compatible with per-request nonces.
   For cached HTML, prefer a hash-based CSP or avoid inline scripts/styles entirely.
 
 Helper:
+
 - `createCspNonce()` is available at `ts/src/security.ts`.
 
 ### Strict no-inline CSP operations
@@ -105,6 +151,7 @@ pair:
   CSP-protected HTML should become a real browser navigation instead of a document-write or SPA DOM replacement.
 
 Evidence boundary:
+
 - A local strict-CSP test or example build proves repository behavior only.
 - A successful RC validation must name the exact FaceTheory GitHub Release tarball installed by the consuming app.
 - Do not record "AWS deployment verified", "Simulacrum verified", or "customer deployed" unless that system supplied
@@ -113,6 +160,7 @@ Evidence boundary:
 ### Response headers policy guidance
 
 Recommended baseline (CDN layer preferred):
+
 - `strict-transport-security` (HSTS)
 - `x-content-type-options: nosniff`
 - `x-frame-options: DENY`
@@ -120,6 +168,7 @@ Recommended baseline (CDN layer preferred):
 - `permissions-policy` (disable features you don’t need)
 
 The SSG/ISR example stack provisions these via `cloudfront.ResponseHeadersPolicy`:
+
 - `infra/apptheory-ssg-isr-site/src/stack.ts`
 
 ### Tenant partitioning guidance
@@ -143,21 +192,36 @@ The SSG/ISR example stack provisions these via `cloudfront.ResponseHeadersPolicy
 ### Deploy / rollback (SSR + assets)
 
 Recommended approach:
+
 1. Deploy assets to S3 (hashed assets `immutable`; manifests and HTML short-lived).
 2. Deploy SSR Lambda (versioned + alias in real deployments).
 3. Invalidate CloudFront only when you deploy non-hashed, cacheable keys.
 
 Rollback:
+
 1. Roll back the SSR Lambda alias to the previous version.
 2. Roll back assets by switching the assets prefix (preferred) or redeploying the previous assets set.
 3. Invalidate CloudFront for any non-hashed keys that may be cached.
 
+### ISR on-demand invalidation and orphaned HTML objects
+
+`IsrMetaStore.invalidate(cacheKey)` invalidates the metadata pointer, not the stored HTML object. That is deliberate: FaceTheory's ISR state authority is the metadata record and regeneration lease. Deleting an S3 object independently of the metadata/lease flow can turn a still-fresh pointer into a cache read failure.
+
+Operational guidance:
+
+- Local/in-memory invalidation deletes the metadata record; the next request regenerates and writes a new HTML pointer.
+- The TableTheory adapter throws `IsrInvalidateUnsupportedError` until TableTheory provides a coordinated invalidation/delete operation for the FaceTheory ISR metadata model. Do not patch around it with raw DynamoDB writes from FaceTheory.
+- For S3-backed HTML stores, configure lifecycle expiration for the ISR HTML prefix (and strict-CSP ISR hydration sidecar suffixes) so metadata-invalidated or superseded objects age out automatically. Choose the lifecycle window longer than your maximum rollback/debugging window and longer than any CloudFront/S3 cache horizon for the same keys.
+- If you need emergency removal of sensitive HTML, coordinate both sides: invalidate or remove the metadata pointer through the supported meta-store path, remove or deny the S3 object, and invalidate CloudFront for affected paths.
+
 ### SSG cache invalidation strategy
 
 Prefer versioned prefixes for HTML/data outputs:
+
 - Example: deploy under `ssg/<build-id>/...` and switch CloudFront behavior/origin path.
 
 If using stable keys:
+
 - Invalidate HTML keys (`/*` or targeted paths) on deploy.
 - Do not invalidate immutable hashed assets.
 
@@ -194,6 +258,7 @@ Use this checklist before promoting strict-CSP changes from release candidate to
    - `main` is back-merged to `staging` after stable release per the normal release flow
 
 Rollback:
+
 - pin consumers to the previous FaceTheory release tarball, or remove the strict-CSP opt-in on affected routes.
 - do not weaken OAC, expose direct Lambda Function URLs, or remove CSP headers as the framework rollback path.
 
@@ -218,15 +283,20 @@ The workflow guardrails are intentionally fail-closed:
 ### ISR lock contention diagnostics
 
 Symptoms:
+
 - Elevated `x-facetheory-isr: stale` or `x-facetheory-isr: wait-hit`.
+- Any `x-facetheory-isr: stale-metadata-error` response, which indicates a metadata-store read or lease failure was degraded to stale HTML using a last-known pointer.
 
 Checks:
+
 - CloudWatch logs for request patterns and render durations (`renderMs`).
+- `observability.onError` events with `ctx.phase === "isr-metadata"`; inspect `ctx.errorClass` and the associated `x-request-id` before treating the stale response as healthy.
 - DynamoDB table hot partitions (if tenant+route concentrates traffic).
 - Regeneration time vs lease duration:
   - If regeneration routinely exceeds the lease, you will see contention and repeated stale serving.
 
 Mitigations (FaceTheory ISR options):
+
 - Increase `leaseDurationMs`.
 - Increase `regenerationWaitTimeoutMs` or switch `lockContentionPolicy` to `serve-stale`.
 - Ensure the regeneration path does not block on external dependencies without timeouts.

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import {
     classifyResponsiveLinkClick,
     forcedSafeLinkRel,
@@ -7,22 +8,41 @@
     type ResponsiveLinkNavigateHandler,
   } from '../../responsive-primitives/index.js';
 
-  export let href: string;
-  export let onclick: ((event: MouseEvent) => void) | undefined = undefined;
-  export let onnavigate: ResponsiveLinkNavigateHandler | undefined = undefined;
-  export let rel: string | undefined = undefined;
-  export let sameOriginBaseHref: string | URL | undefined = undefined;
-  export let shouldHandleUrl:
-    | ((url: URL, anchor: HTMLAnchorElement | null) => boolean)
-    | undefined = undefined;
-  export let target: string | undefined = undefined;
-  export let window: Window | undefined = undefined;
-  let className = '';
-  export { className as class };
+  let {
+    href,
+    onclick = undefined,
+    onnavigate = undefined,
+    rel = undefined,
+    sameOriginBaseHref = undefined,
+    shouldHandleUrl = undefined,
+    target = undefined,
+    window = undefined,
+    class: className = '',
+    children,
+    ...rest
+  }: {
+    href: string;
+    onclick?: ((event: MouseEvent) => void) | undefined;
+    onnavigate?: ResponsiveLinkNavigateHandler | undefined;
+    rel?: string | undefined;
+    sameOriginBaseHref?: string | URL | undefined;
+    shouldHandleUrl?:
+      | ((url: URL, anchor: HTMLAnchorElement | null) => boolean)
+      | undefined;
+    target?: string | undefined;
+    window?: Window | undefined;
+    class?: string;
+    children?: Snippet;
+    [key: string]: unknown;
+  } = $props();
 
-  $: safeRel = forcedSafeLinkRel({ href, rel, sameOriginBaseHref, target });
-  $: safeHref = sanitizeResponsiveLinkHref(href);
-  $: resolvedClass = ['facetheory-rcp-link', className].filter(Boolean).join(' ');
+  const safeRel = $derived(
+    forcedSafeLinkRel({ href, rel, sameOriginBaseHref, target }),
+  );
+  const safeHref = $derived(sanitizeResponsiveLinkHref(href));
+  const resolvedClass = $derived(
+    ['facetheory-rcp-link', className].filter(Boolean).join(' '),
+  );
 
   function handleClick(event: MouseEvent): void {
     onclick?.(event);
@@ -37,10 +57,10 @@
 </script>
 
 <a
-  {...$$restProps}
+  {...rest}
   class={resolvedClass}
   href={safeHref}
   rel={safeRel}
   {target}
   onclick={handleClick}
-><slot /></a>
+>{@render children?.()}</a>

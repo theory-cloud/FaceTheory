@@ -1,12 +1,11 @@
 // Example sketch: inject Vite manifest assets into a Face render.
 //
-// This is not included in `tsc` builds (examples are excluded from tsconfig).
 
 import * as React from 'react';
 
-import { createFaceApp } from '../../src/app.js';
-import { createReactFace } from '../../src/adapters/react.js';
-import { viteAssetsForEntry, viteHydrationForEntry } from '../../src/vite.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createReactFace } from '@theory-cloud/facetheory/react';
+import { viteAssetsForEntry, viteHydrationForEntry } from '@theory-cloud/facetheory';
 
 const manifest = {
   'src/entry-client.tsx': {

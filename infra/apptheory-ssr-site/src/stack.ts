@@ -2,8 +2,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
-import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import { AppTheorySsrSite } from '@theory-cloud/apptheory-cdk';
@@ -33,41 +33,17 @@ export class FaceTheoryAppTheorySsrSiteStack extends Stack {
       autoDeleteObjects: true,
     });
 
-    const ssrFunction = new lambda.Function(this, 'SsrFunction', {
+    const ssrFunction = new NodejsFunction(this, 'SsrFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'index.handler',
+      entry: path.resolve(__dirname, './handler.ts'),
+      handler: 'handler',
       timeout: Duration.seconds(10),
       memorySize: 512,
-      code: lambda.Code.fromInline(`
-exports.handler = awslambda.streamifyResponse(async (event, responseStream, context) => {
-  void event; void context;
-
-  const prefix = String(process.env.APPTHEORY_ASSETS_PREFIX || 'assets').replace(/^\\/+/, '').replace(/\\/+$/, '');
-  const cssHref = '/' + prefix + '/entry.css';
-  const jsSrc = '/' + prefix + '/entry.js';
-
-  const meta = {
-    statusCode: 200,
-    headers: {
-      'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'private, no-store',
-    },
-    cookies: [],
-  };
-
-  const out = awslambda.HttpResponseStream.from(responseStream, meta);
-  out.write('<!doctype html><html lang="en"><head>');
-  out.write('<meta charset="utf-8">');
-  out.write('<meta name="viewport" content="width=device-width,initial-scale=1">');
-  out.write('<title>FaceTheory + AppTheorySsrSite</title>');
-  out.write('<link rel="stylesheet" href="' + cssHref + '">');
-  out.write('</head><body>');
-  out.write('<main><h1>FaceTheory Infra Example</h1><p>If you can see styled text, /assets is working.</p></main>');
-  out.write('<script type="module" src="' + jsSrc + '"></script>');
-  out.write('</body></html>');
-  out.end();
-});
-      `.trim()),
+      bundling: {
+        // Keep stack templates stable; minification changes hashes frequently.
+        minify: false,
+        sourceMap: false,
+      },
     });
 
     // Deploy assets with explicit cache semantics.
@@ -119,10 +95,6 @@ exports.handler = awslambda.streamifyResponse(async (event, responseStream, cont
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
-
-    // Make the static behavior cache policy visible and stable in the template.
-    // This also documents the expected behavior for /assets and other static patterns.
-    void cloudfront.CachePolicy.CACHING_OPTIMIZED;
 
     new CfnOutput(this, 'CloudFrontDomainName', {
       value: this.site.distribution.distributionDomainName,

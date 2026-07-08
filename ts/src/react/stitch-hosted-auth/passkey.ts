@@ -2,17 +2,19 @@ import * as React from 'react';
 import { Button } from 'antd';
 import type { ButtonProps } from 'antd';
 
+import {
+  AUTH_SIGNATURE_GRADIENT_BACKGROUND,
+  type PasskeyCTAProps as SharedPasskeyCTAProps,
+} from '../../stitch-hosted-auth/index.js';
+
 const h = React.createElement;
 
-export interface PasskeyCTAProps {
+export interface PasskeyCTAProps
+  extends Omit<
+    SharedPasskeyCTAProps<React.ReactNode, ButtonProps['onClick']>,
+    'children'
+  > {
   children: React.ReactNode;
-  loading?: boolean;
-  disabled?: boolean;
-  onClick?: ButtonProps['onClick'];
-  /** Leading icon (e.g. a passkey glyph). */
-  icon?: React.ReactNode;
-  /** HTML button type. Default `button` so it does not submit forms. */
-  type?: 'button' | 'submit';
 }
 
 /**
@@ -31,8 +33,7 @@ export function PasskeyCTA(props: PasskeyCTAProps): React.ReactElement {
     htmlType: type,
     className: 'facetheory-stitch-passkey-cta',
     style: {
-      background:
-        'linear-gradient(135deg, var(--stitch-color-primary, #1f108e) 0%, var(--stitch-color-primary-container, #3730a3) 100%)',
+      background: AUTH_SIGNATURE_GRADIENT_BACKGROUND,
       border: 'none',
       borderRadius: '9999px',
       height: 48,

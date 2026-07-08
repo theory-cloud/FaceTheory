@@ -19,59 +19,199 @@
 groups:
   - label: Overview
     items:
-      - { id: home,                  title: Welcome,                 url: /,                                  icon: home }
-      - { id: getting-started,       title: Getting Started,         url: /getting-started/,                  icon: play }
-      - { id: api-reference,         title: API Reference,           url: /api-reference/,                    icon: book,         tag: ga }
-      - { id: architecture,          title: Architecture,            url: /architecture/,                     icon: compass }
-      - { id: aws-deployment-shape,  title: AWS Deployment Shape,    url: /aws-deployment-shape/,             icon: cloud }
+      - { id: home, title: Welcome, url: /, icon: home }
+      - {
+          id: getting-started,
+          title: Getting Started,
+          url: /getting-started/,
+          icon: play,
+        }
+      - {
+          id: api-reference,
+          title: API Reference,
+          url: /api-reference/,
+          icon: book,
+          tag: ga,
+        }
+      - {
+          id: architecture,
+          title: Architecture,
+          url: /architecture/,
+          icon: compass,
+        }
+      - {
+          id: aws-deployment-shape,
+          title: AWS Deployment Shape,
+          url: /aws-deployment-shape/,
+          icon: cloud,
+        }
 
   - label: Adapters
     items:
-      - { id: adapter-react,         title: React,                   url: /adapters/react/,                   icon: layers,       tag: ga }
-      - { id: adapter-vue,           title: Vue,                     url: /adapters/vue/,                     icon: layers,       tag: ga }
-      - { id: adapter-svelte,        title: Svelte,                  url: /adapters/svelte/,                  icon: layers,       tag: ga }
+      - {
+          id: adapter-react,
+          title: React,
+          url: /adapters/react/,
+          icon: layers,
+          tag: ga,
+        }
+      - {
+          id: adapter-vue,
+          title: Vue,
+          url: /adapters/vue/,
+          icon: layers,
+          tag: ga,
+        }
+      - {
+          id: adapter-svelte,
+          title: Svelte,
+          url: /adapters/svelte/,
+          icon: layers,
+          tag: ga,
+        }
 
   - label: Render Modes
     items:
-      - { id: mode-ssr,              title: SSR,                     url: /modes/ssr/,                        icon: zap,          tag: ga }
-      - { id: mode-ssg,              title: SSG,                     url: /modes/ssg/,                        icon: file-text,    tag: ga }
-      - { id: mode-isr,              title: Blocking ISR,            url: /modes/isr/,                        icon: repeat,       tag: ga }
-      - { id: mode-spa,              title: SPA Navigation,          url: /modes/spa/,                        icon: shuffle }
+      - { id: mode-ssr, title: SSR, url: /modes/ssr/, icon: zap, tag: ga }
+      - { id: mode-ssg, title: SSG, url: /modes/ssg/, icon: file-text, tag: ga }
+      - {
+          id: mode-isr,
+          title: Blocking ISR,
+          url: /modes/isr/,
+          icon: repeat,
+          tag: ga,
+        }
+      - { id: mode-spa, title: SPA Navigation, url: /modes/spa/, icon: shuffle }
 
   - label: Features
     items:
-      - { id: feature-head,                    title: Deterministic Head,        url: /features/head/,                      icon: list-checks }
-      - { id: feature-strict-csp,              title: Strict CSP,                url: /features/strict-csp/,                icon: shield-check, tag: ga }
-      - { id: feature-oac-forms,               title: OAC Mutating Forms,        url: /features/oac-forms/,                 icon: key }
-      - { id: feature-ssr-hydration-sidecars,  title: SSR Hydration Sidecars,    url: /features/ssr-hydration-sidecars/,    icon: share }
-      - { id: feature-isr-tenant-safety,       title: ISR Tenant Safety,         url: /features/isr-tenant-safety/,         icon: lock,         tag: ga }
-      - { id: feature-operator-visibility,     title: Operator Visibility,       url: /features/operator-visibility/,       icon: compass }
+      - {
+          id: feature-head,
+          title: Deterministic Head,
+          url: /features/head/,
+          icon: list-checks,
+        }
+      - {
+          id: feature-strict-csp,
+          title: Strict CSP,
+          url: /features/strict-csp/,
+          icon: shield-check,
+          tag: ga,
+        }
+      - {
+          id: feature-oac-forms,
+          title: OAC Mutating Forms,
+          url: /features/oac-forms/,
+          icon: key,
+        }
+      - {
+          id: feature-ssr-hydration-sidecars,
+          title: SSR Hydration Sidecars,
+          url: /features/ssr-hydration-sidecars/,
+          icon: share,
+        }
+      - {
+          id: feature-isr-tenant-safety,
+          title: ISR Tenant Safety,
+          url: /features/isr-tenant-safety/,
+          icon: lock,
+          tag: ga,
+        }
+      - {
+          id: feature-operator-visibility,
+          title: Operator Visibility,
+          url: /features/operator-visibility/,
+          icon: compass,
+        }
 
   - label: Integrations
     items:
-      - { id: int-apptheory,         title: AppTheory,               url: /integrations/apptheory/,           icon: zap }
-      - { id: int-tabletheory,       title: TableTheory,             url: /integrations/tabletheory/,         icon: database }
-      - { id: int-autheory,          title: Autheory,                url: /integrations/autheory/,            icon: key,         surface: auth }
+      - {
+          id: int-apptheory,
+          title: AppTheory,
+          url: /integrations/apptheory/,
+          icon: zap,
+        }
+      - {
+          id: int-tabletheory,
+          title: TableTheory,
+          url: /integrations/tabletheory/,
+          icon: database,
+        }
+      - {
+          id: int-autheory,
+          title: Autheory,
+          url: /integrations/autheory/,
+          icon: key,
+          surface: auth,
+        }
 
   - label: CDK
     items:
-      - { id: cdk-overview,          title: CDK Overview,            url: /cdk/,                              icon: package }
-      - { id: cdk-aws-deployment,    title: AWS Deployment,          url: /cdk/aws-deployment/,               icon: cloud }
-      - { id: cdk-operations,        title: CDK Operations,          url: /cdk/operations/,                   icon: tag }
+      - { id: cdk-overview, title: CDK Overview, url: /cdk/, icon: package }
+      - {
+          id: cdk-aws-deployment,
+          title: AWS Deployment,
+          url: /cdk/aws-deployment/,
+          icon: cloud,
+        }
+      - {
+          id: cdk-operations,
+          title: CDK Operations,
+          url: /cdk/operations/,
+          icon: tag,
+        }
 
   - label: Guides
     items:
-      - { id: core-patterns,         title: Core Patterns,           url: /core-patterns/,                    icon: compass }
-      - { id: testing-guide,         title: Testing,                 url: /testing-guide/,                    icon: check }
-      - { id: troubleshooting,       title: Troubleshooting,         url: /troubleshooting/,                  icon: life-buoy }
-      - { id: migration-guide,       title: Migration,               url: /migration-guide/,                  icon: arrow-right }
-      - { id: development-guidelines, title: Development Guidelines, url: /development-guidelines/,           icon: check-square }
-      - { id: operations,            title: Operations,              url: /operations/,                       icon: clock }
+      - {
+          id: core-patterns,
+          title: Core Patterns,
+          url: /core-patterns/,
+          icon: compass,
+        }
+      - { id: testing-guide, title: Testing, url: /testing-guide/, icon: check }
+      - {
+          id: troubleshooting,
+          title: Troubleshooting,
+          url: /troubleshooting/,
+          icon: life-buoy,
+        }
+      - {
+          id: migration-guide,
+          title: Migration,
+          url: /migration-guide/,
+          icon: arrow-right,
+        }
+      - {
+          id: deprecation-policy,
+          title: Deprecation Policy,
+          url: /deprecation-policy/,
+          icon: alert-triangle,
+        }
+      - {
+          id: development-guidelines,
+          title: Development Guidelines,
+          url: /development-guidelines/,
+          icon: check-square,
+        }
+      - { id: operations, title: Operations, url: /operations/, icon: clock }
 
   - label: Reference
     items:
-      - { id: ref-face-module,       title: FaceModule API,          url: /reference/face-module/,            icon: file-text,   tag: ga }
-      - { id: ref-render-modes,      title: Render Modes Compared,   url: /reference/render-modes/,           icon: list-checks }
+      - {
+          id: ref-face-module,
+          title: FaceModule API,
+          url: /reference/face-module/,
+          icon: file-text,
+          tag: ga,
+        }
+      - {
+          id: ref-render-modes,
+          title: Render Modes Compared,
+          url: /reference/render-modes/,
+          icon: list-checks,
+        }
 
 # =============================================================
 # Linear ordering for prev / next pager
@@ -105,6 +245,7 @@ order:
   - testing-guide
   - troubleshooting
   - migration-guide
+  - deprecation-policy
   - development-guidelines
   - operations
   - ref-face-module
@@ -116,35 +257,36 @@ order:
 # _includes/pager.html for prev/next derivation.
 # =============================================================
 url_to_id:
-  /:                                       home
-  /getting-started/:                       getting-started
-  /api-reference/:                         api-reference
-  /architecture/:                          architecture
-  /aws-deployment-shape/:                  aws-deployment-shape
-  /adapters/react/:                        adapter-react
-  /adapters/vue/:                          adapter-vue
-  /adapters/svelte/:                       adapter-svelte
-  /modes/ssr/:                             mode-ssr
-  /modes/ssg/:                             mode-ssg
-  /modes/isr/:                             mode-isr
-  /modes/spa/:                             mode-spa
-  /features/head/:                         feature-head
-  /features/strict-csp/:                   feature-strict-csp
-  /features/oac-forms/:                    feature-oac-forms
-  /features/ssr-hydration-sidecars/:       feature-ssr-hydration-sidecars
-  /features/isr-tenant-safety/:            feature-isr-tenant-safety
-  /features/operator-visibility/:          feature-operator-visibility
-  /integrations/apptheory/:                int-apptheory
-  /integrations/tabletheory/:              int-tabletheory
-  /integrations/autheory/:                 int-autheory
-  /cdk/:                                   cdk-overview
-  /cdk/aws-deployment/:                    cdk-aws-deployment
-  /cdk/operations/:                        cdk-operations
-  /core-patterns/:                         core-patterns
-  /testing-guide/:                         testing-guide
-  /troubleshooting/:                       troubleshooting
-  /migration-guide/:                       migration-guide
-  /development-guidelines/:                development-guidelines
-  /operations/:                            operations
-  /reference/face-module/:                 ref-face-module
-  /reference/render-modes/:                ref-render-modes
+  /: home
+  /getting-started/: getting-started
+  /api-reference/: api-reference
+  /architecture/: architecture
+  /aws-deployment-shape/: aws-deployment-shape
+  /adapters/react/: adapter-react
+  /adapters/vue/: adapter-vue
+  /adapters/svelte/: adapter-svelte
+  /modes/ssr/: mode-ssr
+  /modes/ssg/: mode-ssg
+  /modes/isr/: mode-isr
+  /modes/spa/: mode-spa
+  /features/head/: feature-head
+  /features/strict-csp/: feature-strict-csp
+  /features/oac-forms/: feature-oac-forms
+  /features/ssr-hydration-sidecars/: feature-ssr-hydration-sidecars
+  /features/isr-tenant-safety/: feature-isr-tenant-safety
+  /features/operator-visibility/: feature-operator-visibility
+  /integrations/apptheory/: int-apptheory
+  /integrations/tabletheory/: int-tabletheory
+  /integrations/autheory/: int-autheory
+  /cdk/: cdk-overview
+  /cdk/aws-deployment/: cdk-aws-deployment
+  /cdk/operations/: cdk-operations
+  /core-patterns/: core-patterns
+  /testing-guide/: testing-guide
+  /troubleshooting/: troubleshooting
+  /migration-guide/: migration-guide
+  /deprecation-policy/: deprecation-policy
+  /development-guidelines/: development-guidelines
+  /operations/: operations
+  /reference/face-module/: ref-face-module
+  /reference/render-modes/: ref-render-modes

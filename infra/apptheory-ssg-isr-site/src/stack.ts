@@ -2,13 +2,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
-import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
-import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
-import { AppTheoryDynamoTable } from '@theory-cloud/apptheory-cdk';
+import {
+  AppTheoryDynamoTable,
+  AppTheorySsrSite,
+  AppTheorySsrSiteMode,
+} from '@theory-cloud/apptheory-cdk';
 import { Construct } from 'constructs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +24,8 @@ function requireDir(name: string, relativePath: string): string {
 }
 
 export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
+  public readonly site: AppTheorySsrSite;
+
   constructor(scope: Construct, id: string, props: StackProps = {}) {
     super(scope, id, props);
 
@@ -45,8 +49,6 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.resolve(__dirname, './ssr-handler.ts'),
       handler: 'handler',
-      // Don't rely on the Lambda runtime shipping AWS SDK v3 modules. Bundle them.
-      bundleAwsSDK: true,
       timeout: Duration.seconds(10),
       memorySize: 512,
       environment: {
@@ -70,20 +72,6 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
       sortKeyName: 'sk',
       timeToLiveAttribute: 'ttl',
       removalPolicy: RemovalPolicy.DESTROY,
-    });
-
-    cacheTable.table.grantReadWriteData(ssrFunction);
-    isrBucket.grantReadWrite(ssrFunction);
-
-    // Mirror AppTheory's cache table env aliases for compatibility.
-    ssrFunction.addEnvironment('APPTHEORY_CACHE_TABLE_NAME', cacheTable.table.tableName);
-    ssrFunction.addEnvironment('FACETHEORY_CACHE_TABLE_NAME', cacheTable.table.tableName);
-    ssrFunction.addEnvironment('CACHE_TABLE_NAME', cacheTable.table.tableName);
-    ssrFunction.addEnvironment('CACHE_TABLE', cacheTable.table.tableName);
-
-    const ssrUrl = ssrFunction.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.AWS_IAM,
-      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
     });
 
     // Deploy assets + manifest + SSG output with explicit cache semantics.
@@ -115,216 +103,29 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
       cacheControl: [s3deploy.CacheControl.fromString('public,max-age=0,s-maxage=600')],
     });
 
-    // CloudFront:
-    // - S3 is the primary origin for HTML keys (SSG/static)
-    // - Lambda URL is the fallback origin for misses (SSR/ISR)
-    //
-    // This strategy scales for large SSG route sets because no per-route behaviors are required.
-    const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(assetsBucket);
-    const ssrOrigin = origins.FunctionUrlOrigin.withOriginAccessControl(ssrUrl);
-
-    const ssgRewrite = new cloudfront.Function(this, 'SsgRewrite', {
-      code: cloudfront.FunctionCode.fromInline(`
-function handler(event) {
-  var req = event.request;
-  var uri = req.uri || '/';
-
-  // Request correlation:
-  // - Always set/propagate x-request-id so SSR logs and viewer responses can correlate with CloudFront.
-  // - Prefer an inbound x-request-id if present, otherwise use the CloudFront request ID.
-  if (!req.headers['x-request-id']) {
-    req.headers['x-request-id'] = { value: event.context.requestId };
-  }
-
-  // Preserve the original path so SSR can route correctly when S3 misses.
-  req.headers['x-facetheory-original-uri'] = { value: uri };
-
-  if (uri === '/assets' || uri.startsWith('/assets/')) return req;
-  if (uri === '/.vite' || uri.startsWith('/.vite/')) return req;
-  if (uri === '/_facetheory/data' || uri.startsWith('/_facetheory/data/')) return req;
-  if (uri === '/_facetheory/ssr-data' || uri.startsWith('/_facetheory/ssr-data/')) return req;
-
-  // If the final segment contains a dot, treat it as a file request.
-  var idx = uri.lastIndexOf('/');
-  var last = uri.substring(idx + 1);
-  if (last.indexOf('.') !== -1) return req;
-
-  if (uri.endsWith('/')) {
-    req.uri = uri + 'index.html';
-    return req;
-  }
-
-  req.uri = uri + '/index.html';
-  return req;
-}
-      `.trim()),
-    });
-
-    const requestIdResponseHeader = new cloudfront.Function(this, 'RequestIdResponseHeader', {
-      code: cloudfront.FunctionCode.fromInline(`
-function handler(event) {
-  var req = event.request;
-  var resp = event.response;
-
-  var requestId = '';
-  if (req.headers && req.headers['x-request-id']) {
-    requestId = String(req.headers['x-request-id'].value || '').trim();
-  }
-  if (!requestId) requestId = String(event.context.requestId || '').trim();
-
-  if (requestId) {
-    resp.headers = resp.headers || {};
-    if (!resp.headers['x-request-id']) {
-      resp.headers['x-request-id'] = { value: requestId };
-    }
-  }
-
-  return resp;
-}
-      `.trim()),
-    });
-
-    const originRequestPolicy = new cloudfront.OriginRequestPolicy(this, 'OriginRequestPolicy', {
-      comment: 'Forward enough for SSR/ISR, without exploding the static cache key',
-      headerBehavior: cloudfront.OriginRequestHeaderBehavior.allowList(
-        'x-request-id',
-        'x-facetheory-original-uri',
-      ),
-      queryStringBehavior: cloudfront.OriginRequestQueryStringBehavior.all(),
-      cookieBehavior: cloudfront.OriginRequestCookieBehavior.all(),
-    });
-
-    const htmlOriginGroup = new origins.OriginGroup({
-      primaryOrigin: s3Origin,
-      fallbackOrigin: ssrOrigin,
-      fallbackStatusCodes: [403, 404],
-    });
-
-    const logsBucket = new s3.Bucket(this, 'LogsBucket', {
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      enforceSSL: true,
+    // AppTheory owns the CloudFront/Lambda URL/S3 edge topology. In SSG_ISR mode it
+    // uses S3 as the primary HTML origin and Lambda Function URL as the 403/404
+    // failover origin, while preserving FaceTheory's original-URI and request-id
+    // headers through generated CloudFront Functions.
+    this.site = new AppTheorySsrSite(this, 'Site', {
+      mode: AppTheorySsrSiteMode.SSG_ISR,
+      ssrFunction,
+      ssrUrlAuthType: lambda.FunctionUrlAuthType.AWS_IAM,
+      assetsBucket,
+      assetsKeyPrefix: 'assets',
+      // Vite commonly emits `.vite/manifest.json` in the client build output.
+      assetsManifestKey: '.vite/manifest.json',
+      htmlStoreBucket: isrBucket,
+      htmlStoreKeyPrefix: 'isr',
+      isrMetadataTable: cacheTable.table,
+      directS3PathPatterns: ['/.vite/*'],
+      enableLogging: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
 
-    // Note: avoid CSP here. Nonce-based CSP must be generated per SSR request and set by the SSR origin.
-    const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, 'ResponseHeadersPolicy', {
-      comment: 'FaceTheory example security headers (CSP is origin-defined)',
-      securityHeadersBehavior: {
-        strictTransportSecurity: {
-          accessControlMaxAge: Duration.days(365 * 2),
-          includeSubdomains: true,
-          preload: true,
-          override: true,
-        },
-        contentTypeOptions: { override: true },
-        frameOptions: { frameOption: cloudfront.HeadersFrameOption.DENY, override: true },
-        referrerPolicy: {
-          referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
-          override: true,
-        },
-        xssProtection: { protection: true, modeBlock: true, override: true },
-      },
-      customHeadersBehavior: {
-        customHeaders: [
-          {
-            header: 'permissions-policy',
-            value: 'camera=(), microphone=(), geolocation=()',
-            override: true,
-          },
-        ],
-      },
-    });
-
-    const distribution = new cloudfront.Distribution(this, 'Distribution', {
-      defaultRootObject: 'index.html',
-      enableLogging: true,
-      logBucket: logsBucket,
-      defaultBehavior: {
-        origin: htmlOriginGroup,
-        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
-        originRequestPolicy,
-        responseHeadersPolicy,
-        functionAssociations: [
-          {
-            function: ssgRewrite,
-            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-          },
-          {
-            function: requestIdResponseHeader,
-            eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
-          },
-        ],
-      },
-      additionalBehaviors: {
-        '/assets/*': {
-          origin: s3Origin,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
-          responseHeadersPolicy,
-          functionAssociations: [
-            {
-              function: requestIdResponseHeader,
-              eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
-            },
-          ],
-        },
-        '/.vite/*': {
-          origin: s3Origin,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
-          responseHeadersPolicy,
-          functionAssociations: [
-            {
-              function: requestIdResponseHeader,
-              eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
-            },
-          ],
-        },
-        '/_facetheory/data/*': {
-          origin: s3Origin,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          cachePolicy: cloudfront.CachePolicy.USE_ORIGIN_CACHE_CONTROL_HEADERS,
-          responseHeadersPolicy,
-          functionAssociations: [
-            {
-              function: requestIdResponseHeader,
-              eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
-            },
-          ],
-        },
-        '/_facetheory/ssr-data/*': {
-          // SSR runtime hydration sidecars are framework-owned resource routes on the
-          // same Lambda/FaceApp handler that rendered the HTML. Keep them distinct from
-          // SSG sidecars under /_facetheory/data/*, which remain S3/static objects.
-          origin: ssrOrigin,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy,
-          responseHeadersPolicy,
-          functionAssociations: [
-            {
-              function: ssgRewrite,
-              eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-            },
-            {
-              function: requestIdResponseHeader,
-              eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
-            },
-          ],
-        },
-      },
-    });
-
     new CfnOutput(this, 'CloudFrontDomainName', {
-      value: distribution.distributionDomainName,
+      value: this.site.distribution.distributionDomainName,
     });
 
     new CfnOutput(this, 'AssetsBucketName', {
@@ -340,7 +141,7 @@ function handler(event) {
     });
 
     new CfnOutput(this, 'SsrFunctionUrl', {
-      value: ssrUrl.url,
+      value: this.site.ssrUrl.url,
     });
   }
 }

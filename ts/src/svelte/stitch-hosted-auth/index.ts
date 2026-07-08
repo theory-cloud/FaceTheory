@@ -11,3 +11,19 @@ export { default as ConsentItem } from './ConsentItem.svelte';
 export { default as ConsentList } from './ConsentList.svelte';
 
 export { default as AuthStateCard } from './AuthStateCard.svelte';
+
+export type {
+  AuthCardProps,
+  AuthFlowSectionProps,
+  AuthFlowStep,
+  AuthFlowStepperProps,
+  AuthPageBackground,
+  AuthPageLayoutProps,
+  AuthPasskeyButtonType,
+  AuthStateCardProps,
+  AuthStateVariant,
+  ConsentItemProps,
+  ConsentListProps,
+  OTPInputProps,
+  PasskeyCTAProps,
+} from '../../stitch-hosted-auth/index.js';

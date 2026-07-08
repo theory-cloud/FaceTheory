@@ -7,10 +7,10 @@
 
 import * as React from 'react';
 
-import { createFaceApp } from '../../src/app.js';
-import { createReactFace } from '../../src/adapters/react.js';
-import type { FaceApp } from '../../src/app.js';
-import type { FaceContext } from '../../src/types.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createReactFace } from '@theory-cloud/facetheory/react';
+import type { FaceApp } from '@theory-cloud/facetheory';
+import type { FaceContext } from '@theory-cloud/facetheory';
 import type {
   OperatorEmptyStateConfig,
   OperatorGuardStatus,
@@ -18,14 +18,14 @@ import type {
   OperatorVisibilityMetadata,
   VisibilityMatrixDimension,
   VisibilityMatrixRow,
-} from '../../src/stitch-admin/index.js';
+} from '@theory-cloud/facetheory/stitch-admin';
 import {
   GuardedOperatorShell,
   HealthStatusPanel,
   NonAuthoritativeBanner,
   OperatorEmptyState,
   VisibilityMatrix,
-} from '../../src/react/stitch-admin/index.js';
+} from '@theory-cloud/facetheory/react/stitch-admin';
 
 const h = React.createElement;
 

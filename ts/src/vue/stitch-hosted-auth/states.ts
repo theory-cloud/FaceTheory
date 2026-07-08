@@ -1,37 +1,15 @@
 import { defineComponent, h } from 'vue';
 
+import {
+  authStateClassName,
+  authStateRole,
+  authStateVariantPalette,
+} from '../../stitch-hosted-auth/index.js';
+import type { AuthStateVariant } from '../../stitch-hosted-auth/index.js';
+
 import { renderPropContent, vnodeChildProp } from '../stitch-common.js';
 
-export type AuthStateVariant = 'info' | 'success' | 'warning' | 'error';
-
-interface VariantPalette {
-  accent: string;
-  surface: string;
-  text: string;
-}
-
-const variantPalette: Record<AuthStateVariant, VariantPalette> = {
-  info: {
-    accent: 'var(--stitch-color-primary, #1f108e)',
-    surface: 'var(--stitch-color-surface-container-lowest, #ffffff)',
-    text: 'var(--stitch-color-on-surface, #131b2e)',
-  },
-  success: {
-    accent: 'var(--stitch-color-tertiary, #00332e)',
-    surface: 'var(--stitch-color-surface-container-lowest, #ffffff)',
-    text: 'var(--stitch-color-on-surface, #131b2e)',
-  },
-  warning: {
-    accent: 'var(--stitch-color-error, #ba1a1a)',
-    surface: 'var(--stitch-color-surface-container-lowest, #ffffff)',
-    text: 'var(--stitch-color-on-surface, #131b2e)',
-  },
-  error: {
-    accent: 'var(--stitch-color-error, #ba1a1a)',
-    surface: 'var(--stitch-color-error-container, #ffdad6)',
-    text: 'var(--stitch-color-on-error-container, #93000a)',
-  },
-};
+export type { AuthStateVariant } from '../../stitch-hosted-auth/index.js';
 
 export const AuthStateCard = defineComponent({
   name: 'FaceTheoryVueAuthStateCard',
@@ -47,16 +25,13 @@ export const AuthStateCard = defineComponent({
   },
   setup(props) {
     return () => {
-      const palette = variantPalette[props.variant];
+      const palette = authStateVariantPalette(props.variant);
 
       return h(
         'div',
         {
-          class: `facetheory-stitch-auth-state facetheory-stitch-auth-state-${props.variant}`,
-          role:
-            props.variant === 'error' || props.variant === 'warning'
-              ? 'alert'
-              : undefined,
+          class: authStateClassName(props.variant),
+          role: authStateRole(props.variant),
           style: {
             width: '100%',
             maxWidth: '440px',

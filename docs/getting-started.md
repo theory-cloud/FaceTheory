@@ -4,19 +4,43 @@ title: Getting Started
 
 # Getting Started with FaceTheory
 
-FaceTheory is a TypeScript runtime for SSR, SSG, and blocking ISR on Node.js `>=24`, with published adapters for React, Vue, and Svelte.
+FaceTheory is a TypeScript runtime for SSR, SSG, and blocking ISR on Node.js `>=20`, with published adapters for React, Vue, and Svelte.
 
 ## Prerequisites
 
 Required:
 
-- Node.js `>=24`
+- Node.js `>=20`
 - npm
 
 Optional:
 
 - AWS familiarity if you plan to use the reference deployment stacks
 - AppTheory and TableTheory if you want the documented AWS-first integration path
+
+## Scaffold A Starter App
+
+Use the CLI from the pinned GitHub Release tarball to create an adapter-specific starter before hand-writing any hydration code:
+
+```bash
+export FACETHEORY_VERSION=3.8.1 # x-release-please-version
+npx --package \
+  "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz" \
+  facetheory create my-app --adapter react
+
+cd my-app
+npm install
+npm run check
+```
+
+Use `--adapter vue` or `--adapter svelte` for the other first-class adapters. The generated starter includes:
+
+- pinned FaceTheory, AppTheory, AppTheory CDK, and TableTheory GitHub Release tarball dependencies;
+- the npm `overrides` block that keeps AppTheory aligned to the same TableTheory tarball;
+- a framework-specific client entry with a real hydrate call (`hydrateRoot`, `createSSRApp(...).mount(...)`, or `hydrate(...)`) wired through `loadFaceHydrationData()`;
+- an `AppTheorySsrSite` CDK stack that deploys the Vite client output to S3 and routes SSR through AppTheory's Lambda Function URL path.
+
+The scaffold is a local developer onboarding aid only: it writes files under the target directory and never deploys, mutates AWS, or reads credentials.
 
 ## Install The Published Package
 
@@ -25,7 +49,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=3.8.1-rc # x-release-please-version
+export FACETHEORY_VERSION=3.8.1 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -37,16 +61,24 @@ npm install --save-exact \
 - Vue: `npm install vue @vue/server-renderer`
 - Svelte: `npm install svelte@^5.55.7`
 
+### Packaging posture
+
+FaceTheory publishes an **ESM-only** package through immutable GitHub Release tarballs. Use `import` syntax (or dynamic `import()`) from Node, bundlers, and Lambda handlers. A CommonJS `require("@theory-cloud/facetheory")` host will fail with `ERR_REQUIRE_ESM`; migrate that host to ESM or isolate FaceTheory behind an ESM bridge rather than expecting a CommonJS export map.
+
+The package declares `sideEffects: false` after auditing the published import subpaths: importing FaceTheory modules defines types, constants, and functions, but it does not start servers, register browser listeners, mutate globals, read AWS credentials, or deploy cloud resources. Side-effecting operations such as `createLambdaUrlStreamingHandler()`, `startFaceNavigation()`, `startAwsOacFormTransport()`, the SSG CLI, and the dev server happen only when the caller invokes them.
+
+FaceTheory requires Svelte `>=5.55.7`: v4.0.0 dropped Svelte 4 support and the components are authored with Svelte 5 runes. SSR/hydration behavior below `5.55.7` — including Svelte 4 and the `5.46.0`–`5.55.6` band — is not part of the verified adapter contract. Install `svelte@^5.55.7`.
+
 ### Step 3: Install optional companion packages
 
 These are only required if your application uses the corresponding integration surface:
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.13.2/theory-cloud-apptheory-1.13.2.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.16.1/theory-cloud-apptheory-1.16.1.tgz
 
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz
 ```
 
 Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoint. Use TableTheory when you want the documented production ISR metadata store adapter.
@@ -138,6 +170,90 @@ runtime.get("/{proxy+}", createAppTheoryFaceHandler({ app }));
 export const handler = createLambdaFunctionURLStreamingHandler(runtime);
 ```
 
+## Deploy With `AppTheorySsrSite`
+
+For AWS deployment, keep the same FaceTheory app and let AppTheory own the CloudFront + S3 + Lambda Function URL shape.
+The deploy reference is not a second render path: `createFaceApp(...)` still renders the document, and
+`createAppTheoryFaceHandler({ app })` still adapts it into AppTheory.
+
+Minimal SSR stack shape:
+
+```ts
+import { CfnOutput, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import { AppTheorySsrSite } from "@theory-cloud/apptheory-cdk";
+
+const assetsBucket = new s3.Bucket(this, "AssetsBucket", {
+  blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+  encryption: s3.BucketEncryption.S3_MANAGED,
+  enforceSSL: true,
+  removalPolicy: RemovalPolicy.RETAIN,
+});
+
+const ssrFunction = new NodejsFunction(this, "SsrFunction", {
+  runtime: lambda.Runtime.NODEJS_20_X,
+  entry: "src/handler.ts",
+  handler: "handler",
+  timeout: Duration.seconds(10),
+});
+
+const site = new AppTheorySsrSite(this, "Site", {
+  ssrFunction,
+  ssrUrlAuthType: lambda.FunctionUrlAuthType.AWS_IAM,
+  assetsBucket,
+  assetsKeyPrefix: "assets",
+  assetsManifestKey: ".vite/manifest.json",
+  domainName: "app.example.com", // optional custom domain
+  certificateArn: "arn:aws:acm:us-east-1:111122223333:certificate/...", // optional, CloudFront requires us-east-1
+  webAclId: "arn:aws:wafv2:us-east-1:111122223333:global/webacl/...", // optional WAF
+});
+
+new CfnOutput(this, "CloudFrontDomainName", {
+  value: site.distribution.distributionDomainName,
+});
+```
+
+For SSG + blocking ISR, switch to `AppTheorySsrSiteMode.SSG_ISR` and pass ISR resources:
+
+```ts
+import { AppTheorySsrSiteMode } from "@theory-cloud/apptheory-cdk";
+
+new AppTheorySsrSite(this, "Site", {
+  mode: AppTheorySsrSiteMode.SSG_ISR,
+  ssrFunction,
+  ssrUrlAuthType: lambda.FunctionUrlAuthType.AWS_IAM,
+  assetsBucket,
+  assetsKeyPrefix: "assets",
+  assetsManifestKey: ".vite/manifest.json",
+  htmlStoreBucket: isrBucket,
+  htmlStoreKeyPrefix: "isr",
+  isrMetadataTable: cacheTable.table,
+  directS3PathPatterns: ["/.vite/*"],
+  ssrPathPatterns: ["/actions/*"],
+});
+```
+
+Validate locally before deploying:
+
+```bash
+cd infra/apptheory-ssr-site && npm ci && npm test
+cd ../apptheory-ssg-isr-site && npm ci && npm test
+```
+
+Then an AWS operator can run the app's CDK deploy and curl the CloudFront output:
+
+```bash
+npx cdk deploy FaceTheoryHelloWorld --outputs-file cdk-outputs.json
+CLOUDFRONT_DOMAIN=$(jq -r '.FaceTheoryHelloWorld.CloudFrontDomainName' cdk-outputs.json)
+curl -I "https://${CLOUDFRONT_DOMAIN}/"
+curl -sS "https://${CLOUDFRONT_DOMAIN}/" | grep "Hello FaceTheory"
+```
+
+Do not treat local synth/tests/docs builds as live deployment proof. The full walkthrough, including domain, WAF, ISR
+wiring, SSG sidecars, invalidation notes, and post-deploy curl checks, lives in [CDK And AWS Notes](./cdk/README.md).
+
 ## Add Strict No-Inline CSP Hydration
 
 Use this path when a route must run without inline scripts, inline styles, or raw head HTML. The server render still owns
@@ -151,13 +267,40 @@ import {
   InMemoryHtmlStore,
   viteAssetsForEntry,
   viteHydrationForEntry,
+  type FaceModule,
+  type ViteManifest,
 } from "@theory-cloud/facetheory";
+
+declare const manifest: ViteManifest;
 
 const strictCsp = {
   inlineScripts: false,
   inlineStyles: false,
   rawHead: false,
 } as const;
+
+const faces: FaceModule<{ message: string }>[] = [
+  {
+    route: "/",
+    mode: "ssr",
+    load: async () => ({ message: "Hello strict CSP" }),
+    render: async (_ctx, data) => {
+      const { headTags } = viteAssetsForEntry(manifest, "src/entry-client.ts", {
+        includeAssets: true,
+      });
+
+      return {
+        csp: strictCsp,
+        headers: {
+          "content-security-policy": buildStrictCspHeader(),
+        },
+        headTags,
+        html: `<main>${data.message}</main>`,
+        hydration: viteHydrationForEntry(manifest, "src/entry-client.ts", data),
+      };
+    },
+  },
+];
 
 const app = createFaceApp({
   ssrHydrationSidecars: {
@@ -167,21 +310,6 @@ const app = createFaceApp({
   },
   faces,
 });
-
-renderOptions: async (_ctx, data) => {
-  const { headTags } = viteAssetsForEntry(manifest, "src/entry-client.ts", {
-    includeAssets: true,
-  });
-
-  return {
-    csp: strictCsp,
-    headers: {
-      "content-security-policy": buildStrictCspHeader(),
-    },
-    headTags,
-    hydration: viteHydrationForEntry(manifest, "src/entry-client.ts", data),
-  };
-};
 ```
 
 When `ssrHydrationSidecars` is configured, strict SSR writes the render-time
@@ -230,6 +358,34 @@ If a route still needs FaceTheory-owned inline scripts or styles, use the nonce-
 HTML only: pass `FaceRequest.cspNonce`, include the matching nonce in your CSP header, and do not cache that HTML as
 SSG/ISR unless the header and cached nonce stay identical for every request.
 
+## Run The Vite SSR Dev Loop
+
+The Vite middleware dev server is a development loop only. It does not create a
+second production deploy path and does not replace the production
+`viteAssetsForEntry(manifest, ...)` manifest flow used by SSG, SSR, ISR, or
+Lambda deployments.
+
+The React/Vite SSR example has a ready dev script:
+
+```bash
+cd ts/examples/vite-ssr-react
+npm run dev
+```
+
+Open `http://localhost:5174/`. The server is created with
+`vite.createServer({ server: { middlewareMode: true }, appType: "custom" })`;
+Vite handles `/@vite/client`, `/src/*`, CSS, and module HMR while FaceTheory
+mounts the FaceApp for application routes. The server render uses
+`vite.ssrLoadModule()` for the SSR entry on each request, so an edit to
+`src/app.tsx` is reflected by refreshing the page without a manual rebuild. In
+production, keep using the build + manifest path:
+
+```bash
+cd ts
+npm run example:vite:ssr:build
+npm run example:vite:ssr:serve
+```
+
 ## Add An OAC-Safe Mutating SSR Form
 
 When a FaceTheory app is deployed through `AppTheorySsrSite` with Lambda Function URL OAC and `AWS_IAM`, native browser
@@ -249,9 +405,7 @@ import {
 const oacBootstrapModule = "/assets/oac-form-bootstrap.js";
 
 function formDocument(message = "") {
-  const alert = message
-    ? `<p role="alert">${escapeHTML(message)}</p>`
-    : "";
+  const alert = message ? `<p role="alert">${escapeHTML(message)}</p>` : "";
 
   return `
     <main>
@@ -478,7 +632,7 @@ Important ISR default:
 
 ## Reference Bundle
 
-The `v3.8.1-rc` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v3.8.1` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples

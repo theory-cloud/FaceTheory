@@ -19,6 +19,11 @@ export interface ViteAssetsOptions {
   dynamicImports?: DynamicImportPolicy;
 }
 
+export interface ViteDevAssetsOptions {
+  base?: string;
+  hmrClient?: boolean;
+}
+
 export interface ViteExternalHydrationOptions extends ViteAssetsOptions {
   dataUrl: string;
   allowedOrigin?: string | URL;
@@ -122,6 +127,14 @@ function requireEntryChunk(manifest: ViteManifest, entry: string): ViteManifestC
     throw new Error(`vite manifest entry missing file: ${entry}`);
   }
   return chunk;
+}
+
+function normalizeDevEntryPath(entry: string): string {
+  const trimmed = String(entry ?? '').trim();
+  if (!trimmed) {
+    throw new Error('vite dev entry must not be empty');
+  }
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
 function isAbsoluteOrProtocolRelativeUrl(value: string): boolean {
@@ -314,6 +327,29 @@ export function viteDynamicImportPolicy(): DynamicImportPolicy {
   return 'ignore';
 }
 
+export function viteDevAssetsForEntry(
+  entry: string,
+  options: ViteDevAssetsOptions = {},
+): { bootstrapModule: string; headTags: FaceHeadTag[] } {
+  const base = options.base ?? '/';
+  const hmrClient = options.hmrClient ?? true;
+  const normalizedEntry = normalizeDevEntryPath(entry);
+  const bootstrapModule = joinBase(base, normalizedEntry);
+  const headTags: FaceHeadTag[] = [];
+
+  if (hmrClient) {
+    headTags.push({
+      type: 'script',
+      attrs: {
+        type: 'module',
+        src: joinBase(base, '/@vite/client'),
+      },
+    });
+  }
+
+  return { bootstrapModule, headTags };
+}
+
 export function viteHydrationForEntry(
   manifest: ViteManifest,
   entry: string,
@@ -321,6 +357,15 @@ export function viteHydrationForEntry(
   options: ViteAssetsOptions = {},
 ): FaceHydration {
   const { bootstrapModule } = viteAssetsForEntry(manifest, entry, options);
+  return { data, bootstrapModule };
+}
+
+export function viteDevHydrationForEntry(
+  entry: string,
+  data: unknown,
+  options: ViteDevAssetsOptions = {},
+): FaceHydration {
+  const { bootstrapModule } = viteDevAssetsForEntry(entry, options);
   return { data, bootstrapModule };
 }
 

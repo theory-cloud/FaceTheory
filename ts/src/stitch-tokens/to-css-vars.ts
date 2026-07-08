@@ -92,7 +92,7 @@ export function stitchToCssVars(
  * option. The returned string is CSS text with `</style>` terminators escaped,
  * so emit it through FaceTheory's `styleTags` /
  * `headTags: [{ type: 'style', ... }]` paths rather than wrapping it in
- * `<style>...</style>` and passing it through `head.html`.
+ * `<style>...</style>` and passing it through caller-owned raw head HTML.
  */
 export function stitchCssVarsToRootBlock(vars: Record<string, string>): string {
   const lines = Object.entries(vars)

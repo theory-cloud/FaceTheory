@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   externalHydrationForEntry,
+  viteDevAssetsForEntry,
+  viteDevHydrationForEntry,
   viteAssetsForEntry,
   viteDynamicImportPolicy,
   viteHydrationForEntry,
@@ -18,6 +20,12 @@ function hrefsByRel(headTags: Array<{ type: string; attrs: Record<string, unknow
   return linkTags(headTags)
     .filter((tag) => tag.attrs.rel === rel)
     .map((tag) => String(tag.attrs.href));
+}
+
+function scriptSrcs(headTags: Array<{ type: string; attrs: Record<string, unknown> }>) {
+  return headTags
+    .filter((tag): tag is { type: 'script'; attrs: Record<string, unknown> } => tag.type === 'script')
+    .map((tag) => String(tag.attrs.src));
 }
 
 test('vite: resolves bootstrap module + injects preload + css links', () => {
@@ -157,6 +165,57 @@ test('vite: hydration helper sets bootstrap module', () => {
 
   const hydration = viteHydrationForEntry(manifest, 'src/entry-client.tsx', { ok: true });
   assert.equal(hydration.bootstrapModule, '/assets/entry.aaa.js');
+  assert.deepEqual(hydration.data, { ok: true });
+});
+
+test('vite: dev assets stay separate from production manifest assets', () => {
+  const manifest = {
+    'src/entry-client.tsx': {
+      file: 'assets/entry.aaa.js',
+      css: ['assets/entry.aaa.css'],
+      imports: ['_vendor.bbb.js'],
+      isEntry: true,
+    },
+    '_vendor.bbb.js': {
+      file: 'assets/vendor.bbb.js',
+    },
+  } as const;
+
+  const production = viteAssetsForEntry(manifest, 'src/entry-client.tsx', {
+    includeAssets: true,
+  });
+  const dev = viteDevAssetsForEntry('src/entry-client.tsx');
+
+  assert.equal(production.bootstrapModule, '/assets/entry.aaa.js');
+  assert.deepEqual(
+    hrefsByRel(
+      production.headTags as Array<{ type: string; attrs: Record<string, unknown> }>,
+      'modulepreload',
+    ),
+    ['/assets/vendor.bbb.js'],
+  );
+  assert.deepEqual(
+    hrefsByRel(
+      production.headTags as Array<{ type: string; attrs: Record<string, unknown> }>,
+      'stylesheet',
+    ),
+    ['/assets/entry.aaa.css'],
+  );
+  assert.deepEqual(
+    scriptSrcs(production.headTags as Array<{ type: string; attrs: Record<string, unknown> }>),
+    [],
+  );
+
+  assert.equal(dev.bootstrapModule, '/src/entry-client.tsx');
+  assert.deepEqual(
+    scriptSrcs(dev.headTags as Array<{ type: string; attrs: Record<string, unknown> }>),
+    ['/@vite/client'],
+  );
+});
+
+test('vite: dev hydration helper uses source entry bootstrap module', () => {
+  const hydration = viteDevHydrationForEntry('src/entry-client.tsx', { ok: true });
+  assert.equal(hydration.bootstrapModule, '/src/entry-client.tsx');
   assert.deepEqual(hydration.data, { ok: true });
 });
 

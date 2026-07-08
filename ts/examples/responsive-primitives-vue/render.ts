@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
-import { createFaceApp } from '../../src/app.js';
-import { createVueFace, h } from '../../src/vue/index.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createVueFace, h } from '@theory-cloud/facetheory/vue';
 import {
   AsyncStateBoundary,
   Button,
@@ -9,8 +9,8 @@ import {
   LoadingState,
   Skeleton,
   Spinner,
-} from '../../src/vue/responsive-primitives/index.js';
-import { RESPONSIVE_PRIMITIVES_CSS } from '../../src/responsive-primitives/index.js';
+} from '@theory-cloud/facetheory/vue/responsive-primitives';
+import { RESPONSIVE_PRIMITIVES_CSS } from '@theory-cloud/facetheory/responsive-primitives';
 
 const app = createFaceApp({
   faces: [

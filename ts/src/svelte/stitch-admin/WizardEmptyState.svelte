@@ -1,8 +1,14 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { OperatorEmptyStateIntent, WizardEmptyStateConfig } from './types.js';
 
-  export let config: WizardEmptyStateConfig;
-  export let action: unknown = undefined;
+  let {
+    config,
+    action = undefined,
+  }: {
+    config: WizardEmptyStateConfig;
+    action?: unknown;
+  } = $props();
 
   const INTENT_LABEL: Record<OperatorEmptyStateIntent, string> = {
     'no-data': 'No data',
@@ -13,8 +19,11 @@
     error: 'Unavailable',
   };
 
-  $: actionContent = action ?? config.actionLabel;
-  $: role = config.intent === 'error' ? 'alert' : 'status';
+  const actionContent = $derived(action ?? config.actionLabel);
+  const actionContentNode = $derived(
+    typeof actionContent === 'function' ? (actionContent as Snippet) : undefined,
+  );
+  const role = $derived(config.intent === 'error' ? 'alert' : 'status');
 </script>
 
 <section
@@ -26,9 +35,9 @@
   <span class="facetheory-stitch-wizard-empty-state-intent">{INTENT_LABEL[config.intent]}</span>
   <strong>{config.title}</strong>
   {#if config.description !== undefined}<p>{config.description}</p>{/if}
-  {#if $$slots.action || actionContent !== undefined}
+  {#if actionContent !== undefined}
     <div class="facetheory-stitch-wizard-empty-state-action">
-      <slot name="action">{actionContent}</slot>
+      {#if actionContentNode}{@render actionContentNode()}{:else}{actionContent}{/if}
     </div>
   {/if}
   <p

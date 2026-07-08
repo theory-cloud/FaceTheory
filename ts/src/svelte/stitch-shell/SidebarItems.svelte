@@ -1,10 +1,17 @@
 <script lang="ts">
   import type { NavItem } from './nav-types.js';
 
-  export let items: NavItem[] = [];
-  export let activeKey: string | undefined = undefined;
-  export let openKeys: string[] | undefined = undefined;
-  export let onNavigate: ((path: string, key: string) => void) | undefined = undefined;
+  let {
+    items = [],
+    activeKey = undefined,
+    openKeys = undefined,
+    onNavigate = undefined,
+  }: {
+    items?: NavItem[];
+    activeKey?: string | undefined;
+    openKeys?: string[] | undefined;
+    onNavigate?: ((path: string, key: string) => void) | undefined;
+  } = $props();
 
   function isOpen(item: NavItem): boolean {
     if (!item.children || item.children.length === 0) return false;
@@ -23,7 +30,7 @@
     {#if item.path}
       <a
         href={item.path}
-        on:click={(event) => {
+        onclick={(event) => {
           if (!onNavigate) return;
           event.preventDefault();
           onNavigate(item.path!, item.key);

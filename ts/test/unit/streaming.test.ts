@@ -250,11 +250,11 @@ test('FaceApp: strict CSP streaming responses are coerced to validated buffered 
 test('FaceApp: strict CSP streaming with nonce validates the full document before responding', async () => {
   let streamChunksRead = 0;
   const metrics: Array<{ name: string; tags?: Record<string, string> }> = [];
-  const logs: Array<{ isStream?: boolean }> = [];
+  const logs: Array<Record<string, unknown>> = [];
   const app = createFaceApp({
     observability: {
       metric: (entry) => metrics.push(entry),
-      log: (entry) => logs.push(entry),
+      log: (entry) => logs.push(entry as unknown as Record<string, unknown>),
     },
     faces: [
       {
@@ -920,32 +920,71 @@ test('react adapter: streaming applies CSP nonce to all inline style/script tags
 });
 
 test('FaceApp: streaming body error emits marker and closes document', async () => {
-  const app = createFaceApp({
-    faces: [
-      {
-        route: '/',
-        mode: 'ssr',
-        render: () => ({
-          headTags: [{ type: 'title', text: 'Err' }],
-          html: (async function* () {
-            yield utf8('<main>ok</main>');
-            throw new Error('boom');
-          })(),
-        }),
-      },
-    ],
-  });
+  const createStreamingErrorApp = (
+    observability?: Parameters<typeof createFaceApp>[0]['observability'],
+  ) =>
+    createFaceApp({
+      ...(observability ? { observability } : {}),
+      faces: [
+        {
+          route: '/',
+          mode: 'ssr',
+          render: () => ({
+            headTags: [{ type: 'title', text: 'Err' }],
+            html: (async function* () {
+              yield utf8('<main>ok</main>');
+              throw new Error('boom');
+            })(),
+          }),
+        },
+      ],
+    });
 
   const originalConsoleError = console.error;
   console.error = () => {};
   try {
-    const resp = await app.handle({ method: 'GET', path: '/' });
+    const baselineResp = await createStreamingErrorApp().handle({
+      method: 'GET',
+      path: '/',
+    });
+    const baselineFull = new TextDecoder().decode(
+      await collectBody(baselineResp.body),
+    );
+
+    const logs: Array<Record<string, unknown>> = [];
+    const metrics: Array<Record<string, unknown>> = [];
+    const resp = await createStreamingErrorApp({
+      log: (record) => logs.push(record as unknown as Record<string, unknown>),
+      metric: (record) =>
+        metrics.push(record as unknown as Record<string, unknown>),
+    }).handle({
+      method: 'GET',
+      path: '/',
+      headers: { 'x-request-id': ['req-stream'] },
+    });
     assert.ok(!(resp.body instanceof Uint8Array));
 
     const full = new TextDecoder().decode(await collectBody(resp.body));
+    assert.equal(full, baselineFull);
     assert.ok(full.includes('<main>ok</main>'));
     assert.ok(full.includes('data-facetheory-stream-error="true"'));
     assert.ok(full.endsWith('</body></html>'));
+
+    const streamLog = logs.find(
+      (record) => record.event === 'facetheory.stream_error',
+    );
+    assert.ok(streamLog);
+    assert.equal(streamLog.requestId, 'req-stream');
+    assert.equal(streamLog.errorClass, 'Error');
+
+    const streamMetric = metrics.find(
+      (record) => record.name === 'facetheory.stream_error',
+    );
+    assert.ok(streamMetric);
+    assert.equal(
+      (streamMetric.tags as Record<string, string>).error_class,
+      'Error',
+    );
   } finally {
     console.error = originalConsoleError;
   }

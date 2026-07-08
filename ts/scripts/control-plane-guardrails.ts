@@ -1,4 +1,4 @@
-import type { ControlPlaneCspMode } from './control-plane.js';
+import type { ControlPlaneCspMode } from '../src/control-plane.js';
 
 export interface ControlPlaneDeliveryGuardrailInput {
   csp: {
@@ -304,7 +304,6 @@ function isIdentifierCode(code: number): boolean {
 function isControlPlaneOrStitchSurface(path: string): boolean {
   return (
     path === 'ts/src/control-plane.ts' ||
-    path === 'ts/src/control-plane-guardrails.ts' ||
     path.startsWith('ts/src/stitch-') ||
     path.startsWith('ts/src/react/stitch-') ||
     path.startsWith('ts/src/vue/stitch-') ||

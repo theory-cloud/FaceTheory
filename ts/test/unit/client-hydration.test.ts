@@ -8,6 +8,7 @@ import {
   loadFaceHydrationData,
   readFaceExternalHydrationDataUrl,
   readFaceInlineHydrationData,
+  reportHydrationFailure,
   resolveSameOriginFaceHydrationUrl,
 } from '../../src/client/index.js';
 
@@ -34,7 +35,10 @@ test('client hydration loader: reads inline hydration before external links', as
 
   try {
     let fetchCalls = 0;
-    const data = await loadFaceHydrationData<{ roles: string[]; subject: string }>({
+    const data = await loadFaceHydrationData<{
+      roles: string[];
+      subject: string;
+    }>({
       document: dom.window.document,
       fetcher: async () => {
         fetchCalls += 1;
@@ -91,7 +95,9 @@ test('client hydration loader: treats spoofed inline markers as absent', async (
 
       assert.equal(readFaceInlineHydrationData(dom.window.document), null);
       assert.deepEqual(data, { route: 'external-home' });
-      assert.deepEqual(fetched, ['https://app.test/_facetheory/ssr-data/home.json']);
+      assert.deepEqual(fetched, [
+        'https://app.test/_facetheory/ssr-data/home.json',
+      ]);
     } finally {
       dom.window.close();
     }
@@ -134,9 +140,10 @@ test('client hydration loader: fetches same-origin external hydration data', asy
       readFaceExternalHydrationDataUrl(dom.window.document),
       '/_facetheory/ssr-data/home.json',
     );
-    assert.deepEqual(fetched.map((entry) => entry.input), [
-      'https://app.test/_facetheory/ssr-data/home.json',
-    ]);
+    assert.deepEqual(
+      fetched.map((entry) => entry.input),
+      ['https://app.test/_facetheory/ssr-data/home.json'],
+    );
     assert.equal(fetched[0]?.init?.credentials, 'same-origin');
     assert.equal(fetched[0]?.init?.redirect, 'follow');
     assert.equal(
@@ -155,12 +162,18 @@ test('client hydration loader: fetches same-origin external hydration data', asy
 });
 
 test('client hydration loader: returns null when no hydration marker is present', async () => {
-  const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>', {
-    url: 'https://app.test/empty',
-  });
+  const dom = new JSDOM(
+    '<!doctype html><html><head></head><body></body></html>',
+    {
+      url: 'https://app.test/empty',
+    },
+  );
 
   try {
-    assert.equal(await loadFaceHydrationData({ document: dom.window.document }), null);
+    assert.equal(
+      await loadFaceHydrationData({ document: dom.window.document }),
+      null,
+    );
   } finally {
     dom.window.close();
   }
@@ -294,4 +307,168 @@ test('client hydration loader: rejects non-JSON and invalid JSON responses', asy
     }),
     /hydration data response was not valid JSON/,
   );
+});
+
+test('client hydration beacon: reports opted-in hydrate failures with same-origin sendBeacon', () => {
+  const dom = new JSDOM(
+    '<!doctype html><html><body><main id="root"></main></body></html>',
+    {
+      url: 'https://app.test/checkout?cart=cart_test',
+    },
+  );
+
+  try {
+    const beacons: Array<{ body: string; url: string }> = [];
+    Object.defineProperty(dom.window.navigator, 'sendBeacon', {
+      configurable: true,
+      value: (url: string | URL, data?: BodyInit | null) => {
+        beacons.push({ url: String(url), body: String(data ?? '') });
+        return true;
+      },
+    });
+
+    const report = reportHydrationFailure({
+      document: dom.window.document,
+      endpoint: '/ops/hydration-failure',
+      framework: 'react',
+      navigator: dom.window.navigator,
+      tags: { surface: 'checkout', ignored: null },
+    });
+
+    assert.equal(beacons.length, 0);
+
+    report(
+      new Error('Hydration failed because the server HTML did not match'),
+      {
+        componentStack: 'at Checkout',
+        digest: 'react-digest',
+      },
+    );
+
+    assert.equal(beacons.length, 1);
+    const firstBeacon = beacons[0];
+    assert.ok(firstBeacon);
+    assert.equal(firstBeacon.url, 'https://app.test/ops/hydration-failure');
+    assert.deepEqual(JSON.parse(firstBeacon.body), {
+      componentStack: 'at Checkout',
+      digest: 'react-digest',
+      errorClass: 'Error',
+      event: 'facetheory.hydration_failure',
+      framework: 'react',
+      message: 'Hydration failed because the server HTML did not match',
+      path: '/checkout?cart=cart_test',
+      tags: { surface: 'checkout' },
+    });
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('client hydration beacon: normalizes labels without regex-sensitive trimming', () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'https://app.test/checkout',
+  });
+
+  try {
+    const beacons: Array<{ body: string; url: string }> = [];
+    Object.defineProperty(dom.window.navigator, 'sendBeacon', {
+      configurable: true,
+      value: (url: string | URL, data?: BodyInit | null) => {
+        beacons.push({ url: String(url), body: String(data ?? '') });
+        return true;
+      },
+    });
+
+    const report = reportHydrationFailure({
+      document: dom.window.document,
+      endpoint: '/ops/hydration-failure',
+      framework: ' __react app!! ',
+      navigator: dom.window.navigator,
+      tags: { ' __surface name!! ': 'checkout' },
+    });
+    const hydrationError = new Error('mismatch');
+    hydrationError.name = ' __Hydration failure!! ';
+
+    report(hydrationError, {});
+
+    assert.equal(beacons.length, 1);
+    const firstBeacon = beacons[0];
+    assert.ok(firstBeacon);
+    assert.deepEqual(JSON.parse(firstBeacon.body), {
+      errorClass: 'Hydration_failure',
+      event: 'facetheory.hydration_failure',
+      framework: 'react_app',
+      message: 'mismatch',
+      path: '/checkout',
+      tags: { surface_name: 'checkout' },
+    });
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('client hydration beacon: falls back to same-origin keepalive fetch', async () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'https://app.test/account',
+  });
+
+  try {
+    const posts: Array<{
+      body: string | null;
+      input: string;
+      init: RequestInit | undefined;
+    }> = [];
+    const report = reportHydrationFailure({
+      document: dom.window.document,
+      endpoint: '/ops/hydration-failure',
+      framework: 'vue',
+      fetcher: async (input, init) => {
+        posts.push({
+          input: String(input),
+          init,
+          body: typeof init?.body === 'string' ? init.body : null,
+        });
+        return new Response(null, { status: 204 });
+      },
+      navigator: { sendBeacon: () => false },
+    });
+
+    report('Vue hydration mismatch');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0]?.input, 'https://app.test/ops/hydration-failure');
+    assert.equal(posts[0]?.init?.method, 'POST');
+    assert.equal(posts[0]?.init?.credentials, 'same-origin');
+    assert.equal(posts[0]?.init?.keepalive, true);
+    assert.equal(posts[0]?.init?.redirect, 'error');
+    assert.deepEqual(JSON.parse(posts[0]?.body ?? '{}'), {
+      errorClass: 'NonError_string',
+      event: 'facetheory.hydration_failure',
+      framework: 'vue',
+      message: 'Vue hydration mismatch',
+      path: '/account',
+    });
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('client hydration beacon: rejects cross-origin endpoints before wiring', () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'https://app.test/',
+  });
+
+  try {
+    assert.throws(
+      () =>
+        reportHydrationFailure({
+          document: dom.window.document,
+          endpoint: 'https://evil.test/ops/hydration-failure',
+        }),
+      /hydration failure endpoint must be a same-origin/,
+    );
+  } finally {
+    dom.window.close();
+  }
 });

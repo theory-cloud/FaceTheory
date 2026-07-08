@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
@@ -53,6 +54,28 @@ function extractHydrationHref(html: string): string {
   const href = /\bhref="([^"]+)"/i.exec(tag)?.[1];
   assert.ok(href, 'expected FaceTheory hydration href');
   return href;
+}
+
+async function withTimeout<T>(
+  input: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  return await new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
+    input.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
 }
 
 test('lambdaUrlEventToFaceRequest: maps Lambda URL event shape deterministically', () => {
@@ -196,6 +219,170 @@ test('writeFaceResponseToLambdaWriter: writes head once before first body bytes'
   assert.ok(firstChunk.startsWith('<!doctype html>'));
   assert.ok(firstChunk.includes('</head><body>'));
 });
+
+test('writeFaceResponseToLambdaWriter: waits for drain when writes apply backpressure', async () => {
+  const events: string[] = [];
+  const sourceChunks = [utf8('alpha'), utf8('beta'), utf8('gamma')];
+
+  async function* body(): AsyncIterable<Uint8Array> {
+    for (const [index, chunk] of sourceChunks.entries()) {
+      events.push(`source:${String(index)}`);
+      yield chunk;
+    }
+  }
+
+  const writtenChunks: Uint8Array[] = [];
+  let pendingBackpressure = false;
+  let bufferedWrites = 0;
+  let maxBufferedWrites = 0;
+  let drainCount = 0;
+
+  const writer: LambdaResponseWriter = {
+    writeHead: () => {
+      events.push('head');
+    },
+    write: (chunk) => {
+      if (pendingBackpressure) {
+        throw new Error('next chunk was written before drain resolved');
+      }
+
+      const text = new TextDecoder().decode(chunk);
+      events.push(`write:${text}`);
+      writtenChunks.push(chunk);
+      pendingBackpressure = true;
+      bufferedWrites += 1;
+      maxBufferedWrites = Math.max(maxBufferedWrites, bufferedWrites);
+      return false;
+    },
+    drain: async () => {
+      assert.equal(pendingBackpressure, true);
+      events.push('drain:start');
+      drainCount += 1;
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
+      pendingBackpressure = false;
+      bufferedWrites -= 1;
+      events.push('drain:end');
+    },
+    end: () => {
+      assert.equal(pendingBackpressure, false);
+      events.push('end');
+    },
+  };
+
+  await writeFaceResponseToLambdaWriter(
+    {
+      status: 200,
+      headers: { 'content-type': ['text/plain; charset=utf-8'] },
+      cookies: [],
+      body: body(),
+      isBase64: false,
+    },
+    writer,
+  );
+
+  assert.equal(drainCount, sourceChunks.length);
+  assert.equal(maxBufferedWrites, 1);
+  assert.equal(
+    new TextDecoder().decode(Buffer.concat(writtenChunks.map((chunk) => Buffer.from(chunk)))),
+    'alphabetagamma',
+  );
+  assert.deepEqual(events, [
+    'head',
+    'source:0',
+    'write:alpha',
+    'drain:start',
+    'drain:end',
+    'source:1',
+    'write:beta',
+    'drain:start',
+    'drain:end',
+    'source:2',
+    'write:gamma',
+    'drain:start',
+    'drain:end',
+    'end',
+  ]);
+});
+
+for (const terminalEvent of ['close', 'error'] as const) {
+  test(`createLambdaUrlStreamingHandler: stops drain wait on raw stream ${terminalEvent} before drain`, async () => {
+    const app = createFaceApp({
+      faces: [
+        {
+          route: '/',
+          mode: 'ssr',
+          render: () => ({
+            html: streamFromString('<main>backpressure</main>'),
+          }),
+        },
+      ],
+    });
+
+    const events: string[] = [];
+    const emitter = new EventEmitter();
+    const terminalError = new Error('client disconnected before drain');
+    const rawStream: LambdaWritableStream = {
+      write: (chunk) => {
+        const text =
+          typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
+        events.push(`write:${text}`);
+        setImmediate(() => {
+          if (terminalEvent === 'error') {
+            emitter.emit('error', terminalError);
+            return;
+          }
+          emitter.emit('close');
+        });
+        return false;
+      },
+      end: () => {
+        events.push('end');
+      },
+      once: (event, listener) => {
+        emitter.once(event, listener);
+        return emitter;
+      },
+      off: (event, listener) => {
+        emitter.off(event, listener);
+        return emitter;
+      },
+    };
+
+    const awslambda: AwsLambdaGlobalLike = {
+      streamifyResponse: (impl) => {
+        return async (event, context) => {
+          await impl(event, rawStream, context);
+        };
+      },
+    };
+
+    const handler = createLambdaUrlStreamingHandler({ app, awslambda });
+
+    await assert.rejects(
+      withTimeout(
+        handler(
+          {
+            rawPath: '/',
+            requestContext: { http: { method: 'GET' } },
+          },
+          {},
+        ),
+        1_000,
+      ),
+      (err) => {
+        if (terminalEvent === 'error') return err === terminalError;
+        return (
+          err instanceof Error &&
+          err.message.includes('Lambda response stream closed before drain')
+        );
+      },
+    );
+    assert.ok(events.some((entry) => entry.startsWith('write:')));
+    assert.equal(events.includes('end'), false);
+  });
+}
 
 test('handleLambdaUrlEvent: serves emitted SSR hydration sidecar URL as raw JSON without rerendering', async () => {
   const htmlStore = new RecordingHtmlStore();

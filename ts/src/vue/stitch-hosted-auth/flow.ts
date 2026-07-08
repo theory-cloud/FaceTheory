@@ -1,17 +1,16 @@
 import { defineComponent, h } from 'vue';
 import type { PropType } from 'vue';
 
+import { resolveAuthFlowStepState } from '../../stitch-hosted-auth/index.js';
+import type { AuthFlowStep } from '../../stitch-hosted-auth/index.js';
+
 import {
   renderDefaultSlot,
   renderPropContent,
   vnodeChildProp,
 } from '../stitch-common.js';
 
-export interface AuthFlowStep {
-  key: string;
-  label: string;
-  description?: unknown;
-}
+export type { AuthFlowStep } from '../../stitch-hosted-auth/index.js';
 
 export const AuthFlowStepper = defineComponent({
   name: 'FaceTheoryVueAuthFlowStepper',
@@ -41,21 +40,16 @@ export const AuthFlowStepper = defineComponent({
           },
         },
         props.steps.map((step, index) => {
-          const isCurrent = index === props.currentIndex;
-          const isCompleted = index < props.currentIndex;
-          const dotColor =
-            isCompleted || isCurrent
-              ? 'var(--stitch-color-primary, #1f108e)'
-              : 'var(--stitch-color-surface-container-high, #e2e7ff)';
-          const labelColor = isCurrent
-            ? 'var(--stitch-color-on-surface, #131b2e)'
-            : 'var(--stitch-color-on-surface-variant, #464553)';
+          const stepState = resolveAuthFlowStepState(
+            index,
+            props.currentIndex,
+          );
 
           return h(
             'li',
             {
               key: step.key,
-              'aria-current': isCurrent ? 'step' : undefined,
+              'aria-current': stepState.ariaCurrent,
               style: { display: 'flex', alignItems: 'center', gap: '8px' },
             },
             [
@@ -65,7 +59,7 @@ export const AuthFlowStepper = defineComponent({
                   width: '10px',
                   height: '10px',
                   borderRadius: '9999px',
-                  background: dotColor,
+                  background: stepState.dotColor,
                   display: 'inline-block',
                 },
               }),
@@ -76,8 +70,8 @@ export const AuthFlowStepper = defineComponent({
                     fontSize: '12px',
                     textTransform: 'uppercase',
                     letterSpacing: '0.08em',
-                    color: labelColor,
-                    fontWeight: isCurrent ? 600 : 400,
+                    color: stepState.labelColor,
+                    fontWeight: stepState.labelFontWeight,
                   },
                 },
                 step.label,

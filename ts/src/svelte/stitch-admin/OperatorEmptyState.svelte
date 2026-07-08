@@ -1,8 +1,14 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { OperatorEmptyStateConfig, OperatorEmptyStateIntent } from './types.js';
 
-  export let config: OperatorEmptyStateConfig;
-  export let action: unknown = undefined;
+  let {
+    config,
+    action = undefined,
+  }: {
+    config: OperatorEmptyStateConfig;
+    action?: unknown;
+  } = $props();
 
   const intentLabels: Record<OperatorEmptyStateIntent, string> = {
     'no-data': 'No data',
@@ -13,7 +19,10 @@
     error: 'Unavailable',
   };
 
-  $: actionContent = action ?? config.actionLabel;
+  const actionContent = $derived(action ?? config.actionLabel);
+  const actionContentNode = $derived(
+    typeof actionContent === 'function' ? (actionContent as Snippet) : undefined,
+  );
 </script>
 
 <section
@@ -37,9 +46,9 @@
       {config.description}
     </p>
   {/if}
-  {#if $$slots.action || actionContent !== undefined}
+  {#if actionContent !== undefined}
     <div class="facetheory-stitch-operator-empty-state-action" style="margin-top:4px;">
-      <slot name="action">{actionContent}</slot>
+      {#if actionContentNode}{@render actionContentNode()}{:else}{actionContent}{/if}
     </div>
   {/if}
 </section>

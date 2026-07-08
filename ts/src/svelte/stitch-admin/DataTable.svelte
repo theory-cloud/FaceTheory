@@ -1,10 +1,26 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { DataTableColumn } from './types.js';
 
-  export let rowKey: string | ((record: Record<string, unknown>) => string);
-  export let dataSource: Array<Record<string, unknown>> = [];
-  export let columns: Array<DataTableColumn<Record<string, unknown>>> = [];
-  export let emptyLabel: unknown = undefined;
+  let {
+    rowKey,
+    dataSource = [],
+    columns = [],
+    emptyLabel = undefined,
+    toolbarLeft,
+    toolbarCenter,
+    toolbarRight,
+    rowActions,
+  }: {
+    rowKey: string | ((record: Record<string, unknown>) => string);
+    dataSource?: Array<Record<string, unknown>>;
+    columns?: Array<DataTableColumn<Record<string, unknown>>>;
+    emptyLabel?: unknown;
+    toolbarLeft?: Snippet;
+    toolbarCenter?: Snippet;
+    toolbarRight?: Snippet;
+    rowActions?: Snippet<[Record<string, unknown>, number]>;
+  } = $props();
 
   function resolveRowKey(record: Record<string, unknown>): string {
     if (typeof rowKey === 'function') return rowKey(record);
@@ -28,11 +44,11 @@
     class="facetheory-stitch-data-table-toolbar"
     style="display:flex;align-items:center;gap:16px;padding:16px 24px;background:var(--stitch-color-surface-container-low, #f2f3ff);border-top-left-radius:var(--stitch-radius-lg, 12px);border-top-right-radius:var(--stitch-radius-lg, 12px);"
   >
-    <div style="flex:1;min-width:0;"><slot name="toolbar-left" /></div>
-    <div style="display:flex;justify-content:center;flex:1;"><slot name="toolbar-center" /></div>
+    <div style="flex:1;min-width:0;">{@render toolbarLeft?.()}</div>
+    <div style="display:flex;justify-content:center;flex:1;">{@render toolbarCenter?.()}</div>
     <div
       style="display:flex;justify-content:flex-end;gap:8px;flex:1;"
-    ><slot name="toolbar-right" /></div>
+    >{@render toolbarRight?.()}</div>
   </div>
 
   {#if dataSource.length === 0}
@@ -74,7 +90,7 @@
               </td>
             {/each}
             <td style="padding:16px;text-align:right;">
-              <slot name="rowActions" {record} {index} />
+              {@render rowActions?.(record, index)}
             </td>
           </tr>
         {/each}

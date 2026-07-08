@@ -1,6 +1,15 @@
 <script lang="ts">
-  export let title: unknown = undefined;
-  export let description: unknown = undefined;
+  import type { Snippet } from 'svelte';
+
+  let {
+    title = undefined,
+    description = undefined,
+    children,
+  }: {
+    title?: unknown;
+    description?: unknown;
+    children?: Snippet;
+  } = $props();
 </script>
 
 <div
@@ -25,6 +34,6 @@
   {/if}
 
   <div style="display:flex;flex-direction:column;gap:24px;">
-    <slot />
+    {@render children?.()}
   </div>
 </div>

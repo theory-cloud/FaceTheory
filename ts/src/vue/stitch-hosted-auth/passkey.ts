@@ -1,6 +1,9 @@
 import { defineComponent, h } from 'vue';
 import type { PropType } from 'vue';
 
+import { AUTH_SIGNATURE_GRADIENT_BACKGROUND } from '../../stitch-hosted-auth/index.js';
+import type { AuthPasskeyButtonType } from '../../stitch-hosted-auth/index.js';
+
 import {
   renderDefaultSlot,
   renderPropContent,
@@ -18,7 +21,7 @@ export const PasskeyCTA = defineComponent({
     },
     icon: vnodeChildProp,
     type: {
-      type: String as () => 'button' | 'submit',
+      type: String as () => AuthPasskeyButtonType,
       default: 'button',
     },
   },
@@ -38,8 +41,7 @@ export const PasskeyCTA = defineComponent({
             alignItems: 'center',
             justifyContent: 'center',
             gap: '10px',
-            background:
-              'linear-gradient(135deg, var(--stitch-color-primary, #1f108e) 0%, var(--stitch-color-primary-container, #3730a3) 100%)',
+            background: AUTH_SIGNATURE_GRADIENT_BACKGROUND,
             border: 'none',
             borderRadius: '9999px',
             height: '48px',

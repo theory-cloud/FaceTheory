@@ -1,19 +1,17 @@
 import * as React from 'react';
 
+import {
+  resolveAuthFlowStepState,
+  type AuthFlowSectionProps as SharedAuthFlowSectionProps,
+  type AuthFlowStep as SharedAuthFlowStep,
+  type AuthFlowStepperProps as SharedAuthFlowStepperProps,
+} from '../../stitch-hosted-auth/index.js';
+
 const h = React.createElement;
 
-export interface AuthFlowStep {
-  key: string;
-  label: string;
-  /** Optional long-form description shown when this step is active. */
-  description?: React.ReactNode;
-}
+export type AuthFlowStep = SharedAuthFlowStep<React.ReactNode>;
 
-export interface AuthFlowStepperProps {
-  steps: AuthFlowStep[];
-  /** Zero-based index of the currently active step. */
-  currentIndex: number;
-}
+export type AuthFlowStepperProps = SharedAuthFlowStepperProps<AuthFlowStep>;
 
 /**
  * Compact stepper for multi-step hosted-auth flows (MFA setup, passkey
@@ -40,20 +38,12 @@ export function AuthFlowStepper(
       },
     },
     steps.map((step, index) => {
-      const isCurrent = index === currentIndex;
-      const isCompleted = index < currentIndex;
-      const dotColor =
-        isCompleted || isCurrent
-          ? 'var(--stitch-color-primary, #1f108e)'
-          : 'var(--stitch-color-surface-container-high, #e2e7ff)';
-      const labelColor = isCurrent
-        ? 'var(--stitch-color-on-surface, #131b2e)'
-        : 'var(--stitch-color-on-surface-variant, #464553)';
+      const stepState = resolveAuthFlowStepState(index, currentIndex);
       return h(
         'li',
         {
           key: step.key,
-          'aria-current': isCurrent ? 'step' : undefined,
+          'aria-current': stepState.ariaCurrent,
           style: { display: 'flex', alignItems: 'center', gap: '8px' },
         },
         h('span', {
@@ -62,7 +52,7 @@ export function AuthFlowStepper(
             width: 10,
             height: 10,
             borderRadius: '9999px',
-            background: dotColor,
+            background: stepState.dotColor,
             display: 'inline-block',
           },
         }),
@@ -73,8 +63,8 @@ export function AuthFlowStepper(
               fontSize: '12px',
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
-              color: labelColor,
-              fontWeight: isCurrent ? 600 : 400,
+              color: stepState.labelColor,
+              fontWeight: stepState.labelFontWeight,
             },
           },
           step.label,
@@ -84,11 +74,8 @@ export function AuthFlowStepper(
   );
 }
 
-export interface AuthFlowSectionProps {
-  /** Optional step heading (e.g. "Step 2 of 3"). */
-  eyebrow?: React.ReactNode;
-  title?: React.ReactNode;
-  description?: React.ReactNode;
+export interface AuthFlowSectionProps
+  extends Omit<SharedAuthFlowSectionProps<React.ReactNode>, 'children'> {
   children: React.ReactNode;
 }
 
@@ -148,6 +135,10 @@ export function AuthFlowSection(
           description,
         )
       : null,
-    h('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } }, children),
+    h(
+      'div',
+      { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+      children,
+    ),
   );
 }

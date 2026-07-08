@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { renderFaceHead } from '../../src/head.js';
+import {
+  canonical,
+  jsonLd,
+  metaTag,
+  openGraph,
+  renderFaceHead,
+  titleTag,
+  twitterCard,
+} from '../../src/head.js';
+import { renderHTMLDocument } from '../../src/html.js';
+import { validateStrictCspDocument } from '../../src/security.js';
 import type { FaceCspPolicy, FaceHydration, FaceRenderResult } from '../../src/types.js';
 
 test('head contracts: strict CSP policy and hydration shapes are additive', () => {
@@ -58,6 +68,186 @@ test('head: charset meta then title, with dedupe (last wins)', () => {
       '<meta charset="utf-8"><title>Second</title><meta content="b" name="description">',
     ),
   );
+});
+
+test('head helpers: emit typed tags through deterministic primitive ordering', () => {
+  const head = renderFaceHead({
+    html: '<main>ok</main>',
+    headTags: [
+      metaTag('description', 'Helper-first page'),
+      ...openGraph({
+        title: 'Open Graph title',
+        type: 'article',
+        url: 'https://app.example/articles/1',
+        image: '/assets/card.png',
+        additional: { 'image:alt': 'Alt text' },
+      }),
+      ...twitterCard({
+        card: 'summary_large_image',
+        title: 'Twitter title',
+        description: 'Twitter description',
+        image: '/assets/twitter.png',
+      }),
+      canonical('/articles/1'),
+      titleTag('Article', { template: '%s · FaceTheory' }),
+    ],
+  });
+
+  assert.ok(head.startsWith('<title>Article · FaceTheory</title>'));
+  assert.match(head, /<meta content="Helper-first page" name="description">/);
+  assert.match(head, /<meta content="Open Graph title" property="og:title">/);
+  assert.match(head, /<meta content="article" property="og:type">/);
+  assert.match(head, /<meta content="\/assets\/card.png" property="og:image">/);
+  assert.match(head, /<meta content="Alt text" property="og:image:alt">/);
+  assert.match(head, /<meta content="summary_large_image" name="twitter:card">/);
+  assert.match(head, /<meta content="Twitter title" name="twitter:title">/);
+  assert.match(head, /<link href="\/articles\/1" rel="canonical">/);
+});
+
+test('head helpers: title template requires an explicit placeholder', () => {
+  assert.throws(
+    () => titleTag('Article', { template: 'FaceTheory' }),
+    /title template must include a %s placeholder/,
+  );
+});
+
+test('head helpers: title template treats dollar sequences as literal title text', () => {
+  const dollarMatchTitle = titleTag('Rock $& Roll', {
+    template: '%s · FaceTheory',
+  });
+  const dollarEscapeTitle = titleTag('Save $$ now', {
+    template: '%s · FaceTheory',
+  });
+
+  assert.deepEqual(dollarMatchTitle, {
+    type: 'title',
+    text: 'Rock $& Roll · FaceTheory',
+  });
+  assert.deepEqual(dollarEscapeTitle, {
+    type: 'title',
+    text: 'Save $$ now · FaceTheory',
+  });
+  assert.equal(
+    renderFaceHead({
+      html: '<main>ok</main>',
+      headTags: [dollarMatchTitle],
+    }),
+    '<title>Rock $&amp; Roll · FaceTheory</title>',
+  );
+  assert.equal(
+    renderFaceHead({
+      html: '<main>ok</main>',
+      headTags: [dollarEscapeTitle],
+    }),
+    '<title>Save $$ now · FaceTheory</title>',
+  );
+});
+
+test('head helpers: JSON-LD carries request nonce through strict CSP', () => {
+  const strictCsp = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+  const head = renderFaceHead(
+    {
+      html: '<main>jsonld</main>',
+      csp: strictCsp,
+      headTags: [
+        jsonLd({ '@context': 'https://schema.org', name: '</script><b>safe</b>' }),
+      ],
+    },
+    { cspNonce: 'nonce-jsonld' },
+  );
+
+  assert.ok(
+    head.includes(
+      '<script nonce="nonce-jsonld" type="application/ld+json">',
+    ),
+  );
+  assert.ok(head.includes('\\u003c/script\\u003e'));
+  assert.equal(head.includes('</script><b>safe</b>'), false);
+
+  const documentHtml = renderHTMLDocument({
+    head,
+    body: '<main>jsonld</main>',
+  });
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(documentHtml, {
+      policy: strictCsp,
+      cspNonce: 'nonce-jsonld',
+    }),
+  );
+});
+
+test('head helpers: strict JSON-LD fails closed without matching request nonce', () => {
+  const strictCsp = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+
+  assert.throws(
+    () =>
+      renderFaceHead({
+        html: '<main>jsonld</main>',
+        csp: strictCsp,
+        headTags: [jsonLd({ name: 'missing nonce' })],
+      }),
+    /strict CSP rejects inline script tags/,
+  );
+
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<main>jsonld</main>',
+          csp: strictCsp,
+          headTags: [jsonLd({ name: 'wrong nonce' }, { nonce: 'nonce-a' })],
+        },
+        { cspNonce: 'nonce-b' },
+      ),
+    /strict CSP rejects inline script tags/,
+  );
+});
+
+test('head helpers: structurally dedupe identical keyless JSON-LD tags', () => {
+  const firstJsonLd = jsonLd({ '@type': 'BreadcrumbList', position: 1 });
+  const head = renderFaceHead({
+    html: '<main>jsonld</main>',
+    headTags: [
+      firstJsonLd,
+      jsonLd({ '@type': 'BreadcrumbList', position: 1 }),
+      jsonLd({ '@type': 'NewsArticle', headline: 'Two' }),
+    ],
+  });
+
+  assert.equal((firstJsonLd as { body?: string }).body, undefined);
+  assert.equal(
+    (head.match(/type="application\/ld\+json"/g) ?? []).length,
+    2,
+  );
+});
+
+test('head: structurally dedupes keyless meta link script and style tags', () => {
+  const head = renderFaceHead({
+    html: '<main>keyless</main>',
+    headTags: [
+      { type: 'meta', attrs: { content: 'one' } },
+      { type: 'meta', attrs: { content: 'one' } },
+      { type: 'link', attrs: { title: 'preconnect' } },
+      { type: 'link', attrs: { title: 'preconnect' } },
+      { type: 'script', attrs: { type: 'application/json' }, body: '{"a":1}' },
+      { type: 'script', attrs: { type: 'application/json' }, body: '{"a":1}' },
+      { type: 'style', cssText: '.a{color:red}' },
+      { type: 'style', cssText: '.a{color:red}' },
+    ],
+  });
+
+  assert.equal((head.match(/<meta content="one">/g) ?? []).length, 1);
+  assert.equal((head.match(/<link title="preconnect">/g) ?? []).length, 1);
+  assert.equal((head.match(/<script type="application\/json">/g) ?? []).length, 1);
+  assert.equal((head.match(/<style>/g) ?? []).length, 1);
 });
 
 test('head: applies CSP nonce to inline styles and hydration scripts', () => {
@@ -179,7 +369,6 @@ test('head: strict CSP allows external hydration with same-origin URLs', () => {
       },
       head: {
         title: 'Strict',
-        html: '<meta name="escaped">',
       },
       headTags: [{ type: 'link', attrs: { rel: 'stylesheet', href: '/assets/app.css' } }],
       hydration: {
@@ -193,7 +382,6 @@ test('head: strict CSP allows external hydration with same-origin URLs', () => {
   );
 
   assert.ok(head.includes('<title>Strict</title>'));
-  assert.ok(head.includes('&lt;meta name=&quot;escaped&quot;&gt;'));
   assert.ok(head.includes('href="/_facetheory/hydration/strict.json"'));
   assert.equal(head.includes('__FACETHEORY_DATA__'), false);
 });
@@ -458,13 +646,13 @@ test('head: strict CSP rejects backslash-normalized external hydration URLs', ()
   );
 });
 
-test('head: escapes legacy head fields and blocks unsafe hydration module URLs', () => {
+test('head: escapes title and blocks unsafe hydration module URLs', () => {
   const head = renderFaceHead({
     html: '<div>ok</div>',
     head: {
       title: '</title><script>alert("title")</script>',
-      html: '<meta name="unsafe" content="</head><script>alert(1)</script>">',
-    },
+      html: '<meta name="legacy" content="ignored">',
+    } as unknown as { title?: string },
     hydration: {
       data: { safe: true },
       bootstrapModule: 'javascript:alert(1)',
@@ -476,12 +664,7 @@ test('head: escapes legacy head fields and blocks unsafe hydration module URLs',
       '<title>&lt;/title&gt;&lt;script&gt;alert(&quot;title&quot;)&lt;/script&gt;</title>',
     ),
   );
-  assert.ok(
-    head.includes(
-      '&lt;meta name=&quot;unsafe&quot; content=&quot;&lt;/head&gt;&lt;script&gt;alert(1)&lt;/script&gt;&quot;&gt;',
-    ),
-  );
+  assert.equal(head.includes('legacy'), false);
   assert.equal(head.includes('<script>alert("title")</script>'), false);
-  assert.equal(head.includes('<script>alert(1)</script>'), false);
   assert.equal(head.includes('javascript:alert(1)'), false);
 });

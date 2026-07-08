@@ -6,7 +6,9 @@ export interface ReadFaceHydrationDataOptions {
   document?: Document;
 }
 
-export type ReadFaceHydrationDataInput = Document | ReadFaceHydrationDataOptions;
+export type ReadFaceHydrationDataInput =
+  | Document
+  | ReadFaceHydrationDataOptions;
 
 export interface ResolveFaceHydrationUrlOptions {
   allowedOrigin?: string | URL;
@@ -14,13 +16,39 @@ export interface ResolveFaceHydrationUrlOptions {
   document?: Document;
 }
 
-export interface FetchExternalFaceHydrationDataOptions
-  extends ResolveFaceHydrationUrlOptions {
+export interface FetchExternalFaceHydrationDataOptions extends ResolveFaceHydrationUrlOptions {
   fetcher?: typeof fetch;
   requestInit?: RequestInit;
 }
 
-export type LoadFaceHydrationDataOptions = FetchExternalFaceHydrationDataOptions;
+export type LoadFaceHydrationDataOptions =
+  FetchExternalFaceHydrationDataOptions;
+
+export interface ReportHydrationFailureOptions extends ResolveFaceHydrationUrlOptions {
+  endpoint: string | URL;
+  framework?: string;
+  route?: string;
+  tags?: Record<string, string | number | boolean | null | undefined>;
+  navigator?: Pick<Navigator, 'sendBeacon'>;
+  window?: Pick<Window, 'location'>;
+  fetcher?: typeof fetch;
+}
+
+export interface HydrationFailurePayload {
+  event: 'facetheory.hydration_failure';
+  framework: string;
+  message: string;
+  errorClass: string;
+  path: string;
+  componentStack?: string;
+  digest?: string;
+  tags?: Record<string, string>;
+}
+
+export type HydrationFailureReporter = (
+  error: unknown,
+  errorInfo?: unknown,
+) => void;
 
 interface FaceHydrationFetchResponse {
   headers: Pick<Headers, 'get'>;
@@ -30,7 +58,9 @@ interface FaceHydrationFetchResponse {
   url: string;
 }
 
-export function readFaceInlineHydrationData<T = unknown>(doc?: Document): T | null;
+export function readFaceInlineHydrationData<T = unknown>(
+  doc?: Document,
+): T | null;
 export function readFaceInlineHydrationData<T = unknown>(
   options?: ReadFaceHydrationDataOptions,
 ): T | null;
@@ -66,10 +96,12 @@ export async function loadFaceHydrationData<T = unknown>(
   if (dataUrl === null) return null;
 
   const fetchOptions: FetchExternalFaceHydrationDataOptions = { document: doc };
-  if (options.allowedOrigin !== undefined) fetchOptions.allowedOrigin = options.allowedOrigin;
+  if (options.allowedOrigin !== undefined)
+    fetchOptions.allowedOrigin = options.allowedOrigin;
   if (options.baseUrl !== undefined) fetchOptions.baseUrl = options.baseUrl;
   if (options.fetcher !== undefined) fetchOptions.fetcher = options.fetcher;
-  if (options.requestInit !== undefined) fetchOptions.requestInit = options.requestInit;
+  if (options.requestInit !== undefined)
+    fetchOptions.requestInit = options.requestInit;
   return fetchExternalFaceHydrationData<T>(dataUrl, fetchOptions);
 }
 
@@ -80,7 +112,9 @@ export async function fetchExternalFaceHydrationData<T = unknown>(
   const requestUrl = resolveSameOriginFaceHydrationUrl(dataUrl, options);
   const fetcher = options.fetcher ?? globalThis.fetch;
   if (typeof fetcher !== 'function') {
-    throw new Error('FaceTheory hydration loader requires fetch in the current environment');
+    throw new Error(
+      'FaceTheory hydration loader requires fetch in the current environment',
+    );
   }
 
   const response = await fetcher(
@@ -115,7 +149,11 @@ export async function fetchExternalFaceHydrationData<T = unknown>(
   }
 
   const contentType = response.headers.get('content-type');
-  if (contentType !== null && contentType.trim() !== '' && !isJsonContentType(contentType)) {
+  if (
+    contentType !== null &&
+    contentType.trim() !== '' &&
+    !isJsonContentType(contentType)
+  ) {
     throw new Error('FaceTheory hydration data response was not JSON');
   }
 
@@ -135,6 +173,37 @@ export async function fetchExternalFaceHydrationData<T = unknown>(
   return data as T;
 }
 
+export function reportHydrationFailure(
+  options: ReportHydrationFailureOptions,
+): HydrationFailureReporter {
+  const endpoint = resolveSameOriginHydrationFailureEndpoint(options);
+
+  return (error: unknown, errorInfo?: unknown): void => {
+    const payload = JSON.stringify(
+      buildHydrationFailurePayload(options, error, errorInfo),
+    );
+
+    const beaconNavigator = options.navigator ?? resolveGlobalNavigator();
+    if (beaconNavigator?.sendBeacon?.(endpoint.toString(), payload)) {
+      return;
+    }
+
+    const fetcher = options.fetcher ?? globalThis.fetch;
+    if (typeof fetcher !== 'function') return;
+
+    void Promise.resolve(
+      fetcher(endpoint.toString(), {
+        body: payload,
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        keepalive: true,
+        method: 'POST',
+        redirect: 'error',
+      }),
+    ).catch(() => undefined);
+  };
+}
+
 export function resolveSameOriginFaceHydrationUrl(
   dataUrl: string | URL,
   options: ResolveFaceHydrationUrlOptions = {},
@@ -151,7 +220,9 @@ export function resolveSameOriginFaceHydrationUrl(
   try {
     resolved = new URL(raw, baseHref);
   } catch (error) {
-    throw new Error('FaceTheory hydration data URL is invalid', { cause: error });
+    throw new Error('FaceTheory hydration data URL is invalid', {
+      cause: error,
+    });
   }
 
   if (!isHttpUrl(resolved)) {
@@ -165,6 +236,161 @@ export function resolveSameOriginFaceHydrationUrl(
   return resolved;
 }
 
+function resolveSameOriginHydrationFailureEndpoint(
+  options: ReportHydrationFailureOptions,
+): URL {
+  try {
+    return resolveSameOriginFaceHydrationUrl(options.endpoint, options);
+  } catch (error) {
+    throw new Error(
+      'FaceTheory hydration failure endpoint must be a same-origin http(s) URL',
+      { cause: error },
+    );
+  }
+}
+
+function buildHydrationFailurePayload(
+  options: ReportHydrationFailureOptions,
+  error: unknown,
+  errorInfo: unknown,
+): HydrationFailurePayload {
+  const payload: HydrationFailurePayload = {
+    event: 'facetheory.hydration_failure',
+    framework: normalizeHydrationFailureLabel(options.framework, 'unknown'),
+    message: hydrationFailureMessage(error),
+    errorClass: hydrationFailureErrorClass(error),
+    path: options.route ?? resolveHydrationFailurePath(options),
+  };
+
+  const componentStack = readHydrationFailureString(
+    errorInfo,
+    'componentStack',
+  );
+  if (componentStack) payload.componentStack = componentStack;
+  const digest = readHydrationFailureString(errorInfo, 'digest');
+  if (digest) payload.digest = digest;
+
+  const tags = normalizeHydrationFailureTags(options.tags);
+  if (Object.keys(tags).length > 0) payload.tags = tags;
+
+  return payload;
+}
+
+function resolveHydrationFailurePath(
+  options: ReportHydrationFailureOptions,
+): string {
+  const location =
+    options.window?.location ??
+    options.document?.defaultView?.location ??
+    (typeof window !== 'undefined' ? window.location : null);
+  if (!location) return '';
+  return `${location.pathname}${location.search}`;
+}
+
+function hydrationFailureMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return String(error ?? 'Unknown hydration failure');
+}
+
+function hydrationFailureErrorClass(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const name = normalizeHydrationFailureLabel(
+      (error as { name?: unknown }).name,
+      '',
+    );
+    if (name) return name;
+    const ctorName = normalizeHydrationFailureLabel(
+      (error as { constructor?: { name?: unknown } }).constructor?.name,
+      '',
+    );
+    if (ctorName) return ctorName;
+    return 'Object';
+  }
+
+  const typeName = normalizeHydrationFailureLabel(typeof error, 'Unknown');
+  return typeName === 'Unknown' ? typeName : `NonError_${typeName}`;
+}
+
+function readHydrationFailureString(
+  value: unknown,
+  key: string,
+): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = (value as Record<string, unknown>)[key];
+  const normalized = String(raw ?? '').trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeHydrationFailureTags(
+  tags:
+    | Record<string, string | number | boolean | null | undefined>
+    | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(tags ?? {})) {
+    const normalizedKey = normalizeHydrationFailureLabel(key, '');
+    if (!normalizedKey || value === null || value === undefined) continue;
+    out[normalizedKey] = String(value);
+  }
+  return out;
+}
+
+function normalizeHydrationFailureLabel(
+  value: unknown,
+  fallback: string,
+): string {
+  const normalized = normalizeAsciiLabel(value);
+  return normalized || fallback;
+}
+
+function normalizeAsciiLabel(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  const normalized: string[] = [];
+  let pendingSeparator = false;
+
+  for (const char of raw) {
+    if (isAsciiLabelChar(char)) {
+      if (pendingSeparator && normalized.length > 0) {
+        normalized.push('_');
+      }
+      pendingSeparator = false;
+
+      if (char === '_' && normalized.length === 0) {
+        continue;
+      }
+      normalized.push(char);
+      continue;
+    }
+
+    pendingSeparator = normalized.length > 0;
+  }
+
+  while (normalized[normalized.length - 1] === '_') {
+    normalized.pop();
+  }
+
+  return normalized.join('');
+}
+
+function isAsciiLabelChar(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    (code >= 48 && code <= 57) ||
+    char === '_' ||
+    char === '.' ||
+    char === ':' ||
+    char === '-'
+  );
+}
+
+function resolveGlobalNavigator(): Pick<Navigator, 'sendBeacon'> | null {
+  if (typeof navigator === 'undefined') return null;
+  return navigator;
+}
+
 function resolveReadHydrationDocument(
   input: ReadFaceHydrationDataInput | undefined,
 ): Document {
@@ -175,34 +401,44 @@ function resolveReadHydrationDocument(
 function resolveHydrationDocument(doc: Document | undefined): Document {
   if (doc !== undefined) return doc;
   if (typeof document !== 'undefined') return document;
-  throw new Error('FaceTheory hydration loader requires document in the current environment');
+  throw new Error(
+    'FaceTheory hydration loader requires document in the current environment',
+  );
 }
 
 function isDocumentLike(value: unknown): value is Document {
   return (
     typeof value === 'object' &&
     value !== null &&
-    typeof (value as { getElementById?: unknown }).getElementById === 'function' &&
+    typeof (value as { getElementById?: unknown }).getElementById ===
+      'function' &&
     typeof (value as { querySelector?: unknown }).querySelector === 'function'
   );
 }
 
-function readInlineHydrationScript(doc: Document):
-  | { present: false }
-  | { present: true; text: string } {
+function readInlineHydrationScript(
+  doc: Document,
+): { present: false } | { present: true; text: string } {
   const el = doc.getElementById(FACE_HYDRATION_DATA_SCRIPT_ID);
   if (!isJsonHydrationScriptElement(el)) return { present: false };
   return { present: true, text: el.textContent ?? '' };
 }
 
-function isJsonHydrationScriptElement(el: Element | null): el is HTMLScriptElement {
+function isJsonHydrationScriptElement(
+  el: Element | null,
+): el is HTMLScriptElement {
   if (el?.tagName.toLowerCase() !== 'script') return false;
   return isJsonScriptType(el.getAttribute('type'));
 }
 
 function isJsonScriptType(type: string | null): boolean {
-  const mediaType = String(type ?? '').split(';', 1)[0]?.trim().toLowerCase();
-  return mediaType === 'application/json' || Boolean(mediaType?.endsWith('+json'));
+  const mediaType = String(type ?? '')
+    .split(';', 1)[0]
+    ?.trim()
+    .toLowerCase();
+  return (
+    mediaType === 'application/json' || Boolean(mediaType?.endsWith('+json'))
+  );
 }
 
 function readExternalHydrationUrl(doc: Document): string | null {
@@ -212,7 +448,9 @@ function readExternalHydrationUrl(doc: Document): string | null {
     if (href) return href;
   }
 
-  const byRel = doc.querySelector(`link[rel="${FACE_HYDRATION_DATA_LINK_REL}"]`);
+  const byRel = doc.querySelector(
+    `link[rel="${FACE_HYDRATION_DATA_LINK_REL}"]`,
+  );
   if (!byRel) return null;
   const href = byRel.getAttribute('href');
   return href || null;
@@ -228,15 +466,20 @@ function parseHydrationJson<T>(text: string): T {
   }
 }
 
-function resolveHydrationBaseHref(options: ResolveFaceHydrationUrlOptions): string {
-  const fallback = resolveDocumentBaseHref(options.document) ?? resolveGlobalBaseHref();
+function resolveHydrationBaseHref(
+  options: ResolveFaceHydrationUrlOptions,
+): string {
+  const fallback =
+    resolveDocumentBaseHref(options.document) ?? resolveGlobalBaseHref();
   if (options.baseUrl !== undefined) {
     try {
       return fallback === null
         ? new URL(String(options.baseUrl)).toString()
         : new URL(String(options.baseUrl), fallback).toString();
     } catch (error) {
-      throw new Error('FaceTheory hydration baseUrl is invalid', { cause: error });
+      throw new Error('FaceTheory hydration baseUrl is invalid', {
+        cause: error,
+      });
     }
   }
 
@@ -270,7 +513,9 @@ function resolveHydrationAllowedOrigin(
   try {
     base = new URL(baseHref);
   } catch (error) {
-    throw new Error('FaceTheory hydration baseUrl is invalid', { cause: error });
+    throw new Error('FaceTheory hydration baseUrl is invalid', {
+      cause: error,
+    });
   }
 
   if (!isHttpUrl(base)) {
@@ -284,7 +529,9 @@ function normalizeAllowedOrigin(origin: string | URL): string {
   try {
     parsed = new URL(String(origin));
   } catch (error) {
-    throw new Error('FaceTheory hydration allowedOrigin is invalid', { cause: error });
+    throw new Error('FaceTheory hydration allowedOrigin is invalid', {
+      cause: error,
+    });
   }
 
   if (!isHttpUrl(parsed)) {
@@ -314,7 +561,9 @@ function isHttpUrl(url: URL): boolean {
   return url.protocol === 'http:' || url.protocol === 'https:';
 }
 
-function createHydrationRequestInit(requestInit: RequestInit | undefined): RequestInit {
+function createHydrationRequestInit(
+  requestInit: RequestInit | undefined,
+): RequestInit {
   return {
     credentials: 'same-origin',
     redirect: 'follow',
@@ -323,7 +572,9 @@ function createHydrationRequestInit(requestInit: RequestInit | undefined): Reque
   };
 }
 
-function withHydrationAcceptHeader(headers: HeadersInit | undefined): HeadersInit {
+function withHydrationAcceptHeader(
+  headers: HeadersInit | undefined,
+): HeadersInit {
   if (headers === undefined || isHeaderRecord(headers)) {
     return { accept: 'application/json', ...(headers ?? {}) };
   }
@@ -333,7 +584,9 @@ function withHydrationAcceptHeader(headers: HeadersInit | undefined): HeadersIni
   return merged;
 }
 
-function isHeaderRecord(headers: HeadersInit): headers is Record<string, string> {
+function isHeaderRecord(
+  headers: HeadersInit,
+): headers is Record<string, string> {
   return !Array.isArray(headers) && !isHeadersLike(headers);
 }
 
@@ -350,7 +603,9 @@ function assertHydrationFetchResponse(
   response: unknown,
 ): asserts response is FaceHydrationFetchResponse {
   if (typeof response !== 'object' || response === null) {
-    throw new Error('FaceTheory hydration data fetch returned an invalid response');
+    throw new Error(
+      'FaceTheory hydration data fetch returned an invalid response',
+    );
   }
 
   const candidate = response as Partial<FaceHydrationFetchResponse>;
@@ -362,11 +617,15 @@ function assertHydrationFetchResponse(
     !candidate.headers ||
     typeof candidate.headers.get !== 'function'
   ) {
-    throw new Error('FaceTheory hydration data fetch returned an invalid response');
+    throw new Error(
+      'FaceTheory hydration data fetch returned an invalid response',
+    );
   }
 }
 
 function isJsonContentType(contentType: string): boolean {
   const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase();
-  return mediaType === 'application/json' || Boolean(mediaType?.endsWith('+json'));
+  return (
+    mediaType === 'application/json' || Boolean(mediaType?.endsWith('+json'))
+  );
 }

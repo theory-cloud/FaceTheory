@@ -7,7 +7,7 @@
     Shell,
     StatCard,
     SummaryStrip,
-  } from '../../../src/svelte/stitch-shell/index.js';
+  } from '@theory-cloud/facetheory/svelte/stitch-shell';
   import {
     AuthCard,
     AuthFlowSection,
@@ -17,7 +17,7 @@
     ConsentList,
     OTPInput,
     PasskeyCTA,
-  } from '../../../src/svelte/stitch-hosted-auth/index.js';
+  } from '@theory-cloud/facetheory/svelte/stitch-hosted-auth';
   import {
     CopyableCode,
     DataTable,
@@ -31,9 +31,9 @@
     SplitForm,
     StatusTag,
     Tabs,
-  } from '../../../src/svelte/stitch-admin/index.js';
+  } from '@theory-cloud/facetheory/svelte/stitch-admin';
 
-  export let message: string;
+  let { message }: { message: string } = $props();
 
   const nav = [
     { key: '/dashboard', label: 'Dashboard', path: '/dashboard' },
@@ -59,8 +59,8 @@
 </script>
 
 <Shell {nav} activeKey="/dashboard">
-  <span slot="brand">Autheory</span>
-  <span slot="topbarRight">Jane Doe</span>
+  {#snippet brand()}<span>Autheory</span>{/snippet}
+  {#snippet topbarRight()}<span>Jane Doe</span>{/snippet}
 
   <PageFrame
     breadcrumbs={[
@@ -70,7 +70,7 @@
     title="Svelte SSR Example"
     description={`Hello ${message}`}
   >
-    <button slot="actions" type="button">Edit</button>
+    {#snippet actions()}<button type="button">Edit</button>{/snippet}
 
     <SummaryStrip>
       <StatCard label="Active users" value="1,204" delta={{ value: '+8%', trend: 'up' }} />
@@ -78,14 +78,14 @@
     </SummaryStrip>
 
     <Callout variant="warning" title="Stale manifest">
+      {#snippet actions()}<button type="button">Refresh</button>{/snippet}
       Incoming policy changes have not been redeployed to the regional edge fleet yet.
-      <button slot="actions" type="button">Refresh</button>
     </Callout>
 
     <Section title="Hosted auth" description="Passkey-first primitives">
       <AuthCard title="Sign in to Autheory" description="Use your passkey or password">
-        <a slot="headerAction" href="/signup">Sign up</a>
-        <a slot="footer" href="/reset">Trouble signing in?</a>
+        {#snippet headerAction()}<a href="/signup">Sign up</a>{/snippet}
+        {#snippet footer()}<a href="/reset">Trouble signing in?</a>{/snippet}
 
         <AuthFlowStepper
           steps={[
@@ -110,7 +110,7 @@
             label="Read your profile"
             description="Name, email, and tenant memberships"
           >
-            <span slot="icon">◈</span>
+            {#snippet icon()}<span>◈</span>{/snippet}
           </ConsentItem>
           <ConsentItem label="Manage API clients" granted={true} />
         </ConsentList>
@@ -120,8 +120,8 @@
           title="Account locked"
           description="Too many failed attempts"
         >
-          <span slot="icon">!</span>
-          <button slot="actions" type="button">Contact support</button>
+          {#snippet icon()}<span>!</span>{/snippet}
+          {#snippet actions()}<button type="button">Contact support</button>{/snippet}
         </AuthStateCard>
       </AuthCard>
     </Section>
@@ -143,7 +143,7 @@
           { key: 'manifest', label: 'manifest: stale', count: 2 },
         ]}
       >
-        <a slot="trailing" href="#clear">Clear all</a>
+        {#snippet trailing()}<a href="#clear">Clear all</a>{/snippet}
       </FilterChipGroup>
 
       <DetailPanel
@@ -154,14 +154,14 @@
           { key: 'plan', label: 'Plan', value: 'Enterprise' },
         ]}
       >
-        <button slot="actions" type="button">Edit</button>
+        {#snippet actions()}<button type="button">Edit</button>{/snippet}
       </DetailPanel>
 
       <DataTable rowKey="key" dataSource={partnerRows} columns={partnerColumns}>
-        <span slot="toolbar-left">2 partners</span>
-        <input slot="toolbar-center" placeholder="Search" />
-        <button slot="toolbar-right" type="button">New partner</button>
-        <button slot="rowActions" let:record data-key={record.key} type="button">Edit</button>
+        {#snippet toolbarLeft()}<span>2 partners</span>{/snippet}
+        {#snippet toolbarCenter()}<input placeholder="Search" />{/snippet}
+        {#snippet toolbarRight()}<button type="button">New partner</button>{/snippet}
+        {#snippet rowActions(record)}<button data-key={record.key} type="button">Edit</button>{/snippet}
       </DataTable>
 
       <InlineKeyValueList

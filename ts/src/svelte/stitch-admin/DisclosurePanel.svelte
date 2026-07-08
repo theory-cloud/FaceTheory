@@ -1,18 +1,25 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type {
     AuditTrailEventStatus,
     AuditTrailEventTone,
     DisclosurePanelProps,
   } from '../../stitch-admin/audit-trail-types.js';
 
-  export let panel: DisclosurePanelProps;
-  export let onToggle: ((nextExpanded: boolean) => void) | undefined =
-    undefined;
+  let {
+    panel,
+    onToggle = undefined,
+    children,
+  }: {
+    panel: DisclosurePanelProps;
+    onToggle?: ((nextExpanded: boolean) => void) | undefined;
+    children?: Snippet;
+  } = $props();
 
-  $: tone = (panel.tone ?? 'neutral') as AuditTrailEventTone;
-  $: status = panel.status as AuditTrailEventStatus | undefined;
-  $: stateRole = status === 'error' ? 'alert' : undefined;
-  $: panelContentId = `${panel.panelId}-region`;
+  const tone = $derived((panel.tone ?? 'neutral') as AuditTrailEventTone);
+  const status = $derived(panel.status as AuditTrailEventStatus | undefined);
+  const stateRole = $derived(status === 'error' ? 'alert' : undefined);
+  const panelContentId = $derived(`${panel.panelId}-region`);
 
   function handleToggle(): void {
     if (onToggle === undefined) return;
@@ -40,7 +47,7 @@
     aria-expanded={panel.expanded ? 'true' : 'false'}
     aria-controls={panelContentId}
     data-disclosure-toggle={panel.panelId}
-    on:click={handleToggle}
+    onclick={handleToggle}
   >
     <span class="facetheory-stitch-disclosure-panel-label">{panel.label}</span>
     <span
@@ -62,7 +69,7 @@
     hidden={!panel.expanded}
   >
     {#if panel.expanded}
-      <slot />
+      {@render children?.()}
     {/if}
   </div>
 

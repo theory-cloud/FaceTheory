@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "facetheory-dev --entry src/entry-server.tsx --factory createViteSSRExampleDevApp --port 5174"
+  }
+}

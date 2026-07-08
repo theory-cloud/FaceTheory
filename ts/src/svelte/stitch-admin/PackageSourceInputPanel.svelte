@@ -8,12 +8,21 @@
     PackageSourceInputState,
   } from './types.js';
 
-  export let input: PackageSourceInput;
-  export let onValueChange: ((next: string) => void) | undefined = undefined;
-  export let onFiles: ((files: PackageSourceInputFileMeta[]) => void) | undefined = undefined;
-  export let onClear: (() => void) | undefined = undefined;
-  export let onReplace: (() => void) | undefined = undefined;
-  export let onCopy: ((copyValue: string) => void) | undefined = undefined;
+  let {
+    input,
+    onValueChange = undefined,
+    onFiles = undefined,
+    onClear = undefined,
+    onReplace = undefined,
+    onCopy = undefined,
+  }: {
+    input: PackageSourceInput;
+    onValueChange?: ((next: string) => void) | undefined;
+    onFiles?: ((files: PackageSourceInputFileMeta[]) => void) | undefined;
+    onClear?: (() => void) | undefined;
+    onReplace?: (() => void) | undefined;
+    onCopy?: ((copyValue: string) => void) | undefined;
+  } = $props();
 
   const STATE_LABEL_DEFAULTS: Record<PackageSourceInputState, string> = {
     idle: 'Awaiting source',
@@ -83,23 +92,23 @@
     if (onCopy !== undefined) onCopy(value);
   }
 
-  $: labelId = input.label !== undefined ? `${input.groupId}-label` : undefined;
-  $: descriptionId = input.description !== undefined ? `${input.groupId}-description` : undefined;
-  $: stateAnnouncementId = `${input.groupId}-state`;
-  $: errorIds = input.errors.map((e) => `${input.groupId}-error-${e.id}`);
-  $: ariaDescribedBy =
+  const labelId = $derived(input.label !== undefined ? `${input.groupId}-label` : undefined);
+  const descriptionId = $derived(input.description !== undefined ? `${input.groupId}-description` : undefined);
+  const stateAnnouncementId = $derived(`${input.groupId}-state`);
+  const errorIds = $derived(input.errors.map((e) => `${input.groupId}-error-${e.id}`));
+  const ariaDescribedBy = $derived(
     [descriptionId, stateAnnouncementId, ...errorIds]
       .filter((id): id is string => typeof id === 'string')
-      .join(' ') || undefined;
-  $: allowPaste = (input.modes as PackageSourceInputMode[]).includes('paste');
-  $: allowUpload = (input.modes as PackageSourceInputMode[]).includes('upload');
-  $: allowDropzone = (input.modes as PackageSourceInputMode[]).includes('dropzone');
-  $: announceLabel = stateLabel(input.state);
-  $: stateRole = isAlertState(input.state)
+      .join(' ') || undefined);
+  const allowPaste = $derived((input.modes as PackageSourceInputMode[]).includes('paste'));
+  const allowUpload = $derived((input.modes as PackageSourceInputMode[]).includes('upload'));
+  const allowDropzone = $derived((input.modes as PackageSourceInputMode[]).includes('dropzone'));
+  const announceLabel = $derived(stateLabel(input.state));
+  const stateRole = $derived(isAlertState(input.state)
     ? 'alert'
     : isStatusState(input.state)
       ? 'status'
-      : undefined;
+      : undefined);
 </script>
 
 <section
@@ -134,7 +143,7 @@
       aria-labelledby={labelId}
       aria-describedby={ariaDescribedBy}
       aria-invalid={isAlertState(input.state) ? 'true' : 'false'}
-      on:input={handlePaste}
+      oninput={handlePaste}
     ></textarea>
   {/if}
 
@@ -148,8 +157,8 @@
       aria-describedby={ariaDescribedBy}
       aria-disabled={input.state === 'loading' ? 'true' : undefined}
       tabindex="0"
-      on:dragover={handleDragOver}
-      on:drop={handleDrop}
+      ondragover={handleDragOver}
+      ondrop={handleDrop}
     >
       <strong>Drop files here or use the picker</strong>
       <span>Files are parsed by TheoryMCP, not by FaceTheory.</span>
@@ -165,7 +174,7 @@
         class="facetheory-stitch-package-source-input-file"
         accept={input.fileAccept}
         aria-describedby={ariaDescribedBy}
-        on:change={handleFileChange}
+        onchange={handleFileChange}
       />
     </div>
   {/if}
@@ -232,7 +241,7 @@
           class="facetheory-stitch-package-source-input-action facetheory-stitch-package-source-input-action-clear"
           data-action="clear"
           aria-label="Clear package source"
-          on:click={() => onClear?.()}
+          onclick={() => onClear?.()}
         >Clear</button>
       {/if}
       {#if input.actions.replace === true}
@@ -241,7 +250,7 @@
           class="facetheory-stitch-package-source-input-action facetheory-stitch-package-source-input-action-replace"
           data-action="replace"
           aria-label="Replace package source"
-          on:click={() => onReplace?.()}
+          onclick={() => onReplace?.()}
         >Replace</button>
       {/if}
       {#if input.actions.copy === true && input.actions.copyValue !== undefined}
@@ -252,7 +261,7 @@
           data-action="copy"
           data-copy-value={copyValue}
           aria-label="Copy package source"
-          on:click={() => handleCopy(copyValue)}
+          onclick={() => handleCopy(copyValue)}
         >Copy</button>
       {/if}
     </div>
