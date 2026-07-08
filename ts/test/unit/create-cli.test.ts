@@ -45,6 +45,15 @@ async function readGeneratedJson<T>(
   ) as T;
 }
 
+async function currentFaceTheoryVersion(): Promise<string> {
+  const packageJson = await readGeneratedJson<{ version: string }>(
+    packageRoot,
+    'package.json',
+  );
+  assert.match(packageJson.version, /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/);
+  return packageJson.version;
+}
+
 async function symlinkPackage(
   appDir: string,
   name: string,
@@ -194,10 +203,12 @@ test('facetheory create emits a React starter that typechecks', async () => {
       devDependencies: Record<string, string>;
       overrides: Record<string, Record<string, string>>;
     }>(appDir, 'package.json');
+    const faceTheoryVersion = await currentFaceTheoryVersion();
+    const expectedFaceTheoryTarball = `https://github.com/theory-cloud/FaceTheory/releases/download/v${faceTheoryVersion}/theory-cloud-facetheory-${faceTheoryVersion}.tgz`;
 
-    assert.match(
+    assert.equal(
       packageJson.dependencies['@theory-cloud/facetheory'] ?? '',
-      /^https:\/\/github\.com\/theory-cloud\/FaceTheory\/releases\/download\/v3\.8\.1\/theory-cloud-facetheory-3\.8\.1\.tgz$/,
+      expectedFaceTheoryTarball,
     );
     assert.equal(packageJson.dependencies.react, '^19.2.6');
     assert.equal(packageJson.dependencies['react-dom'], '^19.2.6');
@@ -223,7 +234,9 @@ test('facetheory create emits a React starter that typechecks', async () => {
 
     const readme = await readFile(path.resolve(appDir, 'README.md'), 'utf8');
     assert.match(readme, /npm install --save-exact/);
-    assert.match(readme, /theory-cloud-facetheory-3\.8\.1\.tgz/);
+    assert.ok(
+      readme.includes(`theory-cloud-facetheory-${faceTheoryVersion}.tgz`),
+    );
 
     await linkTypecheckDependencies(appDir);
     await runGeneratedTypecheck(appDir);
