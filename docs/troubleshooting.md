@@ -8,18 +8,76 @@ Use this guide for recurring setup, build, and runtime failures that already hav
 
 ## Quick Diagnosis
 
-| Symptom                                                               | Likely cause                                                                                  | Where to look                                                       |
-| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `npm ci` or scripts fail early                                        | Node.js is below the required baseline                                                        | `ts/package.json` (`engines.node: >=24`)                            |
-| `npm run ssg` exits with usage errors                                 | Missing or invalid CLI flags                                                                  | `docs/api-reference.md` and `ts/src/ssg-cli.ts`                     |
-| SSG build fails during page generation                                | Network access was attempted without opting in                                                | `buildSsgSite()` and SSG fetch guard behavior                       |
-| SSG build fails with dot-segment output errors                        | `generateStaticParams()` returned `.` / `..` path segments                                    | `ts/src/ssg.ts` path validation and route params                    |
-| ISR route returns a deterministic 500 when tenant headers are present | Known tenant boundary headers reached ISR without an explicit tenant/cache partition          | `docs/migration-guide.md` and `ts/src/isr.ts` tenant guard behavior |
-| ISR object keys look duplicated                                       | `S3HtmlStore.keyPrefix` and `htmlPointerPrefix` repeat the same prefix                        | `docs/core-patterns.md` and `docs/cdk/aws-deployment.md`            |
-| React streaming misses late styles                                    | `styleStrategy: shell` was used where `all-ready` was needed                                  | `docs/core-patterns.md`                                             |
-| Strict-CSP route fails before returning HTML                          | The route emitted inline hydration, inline styles/scripts, raw head, or unsafe body attrs     | `FaceRenderResult.csp` and `docs/core-patterns.md`                  |
-| Browser receives 404 or HTML for an SSR hydration sidecar             | `/_facetheory/ssr-data/...` was not routed to the same FaceApp/Lambda handler as the SSR page | `ssrHydrationSidecars` and Lambda URL routing                       |
-| Form POST behind AppTheorySsrSite OAC returns 403 before Lambda       | Native browser form cannot provide `x-amz-content-sha256` for the Lambda URL OAC signing path | `startAwsOacFormTransport()` and `docs/core-patterns.md`            |
+| Symptom                                                               | Likely cause                                                                                  | Where to look                                                            |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `npm ci` or scripts fail early                                        | Node.js is below the required baseline                                                        | `ts/package.json` (`engines.node: >=20`)                                 |
+| `npm run ssg` exits with usage errors                                 | Missing or invalid CLI flags                                                                  | `docs/api-reference.md` and `ts/src/ssg-cli.ts`                          |
+| SSG build fails during page generation                                | Network access was attempted without opting in                                                | `buildSsgSite()` and SSG fetch guard behavior                            |
+| SSG build fails with dot-segment output errors                        | `generateStaticParams()` returned `.` / `..` path segments                                    | `ts/src/ssg.ts` path validation and route params                         |
+| ISR route returns a deterministic 500 when tenant headers are present | Known tenant boundary headers reached ISR without an explicit tenant/cache partition          | `docs/migration-guide.md` and `ts/src/isr.ts` tenant guard behavior      |
+| ISR object keys look duplicated                                       | `S3HtmlStore.keyPrefix` and `htmlPointerPrefix` repeat the same prefix                        | `docs/core-patterns.md` and `docs/cdk/aws-deployment.md`                 |
+| React streaming misses late styles                                    | `styleStrategy: shell` was used where `all-ready` was needed                                  | `docs/core-patterns.md`                                                  |
+| Strict-CSP route fails before returning HTML                          | The route emitted inline hydration, inline styles/scripts, raw head, or unsafe body attrs     | `FaceRenderResult.csp` and `docs/core-patterns.md`                       |
+| Browser receives 404 or HTML for an SSR hydration sidecar             | `/_facetheory/ssr-data/...` was not routed to the same FaceApp/Lambda handler as the SSR page | `ssrHydrationSidecars` and Lambda URL routing                            |
+| Browser logs hydration mismatch warnings after SSR                    | Client hydrate output differs from server HTML or hydration data was refetched/recomputed     | `@theory-cloud/facetheory/testing` and the affected adapter hydrate path |
+| Form POST behind AppTheorySsrSite OAC returns 403 before Lambda       | Native browser form cannot provide `x-amz-content-sha256` for the Lambda URL OAC signing path | `startAwsOacFormTransport()` and `docs/core-patterns.md`                 |
+| `facetheory doctor` reports install failures                         | Node, peer package, or AppTheory/TableTheory override drift in the local app                  | `facetheory doctor` output and the fixes below                           |
+
+## Issue: `facetheory doctor` Reports Install Failures
+
+Symptoms:
+
+- `facetheory doctor` exits non-zero
+- output includes `[fail]` rows for Node.js, adapter peers, Svelte, or AppTheory/TableTheory overrides
+
+Cause:
+
+- the local app is not on the Node.js floor declared by the installed FaceTheory package `engines.node`
+- or the selected adapter peer set is incomplete / outside the FaceTheory peer ranges
+- or the app declares AppTheory and TableTheory tarballs but the npm `overrides` block does not force AppTheory to the same TableTheory tarball
+
+Solution:
+
+```bash
+npx facetheory doctor
+```
+
+Apply each printed `Fix:` line. Common fixes are:
+
+```bash
+# Node floor: switch to the version range printed from FaceTheory's package engines.
+node --version
+
+# React peer set
+npm install react react-dom
+
+# Vue peer set
+npm install vue @vue/server-renderer
+
+# Svelte peer set; FaceTheory requires Svelte >=5.55.7 (Svelte 4 and 5.46.0-5.55.6 unsupported).
+npm install svelte@^5.55.7
+```
+
+For AppTheory/TableTheory alignment, make the app's `package.json` use the same TableTheory GitHub Release tarball in both places:
+
+```json
+{
+  "dependencies": {
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.16.1/theory-cloud-apptheory-1.16.1.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz"
+  },
+  "overrides": {
+    "@theory-cloud/apptheory": {
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz"
+    }
+  }
+}
+```
+
+Verification:
+
+- `facetheory doctor` exits zero and prints `FaceTheory doctor passed.`
+- `npm run check` still passes in the app
 
 ## Issue: Node.js Version Mismatch
 
@@ -30,7 +88,7 @@ Symptoms:
 
 Cause:
 
-- FaceTheory requires Node.js `>=24`.
+- FaceTheory requires Node.js `>=20`.
 
 Solution:
 
@@ -48,6 +106,49 @@ Verification:
 
 - `npm run typecheck` passes
 - `npm test` passes
+
+## Issue: Browser Logs Hydration Mismatch Warnings
+
+Symptoms:
+
+- React reports hydration failed, Vue remounts over server DOM, or Svelte claim/hydration warnings appear in the browser console
+- server-rendered HTML looks correct before hydration but changes during the first client boot
+- style tags, head tags, IDs, dates, random values, or fetched data differ between server and client
+
+Cause:
+
+- the Face rendered non-deterministic output, or the client bootstrap hydrated with data that was not the exact data used during the server render
+- common sources are `Date.now()`, `new Date()`, `Math.random()`, generated IDs, direct `window`/`document` reads during render, locale/time-zone formatting, direct head-tag emission, missing style extraction, or a client-side refetch during hydration
+
+Solution:
+
+- move head tags through FaceTheory's head primitive and framework style extraction path
+- serialize server-loaded data into FaceTheory hydration data or strict external sidecars and load it before hydrate
+- keep browser-only reads inside client-only effects/hooks rather than render functions
+- add a consumer test with `@theory-cloud/facetheory/testing`:
+
+```ts
+import {
+  assertHydrationEquivalent,
+  renderFace,
+} from "@theory-cloud/facetheory/testing";
+
+const rendered = await renderFace(face, { path: "/checkout" });
+
+await assertHydrationEquivalent({
+  html: rendered.html,
+  selector: "#root",
+  hydrate: async ({ document }) => {
+    // call the same hydrate primitive used by the app's client bootstrap
+  },
+});
+```
+
+Verification:
+
+- the hydration-equivalence test passes without console mismatch messages
+- repeated SSR renders for the same request produce byte-identical HTML for deterministic inputs
+- strict-CSP routes fetch same-origin external hydration JSON before hydrate and do not recompute server-only data on the client
 
 ## Issue: SSR Hydration Sidecar URL Returns 404 or HTML
 

@@ -1,9 +1,18 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import Panel from './Panel.svelte';
 
-  export let label: unknown;
-  export let value: unknown;
-  export let delta: { value: unknown; trend?: 'up' | 'down' | 'flat' } | undefined = undefined;
+  let {
+    label,
+    value,
+    delta = undefined,
+    icon,
+  }: {
+    label?: unknown;
+    value?: unknown;
+    delta?: { value: unknown; trend?: 'up' | 'down' | 'flat' } | undefined;
+    icon?: Snippet;
+  } = $props();
 
   const trendColor: Record<'up' | 'down' | 'flat', string> = {
     up: 'var(--stitch-color-tertiary, #00332e)',
@@ -15,7 +24,7 @@
 <Panel padded={true}>
   <div class="facetheory-stitch-stat-card" style="display:flex;align-items:flex-start;gap:16px;">
     <div class="facetheory-stitch-stat-card-icon" style="font-size:20px;flex-shrink:0;">
-      <slot name="icon" />
+      {@render icon?.()}
     </div>
 
     <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;">

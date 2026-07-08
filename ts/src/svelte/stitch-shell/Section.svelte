@@ -1,6 +1,17 @@
 <script lang="ts">
-  export let title: unknown = undefined;
-  export let description: unknown = undefined;
+  import type { Snippet } from 'svelte';
+
+  let {
+    title = undefined,
+    description = undefined,
+    actions,
+    children,
+  }: {
+    title?: unknown;
+    description?: unknown;
+    actions?: Snippet;
+    children?: Snippet;
+  } = $props();
 </script>
 
 <section class="facetheory-stitch-section" style="display:flex;flex-direction:column;gap:12px;">
@@ -23,10 +34,10 @@
       </div>
 
       <div style="display:flex;gap:8px;flex-shrink:0;">
-        <slot name="actions" />
+        {@render actions?.()}
       </div>
     </header>
   {/if}
 
-  <slot />
+  {@render children?.()}
 </section>

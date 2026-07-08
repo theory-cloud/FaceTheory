@@ -6,13 +6,9 @@
   colors bind through Stitch CSS variables.
 
   Props:
-    - `logo`         Logo content. Use the prop for simple strings / HTML
-                     fragments, or the `logo` named slot for rich content.
-    - `wordmark`     Wordmark content (product or platform name). Use the
-                     prop for strings, or the `wordmark` named slot for rich
-                     content.
-    - `surfaceLabel` Optional surface-chip label. Use the prop for strings,
-                     or the `surfaceLabel` named slot for rich content.
+    - `logo`         Logo content (string or HTML fragment).
+    - `wordmark`     Wordmark content (product or platform name).
+    - `surfaceLabel` Optional surface-chip label.
     - `surfaceTone`  Optional tone hint. The value is normalized to a safe
                      lowercase kebab-case token suffix before binding the
                      chip's background / foreground to
@@ -21,14 +17,34 @@
                      provide a value that normalizes empty) for a neutral chip.
 -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { resolveSurfaceTone } from '../../stitch-shell/surface-tone.js';
 
-  export let logo: unknown = undefined;
-  export let wordmark: unknown = undefined;
-  export let surfaceLabel: unknown = undefined;
-  export let surfaceTone: string | undefined = undefined;
+  let {
+    logo = undefined,
+    wordmark = undefined,
+    surfaceLabel = undefined,
+    surfaceTone = undefined,
+  }: {
+    logo?: unknown;
+    wordmark?: unknown;
+    surfaceLabel?: unknown;
+    surfaceTone?: string | undefined;
+  } = $props();
 
-  $: ({ normalizedTone, chipBg, chipColor } = resolveSurfaceTone(surfaceTone));
+  // `logo`/`wordmark`/`surfaceLabel` accept either a value (rendered as text) or
+  // a snippet (rendered as markup, filled via `{#snippet logo()}...`).
+  const logoNode = $derived(
+    typeof logo === 'function' ? (logo as Snippet) : undefined,
+  );
+  const wordmarkNode = $derived(
+    typeof wordmark === 'function' ? (wordmark as Snippet) : undefined,
+  );
+  const surfaceLabelNode = $derived(
+    typeof surfaceLabel === 'function' ? (surfaceLabel as Snippet) : undefined,
+  );
+
+  const surface = $derived(resolveSurfaceTone(surfaceTone));
 
   // Match the React / Vue `isRenderableNode` semantics: the surface-chip
   // wrapper only renders when the caller actually passes visible content.
@@ -52,8 +68,7 @@
     return true;
   }
 
-  $: hasSurfaceLabel =
-    Boolean($$slots.surfaceLabel) || isRenderable(surfaceLabel);
+  const hasSurfaceLabel = $derived(isRenderable(surfaceLabel));
 </script>
 
 <div
@@ -64,21 +79,21 @@
     class="facetheory-stitch-brand-header-logo"
     style="display:inline-flex;align-items:center;"
   >
-    <slot name="logo">{#if logo !== undefined}{logo}{/if}</slot>
+    {#if logoNode}{@render logoNode()}{:else if logo !== undefined}{logo}{/if}
   </span>
   <span
     class="facetheory-stitch-brand-header-wordmark"
     style="font-family:var(--stitch-font-display, inherit);font-weight:600;font-size:15px;letter-spacing:0.01em;color:var(--stitch-color-on-surface, #131b2e);"
   >
-    <slot name="wordmark">{#if wordmark !== undefined}{wordmark}{/if}</slot>
+    {#if wordmarkNode}{@render wordmarkNode()}{:else if wordmark !== undefined}{wordmark}{/if}
   </span>
   {#if hasSurfaceLabel}
     <span
       class="facetheory-stitch-brand-header-surface-label"
-      data-surface-tone={normalizedTone}
-      style={`display:inline-flex;align-items:center;padding:2px 10px;border-radius:var(--stitch-radius-sm, 4px);background:${chipBg};color:${chipColor};font-family:var(--stitch-font-label, inherit);font-size:11px;font-weight:600;letter-spacing:0.08em;`}
+      data-surface-tone={surface.normalizedTone}
+      style={`display:inline-flex;align-items:center;padding:2px 10px;border-radius:var(--stitch-radius-sm, 4px);background:${surface.chipBg};color:${surface.chipColor};font-family:var(--stitch-font-label, inherit);font-size:11px;font-weight:600;letter-spacing:0.08em;`}
     >
-      <slot name="surfaceLabel">{#if surfaceLabel !== undefined}{surfaceLabel}{/if}</slot>
+      {#if surfaceLabelNode}{@render surfaceLabelNode()}{:else if surfaceLabel !== undefined}{surfaceLabel}{/if}
     </span>
   {/if}
 </div>

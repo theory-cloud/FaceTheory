@@ -1,30 +1,22 @@
-# Vite SSR Example (Svelte)
+# Vite SSR Svelte Example
 
-Builds both:
+## Demonstrates
 
-- client assets + `manifest.json`
-- server bundle entrypoint
+This example builds a Svelte SSR app with Vite client assets, a Vite server bundle, manifest-derived head tags, Svelte asset output, and a matching hydration bootstrap module.
 
-Then runs FaceTheory SSR using the manifest to inject preload/CSS/asset tags and hydration bootstrap.
-
-## Build
+## Run
 
 From `ts/`:
 
 ```bash
 npm run example:vite:svelte:build
-```
-
-Outputs:
-
-- `ts/examples/vite-ssr-svelte/dist/client/.vite/manifest.json`
-- `ts/examples/vite-ssr-svelte/dist/client/assets/*`
-- `ts/examples/vite-ssr-svelte/dist/server/entry-server.js`
-
-## Run
-
-```bash
 npm run example:vite:svelte:serve
 ```
 
-Then open `http://localhost:4176/`.
+Open `http://localhost:4176/`.
+
+## Backs
+
+- `docs/adapters/svelte.md` — Svelte Vite SSR example.
+- `docs/api-reference.md` — Vite and hydration helpers.
+- Public package surfaces: Vite helpers from `@theory-cloud/facetheory` and Svelte adapter exports.

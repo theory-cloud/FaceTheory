@@ -32,9 +32,33 @@ See [Operator visibility dashboards](../features/operator-visibility.md) for the
 
 Changes to FaceTheory's Stitch shell, hosted-auth, or admin primitives that would break Autheory's bindings are coordination events. The simplest path is:
 
-1. Open a FaceTheory PR with a `feat!:` or `fix!:` commit subject (Conventional Commits — pre-1.0 still flags breaking changes explicitly).
+1. Open a FaceTheory PR with a `feat!:` or `fix!:` commit subject (Conventional Commits — the 3.x line flags breaking changes explicitly).
 2. Notify Autheory's steward through the user.
 3. Land matching changes in Autheory against the new FaceTheory version.
+
+## Hosted-auth Svelte named-slot readiness
+
+FaceTheory's Svelte hosted-auth primitives are Svelte 5 runes components. Named insertion points are snippet props, not
+legacy slots. Autheory Svelte templates that fill hosted-auth chrome must use snippets such as:
+
+```svelte
+<AuthPageLayout>
+  {#snippet brand()}...{/snippet}
+  {#snippet footer()}...{/snippet}
+
+  <AuthCard title="Sign in">
+    {#snippet headerAction()}...{/snippet}
+    {#snippet footer()}...{/snippet}
+    ...
+  </AuthCard>
+</AuthPageLayout>
+```
+
+Legacy `slot="brand"`, `slot="footer"`, or `<svelte:fragment slot="headerAction">` authoring does not bind to these
+snippet props and can silently drop content after migration. FaceTheory has not edited or validated Autheory in this
+repository; before Autheory pins a FaceTheory release containing the migrated hosted-auth primitives, run Autheory's live
+hosted-auth screens or an equivalent SSR fixture with snippet fills for at least `brand`, `footer`, `headerAction`,
+`icon`, and `actions`.
 
 ## Related docs
 

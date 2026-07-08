@@ -1,18 +1,32 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type {
     OperatorEmptyStateConfig,
     OperatorGuardStatus,
     OperatorPlaceholderDataPolicy,
   } from './types.js';
 
-  export let guard: OperatorGuardStatus;
-  export let authorized: unknown = undefined;
-  export let unauthorized: unknown = undefined;
-  export let loading: unknown = undefined;
-  export let error: unknown = undefined;
-  export let placeholderDataPolicy: OperatorPlaceholderDataPolicy = 'no-production-like-data';
+  let {
+    guard,
+    authorized = undefined,
+    unauthorized = undefined,
+    loading = undefined,
+    error = undefined,
+    placeholderDataPolicy = 'no-production-like-data',
+    children,
+  }: {
+    guard: OperatorGuardStatus;
+    authorized?: unknown;
+    unauthorized?: unknown;
+    loading?: unknown;
+    error?: unknown;
+    placeholderDataPolicy?: OperatorPlaceholderDataPolicy;
+    children?: Snippet;
+  } = $props();
 
-  $: fallbackConfig = guardToEmptyStateConfig(guard, placeholderDataPolicy);
+  const fallbackConfig = $derived(
+    guardToEmptyStateConfig(guard, placeholderDataPolicy),
+  );
   function guardToEmptyStateConfig(
     status: OperatorGuardStatus,
     policy: OperatorPlaceholderDataPolicy,
@@ -72,13 +86,13 @@
   style="display:flex;flex-direction:column;gap:16px;min-width:0;"
 >
   {#if guard.state === 'authorized'}
-    <slot>{authorized}</slot>
-  {:else if guard.state === 'unauthorized' && ($$slots.unauthorized || unauthorized !== undefined)}
-    <slot name="unauthorized">{unauthorized}</slot>
-  {:else if guard.state === 'loading' && ($$slots.loading || loading !== undefined)}
-    <slot name="loading">{loading}</slot>
-  {:else if guard.state === 'error' && ($$slots.error || error !== undefined)}
-    <slot name="error">{error}</slot>
+    {#if children}{@render children()}{:else}{authorized}{/if}
+  {:else if guard.state === 'unauthorized' && unauthorized !== undefined}
+    {unauthorized}
+  {:else if guard.state === 'loading' && loading !== undefined}
+    {loading}
+  {:else if guard.state === 'error' && error !== undefined}
+    {error}
   {:else}
     <section
       class={`facetheory-stitch-operator-empty-state facetheory-stitch-operator-empty-state-${fallbackConfig.intent}`}

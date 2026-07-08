@@ -1,14 +1,12 @@
 import { utf8 } from './bytes.js';
 import { createFaceApp, type FaceApp, type FaceAppOptions } from './app.js';
-import {
-  DEFAULT_NAVIGATION_PENDING_INDICATOR_ID,
-  NAVIGATION_PENDING_ATTRIBUTE,
-  NAVIGATION_PENDING_INDICATOR_ATTRIBUTE,
-} from './navigation-pending.js';
+import { escapeHTML } from './html.js';
+import { NAVIGATION_PENDING_BOOTSTRAP_SOURCE } from './navigation-pending.js';
 import {
   RESPONSIVE_PRIMITIVES_CSS,
   RESPONSIVE_PRIMITIVES_CLASS_PREFIX,
 } from './responsive-primitives/index.js';
+import { reportFaceError, type FaceObservabilityHooks } from './ops.js';
 import {
   jsonResourceResponse,
   methodNotAllowedResourceResponse,
@@ -218,6 +216,7 @@ interface NormalizedControlPlaneAppOptions {
   cspMode: ControlPlaneCspMode;
   delivery: ControlPlaneDeliveryCapability;
   gate: ControlPlaneGate;
+  observability: FaceObservabilityHooks | null;
 }
 
 export function createControlPlaneApp(
@@ -332,7 +331,12 @@ function normalizeControlPlaneAppOptions(
     );
   }
 
-  return { cspMode, delivery, gate: options.gate };
+  return {
+    cspMode,
+    delivery,
+    gate: options.gate,
+    observability: options.faceApp?.observability ?? null,
+  };
 }
 
 function normalizeControlPlaneFaces(
@@ -390,7 +394,13 @@ function createPresetFace(
       if (options.delivery === 'streaming') {
         return {
           ...base,
-          html: streamControlPlaneSections(base.html, normalized, ctx, gate),
+          html: streamControlPlaneSections(
+            base.html,
+            normalized,
+            ctx,
+            gate,
+            options.observability,
+          ),
         };
       }
       return base;
@@ -481,12 +491,12 @@ function renderDefaultControlPlaneShell(
 
 function renderSectionFrame(section: ControlPlaneSectionRenderInfo): string {
   const title = section.title
-    ? `<h2 class="facetheory-control-plane-section__title">${escapeHtml(section.title)}</h2>`
+    ? `<h2 class="facetheory-control-plane-section__title">${escapeHTML(section.title)}</h2>`
     : '';
   const srcAttr = section.src
-    ? ` data-facetheory-section-src="${escapeHtml(section.src)}"`
+    ? ` data-facetheory-section-src="${escapeHTML(section.src)}"`
     : '';
-  return `<section class="facetheory-control-plane-section" data-facetheory-control-section="${escapeHtml(section.id)}" data-state="loading"${srcAttr}>${title}<div class="facetheory-control-plane-section__body">${section.loadingHtml}</div></section>`;
+  return `<section class="facetheory-control-plane-section" data-facetheory-control-section="${escapeHTML(section.id)}" data-state="loading"${srcAttr}>${title}<div class="facetheory-control-plane-section__body">${section.loadingHtml}</div></section>`;
 }
 
 async function* streamControlPlaneSections(
@@ -494,6 +504,7 @@ async function* streamControlPlaneSections(
   normalized: NormalizedControlPlaneFace,
   ctx: FaceContext,
   gate: ControlPlaneGateAccepted,
+  observability: FaceObservabilityHooks | null,
 ): AsyncIterable<Uint8Array> {
   if (typeof shell === 'string') {
     yield utf8(shell);
@@ -502,9 +513,9 @@ async function* streamControlPlaneSections(
   }
 
   for (const section of normalized.sections) {
-    const html = await renderSectionDataHtml(section, ctx, gate);
+    const html = await renderSectionDataHtml(section, ctx, gate, observability);
     yield utf8(
-      `<section class="facetheory-control-plane-section facetheory-control-plane-section--streamed" data-facetheory-control-streamed-section="${escapeHtml(section.id)}" data-state="success"><div class="facetheory-control-plane-section__body">${html}</div></section>`,
+      `<section class="facetheory-control-plane-section facetheory-control-plane-section--streamed" data-facetheory-control-streamed-section="${escapeHTML(section.id)}" data-state="success"><div class="facetheory-control-plane-section__body">${html}</div></section>`,
     );
   }
 }
@@ -524,12 +535,20 @@ function createControlPlaneSectionRoutes(
           }
           const gate = await options.gate(ctx);
           if (!gate.ok) return deniedSectionResponse(gate);
-          const html = await renderSectionDataHtml(section, ctx, gate);
+          const html = await renderSectionDataHtml(
+            section,
+            ctx,
+            gate,
+            options.observability,
+          );
           return sectionHtmlResponse(
             html,
             ctx.request.method === 'HEAD',
             options.cspMode,
             ctx.request.cspNonce,
+            options.observability,
+            section,
+            ctx,
           );
         },
       });
@@ -542,6 +561,7 @@ async function renderSectionDataHtml<Data>(
   section: NormalizedControlPlaneDataSection<Data>,
   ctx: FaceContext,
   gate: ControlPlaneGateAccepted,
+  observability: FaceObservabilityHooks | null,
 ): Promise<string> {
   try {
     const data = await section.load(ctx, gate);
@@ -550,9 +570,29 @@ async function renderSectionDataHtml<Data>(
       return section.emptyHtml;
     }
     return rendered;
-  } catch {
+  } catch (err) {
+    reportControlPlaneSectionError(observability, err, section, ctx);
     return section.errorHtml ?? defaultSectionErrorHtml(section);
   }
+}
+
+function reportControlPlaneSectionError<Data>(
+  observability: FaceObservabilityHooks | null,
+  err: unknown,
+  section: NormalizedControlPlaneDataSection<Data>,
+  ctx: FaceContext,
+): void {
+  reportFaceError(observability, err, {
+    requestId: String(ctx.request.headers['x-request-id']?.[0] ?? ''),
+    method: ctx.request.method,
+    path: ctx.request.path,
+    routePattern: section.endpoint,
+    mode: 'none',
+    phase: 'control-plane-section',
+    status: 200,
+    isrState: null,
+    sectionId: section.id,
+  });
 }
 
 function sectionHtmlResponse(
@@ -560,13 +600,22 @@ function sectionHtmlResponse(
   headOnly: boolean,
   cspMode: ControlPlaneCspMode,
   cspNonce: string | null,
+  observability: FaceObservabilityHooks | null,
+  section: NormalizedControlPlaneDataSection,
+  ctx: FaceContext,
 ): FaceResponse {
   const headers: Record<string, string> = { 'x-content-type-options': NOSNIFF };
   if (cspMode === 'strict') {
     headers['content-security-policy'] = buildStrictCspHeader({ cspNonce });
     try {
       validateStrictCspDocument(html, { policy: STRICT_CONTROL_PLANE_CSP });
-    } catch {
+    } catch (err) {
+      reportControlPlaneSectionValidationError(
+        observability,
+        err,
+        section,
+        ctx,
+      );
       return textResourceResponse('', {
         status: 500,
         contentType: HTML_FRAGMENT_CONTENT_TYPE,
@@ -580,6 +629,25 @@ function sectionHtmlResponse(
     headers,
   });
   return response;
+}
+
+function reportControlPlaneSectionValidationError<Data>(
+  observability: FaceObservabilityHooks | null,
+  err: unknown,
+  section: NormalizedControlPlaneDataSection<Data>,
+  ctx: FaceContext,
+): void {
+  reportFaceError(observability, err, {
+    requestId: String(ctx.request.headers['x-request-id']?.[0] ?? ''),
+    method: ctx.request.method,
+    path: ctx.request.path,
+    routePattern: section.endpoint,
+    mode: 'none',
+    phase: 'control-plane-section-validation',
+    status: 500,
+    isrState: null,
+    sectionId: section.id,
+  });
 }
 
 function deniedSectionResponse(gate: ControlPlaneGateRejected): FaceResponse {
@@ -611,7 +679,7 @@ function deniedControlPlaneResult(
     },
     head: { title },
     headTags: [controlPlaneStylesheetHeadTag()],
-    html: `<main data-facetheory-control-plane-gate="denied"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p></main>`,
+    html: `<main data-facetheory-control-plane-gate="denied"><h1>${escapeHTML(title)}</h1><p>${escapeHTML(message)}</p></main>`,
   };
   if (gate.cookies !== undefined) result.cookies = gate.cookies;
   if (cspMode === 'strict') {
@@ -662,14 +730,14 @@ function sectionEndpointForRequest(endpoint: string, ctx: FaceContext): string {
 
 function defaultSectionLoadingHtml(section: ControlPlaneDataSection): string {
   const label = section.title ? `${section.title} loading` : 'Loading';
-  return `<div class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-async-boundary" data-state="loading"><div class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-loading-state" role="status" aria-live="polite" aria-busy="true"><div class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-loading-state__content"><span class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-spinner ${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-spinner--sm ${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-spinner--primary" role="status" aria-label="${escapeHtml(label)}"><svg class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-spinner__glyph" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg><span class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-visually-hidden">${escapeHtml(label)}</span></span><p class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-loading-state__message">Loading…</p></div></div></div>`;
+  return `<div class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-async-boundary" data-state="loading"><div class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-loading-state" role="status" aria-live="polite" aria-busy="true"><div class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-loading-state__content"><span class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-spinner ${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-spinner--sm ${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-spinner--primary" role="status" aria-label="${escapeHTML(label)}"><svg class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-spinner__glyph" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg><span class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-visually-hidden">${escapeHTML(label)}</span></span><p class="${RESPONSIVE_PRIMITIVES_CLASS_PREFIX}-loading-state__message">Loading…</p></div></div></div>`;
 }
 
 function defaultSectionErrorHtml<Data>(
   section: ControlPlaneDataSection<Data>,
 ): string {
   const title = section.title ?? section.id;
-  return `<div class="facetheory-control-plane-section__error" role="alert">${escapeHtml(title)} failed to load.</div>`;
+  return `<div class="facetheory-control-plane-section__error" role="alert">${escapeHTML(title)} failed to load.</div>`;
 }
 
 function slugForRoute(route: string, index: number): string {
@@ -713,15 +781,6 @@ function sortHeaderValues(
   for (const key of Object.keys(headers).sort())
     sorted[key] = headers[key] ?? [];
   return sorted;
-}
-
-function escapeHtml(value: string): string {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }
 
 export const CONTROL_PLANE_STYLESHEET = `${RESPONSIVE_PRIMITIVES_CSS}
@@ -774,15 +833,7 @@ export const CONTROL_PLANE_STYLESHEET = `${RESPONSIVE_PRIMITIVES_CSS}
 }
 `;
 
-export const CONTROL_PLANE_BOOTSTRAP_MODULE = `const NAV_ATTR=${JSON.stringify(NAVIGATION_PENDING_ATTRIBUTE)};
-const INDICATOR_ATTR=${JSON.stringify(NAVIGATION_PENDING_INDICATOR_ATTRIBUTE)};
-const DEFAULT_INDICATOR_ID=${JSON.stringify(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID)};
-function sameOriginUrl(href){try{const url=new URL(href,window.location.href);return url.origin===window.location.origin?url:null;}catch{return null;}}
-function acceptedAnchor(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.altKey||event.ctrlKey||event.shiftKey)return null;const target=event.target instanceof Element?event.target.closest('a[href]'):null;if(!(target instanceof HTMLAnchorElement))return null;if(target.target&&target.target.toLowerCase()!=='_self')return null;if(target.hasAttribute('download')||target.hasAttribute('data-facetheory-reload'))return null;const rel=(target.getAttribute('rel')||'').toLowerCase().split(/\\s+/);if(rel.includes('external'))return null;const url=sameOriginUrl(target.href);if(!url||url.href===window.location.href)return null;return target;}
-function isIndicator(el){return el instanceof HTMLElement&&el.getAttribute(INDICATOR_ATTR)==='true';}
-function indicatorElement(id){const existing=document.getElementById(id);if(isIndicator(existing))return existing;if(!existing){const el=document.createElement('div');el.id=id;return el;}for(let i=1;i<1000;i+=1){const candidate=id+'-'+String(i);const next=document.getElementById(candidate);if(isIndicator(next))return next;if(!next){const el=document.createElement('div');el.id=candidate;console.warn('FaceTheory navigation pending indicator id "'+id+'" already belongs to a non-indicator element; using "'+candidate+'" instead.');return el;}}throw new Error('FaceTheory navigation pending could not allocate indicator id');}
-function showPending(source,targets){for(const target of targets){target.setAttribute(NAV_ATTR,source);target.setAttribute('aria-busy','true');target.classList.add('facetheory-navigation-pending-control');}const el=indicatorElement(DEFAULT_INDICATOR_ID);el.textContent='Loading…';el.setAttribute('role','status');el.setAttribute('aria-live','polite');el.setAttribute('aria-atomic','true');el.setAttribute(NAV_ATTR,source);el.setAttribute(INDICATOR_ATTR,'true');el.classList.add('facetheory-navigation-pending-pill');if(!el.parentNode)(document.body||document.documentElement).appendChild(el);}
-function startNavigationPending(){document.addEventListener('click',event=>{const anchor=acceptedAnchor(event);if(anchor)showPending('link',[anchor]);});document.addEventListener('submit',event=>{const form=event.target instanceof HTMLFormElement?event.target:null;if(!form)return;const targets=[form];if(event.submitter instanceof HTMLElement)targets.push(event.submitter);showPending('form',targets);},true);}
+export const CONTROL_PLANE_BOOTSTRAP_MODULE = `${NAVIGATION_PENDING_BOOTSTRAP_SOURCE}
 async function fillSection(section){const src=section.getAttribute('data-facetheory-section-src');if(!src)return;try{const response=await fetch(src,{credentials:'same-origin',headers:{accept:'text/html'}});if(!response.ok)throw new Error('HTTP '+String(response.status));const html=await response.text();const body=section.querySelector('.facetheory-control-plane-section__body')||section;body.innerHTML=html;section.setAttribute('data-state','success');}catch(error){section.setAttribute('data-state','error');const body=section.querySelector('.facetheory-control-plane-section__body')||section;body.innerHTML='<div class="facetheory-control-plane-section__error" role="alert">Section failed to load.</div>';console.error('FaceTheory control-plane section fill failed',error);}}
 function startClientFill(){for(const section of document.querySelectorAll('[data-facetheory-control-section][data-facetheory-section-src]'))void fillSection(section);}
 export function startControlPlane(){startNavigationPending();startClientFill();}

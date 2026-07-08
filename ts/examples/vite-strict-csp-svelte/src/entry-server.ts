@@ -1,12 +1,12 @@
-import { createFaceApp } from '../../../src/app.js';
-import { InMemoryHtmlStore } from '../../../src/isr.js';
-import { buildStrictCspHeader } from '../../../src/security.js';
-import { createSvelteFace } from '../../../src/svelte/index.js';
-import type { ViteManifest } from '../../../src/vite.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { InMemoryHtmlStore } from '@theory-cloud/facetheory';
+import { buildStrictCspHeader } from '@theory-cloud/facetheory';
+import { createSvelteFace } from '@theory-cloud/facetheory/svelte';
+import type { ViteManifest } from '@theory-cloud/facetheory';
 import {
   viteAssetsForEntry,
   viteHydrationForEntry,
-} from '../../../src/vite.js';
+} from '@theory-cloud/facetheory';
 
 import App from './App.svelte';
 import logoUrl from './logo.svg';

@@ -1,70 +1,65 @@
 import type { Component } from 'svelte';
+import type {
+  AuthCardProps as SharedAuthCardProps,
+  AuthFlowSectionProps as SharedAuthFlowSectionProps,
+  AuthFlowStepperProps as SharedAuthFlowStepperProps,
+  AuthPageLayoutProps as SharedAuthPageLayoutProps,
+  AuthStateCardProps as SharedAuthStateCardProps,
+  ConsentItemProps as SharedConsentItemProps,
+  PasskeyCTAProps as SharedPasskeyCTAProps,
+} from '../../stitch-hosted-auth/index.js';
 
-export interface AuthPageLayoutProps {
-  background?: 'surface' | 'gradient';
-}
+export type {
+  AuthFlowStep,
+  AuthPageBackground,
+  AuthPasskeyButtonType,
+  AuthStateVariant,
+  ConsentListProps,
+  OTPInputProps,
+} from '../../stitch-hosted-auth/index.js';
 
-export interface AuthCardProps {
-  title: unknown;
-  description?: unknown;
-}
+export type AuthPageLayoutProps = Pick<
+  SharedAuthPageLayoutProps,
+  'background'
+>;
 
-export interface AuthFlowStep {
-  key: string;
-  label: string;
-  description?: unknown;
-}
+export type AuthCardProps = Pick<
+  SharedAuthCardProps,
+  'title' | 'description'
+>;
 
-export interface AuthFlowStepperProps {
-  steps: AuthFlowStep[];
-  currentIndex: number;
-}
+export type AuthFlowStepperProps = SharedAuthFlowStepperProps;
 
-export interface AuthFlowSectionProps {
-  eyebrow?: unknown;
-  title?: unknown;
-  description?: unknown;
-}
+export type AuthFlowSectionProps = Pick<
+  SharedAuthFlowSectionProps,
+  'eyebrow' | 'title' | 'description'
+>;
 
-export interface PasskeyCTAProps {
-  loading?: boolean;
-  disabled?: boolean;
-  onClick?: (event: MouseEvent) => void;
-  type?: 'button' | 'submit';
-}
+export type PasskeyCTAProps = Pick<
+  SharedPasskeyCTAProps<unknown, (event: MouseEvent) => void>,
+  'loading' | 'disabled' | 'onClick' | 'type'
+>;
 
-export interface OTPInputProps {
-  length?: number;
-  value?: string;
-  onChange?: (value: string) => void;
-  onComplete?: (value: string) => void;
-  disabled?: boolean;
-  invalid?: boolean;
-  autoFocus?: boolean;
-}
+export type ConsentItemProps = Pick<
+  SharedConsentItemProps,
+  'label' | 'description' | 'granted'
+>;
 
-export interface ConsentItemProps {
-  label: unknown;
-  description?: unknown;
-  granted?: boolean;
-}
-
-export type ConsentListProps = Record<string, never>;
-
-export type AuthStateVariant = 'info' | 'success' | 'warning' | 'error';
-
-export interface AuthStateCardProps {
-  variant?: AuthStateVariant;
-  title: unknown;
-  description?: unknown;
-}
+export type AuthStateCardProps = Pick<
+  SharedAuthStateCardProps,
+  'variant' | 'title' | 'description'
+>;
 
 export declare const AuthPageLayout: Component<AuthPageLayoutProps>;
 export declare const AuthCard: Component<AuthCardProps>;
 export declare const AuthFlowStepper: Component<AuthFlowStepperProps>;
 export declare const AuthFlowSection: Component<AuthFlowSectionProps>;
 export declare const PasskeyCTA: Component<PasskeyCTAProps>;
-export declare const OTPInput: Component<OTPInputProps>;
+export declare const OTPInput: Component<
+  import('../../stitch-hosted-auth/index.js').OTPInputProps
+>;
 export declare const ConsentItem: Component<ConsentItemProps>;
-export declare const ConsentList: Component<ConsentListProps>;
+export declare const ConsentList: Component<
+  import('../../stitch-hosted-auth/index.js').ConsentListProps
+>;
 export declare const AuthStateCard: Component<AuthStateCardProps>;

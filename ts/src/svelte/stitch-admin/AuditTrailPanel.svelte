@@ -9,10 +9,15 @@
   } from '../../stitch-admin/audit-trail-types.js';
   import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
-  export let trail: AuditTrail;
-  export let onToggleGroup:
-    | ((groupId: string, nextExpanded: boolean) => void)
-    | undefined = undefined;
+  let {
+    trail,
+    onToggleGroup = undefined,
+  }: {
+    trail?: AuditTrail;
+    onToggleGroup?:
+      | ((groupId: string, nextExpanded: boolean) => void)
+      | undefined;
+  } = $props();
 
   const STATUS_LABEL: Record<AuditTrailEventStatus, string> = {
     info: 'Info',
@@ -68,13 +73,16 @@
     onToggleGroup(groupId, !expanded);
   }
 
-  $: variant = trail.variant as AuditTrailVariant;
-  $: labelId = trail.label !== undefined ? `${trail.groupId}-label` : undefined;
-  $: descriptionId =
-    trail.description !== undefined ? `${trail.groupId}-description` : undefined;
-  $: eventCount = totalEvents(trail);
-  $: errorCount = totalErrors(trail);
-  $: isEmpty = eventCount === 0;
+  const variant = $derived(trail.variant as AuditTrailVariant);
+  const labelId = $derived(
+    trail.label !== undefined ? `${trail.groupId}-label` : undefined,
+  );
+  const descriptionId = $derived(
+    trail.description !== undefined ? `${trail.groupId}-description` : undefined,
+  );
+  const eventCount = $derived(totalEvents(trail));
+  const errorCount = $derived(totalErrors(trail));
+  const isEmpty = $derived(eventCount === 0);
 </script>
 
 <section
@@ -127,7 +135,7 @@
             aria-expanded={expanded ? 'true' : 'false'}
             aria-controls={eventsRegionId}
             data-group-toggle={group.id}
-            on:click={() => handleToggleGroup(group.id, expanded)}
+            onclick={() => handleToggleGroup(group.id, expanded)}
           >
             <span class="facetheory-stitch-audit-trail-group-label">{group.label}</span>
             <span

@@ -139,7 +139,7 @@
                         },
                         ":distribution/",
                         {
-                          "Ref": "Distribution830FAC52"
+                          "Ref": "SiteDistribution390DED28"
                         }
                       ]
                     ]
@@ -229,7 +229,7 @@
             "Arn"
           ]
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Description": {
           "Fn::Join": [
             "",
@@ -355,6 +355,50 @@
                   ]
                 }
               ]
+            },
+            {
+              "Action": "s3:GetObject",
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition"
+                        },
+                        ":cloudfront::",
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        ":distribution/",
+                        {
+                          "Ref": "SiteDistribution390DED28"
+                        }
+                      ]
+                    ]
+                  }
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com"
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "IsrBucketCAA25890",
+                        "Arn"
+                      ]
+                    },
+                    "/*"
+                  ]
+                ]
+              }
             }
           ],
           "Version": "2012-10-17"
@@ -418,6 +462,43 @@
           "Statement": [
             {
               "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging",
+                "s3:Abort*"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "IsrBucketCAA25890",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "IsrBucketCAA25890",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
                 "dynamodb:BatchGetItem",
                 "dynamodb:Query",
                 "dynamodb:GetItem",
@@ -458,20 +539,13 @@
               "Action": [
                 "s3:GetObject*",
                 "s3:GetBucket*",
-                "s3:List*",
-                "s3:DeleteObject*",
-                "s3:PutObject",
-                "s3:PutObjectLegalHold",
-                "s3:PutObjectRetention",
-                "s3:PutObjectTagging",
-                "s3:PutObjectVersionTagging",
-                "s3:Abort*"
+                "s3:List*"
               ],
               "Effect": "Allow",
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "IsrBucketCAA25890",
+                    "AssetsBucket5CB76180",
                     "Arn"
                   ]
                 },
@@ -481,7 +555,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "IsrBucketCAA25890",
+                          "AssetsBucket5CB76180",
                           "Arn"
                         ]
                       },
@@ -509,7 +583,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "4fc381ead946b3d7b8c561a26106aa1b4fbf3ab421ab1ba7b74311ddafdfffd6.zip"
+          "S3Key": "1cc44a53b93ac6844f12cefe4cb47e77d8677dc6bb4cfc9bcb9467b427c84d10.zip"
         },
         "Environment": {
           "Variables": {
@@ -552,15 +626,35 @@
         "SsrFunctionServiceRoleF0484DAB"
       ]
     },
-    "SsrFunctionFunctionUrl8D4BC70B": {
-      "Type": "AWS::Lambda::Url",
+    "SsrFunctionAllowCloudFrontInvokeFunctionViaUrl8D4F8C8A": {
+      "Type": "AWS::Lambda::Permission",
       "Properties": {
-        "AuthType": "AWS_IAM",
-        "InvokeMode": "RESPONSE_STREAM",
-        "TargetFunctionArn": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
           "Fn::GetAtt": [
             "SsrFunctionD22C6F1E",
             "Arn"
+          ]
+        },
+        "InvokedViaFunctionUrl": true,
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":cloudfront::",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":distribution/",
+              {
+                "Ref": "SiteDistribution390DED28"
+              }
+            ]
           ]
         }
       }
@@ -611,7 +705,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "e2659170a0721541efa761a8d5d04d5e36cbbf691c4b15a9053002b7c825055d.zip"
+          "S3Key": "a72522445441e9b66c2f16956c54d4786af8c61c156b80c48a6e7c32fcc49023.zip"
         },
         "Description": "/opt/awscli/aws"
       }
@@ -779,7 +873,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "3423a042b818e31c1e34a19d6689ab2e5f9b70fcbe9e71df66f241b20a200bd9.zip"
+          "S3Key": "97e9ebf0b174a5c8f7faa505739022b7f509edddffcab9211dcd08b759944c4f.zip"
         },
         "Environment": {
           "Variables": {
@@ -813,7 +907,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "e2659170a0721541efa761a8d5d04d5e36cbbf691c4b15a9053002b7c825055d.zip"
+          "S3Key": "a72522445441e9b66c2f16956c54d4786af8c61c156b80c48a6e7c32fcc49023.zip"
         },
         "Description": "/opt/awscli/aws"
       }
@@ -856,7 +950,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "e2659170a0721541efa761a8d5d04d5e36cbbf691c4b15a9053002b7c825055d.zip"
+          "S3Key": "a72522445441e9b66c2f16956c54d4786af8c61c156b80c48a6e7c32fcc49023.zip"
         },
         "Description": "/opt/awscli/aws"
       }
@@ -892,93 +986,7 @@
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
     },
-    "SsgRewrite0C735A0F": {
-      "Type": "AWS::CloudFront::Function",
-      "Properties": {
-        "AutoPublish": true,
-        "FunctionCode": "function handler(event) {\n  var req = event.request;\n  var uri = req.uri || '/';\n\n  // Request correlation:\n  // - Always set/propagate x-request-id so SSR logs and viewer responses can correlate with CloudFront.\n  // - Prefer an inbound x-request-id if present, otherwise use the CloudFront request ID.\n  if (!req.headers['x-request-id']) {\n    req.headers['x-request-id'] = { value: event.context.requestId };\n  }\n\n  // Preserve the original path so SSR can route correctly when S3 misses.\n  req.headers['x-facetheory-original-uri'] = { value: uri };\n\n  if (uri === '/assets' || uri.startsWith('/assets/')) return req;\n  if (uri === '/.vite' || uri.startsWith('/.vite/')) return req;\n  if (uri === '/_facetheory/data' || uri.startsWith('/_facetheory/data/')) return req;\n  if (uri === '/_facetheory/ssr-data' || uri.startsWith('/_facetheory/ssr-data/')) return req;\n\n  // If the final segment contains a dot, treat it as a file request.\n  var idx = uri.lastIndexOf('/');\n  var last = uri.substring(idx + 1);\n  if (last.indexOf('.') !== -1) return req;\n\n  if (uri.endsWith('/')) {\n    req.uri = uri + 'index.html';\n    return req;\n  }\n\n  req.uri = uri + '/index.html';\n  return req;\n}",
-        "FunctionConfig": {
-          "Comment": {
-            "Fn::Join": [
-              "",
-              [
-                {
-                  "Ref": "AWS::Region"
-                },
-                "FaceTheoryAppThesrSiteSsgRewriteBCB96CBF"
-              ]
-            ]
-          },
-          "Runtime": "cloudfront-js-1.0"
-        },
-        "Name": {
-          "Fn::Join": [
-            "",
-            [
-              {
-                "Ref": "AWS::Region"
-              },
-              "FaceTheoryAppThesrSiteSsgRewriteBCB96CBF"
-            ]
-          ]
-        }
-      }
-    },
-    "RequestIdResponseHeaderA32D1D61": {
-      "Type": "AWS::CloudFront::Function",
-      "Properties": {
-        "AutoPublish": true,
-        "FunctionCode": "function handler(event) {\n  var req = event.request;\n  var resp = event.response;\n\n  var requestId = '';\n  if (req.headers && req.headers['x-request-id']) {\n    requestId = String(req.headers['x-request-id'].value || '').trim();\n  }\n  if (!requestId) requestId = String(event.context.requestId || '').trim();\n\n  if (requestId) {\n    resp.headers = resp.headers || {};\n    if (!resp.headers['x-request-id']) {\n      resp.headers['x-request-id'] = { value: requestId };\n    }\n  }\n\n  return resp;\n}",
-        "FunctionConfig": {
-          "Comment": {
-            "Fn::Join": [
-              "",
-              [
-                {
-                  "Ref": "AWS::Region"
-                },
-                "FaceTheoryAppTheIdResponseHeaderAB4B1BF9"
-              ]
-            ]
-          },
-          "Runtime": "cloudfront-js-1.0"
-        },
-        "Name": {
-          "Fn::Join": [
-            "",
-            [
-              {
-                "Ref": "AWS::Region"
-              },
-              "FaceTheoryAppTheIdResponseHeaderAB4B1BF9"
-            ]
-          ]
-        }
-      }
-    },
-    "OriginRequestPolicy3EFDB4FA": {
-      "Type": "AWS::CloudFront::OriginRequestPolicy",
-      "Properties": {
-        "OriginRequestPolicyConfig": {
-          "Comment": "Forward enough for SSR/ISR, without exploding the static cache key",
-          "CookiesConfig": {
-            "CookieBehavior": "all"
-          },
-          "HeadersConfig": {
-            "HeaderBehavior": "whitelist",
-            "Headers": [
-              "x-request-id",
-              "x-facetheory-original-uri"
-            ]
-          },
-          "Name": "FaceTheoryAppTheorySsgIsrSiteOriginRequestPolicy4B63D3F3",
-          "QueryStringsConfig": {
-            "QueryStringBehavior": "all"
-          }
-        }
-      }
-    },
-    "LogsBucket9C4D8843": {
+    "SiteCloudFrontLogsBucketF9C1CD02": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
         "BucketEncryption": {
@@ -987,6 +995,13 @@
               "ServerSideEncryptionByDefault": {
                 "SSEAlgorithm": "AES256"
               }
+            }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "ObjectWriter"
             }
           ]
         },
@@ -1006,11 +1021,11 @@
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
     },
-    "LogsBucketPolicyD70D9252": {
+    "SiteCloudFrontLogsBucketPolicy816DFF56": {
       "Type": "AWS::S3::BucketPolicy",
       "Properties": {
         "Bucket": {
-          "Ref": "LogsBucket9C4D8843"
+          "Ref": "SiteCloudFrontLogsBucketF9C1CD02"
         },
         "PolicyDocument": {
           "Statement": [
@@ -1028,7 +1043,7 @@
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "LogsBucket9C4D8843",
+                    "SiteCloudFrontLogsBucketF9C1CD02",
                     "Arn"
                   ]
                 },
@@ -1038,7 +1053,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "LogsBucket9C4D8843",
+                          "SiteCloudFrontLogsBucketF9C1CD02",
                           "Arn"
                         ]
                       },
@@ -1067,7 +1082,7 @@
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "LogsBucket9C4D8843",
+                    "SiteCloudFrontLogsBucketF9C1CD02",
                     "Arn"
                   ]
                 },
@@ -1077,7 +1092,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "LogsBucket9C4D8843",
+                          "SiteCloudFrontLogsBucketF9C1CD02",
                           "Arn"
                         ]
                       },
@@ -1092,7 +1107,7 @@
         }
       }
     },
-    "LogsBucketAutoDeleteObjectsCustomResource7D54FB85": {
+    "SiteCloudFrontLogsBucketAutoDeleteObjectsCustomResource016FEC8F": {
       "Type": "Custom::S3AutoDeleteObjects",
       "Properties": {
         "ServiceToken": {
@@ -1102,20 +1117,203 @@
           ]
         },
         "BucketName": {
-          "Ref": "LogsBucket9C4D8843"
+          "Ref": "SiteCloudFrontLogsBucketF9C1CD02"
         }
       },
       "DependsOn": [
-        "LogsBucketPolicyD70D9252"
+        "SiteCloudFrontLogsBucketPolicy816DFF56"
       ],
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
     },
-    "ResponseHeadersPolicy13DBF9E0": {
+    "SiteSsrUrl2D74149D": {
+      "Type": "AWS::Lambda::Url",
+      "Properties": {
+        "AuthType": "AWS_IAM",
+        "InvokeMode": "RESPONSE_STREAM",
+        "TargetFunctionArn": {
+          "Fn::GetAtt": [
+            "SsrFunctionD22C6F1E",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "SiteSsrOriginRequestPolicyF6A13560": {
+      "Type": "AWS::CloudFront::OriginRequestPolicy",
+      "Properties": {
+        "OriginRequestPolicyConfig": {
+          "CookiesConfig": {
+            "CookieBehavior": "all"
+          },
+          "HeadersConfig": {
+            "HeaderBehavior": "whitelist",
+            "Headers": [
+              "cloudfront-forwarded-proto",
+              "cloudfront-viewer-address",
+              "x-apptheory-original-host",
+              "x-facetheory-original-host",
+              "x-apptheory-original-uri",
+              "x-facetheory-original-uri",
+              "x-request-id"
+            ]
+          },
+          "Name": "FaceTheoryAppTheorySsgIsrSiteSsrOriginRequestPolicy92B16B7E",
+          "QueryStringsConfig": {
+            "QueryStringBehavior": "all"
+          }
+        }
+      }
+    },
+    "SiteHtmlOriginRequestPolicy308D38C5": {
+      "Type": "AWS::CloudFront::OriginRequestPolicy",
+      "Properties": {
+        "OriginRequestPolicyConfig": {
+          "CookiesConfig": {
+            "CookieBehavior": "none"
+          },
+          "HeadersConfig": {
+            "HeaderBehavior": "whitelist",
+            "Headers": [
+              "cloudfront-forwarded-proto",
+              "cloudfront-viewer-address",
+              "x-apptheory-original-host",
+              "x-facetheory-original-host",
+              "x-apptheory-original-uri",
+              "x-facetheory-original-uri",
+              "x-request-id"
+            ]
+          },
+          "Name": "FaceTheoryAppTheorySsgIsrSiteHtmlOriginRequestPolicy2BB9018B",
+          "QueryStringsConfig": {
+            "QueryStringBehavior": "all"
+          }
+        }
+      }
+    },
+    "SiteStaticAssetsCachePolicy416A79D8": {
+      "Type": "AWS::CloudFront::CachePolicy",
+      "Properties": {
+        "CachePolicyConfig": {
+          "Comment": "AppTheory direct S3 asset/data cache policy: origin Cache-Control bounded by no viewer header forwarding",
+          "DefaultTTL": 86400,
+          "MaxTTL": 31536000,
+          "MinTTL": 0,
+          "Name": {
+            "Fn::Join": [
+              "",
+              [
+                "FaceTheoryAppTheorySsgIsrSiteStaticAssetsCachePolicy3C8CC3BD-",
+                {
+                  "Ref": "AWS::Region"
+                }
+              ]
+            ]
+          },
+          "ParametersInCacheKeyAndForwardedToOrigin": {
+            "CookiesConfig": {
+              "CookieBehavior": "none"
+            },
+            "EnableAcceptEncodingBrotli": true,
+            "EnableAcceptEncodingGzip": true,
+            "HeadersConfig": {
+              "HeaderBehavior": "none"
+            },
+            "QueryStringsConfig": {
+              "QueryStringBehavior": "none"
+            }
+          }
+        }
+      }
+    },
+    "SiteHtmlCachePolicy2B4843D5": {
+      "Type": "AWS::CloudFront::CachePolicy",
+      "Properties": {
+        "CachePolicyConfig": {
+          "Comment": "FaceTheory HTML cache policy keyed by query strings and stable public variant headers",
+          "DefaultTTL": 0,
+          "MaxTTL": 31536000,
+          "MinTTL": 0,
+          "Name": {
+            "Fn::Join": [
+              "",
+              [
+                "FaceTheoryAppTheorySsgIsrSiteHtmlCachePolicy13EF5DE2-",
+                {
+                  "Ref": "AWS::Region"
+                }
+              ]
+            ]
+          },
+          "ParametersInCacheKeyAndForwardedToOrigin": {
+            "CookiesConfig": {
+              "CookieBehavior": "none"
+            },
+            "EnableAcceptEncodingBrotli": true,
+            "EnableAcceptEncodingGzip": true,
+            "HeadersConfig": {
+              "HeaderBehavior": "whitelist",
+              "Headers": [
+                "x-apptheory-original-host",
+                "x-facetheory-original-host"
+              ]
+            },
+            "QueryStringsConfig": {
+              "QueryStringBehavior": "all"
+            }
+          }
+        }
+      }
+    },
+    "SiteSsrViewerRequestFunction103872E5": {
+      "Type": "AWS::CloudFront::Function",
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "function handler(event) {\n\t  var request = event.request;\n\t  request.headers = request.headers || {};\n\t  var headers = request.headers;\n\t  var uri = request.uri || '/';\n\t  var blockedViewerTenantHeaders = [\n\t    'x-tenant-id'\n\t  ];\n\n\t  for (var blockedIndex = 0; blockedIndex < blockedViewerTenantHeaders.length; blockedIndex++) {\n\t    delete headers[blockedViewerTenantHeaders[blockedIndex]];\n\t  }\n\n\t  var requestIdHeader = headers['x-request-id'];\n\t  var requestId = requestIdHeader && requestIdHeader.value ? requestIdHeader.value.trim() : '';\n\n\t  if (!requestId) {\n\t    requestId = event.context && event.context.requestId ? String(event.context.requestId).trim() : '';\n\t  }\n\n\t  if (!requestId) {\n\t    requestId = 'req_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);\n\t  }\n\n\t  headers['x-request-id'] = { value: requestId };\n\t  headers['x-apptheory-original-uri'] = { value: uri };\n\t  headers['x-facetheory-original-uri'] = { value: uri };\n\n\t  if (headers.host && headers.host.value) {\n\t    headers['x-apptheory-original-host'] = { value: headers.host.value };\n\t    headers['x-facetheory-original-host'] = { value: headers.host.value };\n\t  }\n\n\t  if ('ssg-isr' === 'ssg-isr') {\n\t    var rawS3Prefixes = [\n\t      '/_facetheory/data',\n      '/assets',\n      '/.vite'\n\t    ];\n\t    var lambdaPassthroughPrefixes = [\n\t      '/_facetheory/ssr-data'\n\t    ];\n\t    var isLambdaPassthroughPath = false;\n\n\t    for (var i = 0; i < lambdaPassthroughPrefixes.length; i++) {\n\t      var prefix = lambdaPassthroughPrefixes[i];\n\t      if (uri === prefix || uri.startsWith(prefix + '/')) {\n\t        isLambdaPassthroughPath = true;\n\t        break;\n\t      }\n\t    }\n\n\t    if (!isLambdaPassthroughPath) {\n\t      var isRawS3Path = false;\n\n\t      for (var j = 0; j < rawS3Prefixes.length; j++) {\n\t        var rawPrefix = rawS3Prefixes[j];\n\t        if (uri === rawPrefix || uri.startsWith(rawPrefix + '/')) {\n\t          isRawS3Path = true;\n\t          break;\n\t        }\n\t      }\n\n\t      var lastSlash = uri.lastIndexOf('/');\n\t      var lastSegment = lastSlash >= 0 ? uri.substring(lastSlash + 1) : uri;\n\n\t      if (!isRawS3Path && lastSegment.indexOf('.') === -1) {\n\t        request.uri = uri.endsWith('/') ? uri + 'index.html' : uri + '/index.html';\n\t      }\n\t    }\n\t  }\n\n\t  return request;\n\t}",
+        "FunctionConfig": {
+          "Comment": "FaceTheory viewer-request edge context and HTML rewrite for SSR site",
+          "Runtime": "cloudfront-js-2.0"
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region"
+              },
+              "FaceTheoryAppTherRequestFunctionA4A8A767"
+            ]
+          ]
+        }
+      }
+    },
+    "SiteSsrViewerResponseFunction3CF15787": {
+      "Type": "AWS::CloudFront::Function",
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "function handler(event) {\n\t  var request = event.request;\n\t  var response = event.response;\n\t  var requestIdHeader = request.headers['x-request-id'];\n\t  var requestId = requestIdHeader && requestIdHeader.value ? requestIdHeader.value.trim() : '';\n\n\t  if (!requestId) {\n\t    requestId = event.context && event.context.requestId ? String(event.context.requestId).trim() : '';\n\t  }\n\n\t  if (requestId) {\n\t    response.headers = response.headers || {};\n\t    if (!response.headers['x-request-id']) {\n\t      response.headers['x-request-id'] = { value: requestId };\n\t    }\n\t  }\n\n\t  return response;\n\t}",
+        "FunctionConfig": {
+          "Comment": "FaceTheory viewer-response request-id echo for SSR site",
+          "Runtime": "cloudfront-js-2.0"
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region"
+              },
+              "FaceTheoryAppTheResponseFunction697D5730"
+            ]
+          ]
+        }
+      }
+    },
+    "SiteResponseHeadersPolicy5F343E8C": {
       "Type": "AWS::CloudFront::ResponseHeadersPolicy",
       "Properties": {
         "ResponseHeadersPolicyConfig": {
-          "Comment": "FaceTheory example security headers (CSP is origin-defined)",
+          "Comment": "FaceTheory baseline security headers (CSP stays origin-defined)",
           "CustomHeadersConfig": {
             "Items": [
               {
@@ -1125,7 +1323,7 @@
               }
             ]
           },
-          "Name": "FaceTheoryAppTheorySsgIsrSiteResponseHeadersPolicy9923F5A6",
+          "Name": "FaceTheoryAppTheorySsgIsrSiteResponseHeadersPolicy859A163E",
           "SecurityHeadersConfig": {
             "ContentTypeOptions": {
               "Override": true
@@ -1153,35 +1351,35 @@
         }
       }
     },
-    "DistributionOrigin1S3OriginAccessControlEB606076": {
+    "SiteDistributionOrigin1S3OriginAccessControl4F95283E": {
       "Type": "AWS::CloudFront::OriginAccessControl",
       "Properties": {
         "OriginAccessControlConfig": {
-          "Name": "FaceTheoryAppTheorySsgIsrSitOrigin1S3OriginAccessControl4B9A4AE5",
+          "Name": "FaceTheoryAppTheorySsgIsrSitOrigin1S3OriginAccessControl7D45111B",
           "OriginAccessControlOriginType": "s3",
           "SigningBehavior": "always",
           "SigningProtocol": "sigv4"
         }
       }
     },
-    "DistributionOrigin2FunctionUrlOriginAccessControlAC8EE0B1": {
+    "SiteDistributionOrigin2FunctionUrlOriginAccessControl8BF64721": {
       "Type": "AWS::CloudFront::OriginAccessControl",
       "Properties": {
         "OriginAccessControlConfig": {
-          "Name": "FaceTheoryAppTheorySsgIsrSitnctionUrlOriginAccessControl17703696",
+          "Name": "FaceTheoryAppTheorySsgIsrSitnctionUrlOriginAccessControlFBA50110",
           "OriginAccessControlOriginType": "lambda",
           "SigningBehavior": "always",
           "SigningProtocol": "sigv4"
         }
       }
     },
-    "DistributionOrigin2InvokeFromApiForFaceTheoryAppTheorySsgIsrSiteDistributionOrigin29693F69F1F354135": {
+    "SiteDistributionOrigin2InvokeFromApiForFaceTheoryAppTheorySsgIsrSiteDistributionOrigin29095DE931B1D3CE0": {
       "Type": "AWS::Lambda::Permission",
       "Properties": {
         "Action": "lambda:InvokeFunctionUrl",
         "FunctionName": {
           "Fn::GetAtt": [
-            "SsrFunctionFunctionUrl8D4BC70B",
+            "SiteSsrUrl2D74149D",
             "FunctionArn"
           ]
         },
@@ -1200,14 +1398,25 @@
               },
               ":distribution/",
               {
-                "Ref": "Distribution830FAC52"
+                "Ref": "SiteDistribution390DED28"
               }
             ]
           ]
         }
       }
     },
-    "Distribution830FAC52": {
+    "SiteDistributionOrigin3S3OriginAccessControlF0F5F99A": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": "FaceTheoryAppTheorySsgIsrSitOrigin3S3OriginAccessControlF5D0A596",
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      }
+    },
+    "SiteDistribution390DED28": {
       "Type": "AWS::CloudFront::Distribution",
       "Properties": {
         "DistributionConfig": {
@@ -1215,91 +1424,19 @@
             {
               "AllowedMethods": [
                 "GET",
-                "HEAD"
+                "HEAD",
+                "OPTIONS"
               ],
-              "CachePolicyId": "83da9c7e-98b4-4e11-a168-04f0df8e2c65",
-              "Compress": true,
-              "FunctionAssociations": [
-                {
-                  "EventType": "viewer-response",
-                  "FunctionARN": {
-                    "Fn::GetAtt": [
-                      "RequestIdResponseHeaderA32D1D61",
-                      "FunctionARN"
-                    ]
-                  }
-                }
-              ],
-              "PathPattern": "/assets/*",
-              "ResponseHeadersPolicyId": {
-                "Ref": "ResponseHeadersPolicy13DBF9E0"
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
               },
-              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30301D709",
-              "ViewerProtocolPolicy": "redirect-to-https"
-            },
-            {
-              "AllowedMethods": [
-                "GET",
-                "HEAD"
-              ],
-              "CachePolicyId": "83da9c7e-98b4-4e11-a168-04f0df8e2c65",
-              "Compress": true,
-              "FunctionAssociations": [
-                {
-                  "EventType": "viewer-response",
-                  "FunctionARN": {
-                    "Fn::GetAtt": [
-                      "RequestIdResponseHeaderA32D1D61",
-                      "FunctionARN"
-                    ]
-                  }
-                }
-              ],
-              "PathPattern": "/.vite/*",
-              "ResponseHeadersPolicyId": {
-                "Ref": "ResponseHeadersPolicy13DBF9E0"
-              },
-              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30301D709",
-              "ViewerProtocolPolicy": "redirect-to-https"
-            },
-            {
-              "AllowedMethods": [
-                "GET",
-                "HEAD"
-              ],
-              "CachePolicyId": "83da9c7e-98b4-4e11-a168-04f0df8e2c65",
-              "Compress": true,
-              "FunctionAssociations": [
-                {
-                  "EventType": "viewer-response",
-                  "FunctionARN": {
-                    "Fn::GetAtt": [
-                      "RequestIdResponseHeaderA32D1D61",
-                      "FunctionARN"
-                    ]
-                  }
-                }
-              ],
-              "PathPattern": "/_facetheory/data/*",
-              "ResponseHeadersPolicyId": {
-                "Ref": "ResponseHeadersPolicy13DBF9E0"
-              },
-              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30301D709",
-              "ViewerProtocolPolicy": "redirect-to-https"
-            },
-            {
-              "AllowedMethods": [
-                "GET",
-                "HEAD"
-              ],
-              "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
               "Compress": true,
               "FunctionAssociations": [
                 {
                   "EventType": "viewer-request",
                   "FunctionARN": {
                     "Fn::GetAtt": [
-                      "SsgRewrite0C735A0F",
+                      "SiteSsrViewerRequestFunction103872E5",
                       "FunctionARN"
                     ]
                   }
@@ -1308,36 +1445,305 @@
                   "EventType": "viewer-response",
                   "FunctionARN": {
                     "Fn::GetAtt": [
-                      "RequestIdResponseHeaderA32D1D61",
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": "assets/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30BF9D92B",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": "assets",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30BF9D92B",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": "_facetheory/data/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30BF9D92B",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": "_facetheory/data",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30BF9D92B",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": ".vite/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30BF9D92B",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": ".vite",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30BF9D92B",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS",
+                "PUT",
+                "PATCH",
+                "POST",
+                "DELETE"
+              ],
+              "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
                       "FunctionARN"
                     ]
                   }
                 }
               ],
               "OriginRequestPolicyId": {
-                "Ref": "OriginRequestPolicy3EFDB4FA"
+                "Ref": "SiteSsrOriginRequestPolicyF6A13560"
               },
-              "PathPattern": "/_facetheory/ssr-data/*",
+              "PathPattern": "_facetheory/ssr-data/*",
               "ResponseHeadersPolicyId": {
-                "Ref": "ResponseHeadersPolicy13DBF9E0"
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
               },
-              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin29693F69F",
+              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin29095DE93",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS",
+                "PUT",
+                "PATCH",
+                "POST",
+                "DELETE"
+              ],
+              "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "OriginRequestPolicyId": {
+                "Ref": "SiteSsrOriginRequestPolicyF6A13560"
+              },
+              "PathPattern": "_facetheory/ssr-data",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin29095DE93",
               "ViewerProtocolPolicy": "redirect-to-https"
             }
           ],
           "DefaultCacheBehavior": {
             "AllowedMethods": [
               "GET",
-              "HEAD"
+              "HEAD",
+              "OPTIONS"
             ],
-            "CachePolicyId": "83da9c7e-98b4-4e11-a168-04f0df8e2c65",
+            "CachePolicyId": {
+              "Ref": "SiteHtmlCachePolicy2B4843D5"
+            },
             "Compress": true,
             "FunctionAssociations": [
               {
                 "EventType": "viewer-request",
                 "FunctionARN": {
                   "Fn::GetAtt": [
-                    "SsgRewrite0C735A0F",
+                    "SiteSsrViewerRequestFunction103872E5",
                     "FunctionARN"
                   ]
                 }
@@ -1346,32 +1752,32 @@
                 "EventType": "viewer-response",
                 "FunctionARN": {
                   "Fn::GetAtt": [
-                    "RequestIdResponseHeaderA32D1D61",
+                    "SiteSsrViewerResponseFunction3CF15787",
                     "FunctionARN"
                   ]
                 }
               }
             ],
             "OriginRequestPolicyId": {
-              "Ref": "OriginRequestPolicy3EFDB4FA"
+              "Ref": "SiteHtmlOriginRequestPolicy308D38C5"
             },
             "ResponseHeadersPolicyId": {
-              "Ref": "ResponseHeadersPolicy13DBF9E0"
+              "Ref": "SiteResponseHeadersPolicy5F343E8C"
             },
-            "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOriginGroup1DF0DDE71",
+            "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOriginGroup1746AE2B5",
             "ViewerProtocolPolicy": "redirect-to-https"
           },
-          "DefaultRootObject": "index.html",
           "Enabled": true,
           "HttpVersion": "http2",
           "IPV6Enabled": true,
           "Logging": {
             "Bucket": {
               "Fn::GetAtt": [
-                "LogsBucket9C4D8843",
+                "SiteCloudFrontLogsBucketF9C1CD02",
                 "RegionalDomainName"
               ]
-            }
+            },
+            "Prefix": "cloudfront/"
           },
           "OriginGroups": {
             "Items": [
@@ -1385,14 +1791,14 @@
                     "Quantity": 2
                   }
                 },
-                "Id": "FaceTheoryAppTheorySsgIsrSiteDistributionOriginGroup1DF0DDE71",
+                "Id": "FaceTheoryAppTheorySsgIsrSiteDistributionOriginGroup1746AE2B5",
                 "Members": {
                   "Items": [
                     {
-                      "OriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin154FF04DC"
+                      "OriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin1F1ECEE12"
                     },
                     {
-                      "OriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin29693F69F"
+                      "OriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin29095DE93"
                     }
                   ],
                   "Quantity": 2
@@ -1405,17 +1811,18 @@
             {
               "DomainName": {
                 "Fn::GetAtt": [
-                  "AssetsBucket5CB76180",
+                  "IsrBucketCAA25890",
                   "RegionalDomainName"
                 ]
               },
-              "Id": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin154FF04DC",
+              "Id": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin1F1ECEE12",
               "OriginAccessControlId": {
                 "Fn::GetAtt": [
-                  "DistributionOrigin1S3OriginAccessControlEB606076",
+                  "SiteDistributionOrigin1S3OriginAccessControl4F95283E",
                   "Id"
                 ]
               },
+              "OriginPath": "/isr",
               "S3OriginConfig": {
                 "OriginAccessIdentity": ""
               }
@@ -1435,7 +1842,7 @@
                       "/",
                       {
                         "Fn::GetAtt": [
-                          "SsrFunctionFunctionUrl8D4BC70B",
+                          "SiteSsrUrl2D74149D",
                           "FunctionUrl"
                         ]
                       }
@@ -1443,10 +1850,10 @@
                   }
                 ]
               },
-              "Id": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin29693F69F",
+              "Id": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin29095DE93",
               "OriginAccessControlId": {
                 "Fn::GetAtt": [
-                  "DistributionOrigin2FunctionUrlOriginAccessControlAC8EE0B1",
+                  "SiteDistributionOrigin2FunctionUrlOriginAccessControl8BF64721",
                   "Id"
                 ]
               }
@@ -1458,10 +1865,10 @@
                   "RegionalDomainName"
                 ]
               },
-              "Id": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30301D709",
+              "Id": "FaceTheoryAppTheorySsgIsrSiteDistributionOrigin30BF9D92B",
               "OriginAccessControlId": {
                 "Fn::GetAtt": [
-                  "DistributionOrigin1S3OriginAccessControlEB606076",
+                  "SiteDistributionOrigin3S3OriginAccessControlF0F5F99A",
                   "Id"
                 ]
               },
@@ -1478,7 +1885,7 @@
     "CloudFrontDomainName": {
       "Value": {
         "Fn::GetAtt": [
-          "Distribution830FAC52",
+          "SiteDistribution390DED28",
           "DomainName"
         ]
       }
@@ -1501,7 +1908,7 @@
     "SsrFunctionUrl": {
       "Value": {
         "Fn::GetAtt": [
-          "SsrFunctionFunctionUrl8D4BC70B",
+          "SiteSsrUrl2D74149D",
           "FunctionUrl"
         ]
       }

@@ -6,9 +6,15 @@
     WizardEditableTokenInputTone,
   } from './types.js';
 
-  export let input: WizardEditableTokenInput;
-  export let onChange: (next: string[]) => void;
-  export let onDraftChange: ((next: string) => void) | undefined = undefined;
+  let {
+    input,
+    onChange,
+    onDraftChange = undefined,
+  }: {
+    input: WizardEditableTokenInput;
+    onChange: (next: string[]) => void;
+    onDraftChange?: ((next: string) => void) | undefined;
+  } = $props();
 
   const chipPalette: Record<WizardEditableTokenInputTone, { background: string; color: string; border: string }> = {
     neutral: {
@@ -201,19 +207,23 @@
     }
   }
 
-  $: readOnly = isReadOnly(input);
-  $: disabled = input.disabled === true;
-  $: feedback = resolveFeedback(input);
-  $: feedbackId = `${input.inputId}-feedback`;
-  $: descriptionId =
-    input.description !== undefined ? `${input.inputId}-description` : undefined;
-  $: labelId = input.label !== undefined ? `${input.inputId}-label` : undefined;
-  $: draftValue = input.draftValue ?? '';
-  $: tokenPrefix = input.tokenPrefix;
-  $: ariaDescribedBy =
+  const readOnly = $derived(isReadOnly(input));
+  const disabled = $derived(input.disabled === true);
+  const feedback = $derived(resolveFeedback(input));
+  const feedbackId = $derived(`${input.inputId}-feedback`);
+  const descriptionId = $derived(
+    input.description !== undefined ? `${input.inputId}-description` : undefined,
+  );
+  const labelId = $derived(
+    input.label !== undefined ? `${input.inputId}-label` : undefined,
+  );
+  const draftValue = $derived(input.draftValue ?? '');
+  const tokenPrefix = $derived(input.tokenPrefix);
+  const ariaDescribedBy = $derived(
     [descriptionId, feedback.message !== undefined ? feedbackId : undefined]
       .filter((id): id is string => typeof id === 'string')
-      .join(' ') || undefined;
+      .join(' ') || undefined,
+  );
 </script>
 
 <section
@@ -301,7 +311,7 @@
               data-remove-token-index={String(index)}
               data-remove-token-value={token}
               disabled={meta?.disabled === true}
-              on:click={() => removeAt(input, index, onChange)}
+              onclick={() => removeAt(input, index, onChange)}
               style="appearance:none;background:transparent;border:none;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;"
             >×</button>
           {/if}
@@ -324,8 +334,8 @@
         aria-labelledby={labelId}
         aria-describedby={ariaDescribedBy}
         aria-invalid="false"
-        on:input={handleInput}
-        on:keydown={handleKeydown}
+        oninput={handleInput}
+        onkeydown={handleKeydown}
         class="facetheory-stitch-wizard-editable-token-input-input"
         style="flex:1 1 auto;min-width:0;appearance:none;background:var(--stitch-color-surface-container, #eaedff);border:1px solid var(--stitch-color-outline-variant, #c6c5d0);border-radius:var(--stitch-radius-sm, 8px);padding:6px 10px;font-size:13px;color:var(--stitch-color-on-surface, #131b2e);font-family:inherit;"
       />

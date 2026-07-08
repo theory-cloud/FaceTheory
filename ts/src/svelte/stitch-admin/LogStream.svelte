@@ -1,13 +1,21 @@
 <script lang="ts">
   import type { LogEntry, LogLevel } from './types.js';
 
-  export let entries: LogEntry[] = [];
-  export let variant: 'plain' | 'terminal' = 'plain';
-  export let title: unknown = undefined;
-  export let formatTimestamp:
-    | ((value: string | number) => string)
-    | undefined = undefined;
-  export let maxHeight: number | string = '240px';
+  let {
+    entries = [],
+    variant = 'plain',
+    title = undefined,
+    formatTimestamp = undefined,
+    maxHeight = '240px',
+  }: {
+    entries?: LogEntry[];
+    variant?: 'plain' | 'terminal';
+    title?: unknown;
+    formatTimestamp?:
+      | ((value: string | number) => string)
+      | undefined;
+    maxHeight?: number | string;
+  } = $props();
 
   const levelColor: Record<LogLevel, string> = {
     debug: 'var(--stitch-color-on-surface-variant, #464553)',
@@ -27,9 +35,10 @@
     return `${hh}:${mm}:${ss}`;
   }
 
-  $: format = formatTimestamp ?? defaultFormatTimestamp;
-  $: maxHeightValue =
-    typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight;
+  const format = $derived(formatTimestamp ?? defaultFormatTimestamp);
+  const maxHeightValue = $derived(
+    typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight,
+  );
 </script>
 
 {#if variant === 'terminal'}

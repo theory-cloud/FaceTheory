@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import {
     normalizeAsyncViewState,
     spinnerClassName,
@@ -6,19 +7,41 @@
     type AsyncViewStateStatus,
   } from '../../responsive-primitives/index.js';
 
-  export let errorValue: unknown = undefined;
-  export let loadingMessage: string | undefined = undefined;
-  export let state: AsyncViewStateStatus;
-  let className = '';
-  export { className as class };
+  let {
+    errorValue = undefined,
+    loadingMessage = undefined,
+    state,
+    class: className = '',
+    loading,
+    idle,
+    empty,
+    error,
+    children,
+    ...rest
+  }: {
+    errorValue?: unknown;
+    loadingMessage?: string | undefined;
+    state: AsyncViewStateStatus;
+    class?: string;
+    loading?: Snippet;
+    idle?: Snippet;
+    empty?: Snippet;
+    error?: Snippet;
+    children?: Snippet;
+    [key: string]: unknown;
+  } = $props();
 
-  $: descriptor = normalizeAsyncViewState({ error: errorValue, loadingMessage, status: state });
-  $: embeddedSpinnerClass = spinnerClassName({ size: 'md', tone: 'primary' });
-  $: pixelSize = spinnerSvgSize('md');
+  const descriptor = $derived(
+    normalizeAsyncViewState({ error: errorValue, loadingMessage, status: state }),
+  );
+  const embeddedSpinnerClass = $derived(
+    spinnerClassName({ size: 'md', tone: 'primary' }),
+  );
+  const pixelSize = $derived(spinnerSvgSize('md'));
 </script>
 
 <section
-  {...$$restProps}
+  {...rest}
   class={['facetheory-rcp-async-boundary', className].filter(Boolean).join(' ')}
   data-state={descriptor.status}
   aria-busy={descriptor.ariaBusy}
@@ -26,8 +49,8 @@
   role={descriptor.status === 'error' ? 'alert' : undefined}
 >
   {#if descriptor.status === 'loading'}
-    {#if $$slots.loading}
-      <slot name="loading" />
+    {#if loading}
+      {@render loading()}
     {:else}
       <div class="facetheory-rcp-loading-state" role="status" aria-live="polite" aria-busy="true">
         <div class="facetheory-rcp-loading-state__content">
@@ -54,12 +77,12 @@
       </div>
     {/if}
   {:else if descriptor.status === 'idle'}
-    <slot name="idle" />
+    {@render idle?.()}
   {:else if descriptor.status === 'empty'}
-    <slot name="empty" />
+    {@render empty?.()}
   {:else if descriptor.status === 'error'}
-    <slot name="error">Something went wrong.</slot>
+    {#if error}{@render error()}{:else}Something went wrong.{/if}
   {:else}
-    <slot />
+    {@render children?.()}
   {/if}
 </section>

@@ -1,47 +1,17 @@
 import * as React from 'react';
 
+import {
+  authStateClassName,
+  authStateRole,
+  authStateVariantPalette,
+  type AuthStateCardProps as SharedAuthStateCardProps,
+} from '../../stitch-hosted-auth/index.js';
+
 const h = React.createElement;
 
-export type AuthStateVariant = 'info' | 'success' | 'warning' | 'error';
+export type { AuthStateVariant } from '../../stitch-hosted-auth/index.js';
 
-export interface AuthStateCardProps {
-  variant?: AuthStateVariant;
-  title: React.ReactNode;
-  description?: React.ReactNode;
-  /** Leading icon glyph. */
-  icon?: React.ReactNode;
-  /** Actions rendered below the description (e.g. "Try again", "Contact support"). */
-  actions?: React.ReactNode;
-}
-
-interface VariantPalette {
-  accent: string;
-  surface: string;
-  text: string;
-}
-
-const VARIANT_PALETTE: Record<AuthStateVariant, VariantPalette> = {
-  info: {
-    accent: 'var(--stitch-color-primary, #1f108e)',
-    surface: 'var(--stitch-color-surface-container-lowest, #ffffff)',
-    text: 'var(--stitch-color-on-surface, #131b2e)',
-  },
-  success: {
-    accent: 'var(--stitch-color-tertiary, #00332e)',
-    surface: 'var(--stitch-color-surface-container-lowest, #ffffff)',
-    text: 'var(--stitch-color-on-surface, #131b2e)',
-  },
-  warning: {
-    accent: 'var(--stitch-color-error, #ba1a1a)',
-    surface: 'var(--stitch-color-surface-container-lowest, #ffffff)',
-    text: 'var(--stitch-color-on-surface, #131b2e)',
-  },
-  error: {
-    accent: 'var(--stitch-color-error, #ba1a1a)',
-    surface: 'var(--stitch-color-error-container, #ffdad6)',
-    text: 'var(--stitch-color-on-error-container, #93000a)',
-  },
-};
+export type AuthStateCardProps = SharedAuthStateCardProps<React.ReactNode>;
 
 /**
  * Terminal-state hosted-auth card. Covers the `Account Locked`, `Error`,
@@ -51,13 +21,13 @@ const VARIANT_PALETTE: Record<AuthStateVariant, VariantPalette> = {
  */
 export function AuthStateCard(props: AuthStateCardProps): React.ReactElement {
   const { variant = 'info', title, description, icon, actions } = props;
-  const palette = VARIANT_PALETTE[variant];
+  const palette = authStateVariantPalette(variant);
 
   return h(
     'div',
     {
-      className: `facetheory-stitch-auth-state facetheory-stitch-auth-state-${variant}`,
-      role: variant === 'error' || variant === 'warning' ? 'alert' : undefined,
+      className: authStateClassName(variant),
+      role: authStateRole(variant),
       style: {
         width: '100%',
         maxWidth: 440,

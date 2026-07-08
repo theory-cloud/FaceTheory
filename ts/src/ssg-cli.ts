@@ -1,7 +1,12 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { buildSsgSite, type BuildSsgSiteOptions, type SsgTrailingSlashPolicy } from './ssg.js';
+import {
+  buildSsgSite,
+  SsgBuildFailedError,
+  type BuildSsgSiteOptions,
+  type SsgTrailingSlashPolicy,
+} from './ssg.js';
 import type { FaceModule } from './types.js';
 
 interface SsgCliConfigModule {
@@ -18,6 +23,8 @@ interface ParsedSsgCliArgs {
   entryPath: string;
   outDir: string;
   trailingSlash?: SsgTrailingSlashPolicy;
+  concurrency?: number;
+  incremental: boolean;
   allowNetwork: boolean;
   emitHydrationData: boolean;
 }
@@ -31,6 +38,8 @@ export async function runSsgCli(argv: string[] = process.argv.slice(2)): Promise
   const faces = resolveFaces(config);
 
   const trailingSlash = args.trailingSlash ?? moduleOptions.trailingSlash;
+  const concurrency = args.concurrency ?? moduleOptions.concurrency;
+  const incremental = args.incremental || (moduleOptions.incremental ?? false);
   const allowNetwork = args.allowNetwork || (moduleOptions.allowNetwork ?? false);
   const emitHydrationData = args.emitHydrationData || (moduleOptions.emitHydrationData ?? false);
 
@@ -40,13 +49,24 @@ export async function runSsgCli(argv: string[] = process.argv.slice(2)): Promise
     outDir: path.resolve(args.outDir),
     allowNetwork,
     emitHydrationData,
+    incremental,
     ...(trailingSlash !== undefined ? { trailingSlash } : {}),
+    ...(concurrency !== undefined ? { concurrency } : {}),
   };
 
-  const buildResult = await buildSsgSite(buildOptions);
+  let buildResult: Awaited<ReturnType<typeof buildSsgSite>>;
+  try {
+    buildResult = await buildSsgSite(buildOptions);
+  } catch (error) {
+    if (error instanceof SsgBuildFailedError) {
+      printSsgBuildFailure(error);
+      return 1;
+    }
+    throw error;
+  }
 
   console.log(
-    `SSG complete: ${buildResult.pages.length} page(s) written to ${buildResult.outDir} (manifest: ${buildResult.manifestFile})`,
+    `SSG complete: ${buildResult.pages.length} page(s) written to ${buildResult.outDir} (manifest: ${buildResult.manifestFile})${formatSkippedRoutesSuffix(buildResult.skippedRoutes?.length ?? 0)}`,
   );
   return 0;
 }
@@ -55,6 +75,8 @@ function parseSsgCliArgs(argv: string[]): ParsedSsgCliArgs {
   let entryPath = '';
   let outDir = '';
   let trailingSlash: SsgTrailingSlashPolicy | undefined;
+  let concurrency: number | undefined;
+  let incremental = false;
   let allowNetwork = false;
   let emitHydrationData = false;
 
@@ -83,6 +105,17 @@ function parseSsgCliArgs(argv: string[]): ParsedSsgCliArgs {
       i += 1;
       continue;
     }
+    if (arg === '--concurrency') {
+      const value = argv[i + 1];
+      if (!value) throw new Error('missing value for --concurrency');
+      concurrency = parseConcurrency(value);
+      i += 1;
+      continue;
+    }
+    if (arg === '--incremental') {
+      incremental = true;
+      continue;
+    }
     if (arg === '--allow-network') {
       allowNetwork = true;
       continue;
@@ -97,9 +130,11 @@ function parseSsgCliArgs(argv: string[]): ParsedSsgCliArgs {
         showHelp: true,
         entryPath: '',
         outDir: '',
+        incremental,
         allowNetwork,
         emitHydrationData,
         ...(trailingSlash !== undefined ? { trailingSlash } : {}),
+        ...(concurrency !== undefined ? { concurrency } : {}),
       };
     }
     throw new Error(`unknown argument: ${arg}`);
@@ -114,9 +149,19 @@ function parseSsgCliArgs(argv: string[]): ParsedSsgCliArgs {
     entryPath,
     outDir,
     ...(trailingSlash !== undefined ? { trailingSlash } : {}),
+    ...(concurrency !== undefined ? { concurrency } : {}),
+    incremental,
     allowNetwork,
     emitHydrationData,
   };
+}
+
+function parseConcurrency(value: string): number {
+  const concurrency = Number(value);
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new Error('invalid value for --concurrency (expected a positive integer)');
+  }
+  return concurrency;
 }
 
 async function loadSsgConfigModule(entryPath: string): Promise<SsgCliConfigModule> {
@@ -141,10 +186,30 @@ function printUsage(): void {
       '',
       'Options:',
       '  --trailing-slash <always|never>   HTML output style (default: always)',
+      '  --concurrency <count>             Render routes with bounded concurrency (default: 1)',
+      '  --incremental                     Skip unchanged writes using the SSG manifest',
       '  --emit-hydration-data             Write hydration JSON files when present',
       '  --allow-network                   Allow real fetch() calls during SSG',
     ].join('\n'),
   );
+}
+
+function printSsgBuildFailure(error: SsgBuildFailedError): void {
+  console.error(
+    `SSG failed: ${error.failedRoutes.length} route(s) failed; ${error.result.pages.length} page(s) written to ${error.result.outDir}${formatSkippedRoutesSuffix(error.result.skippedRoutes?.length ?? 0)}`,
+  );
+  for (const failedRoute of error.failedRoutes) {
+    const status =
+      failedRoute.status === undefined ? '' : ` [status ${failedRoute.status}]`;
+    console.error(
+      `- ${failedRoute.path} (${failedRoute.routePattern})${status}: ${failedRoute.message}`,
+    );
+  }
+}
+
+function formatSkippedRoutesSuffix(skippedCount: number): string {
+  if (skippedCount === 0) return '';
+  return `; ${skippedCount} unchanged page(s) skipped`;
 }
 
 function isDirectExecution(): boolean {
@@ -154,8 +219,12 @@ function isDirectExecution(): boolean {
 }
 
 if (isDirectExecution()) {
-  runSsgCli().catch((err) => {
-    console.error(err instanceof Error ? err.message : String(err));
-    process.exitCode = 1;
-  });
+  runSsgCli()
+    .then((exitCode) => {
+      process.exitCode = exitCode;
+    })
+    .catch((err) => {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    });
 }

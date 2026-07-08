@@ -1,10 +1,21 @@
 <script lang="ts">
-  export let background: 'surface' | 'gradient' = 'surface';
+  import type { Snippet } from 'svelte';
+  import { resolveAuthPageBackground } from '../../stitch-hosted-auth/index.js';
+  import type { AuthPageBackground } from '../../stitch-hosted-auth/index.js';
 
-  $: backgroundStyle =
-    background === 'gradient'
-      ? 'linear-gradient(135deg, var(--stitch-color-primary, #1f108e) 0%, var(--stitch-color-primary-container, #3730a3) 100%)'
-      : 'var(--stitch-color-surface, #faf8ff)';
+  let {
+    background = 'surface',
+    brand,
+    footer,
+    children,
+  }: {
+    background?: AuthPageBackground;
+    brand?: Snippet;
+    footer?: Snippet;
+    children?: Snippet;
+  } = $props();
+
+  const backgroundStyle = $derived(resolveAuthPageBackground(background));
 </script>
 
 <div
@@ -12,20 +23,20 @@
   style={`min-height:100vh;display:flex;flex-direction:column;background:${backgroundStyle};`}
 >
   <header class="facetheory-stitch-auth-page-brand" style="padding:24px 32px;">
-    <slot name="brand" />
+    {@render brand?.()}
   </header>
 
   <main
     class="facetheory-stitch-auth-page-main"
     style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px;"
   >
-    <slot />
+    {@render children?.()}
   </main>
 
   <footer
     class="facetheory-stitch-auth-page-footer"
     style="padding:16px 32px 24px;display:flex;justify-content:center;gap:16px;"
   >
-    <slot name="footer" />
+    {@render footer?.()}
   </footer>
 </div>

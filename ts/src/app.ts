@@ -15,13 +15,26 @@ import {
   type IsrRenderFreshOptions,
   type IsrRuntime,
 } from './isr.js';
-import { logLevelForStatus, type FaceObservabilityHooks } from './ops.js';
+import {
+  errorClassFor,
+  logLevelForStatus,
+  reportFaceError,
+  type FaceErrorPhase,
+  type FaceObservabilityHooks,
+  type FaceRequestCompletedLogRecord,
+  type FaceStreamErrorLogRecord,
+} from './ops.js';
 import {
   buildStrictCspHeader,
   requiresStrictCspDocumentValidation,
   validateStrictCspDocument,
 } from './security.js';
-import { routePatternConflict, Router } from './router.js';
+import {
+  canonicalizePathForTrailingSlashPolicy,
+  normalizeTrailingSlashPolicy,
+  routePatternConflict,
+  Router,
+} from './router.js';
 import { jsonResourceResponse, textResourceResponse } from './resource.js';
 import {
   createSsrHydrationSidecarStore,
@@ -40,7 +53,8 @@ import type {
   FaceRenderResult,
   FaceRequest,
   FaceResponse,
-  Headers,
+  FaceHeaders,
+  TrailingSlashPolicy,
 } from './types.js';
 import {
   canonicalizeHeaders,
@@ -51,15 +65,54 @@ import {
   parseQueryString,
 } from './types.js';
 
+/**
+ * Options for constructing a FaceTheory app: Faces define render-mode routes,
+ * resources define raw endpoints, and optional runtimes wire ISR, strict CSP,
+ * hydration sidecars, observability, and trailing-slash policy.
+ */
 export interface FaceAppOptions {
   faces: FaceModule[];
   resources?: FaceResourceRoute[];
   isr?: FaceIsrOptions;
   ssrHydrationSidecars?: FaceSsrHydrationSidecarOptions;
-  observability?: FaceObservabilityHooks;
+  observability?: FaceAppObservabilityHooks;
   strictCsp?: FaceStrictCspOptions;
+  trailingSlash?: TrailingSlashPolicy;
 }
 
+/**
+ * Structured log record emitted by a FaceApp for request completion and stream
+ * errors. Invalid Face contracts fail during construction before a log record can
+ * be emitted.
+ */
+export type FaceAppLogRecord =
+  | FaceRequestCompletedLogRecord
+  | FaceStreamErrorLogRecord;
+
+/**
+ * Observer callback for FaceApp structured logs; implementations must avoid mutating
+ * render output or request context.
+ */
+export type FaceAppLogHook = (record: FaceAppLogRecord) => void;
+
+/**
+ * Observability callbacks used by FaceApp without changing emitted HTML bytes or
+ * hydration behavior.
+ */
+export interface FaceAppObservabilityHooks extends Omit<
+  FaceObservabilityHooks,
+  'log'
+> {
+  /**
+   * Structured request completion and stream-error records.
+   */
+  log?: FaceAppLogHook;
+}
+
+/**
+ * Configuration for strict SSR hydration sidecars that externalize render data into
+ * signed, same-origin resources instead of inline script data.
+ */
 export interface FaceSsrHydrationSidecarOptions extends Pick<
   SsrHydrationSidecarStoreOptions,
   | 'htmlStore'
@@ -84,10 +137,18 @@ export interface FaceSsrHydrationSidecarOptions extends Pick<
   requestVariant?: FaceSsrHydrationSidecarVariantCallback;
 }
 
+/**
+ * Computes a reproducible request variant for SSR hydration sidecars; only stable
+ * request fields present on both HTML and sidecar fetches should be included.
+ */
 export type FaceSsrHydrationSidecarVariantCallback = (
   request: Readonly<Required<FaceRequest>>,
 ) => SsrHydrationSidecarVariantInput | Promise<SsrHydrationSidecarVariantInput>;
 
+/**
+ * Strict CSP runtime limits applied when no-inline policies require buffering streamed
+ * HTML for whole-document validation.
+ */
 export interface FaceStrictCspOptions {
   /**
    * Maximum raw stream bytes FaceTheory will collect for strict no-inline CSP
@@ -98,6 +159,10 @@ export interface FaceStrictCspOptions {
 }
 
 const HTML_CONTENT_TYPE = 'text/html; charset=utf-8';
+/**
+ * Default maximum buffered body size for strict CSP streaming validation, chosen to
+ * fail closed rather than collect unbounded Lambda memory.
+ */
 export const DEFAULT_STRICT_CSP_STREAMING_BODY_LIMIT_BYTES = 5 * 1024 * 1024;
 const SAFE_INTERNAL_ERROR_HTML = renderHTMLDocument({
   head: '<title>Internal Server Error</title>',
@@ -109,8 +174,20 @@ const SAFE_PAYLOAD_TOO_LARGE_HTML = renderHTMLDocument({
 });
 
 const REQUEST_ID_HEADER = 'x-request-id';
+const OBSERVED_ERROR = Symbol('facetheory.observed-error');
+
+interface ObservedFaceError {
+  phase: FaceErrorPhase;
+  value: unknown;
+}
+
+type FaceResponseWithObservedError = FaceResponse & {
+  [OBSERVED_ERROR]?: ObservedFaceError;
+};
 
 class StreamPreflightError extends Error {
+  readonly cause: unknown;
+
   constructor(cause: unknown) {
     super('stream body failed before first chunk');
     this.name = 'StreamPreflightError';
@@ -136,17 +213,25 @@ interface FaceAppSsrHydrationSidecarRuntime {
   requestVariant: FaceSsrHydrationSidecarVariantCallback;
 }
 
+/**
+ * Framework-neutral FaceTheory application that routes resources and Faces, executes
+ * `load`/`render` according to the Face mode, wraps deterministic HTML documents, and
+ * returns handler-agnostic responses.
+ */
 export class FaceApp {
   private readonly router: Router;
   private readonly faceByPattern: Map<string, FaceModule>;
   private readonly resourceByPattern: Map<string, FaceResourceRoute>;
   private readonly isrRuntime: IsrRuntime | null;
   private readonly ssrHydrationSidecarRuntime: FaceAppSsrHydrationSidecarRuntime | null;
-  private readonly observability: FaceObservabilityHooks | null;
+  private readonly observability: FaceAppObservabilityHooks | null;
   private readonly strictCspMaxStreamingBodyBytes: number;
+  private readonly trailingSlash: TrailingSlashPolicy;
+  private coldStartPending = true;
 
   constructor(options: FaceAppOptions) {
-    this.router = new Router();
+    this.trailingSlash = normalizeTrailingSlashPolicy(options.trailingSlash);
+    this.router = new Router({ trailingSlash: this.trailingSlash });
     this.faceByPattern = new Map();
     this.resourceByPattern = new Map();
     this.observability = options.observability ?? null;
@@ -159,7 +244,11 @@ export class FaceApp {
       : null;
 
     for (const face of options.faces) {
-      const pattern = normalizePath(face.route);
+      const pattern = canonicalizePathForTrailingSlashPolicy(
+        validateFaceContract(face),
+        this.trailingSlash,
+      );
+      validateFaceModeContract(face, pattern);
       if (this.faceByPattern.has(pattern)) {
         throw new Error(`duplicate face route: ${pattern}`);
       }
@@ -175,7 +264,10 @@ export class FaceApp {
       : (options.resources ?? []);
 
     for (const resource of resources) {
-      const pattern = normalizePath(resource.route);
+      const pattern = canonicalizePathForTrailingSlashPolicy(
+        resource.route,
+        this.trailingSlash,
+      );
       if (this.resourceByPattern.has(pattern)) {
         throw new Error(`duplicate resource route: ${pattern}`);
       }
@@ -211,15 +303,16 @@ export class FaceApp {
     const hasIsrFace = options.faces.some((face) => face.mode === 'isr');
     if (!hasIsrFace) {
       this.isrRuntime = null;
-      return;
+    } else {
+      const isrOptions = options.isr ?? {};
+      this.isrRuntime = createIsrRuntime({
+        ...isrOptions,
+        htmlStore: isrOptions.htmlStore ?? new InMemoryHtmlStore(),
+        metaStore: isrOptions.metaStore ?? new InMemoryIsrMetaStore(),
+        observability: this.observability ?? isrOptions.observability ?? null,
+      });
     }
 
-    const isrOptions = options.isr ?? {};
-    this.isrRuntime = createIsrRuntime({
-      ...isrOptions,
-      htmlStore: isrOptions.htmlStore ?? new InMemoryHtmlStore(),
-      metaStore: isrOptions.metaStore ?? new InMemoryIsrMetaStore(),
-    });
   }
 
   async handle(request: FaceRequest): Promise<FaceResponse> {
@@ -229,10 +322,33 @@ export class FaceApp {
 
     const normalizedReq = normalizeRequest(request);
     const requestId = normalizedReq.headers[REQUEST_ID_HEADER]?.[0] ?? '';
+    const coldStart = this.consumeColdStartMarker();
 
     let routePattern = '';
     let mode: FaceMode | 'none' = 'none';
     let renderMs: number | null = null;
+
+    const trailingSlashRedirectPath = this.router.redirectPath(
+      normalizedReq.path,
+    );
+    if (trailingSlashRedirectPath !== null) {
+      return finishResponse(
+        hooks,
+        now,
+        startedAt,
+        requestId,
+        normalizedReq,
+        redirectResponse(
+          withQueryString(trailingSlashRedirectPath, normalizedReq.query),
+        ),
+        {
+          routePattern: trailingSlashRedirectPath,
+          mode,
+          renderMs,
+          coldStart,
+        },
+      );
+    }
 
     let response: FaceResponse;
     const match = this.router.match(normalizedReq.path);
@@ -252,6 +368,7 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          coldStart,
         },
       );
     }
@@ -267,9 +384,11 @@ export class FaceApp {
 
     if (resource) {
       routePattern = routePatternForMatch;
+      let observedError: ObservedFaceError | null = null;
       try {
         response = await resource.handle(ctx);
-      } catch {
+      } catch (err) {
+        observedError = { phase: 'resource', value: err };
         response = internalErrorResponse();
       }
 
@@ -284,6 +403,8 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          coldStart,
+          error: observedError,
         },
       );
     }
@@ -304,6 +425,7 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          coldStart,
         },
       );
     }
@@ -334,6 +456,14 @@ export class FaceApp {
             preparedOut,
             normalizedReq,
             this.strictCspMaxStreamingBodyBytes,
+            {
+              hooks,
+              method: normalizedReq.method,
+              mode,
+              path: normalizedReq.path,
+              requestId,
+              routePattern,
+            },
           );
         } finally {
           renderMs = Math.max(0, now() - renderStartedAt);
@@ -363,6 +493,7 @@ export class FaceApp {
             routePattern,
             mode,
             renderMs,
+            coldStart,
           },
         );
       }
@@ -379,9 +510,11 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          coldStart,
         },
       );
     } catch (err) {
+      const observedError = observedErrorFromCaughtRenderError(err);
       response =
         err instanceof StrictCspStreamBodyTooLargeError
           ? strictCspStreamBodyTooLargeResponse()
@@ -397,14 +530,85 @@ export class FaceApp {
           routePattern,
           mode,
           renderMs,
+          coldStart,
+          error: observedError,
         },
       );
     }
   }
+
+  private consumeColdStartMarker(): boolean {
+    const coldStart = this.coldStartPending;
+    this.coldStartPending = false;
+    return coldStart;
+  }
 }
 
+/**
+ * Creates the canonical FaceTheory application instance from a bounded list of Faces
+ * and optional resource/runtime configuration.
+ */
 export function createFaceApp(options: FaceAppOptions): FaceApp {
   return new FaceApp(options);
+}
+
+/**
+ * Identity helper that preserves typed `load` data inference for a FaceModule while
+ * returning the runtime Face contract unchanged.
+ */
+export function defineFace<TData = unknown>(
+  face: FaceModule<TData>,
+): FaceModule<TData> {
+  return face;
+}
+
+function validateFaceContract(face: FaceModule): string {
+  const route = String((face as { route?: unknown }).route ?? '').trim();
+  if (!route) {
+    throw new Error('face route must be a non-empty string');
+  }
+
+  const mode = (face as { mode?: unknown }).mode;
+  if (mode !== 'ssr' && mode !== 'ssg' && mode !== 'isr') {
+    throw new Error(
+      `invalid face mode for route "${route}": expected ssr, ssg, or isr`,
+    );
+  }
+
+  if (typeof (face as { render?: unknown }).render !== 'function') {
+    throw new Error(`face render for route "${route}" must be a function`);
+  }
+
+  return normalizePath(route);
+}
+
+function validateFaceModeContract(face: FaceModule, routePattern: string): void {
+  if (face.mode === 'isr' && face.revalidateSeconds === undefined) {
+    throw new Error(
+      `ISR face "${routePattern}" must declare revalidateSeconds before createFaceApp(); ` +
+        'add a revalidateSeconds value or change the Face to mode "ssr" for per-request rendering',
+    );
+  }
+
+  if (
+    face.mode === 'ssg' &&
+    routePatternHasParams(routePattern) &&
+    typeof face.generateStaticParams !== 'function'
+  ) {
+    throw new Error(
+      `SSG param face "${routePattern}" must declare generateStaticParams() before createFaceApp(); ` +
+        'return every static params object or change the Face to mode "ssr"/"isr"',
+    );
+  }
+}
+
+function routePatternHasParams(routePattern: string): boolean {
+  return routePattern.split('/').some((segment) => {
+    const trimmed = segment.trim();
+    return (
+      trimmed.startsWith('{') && trimmed.endsWith('}') && trimmed.length > 2
+    );
+  });
 }
 
 function createFaceAppSsrHydrationSidecarRuntime(
@@ -472,8 +676,12 @@ async function handleSsrHydrationSidecarResource(
     const variant = await runtime.requestVariant(ctx.request);
     const sidecar = await runtime.store.read({ token, variant });
     return jsonResourceResponse(sidecar.data);
-  } catch {
-    return ssrHydrationSidecarFailureResponse();
+  } catch (err) {
+    return withObservedError(
+      ssrHydrationSidecarFailureResponse(),
+      'ssr-hydration-sidecar',
+      err,
+    );
   }
 }
 
@@ -509,7 +717,7 @@ function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
   };
 }
 
-function ensureRequestId(headers: Headers): void {
+function ensureRequestId(headers: FaceHeaders): void {
   const existing = headers[REQUEST_ID_HEADER] ?? [];
   const first = String(existing[0] ?? '').trim();
   headers[REQUEST_ID_HEADER] = [first || randomUUID()];
@@ -526,12 +734,14 @@ function finishResponse(
     routePattern: string;
     mode: FaceMode | 'none';
     renderMs: number | null;
+    coldStart?: boolean;
+    error?: ObservedFaceError | null;
   },
 ): FaceResponse {
-  const headers: Headers = { ...(response.headers ?? {}) };
+  const headers: FaceHeaders = { ...(response.headers ?? {}) };
   headers[REQUEST_ID_HEADER] = [requestId];
 
-  const sorted: Headers = {};
+  const sorted: FaceHeaders = {};
   for (const key of Object.keys(headers).sort()) {
     sorted[key] = headers[key] ?? [];
   }
@@ -544,6 +754,20 @@ function finishResponse(
   const isStream = !(out.body instanceof Uint8Array);
 
   const level = logLevelForStatus(out.status);
+  const observedError =
+    context.error ?? observedErrorFromResponse(response) ?? null;
+  const errorClass = observedError
+    ? reportFaceError(hooks, observedError.value, {
+        requestId,
+        method: req.method,
+        path: req.path,
+        routePattern: context.routePattern,
+        mode: context.mode,
+        phase: observedError.phase,
+        status: out.status,
+        isrState,
+      })
+    : null;
 
   hooks?.log?.({
     level,
@@ -558,6 +782,7 @@ function finishResponse(
     renderMs: context.renderMs,
     isrState,
     isStream,
+    errorClass,
   });
 
   hooks?.metric?.({
@@ -570,8 +795,23 @@ function finishResponse(
       status: String(out.status),
       isr_state: isrState ?? '',
       is_stream: isStream ? '1' : '0',
+      error_class: errorClass ?? '',
+      cold_start: context.coldStart ? '1' : '0',
     },
   });
+
+  if (context.mode === 'isr' && isrState !== null) {
+    hooks?.metric?.({
+      name: 'facetheory.isr.cache',
+      value: 1,
+      tags: {
+        method: req.method,
+        route_pattern: context.routePattern || req.path,
+        state: isrState,
+        status: String(out.status),
+      },
+    });
+  }
 
   if (context.renderMs !== null) {
     hooks?.metric?.({
@@ -588,6 +828,33 @@ function finishResponse(
   return out;
 }
 
+function withObservedError(
+  response: FaceResponse,
+  phase: FaceErrorPhase,
+  value: unknown,
+): FaceResponse {
+  Object.defineProperty(response, OBSERVED_ERROR, {
+    value: { phase, value },
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+  return response;
+}
+
+function observedErrorFromResponse(
+  response: FaceResponse,
+): ObservedFaceError | null {
+  return (response as FaceResponseWithObservedError)[OBSERVED_ERROR] ?? null;
+}
+
+function observedErrorFromCaughtRenderError(err: unknown): ObservedFaceError {
+  if (err instanceof StreamPreflightError) {
+    return { phase: 'stream-preflight', value: err.cause };
+  }
+  return { phase: 'render', value: err };
+}
+
 function queryFromPath(path: string): Record<string, string[]> {
   const idx = path.indexOf('?');
   if (idx < 0 || idx === path.length - 1) return {};
@@ -597,8 +864,8 @@ function queryFromPath(path: string): Record<string, string[]> {
 function toHeaders(
   input: FaceRenderResult['headers'],
   cookies: string[] | undefined,
-): Headers {
-  const headers: Headers = {};
+): FaceHeaders {
+  const headers: FaceHeaders = {};
   const setCookieValues: string[] = [];
 
   for (const [key, value] of Object.entries(input ?? {})) {
@@ -629,7 +896,7 @@ function toHeaders(
     headers['set-cookie'] = setCookieValues;
   }
 
-  const sortedHeaders: Headers = {};
+  const sortedHeaders: FaceHeaders = {};
   for (const key of Object.keys(headers).sort()) {
     sortedHeaders[key] = headers[key] ?? [];
   }
@@ -713,10 +980,20 @@ function isExternalHydration(
   return hydration.type === 'external';
 }
 
+interface StreamErrorTelemetryContext {
+  hooks: FaceObservabilityHooks | null;
+  requestId: string;
+  method: string;
+  path: string;
+  routePattern: string;
+  mode: FaceMode | 'none';
+}
+
 async function toHTTPResponse(
   out: FaceRenderResult,
   req: Readonly<Required<FaceRequest>>,
   strictCspMaxStreamingBodyBytes: number,
+  streamTelemetry?: StreamErrorTelemetryContext,
 ): Promise<FaceResponse> {
   const status = out.status ?? 200;
   const headers = toHeaders(out.headers, out.cookies);
@@ -772,13 +1049,46 @@ async function toHTTPResponse(
     ...documentParts,
     head,
     body: await preflightStream(out.html),
+    ...(streamTelemetry
+      ? {
+          onStreamError: (err: unknown) =>
+            reportStreamError(streamTelemetry, err),
+        }
+      : {}),
   });
 
   return { status, headers, cookies, body, isBase64: false };
 }
 
+function reportStreamError(
+  context: StreamErrorTelemetryContext,
+  err: unknown,
+): void {
+  const errorClass = errorClassFor(err);
+  context.hooks?.log?.({
+    level: 'error',
+    event: 'facetheory.stream_error',
+    requestId: context.requestId,
+    method: context.method,
+    path: context.path,
+    routePattern: context.routePattern,
+    mode: context.mode,
+    errorClass,
+  });
+  context.hooks?.metric?.({
+    name: 'facetheory.stream_error',
+    value: 1,
+    tags: {
+      method: context.method,
+      route_pattern: context.routePattern || context.path,
+      mode: String(context.mode),
+      error_class: errorClass,
+    },
+  });
+}
+
 function applyStrictCspResponseHeader(
-  headers: Headers,
+  headers: FaceHeaders,
   policy: FaceRenderResult['csp'],
   cspNonce: string | null,
 ): void {
@@ -849,10 +1159,31 @@ async function preflightStream(
   })();
 }
 
+function withQueryString(
+  path: string,
+  query: Record<string, string[]>,
+): string {
+  const params = new URLSearchParams();
+  for (const [key, values] of Object.entries(query)) {
+    for (const value of values) {
+      params.append(key, value);
+    }
+  }
+  const queryString = params.toString();
+  return queryString ? `${path}?${queryString}` : path;
+}
+
+function redirectResponse(location: string): FaceResponse {
+  return textResponse(308, 'Permanent Redirect', {
+    location: [location],
+    'content-type': ['text/plain; charset=utf-8'],
+  });
+}
+
 function textResponse(
   status: number,
   body: string,
-  headers: Headers,
+  headers: FaceHeaders,
 ): FaceResponse {
   return {
     status,

@@ -1,12 +1,30 @@
 <script lang="ts">
-  export interface AuthFlowStep {
-    key: string;
-    label: string;
-    description?: unknown;
+  import { resolveAuthFlowStepState } from '../../stitch-hosted-auth/index.js';
+  import type { AuthFlowStep } from '../../stitch-hosted-auth/index.js';
+
+  let {
+    steps = [],
+    currentIndex,
+  }: {
+    steps?: AuthFlowStep[];
+    currentIndex: number;
+  } = $props();
+
+  function stepAriaCurrent(index: number): 'step' | undefined {
+    return resolveAuthFlowStepState(index, currentIndex).ariaCurrent;
   }
 
-  export let steps: AuthFlowStep[] = [];
-  export let currentIndex: number;
+  function stepDotColor(index: number): string {
+    return resolveAuthFlowStepState(index, currentIndex).dotColor;
+  }
+
+  function stepLabelColor(index: number): string {
+    return resolveAuthFlowStepState(index, currentIndex).labelColor;
+  }
+
+  function stepLabelWeight(index: number): 400 | 600 {
+    return resolveAuthFlowStepState(index, currentIndex).labelFontWeight;
+  }
 </script>
 
 <ol
@@ -15,23 +33,15 @@
 >
   {#each steps as step, index (step.key)}
     <li
-      aria-current={index === currentIndex ? 'step' : undefined}
+      aria-current={stepAriaCurrent(index)}
       style="display:flex;align-items:center;gap:8px;"
     >
       <span
         aria-hidden="true"
-        style={`width:10px;height:10px;border-radius:9999px;display:inline-block;background:${
-          index < currentIndex || index === currentIndex
-            ? 'var(--stitch-color-primary, #1f108e)'
-            : 'var(--stitch-color-surface-container-high, #e2e7ff)'
-        };`}
+        style={`width:10px;height:10px;border-radius:9999px;display:inline-block;background:${stepDotColor(index)};`}
       />
       <span
-        style={`font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:${
-          index === currentIndex
-            ? 'var(--stitch-color-on-surface, #131b2e)'
-            : 'var(--stitch-color-on-surface-variant, #464553)'
-        };font-weight:${index === currentIndex ? 600 : 400};`}
+        style={`font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:${stepLabelColor(index)};font-weight:${stepLabelWeight(index)};`}
       >
         {step.label}
       </span>

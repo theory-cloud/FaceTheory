@@ -1,12 +1,19 @@
 <script lang="ts">
   import type { KeyValueEntry } from './types.js';
 
-  export let entries: KeyValueEntry[] = [];
-  export let labelWidth: number | string = '48px';
-  export let valueMono = true;
+  let {
+    entries = [],
+    labelWidth = '48px',
+    valueMono = true,
+  }: {
+    entries?: KeyValueEntry[];
+    labelWidth?: number | string;
+    valueMono?: boolean;
+  } = $props();
 
-  $: labelWidthValue =
-    typeof labelWidth === 'number' ? `${labelWidth}px` : labelWidth;
+  const labelWidthValue = $derived(
+    typeof labelWidth === 'number' ? `${labelWidth}px` : labelWidth,
+  );
 </script>
 
 <dl

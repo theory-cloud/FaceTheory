@@ -29,3 +29,9 @@ export {
   type AuthStateCardProps,
   type AuthStateVariant,
 } from './states.js';
+
+export type {
+  AuthPageBackground,
+  AuthPasskeyButtonType,
+  AuthStateVariantPalette,
+} from '../../stitch-hosted-auth/index.js';

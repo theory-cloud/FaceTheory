@@ -11,7 +11,11 @@ pnpm-debug.log*
 dist/
 coverage/
 ts/examples/ssg-basic/dist-static/
+ts/examples/vue-ssg/dist-static/
 ts/*.tgz
+
+# Local test harness scratch
+.tmp-facetheory-svelte-ssr-fixtures-*/
 
 # OS/editor
 .DS_Store

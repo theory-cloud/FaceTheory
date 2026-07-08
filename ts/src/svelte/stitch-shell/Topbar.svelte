@@ -1,35 +1,53 @@
 <!--
   Stitch Topbar (Svelte).
 
-  Named slots:
-    - `logo`         Brand logo slot (icon/img/component). Rendered at the far
+  Named snippets:
+    - `logo`         Brand logo (icon/img/component). Rendered at the far
                      left before `surfaceLabel` and `left`. Brand-agnostic:
-                     FaceTheory provides the slot only.
-    - `surfaceLabel` Surface label slot (e.g. a "surface chip" identifying
+                     FaceTheory provides the snippet only.
+    - `surfaceLabel` Surface label (e.g. a "surface chip" identifying
                      Core / MCP / Auth, or any consumer-defined
                      classification). Rendered to the right of `logo` and
                      before `left`. Brand-agnostic.
-    - `left`         Left-aligned slot; typically the current page title or
+    - `left`         Left-aligned content; typically the current page title or
                      search.
-    - `center`       Center slot; typically contextual actions or filters.
-    - `right`        Right-aligned slot; typically the account/user menu.
+    - `center`       Center content; typically contextual actions or filters.
+    - `right`        Right-aligned content; typically the account/user menu.
 
   Props:
     - `showLogo`          Optional explicit override for whether the logo
                           wrapper chrome should render. When undefined,
-                          Topbar falls back to `$$slots.logo`. Shell passes
-                          this prop so callers of Shell that do not provide a
-                          `topbarLogo` slot get no phantom wrapper — Shell's
-                          unconditional forwarding would otherwise make
-                          `$$slots.logo` read truthy regardless.
+                          Topbar falls back to whether a `logo` snippet was
+                          provided. Shell passes this prop so callers of Shell
+                          that do not provide a `topbarLogo` snippet get no
+                          phantom wrapper — Shell's unconditional forwarding
+                          would otherwise make the `logo` snippet read truthy
+                          regardless.
     - `showSurfaceLabel`  Same pattern for the surface-label wrapper.
 -->
 <script lang="ts">
-  export let showLogo: boolean | undefined = undefined;
-  export let showSurfaceLabel: boolean | undefined = undefined;
+  import type { Snippet } from 'svelte';
 
-  $: renderLogo = showLogo ?? Boolean($$slots.logo);
-  $: renderSurfaceLabel = showSurfaceLabel ?? Boolean($$slots.surfaceLabel);
+  let {
+    showLogo = undefined,
+    showSurfaceLabel = undefined,
+    logo,
+    surfaceLabel,
+    left,
+    center,
+    right,
+  }: {
+    showLogo?: boolean | undefined;
+    showSurfaceLabel?: boolean | undefined;
+    logo?: Snippet;
+    surfaceLabel?: Snippet;
+    left?: Snippet;
+    center?: Snippet;
+    right?: Snippet;
+  } = $props();
+
+  const renderLogo = $derived(showLogo ?? Boolean(logo));
+  const renderSurfaceLabel = $derived(showSurfaceLabel ?? Boolean(surfaceLabel));
 </script>
 
 <header
@@ -42,24 +60,24 @@
   >
     {#if renderLogo}
       <div class="facetheory-stitch-topbar-logo" style="display:flex;align-items:center;">
-        <slot name="logo" />
+        {@render logo?.()}
       </div>
     {/if}
     {#if renderSurfaceLabel}
       <div class="facetheory-stitch-topbar-surface-label" style="display:flex;align-items:center;">
-        <slot name="surfaceLabel" />
+        {@render surfaceLabel?.()}
       </div>
     {/if}
-    {#if $$slots.left}
+    {#if left}
       <div style="min-width:0;">
-        <slot name="left" />
+        {@render left()}
       </div>
     {/if}
   </div>
   <div style="flex:1;display:flex;justify-content:center;">
-    <slot name="center" />
+    {@render center?.()}
   </div>
   <div style="flex:1;display:flex;justify-content:flex-end;gap:12px;">
-    <slot name="right" />
+    {@render right?.()}
   </div>
 </header>

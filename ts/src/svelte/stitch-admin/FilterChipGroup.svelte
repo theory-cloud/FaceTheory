@@ -1,11 +1,19 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import FilterChip from './FilterChip.svelte';
   import type { FilterChipConfig } from './types.js';
 
-  export let chips: FilterChipConfig[] = [];
-  export let onChipClick: ((key: string) => void) | undefined = undefined;
-  export let onChipRemove: ((key: string) => void) | undefined = undefined;
-  export let trailing: unknown = undefined;
+  let {
+    chips = [],
+    onChipClick = undefined,
+    onChipRemove = undefined,
+    trailing,
+  }: {
+    chips?: FilterChipConfig[];
+    onChipClick?: ((key: string) => void) | undefined;
+    onChipRemove?: ((key: string) => void) | undefined;
+    trailing?: Snippet;
+  } = $props();
 </script>
 
 <div
@@ -23,19 +31,12 @@
     />
   {/each}
 
-  {#if $$slots.trailing}
+  {#if trailing}
     <span
       class="facetheory-stitch-filter-chip-group-trailing"
       style="margin-left:auto;display:inline-flex;"
     >
-      <slot name="trailing" />
-    </span>
-  {:else if trailing !== undefined}
-    <span
-      class="facetheory-stitch-filter-chip-group-trailing"
-      style="margin-left:auto;display:inline-flex;"
-    >
-      {trailing}
+      {@render trailing()}
     </span>
   {/if}
 </div>

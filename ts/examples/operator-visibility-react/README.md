@@ -1,8 +1,12 @@
-# Operator visibility React SSR example
+# Operator Visibility React SSR Example
 
-This example renders a deterministic operator visibility dashboard through the React adapter.
+## Demonstrates
 
-The Face `load()` function injects every guard, authority, confidence, staleness, health, and matrix value. The React render path only displays those values; it does not compute freshness from ambient time, browser globals, auth/session state, or network calls.
+This example renders a deterministic operator-visibility dashboard through the React adapter. The Face `load()` function injects guard, authority, confidence, staleness, health, correlation, and matrix values; the React tree only displays caller-supplied data.
+
+## Run
+
+From `ts/`:
 
 ```bash
 npm run example:operator-visibility:build
@@ -10,3 +14,9 @@ npm run example:operator-visibility:serve
 ```
 
 The build command writes `examples/operator-visibility-react/dist/index.html` for inspection. The serve command starts a small Node HTTP server on `PORT` or `4174`.
+
+## Backs
+
+- `docs/features/operator-visibility.md` — operator dashboard boundary.
+- `docs/getting-started.md` — operator visibility example walkthrough.
+- Public package surfaces: `@theory-cloud/facetheory/stitch-admin` and `@theory-cloud/facetheory/react/stitch-admin`.

@@ -1,7 +1,17 @@
 <script lang="ts">
-  export let eyebrow: unknown = undefined;
-  export let title: unknown = undefined;
-  export let description: unknown = undefined;
+  import type { Snippet } from 'svelte';
+
+  let {
+    eyebrow = undefined,
+    title = undefined,
+    description = undefined,
+    children,
+  }: {
+    eyebrow?: unknown;
+    title?: unknown;
+    description?: unknown;
+    children?: Snippet;
+  } = $props();
 </script>
 
 <div
@@ -33,6 +43,6 @@
   {/if}
 
   <div style="display:flex;flex-direction:column;gap:12px;">
-    <slot />
+    {@render children?.()}
   </div>
 </div>

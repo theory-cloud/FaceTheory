@@ -2,6 +2,7 @@ import {
   classifyFaceNavigationAnchorClick,
   FACE_NAVIGATION_CLASSIFIER_SOURCE,
 } from './spa.js';
+import { isElement, isElementWithTag } from './dom-guards.js';
 import type { ClassifyFaceNavigationAnchorClickOptions } from './spa.js';
 
 export const NAVIGATION_PENDING_CLASSIFIER_SOURCE =
@@ -15,6 +16,16 @@ export const NAVIGATION_PENDING_INDICATOR_ATTRIBUTE =
 export const DEFAULT_NAVIGATION_PENDING_INDICATOR_ID =
   'facetheory-navigation-pending';
 export const DEFAULT_NAVIGATION_PENDING_TEXT = 'Loading…';
+
+export const NAVIGATION_PENDING_BOOTSTRAP_SOURCE = `const NAV_ATTR=${JSON.stringify(NAVIGATION_PENDING_ATTRIBUTE)};
+const INDICATOR_ATTR=${JSON.stringify(NAVIGATION_PENDING_INDICATOR_ATTRIBUTE)};
+const DEFAULT_INDICATOR_ID=${JSON.stringify(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID)};
+function sameOriginUrl(href){try{const url=new URL(href,window.location.href);return url.origin===window.location.origin?url:null;}catch{return null;}}
+function acceptedAnchor(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.altKey||event.ctrlKey||event.shiftKey)return null;const target=event.target instanceof Element?event.target.closest('a[href]'):null;if(!(target instanceof HTMLAnchorElement))return null;if(target.target&&target.target.toLowerCase()!=='_self')return null;if(target.hasAttribute('download')||target.hasAttribute('data-facetheory-reload'))return null;const rel=(target.getAttribute('rel')||'').toLowerCase().split(/\\s+/);if(rel.includes('external'))return null;const url=sameOriginUrl(target.href);if(!url||url.href===window.location.href)return null;return target;}
+function isIndicator(el){return el instanceof HTMLElement&&el.getAttribute(INDICATOR_ATTR)==='true';}
+function indicatorElement(id){const existing=document.getElementById(id);if(isIndicator(existing))return existing;if(!existing){const el=document.createElement('div');el.id=id;return el;}for(let i=1;i<1000;i+=1){const candidate=id+'-'+String(i);const next=document.getElementById(candidate);if(isIndicator(next))return next;if(!next){const el=document.createElement('div');el.id=candidate;console.warn('FaceTheory navigation pending indicator id "'+id+'" already belongs to a non-indicator element; using "'+candidate+'" instead.');return el;}}throw new Error('FaceTheory navigation pending could not allocate indicator id');}
+function showPending(source,targets){for(const target of targets){target.setAttribute(NAV_ATTR,source);target.setAttribute('aria-busy','true');target.classList.add('facetheory-navigation-pending-control');}const el=indicatorElement(DEFAULT_INDICATOR_ID);el.textContent='Loading…';el.setAttribute('role','status');el.setAttribute('aria-live','polite');el.setAttribute('aria-atomic','true');el.setAttribute(NAV_ATTR,source);el.setAttribute(INDICATOR_ATTR,'true');el.classList.add('facetheory-navigation-pending-pill');if(!el.parentNode)(document.body||document.documentElement).appendChild(el);}
+function startNavigationPending(){document.addEventListener('click',event=>{const anchor=acceptedAnchor(event);if(anchor)showPending('link',[anchor]);});document.addEventListener('submit',event=>{const form=event.target instanceof HTMLFormElement?event.target:null;if(!form)return;const targets=[form];if(event.submitter instanceof HTMLElement)targets.push(event.submitter);showPending('form',targets);},true);}`;
 
 export interface NavigationPendingClassNames {
   form?: string;
@@ -406,21 +417,4 @@ function readSubmitForm(event: SubmitEvent): HTMLFormElement | null {
 
 function readSubmitter(event: SubmitEvent): HTMLElement | null {
   return isElement(event.submitter) ? (event.submitter as HTMLElement) : null;
-}
-
-function isElement(value: EventTarget | null): value is Element {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { tagName?: unknown }).tagName === 'string' &&
-    typeof (value as { setAttribute?: unknown }).setAttribute === 'function' &&
-    typeof (value as { classList?: unknown }).classList === 'object'
-  );
-}
-
-function isElementWithTag(
-  value: EventTarget | null,
-  tagName: string,
-): value is Element {
-  return isElement(value) && value.tagName.toLowerCase() === tagName;
 }

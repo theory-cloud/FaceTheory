@@ -1,9 +1,17 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { WizardRecoveryState, WizardRecoveryStatus } from './types.js';
   import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
-  export let title: unknown = 'Wizard recovery';
-  export let status: WizardRecoveryStatus;
+  let {
+    title = 'Wizard recovery',
+    status,
+    actions,
+  }: {
+    title?: unknown;
+    status: WizardRecoveryStatus;
+    actions?: Snippet;
+  } = $props();
 
   const RECOVERY_LABEL: Record<WizardRecoveryState, string> = {
     fresh: 'Fresh session',
@@ -13,8 +21,8 @@
     unknown: 'Recovery unknown',
   };
 
-  $: role = status.state === 'failed' ? 'alert' : 'status';
-  $: chipLabel = status.label ?? RECOVERY_LABEL[status.state];
+  const role = $derived(status.state === 'failed' ? 'alert' : 'status');
+  const chipLabel = $derived(status.label ?? RECOVERY_LABEL[status.state]);
 </script>
 
 <section
@@ -54,5 +62,5 @@
   {#if status.metadata !== undefined}
     <MetadataBadgeGroup metadata={status.metadata} />
   {/if}
-  <slot name="actions" />
+  {@render actions?.()}
 </section>

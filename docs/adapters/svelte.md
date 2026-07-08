@@ -2,14 +2,16 @@
 title: Svelte adapter
 ---
 
-The Svelte adapter renders Faces using Svelte 5's SSR output. Components compile to a server module exporting `render()`; FaceTheory wires that through the same `FaceModule` contract used by React and Vue.
+The Svelte adapter renders Faces using Svelte 5's SSR output. FaceTheory requires **Svelte `>=5.55.7`** and authors its components with Svelte 5 runes (`$props`/`$state`/`$derived`, snippets and `{@render}` in place of slots, and `onclick=`-style event attributes). Components compile to a server module that FaceTheory renders through `svelte/server`, wiring that through the same `FaceModule` contract used by React and Vue.
+
+> **Svelte 4 is not supported.** Support for Svelte 4 (and Svelte 5 through 5.55.6) was dropped in FaceTheory v4.0.0; the excluded band was not validated for deterministic SSR/hydration. See the [migration guide](../migration-guide.md).
 
 ## Install
 
 ```bash
 npm install --save-exact \
   https://github.com/theory-cloud/FaceTheory/releases/download/v3.4.2/theory-cloud-facetheory-3.4.2.tgz \
-  svelte
+  svelte@^5.55.7
 ```
 
 ## Minimal Face

@@ -8,12 +8,14 @@ import { performance } from 'node:perf_hooks';
 import {
   CONTROL_PLANE_BOOTSTRAP_MODULE_PATH,
   CONTROL_PLANE_RESPONSIVE_PRIMITIVES_STYLESHEET_PATH,
-  assertControlPlaneBoundaryGuardrails,
-  assertControlPlaneDeliveryGuardrails,
   createControlPlaneApp,
   createControlPlanePresetDescriptor,
   type ControlPlaneSectionReadContract,
-} from '../../src/index.js';
+} from '../../src/control-plane.js';
+import {
+  assertControlPlaneBoundaryGuardrails,
+  assertControlPlaneDeliveryGuardrails,
+} from '../../scripts/control-plane-guardrails.js';
 import { handleLambdaUrlEvent } from '../../src/lambda-url.js';
 import type { FaceBody } from '../../src/types.js';
 
@@ -231,6 +233,8 @@ test('control-plane preset: strict section endpoints emit no-inline CSP headers'
 });
 
 test('control-plane preset: strict section endpoints fail closed on unsafe fragments', async () => {
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> =
+    [];
   const app = createControlPlaneApp({
     csp: { mode: 'strict' },
     gate: () => ({ ok: true }),
@@ -247,11 +251,21 @@ test('control-plane preset: strict section endpoints fail closed on unsafe fragm
         ],
       },
     ],
+    faceApp: {
+      observability: {
+        onError: (err, ctx) =>
+          observedErrors.push({
+            err,
+            ctx: ctx as unknown as Record<string, unknown>,
+          }),
+      },
+    },
   });
 
   const section = await app.handle({
     method: 'GET',
     path: '/_facetheory/control-plane/sections/root-0/unsafe',
+    headers: { 'x-request-id': ['cp-section-validation-1'] },
   });
 
   assert.equal(section.status, 500);
@@ -260,6 +274,19 @@ test('control-plane preset: strict section endpoints fail closed on unsafe fragm
     /script-src 'self'/,
   );
   assert.equal(await collect(section.body), '');
+  assert.equal(observedErrors.length, 1);
+  assert.equal(observedErrors[0]?.err instanceof Error, true);
+  assert.match(
+    (observedErrors[0]?.err as Error).message,
+    /strict CSP rejects inline script tags/,
+  );
+  assert.equal(
+    observedErrors[0]?.ctx.phase,
+    'control-plane-section-validation',
+  );
+  assert.equal(observedErrors[0]?.ctx.status, 500);
+  assert.equal(observedErrors[0]?.ctx.sectionId, 'unsafe');
+  assert.equal(observedErrors[0]?.ctx.requestId, 'cp-section-validation-1');
 });
 
 test('control-plane preset: rejects section reads without bounded tenant scope at app construction', () => {

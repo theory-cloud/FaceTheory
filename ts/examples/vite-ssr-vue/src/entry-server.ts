@@ -1,7 +1,7 @@
-import { createFaceApp } from '../../../src/app.js';
-import type { ViteManifest } from '../../../src/vite.js';
-import { viteAssetsForEntry, viteHydrationForEntry } from '../../../src/vite.js';
-import { createVueFace, h } from '../../../src/vue/index.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import type { ViteManifest } from '@theory-cloud/facetheory';
+import { viteAssetsForEntry, viteHydrationForEntry } from '@theory-cloud/facetheory';
+import { createVueFace, h } from '@theory-cloud/facetheory/vue';
 
 import { App } from './app.js';
 

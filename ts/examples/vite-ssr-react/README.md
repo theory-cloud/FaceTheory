@@ -1,30 +1,28 @@
-# Vite SSR Example (React)
+# Vite SSR React Example
 
-Builds both:
+## Demonstrates
 
-- client assets + `manifest.json`
-- server bundle entrypoint
+This example builds a React SSR app with Vite client assets, a Vite server bundle, manifest-derived head tags, and a matching hydration bootstrap module. It is also the default FaceTheory Vite middleware dev-loop example.
 
-Then runs FaceTheory SSR using the manifest to inject preload/CSS tags and the hydration bootstrap module.
-
-## Build
+## Run
 
 From `ts/`:
 
 ```bash
 npm run example:vite:ssr:build
-```
-
-Outputs:
-
-- `ts/examples/vite-ssr-react/dist/client/.vite/manifest.json`
-- `ts/examples/vite-ssr-react/dist/client/assets/*`
-- `ts/examples/vite-ssr-react/dist/server/entry-server.js`
-
-## Run
-
-```bash
 npm run example:vite:ssr:serve
 ```
 
-Then open `http://localhost:4174/`.
+Open `http://localhost:4174/`.
+
+For the dev loop, from `ts/examples/vite-ssr-react/` run:
+
+```bash
+npm run dev
+```
+
+## Backs
+
+- `docs/adapters/react.md` — React Vite SSR example.
+- `docs/getting-started.md` — Vite middleware dev loop.
+- Public package surfaces: Vite helpers from `@theory-cloud/facetheory` and React adapter exports.

@@ -3,6 +3,6 @@ Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/fram
 Rubric ID: SEC-1
 
 npm-audit: PASS (ts)
-npm-audit: ALLOW (infra/apptheory-ssr-site) brace-expansion via bundled aws-cdk-lib tarball; no custom CDK tarball is maintained
-npm-audit: ALLOW (infra/apptheory-ssg-isr-site) brace-expansion via bundled aws-cdk-lib tarball; no custom CDK tarball is maintained
+npm-audit: PASS (infra/apptheory-ssr-site)
+npm-audit: PASS (infra/apptheory-ssg-isr-site)
 workflow-action-pins: PASS

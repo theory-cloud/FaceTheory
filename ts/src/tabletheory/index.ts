@@ -3,7 +3,7 @@ import {
   type FaceTheoryIsrMetaStore,
   type FaceTheoryIsrMetaStoreConfig,
   type FaceTheoryIsrMeta,
-} from '@theory-cloud/tabletheory-ts';
+} from '@theory-cloud/tabletheory-ts/facetheory';
 
 import type {
   CommitIsrGenerationInput,
@@ -17,18 +17,28 @@ import type {
 const DEFAULT_STATUS = 200;
 const DEFAULT_CONTENT_TYPE = 'text/html; charset=utf-8';
 
+// TableTheory's current FaceTheory ISR metadata model does not expose
+// status/contentType fields. Until that schema grows, the adapter keeps
+// deterministic defaults here and FaceTheory restores response status and
+// content type from HTML object metadata on cache hits.
+
 function normalizeRevalidateSeconds(value: number): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;
   return Math.max(0, numeric);
 }
 
-function recordFromTableTheoryMeta(cacheKey: string, meta: FaceTheoryIsrMeta): IsrMetaRecord {
+function recordFromTableTheoryMeta(
+  cacheKey: string,
+  meta: FaceTheoryIsrMeta,
+): IsrMetaRecord {
   return {
     cacheKey,
     htmlPointer: meta.htmlPointer ?? null,
     generatedAt: Number(meta.generatedAtMs ?? 0),
-    revalidateSeconds: normalizeRevalidateSeconds(Number(meta.revalidateSeconds ?? 0)),
+    revalidateSeconds: normalizeRevalidateSeconds(
+      Number(meta.revalidateSeconds ?? 0),
+    ),
     status: DEFAULT_STATUS,
     contentType: DEFAULT_CONTENT_TYPE,
     etag: typeof meta.etag === 'string' ? meta.etag : null,
@@ -38,7 +48,10 @@ function recordFromTableTheoryMeta(cacheKey: string, meta: FaceTheoryIsrMeta): I
   };
 }
 
-function defaultRecord(cacheKey: string, fallbackRevalidateSeconds: number): IsrMetaRecord {
+function defaultRecord(
+  cacheKey: string,
+  fallbackRevalidateSeconds: number,
+): IsrMetaRecord {
   return {
     cacheKey,
     htmlPointer: null,
@@ -53,6 +66,15 @@ function defaultRecord(cacheKey: string, fallbackRevalidateSeconds: number): Isr
   };
 }
 
+export class IsrInvalidateUnsupportedError extends Error {
+  constructor(readonly cacheKey: string) {
+    super(
+      `FaceTheory ISR invalidate("${cacheKey}") is not supported by the TableTheory adapter yet; pending TableTheory coordination must add a first-class invalidation/delete operation to the FaceTheory ISR metadata store before this adapter can invalidate records.`,
+    );
+    this.name = 'IsrInvalidateUnsupportedError';
+  }
+}
+
 export interface TableTheoryIsrMetaStoreAdapterOptions {
   defaultStatus?: number;
   defaultContentType?: string;
@@ -63,12 +85,17 @@ export class TableTheoryIsrMetaStoreAdapter implements IsrMetaStore {
   private readonly defaultStatus: number;
   private readonly defaultContentType: string;
 
-  constructor(inner: FaceTheoryIsrMetaStore, options: TableTheoryIsrMetaStoreAdapterOptions = {}) {
+  constructor(
+    inner: FaceTheoryIsrMetaStore,
+    options: TableTheoryIsrMetaStoreAdapterOptions = {},
+  ) {
     this.inner = inner;
     this.defaultStatus = Number.isFinite(options.defaultStatus ?? NaN)
       ? Math.trunc(Number(options.defaultStatus))
       : DEFAULT_STATUS;
-    this.defaultContentType = String(options.defaultContentType ?? DEFAULT_CONTENT_TYPE).trim() || DEFAULT_CONTENT_TYPE;
+    this.defaultContentType =
+      String(options.defaultContentType ?? DEFAULT_CONTENT_TYPE).trim() ||
+      DEFAULT_CONTENT_TYPE;
   }
 
   async get(cacheKey: string): Promise<IsrMetaRecord | null> {
@@ -81,7 +108,13 @@ export class TableTheoryIsrMetaStoreAdapter implements IsrMetaStore {
     };
   }
 
-  async tryAcquireLease(input: TryAcquireIsrLeaseInput): Promise<TryAcquireIsrLeaseResult> {
+  async invalidate(cacheKey: string): Promise<void> {
+    throw new IsrInvalidateUnsupportedError(cacheKey);
+  }
+
+  async tryAcquireLease(
+    input: TryAcquireIsrLeaseInput,
+  ): Promise<TryAcquireIsrLeaseResult> {
     const existingMeta = await this.inner.get({ cacheKey: input.cacheKey });
     const base = existingMeta
       ? {
@@ -125,7 +158,10 @@ export class TableTheoryIsrMetaStoreAdapter implements IsrMetaStore {
   }
 
   async commitGeneration(input: CommitIsrGenerationInput): Promise<void> {
-    if (!Number.isFinite(input.revalidateSeconds) || input.revalidateSeconds <= 0) {
+    if (
+      !Number.isFinite(input.revalidateSeconds) ||
+      input.revalidateSeconds <= 0
+    ) {
       throw new Error(
         `TableTheory FaceTheoryIsrMetaStore requires revalidateSeconds > 0 (got ${input.revalidateSeconds})`,
       );
@@ -155,7 +191,9 @@ export interface CreateTableTheoryIsrMetaStoreOptions extends TableTheoryIsrMeta
   config: FaceTheoryIsrMetaStoreConfig;
 }
 
-export function createTableTheoryIsrMetaStore(options: CreateTableTheoryIsrMetaStoreOptions): IsrMetaStore {
+export function createTableTheoryIsrMetaStore(
+  options: CreateTableTheoryIsrMetaStoreOptions,
+): IsrMetaStore {
   const inner = createFaceTheoryIsrMetaStore(options.config);
   return new TableTheoryIsrMetaStoreAdapter(inner, options);
 }

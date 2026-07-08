@@ -1,11 +1,12 @@
 import { computed, defineComponent, h, ref } from 'vue';
 import type { PropType } from 'vue';
 
-function splitOtp(value: string, length: number): string[] {
-  const chars = value.slice(0, length).split('');
-  while (chars.length < length) chars.push('');
-  return chars;
-}
+import {
+  authOtpInputClassName,
+  splitAuthOtpValue,
+  updateAuthOtpValueAtIndex,
+} from '../../stitch-hosted-auth/index.js';
+import type { OTPInputProps } from '../../stitch-hosted-auth/index.js';
 
 export const OTPInput = defineComponent({
   name: 'FaceTheoryVueOTPInput',
@@ -13,11 +14,11 @@ export const OTPInput = defineComponent({
     length: { type: Number, default: 6 },
     value: { type: String, required: false },
     onChange: {
-      type: Function as PropType<((value: string) => void) | undefined>,
+      type: Function as PropType<OTPInputProps['onChange']>,
       required: false,
     },
     onComplete: {
-      type: Function as PropType<((value: string) => void) | undefined>,
+      type: Function as PropType<OTPInputProps['onComplete']>,
       required: false,
     },
     disabled: { type: Boolean, default: false },
@@ -29,9 +30,12 @@ export const OTPInput = defineComponent({
     const renderedValue = computed(() => props.value ?? internalValue.value);
 
     function updateIndex(index: number, nextChar: string): void {
-      const chars = splitOtp(renderedValue.value, props.length);
-      chars[index] = nextChar.slice(-1);
-      const nextValue = chars.join('').slice(0, props.length).trimEnd();
+      const nextValue = updateAuthOtpValueAtIndex(
+        renderedValue.value,
+        props.length,
+        index,
+        nextChar,
+      );
       internalValue.value = nextValue;
       props.onChange?.(nextValue);
       if (nextValue.length === props.length) props.onComplete?.(nextValue);
@@ -41,18 +45,13 @@ export const OTPInput = defineComponent({
       h(
         'div',
         {
-          class: [
-            'facetheory-stitch-otp-input',
-            props.invalid ? 'facetheory-stitch-otp-input-invalid' : null,
-          ]
-            .filter(Boolean)
-            .join(' '),
+          class: authOtpInputClassName(props.invalid),
           style: {
             display: 'flex',
             gap: '8px',
           },
         },
-        splitOtp(renderedValue.value, props.length).map((char, index) =>
+        splitAuthOtpValue(renderedValue.value, props.length).map((char, index) =>
           h('input', {
             key: index,
             value: char,
