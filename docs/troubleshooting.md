@@ -63,12 +63,12 @@ For AppTheory/TableTheory alignment, make the app's `package.json` use the same 
 ```json
 {
   "dependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.16.1/theory-cloud-apptheory-1.16.1.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz"
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.17.0/theory-cloud-apptheory-1.17.0.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.3/theory-cloud-tabletheory-ts-2.0.3.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.3/theory-cloud-tabletheory-ts-2.0.3.tgz"
     }
   }
 }

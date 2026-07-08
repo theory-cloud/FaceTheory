@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.0.0...v4.0.1-rc) (2026-07-08)
+
+
+### Bug Fixes
+
+* **deps:** update upstream release pins ([79faf94](https://github.com/theory-cloud/FaceTheory/commit/79faf94d66ed423ad268807968d55a26df2e0914))
+
 ## [4.0.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v3.8.1...v4.0.0-rc) (2026-07-08)
 
 
