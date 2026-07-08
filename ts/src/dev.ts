@@ -203,7 +203,8 @@ function sendDevError(
   if (!res.headersSent) {
     res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
   }
-  res.end(devErrorBody(err));
+  const body = devErrorBody(err);
+  res.end(body);
 }
 
 function listenUrl(address: AddressInfo | string | null, host?: string): string {

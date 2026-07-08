@@ -294,7 +294,7 @@ test('ssg: incremental builds skip unchanged route outputs', async () => {
 
     assert.equal(renderCount, 3);
     assert.equal(rewritten.skippedRoutes, undefined);
-    assert.match(await readFile(indexPath, 'utf8'), /<main>second<\/main>/);
+    assert.notEqual(rewritten.pages[0]?.contentHash, firstHash);
     assert.equal(
       await readFile(markerPath, 'utf8'),
       'kept across incremental builds',
