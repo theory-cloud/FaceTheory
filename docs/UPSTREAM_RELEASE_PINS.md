@@ -7,13 +7,13 @@ This file records the currently pinned versions and the exact install strings we
 
 ## Pins
 
-- AppTheory (TypeScript): `v1.13.2`
-- AppTheory (CDK): `v1.13.2`
-- TableTheory (TypeScript): `v1.10.1`
+- AppTheory (TypeScript): `v1.16.1`
+- AppTheory (CDK): `v1.16.1`
+- TableTheory (TypeScript): `v2.0.2`
 
 ## Compatibility Impact
 
-The AppTheory `v1.13.2` runtime/CDK pins and the TableTheory `v1.10.1` TypeScript pin are a coordinated
+The AppTheory `v1.16.1` runtime/CDK pins and the TableTheory `v2.0.2` TypeScript pin are a coordinated
 FaceTheory compatibility baseline:
 
 - the AppTheory runtime pin keeps Lambda URL streaming and AppTheory integration examples on the same upstream release
@@ -36,38 +36,27 @@ and keep the single release lane intact.
 
 ## Release Asset SHA-256
 
-- AppTheory runtime tarball: `d11c3b30eaefa7244474c6d50af53bfdfeaf788991f95fcdeb4b3491246786ea`
-- AppTheory CDK tarball: `579965da470fbdd8e173a8910dad9fe1d508d361d21422237eed9f393a072b8c`
-- TableTheory TypeScript tarball: `9a96dea6d431fdbdf5dfb98408b6ca64b06350f988ab5411bd06406217a0ae97`
+- AppTheory runtime tarball: `0023e3cede74cadeeb166120c263bdb9a8c99970016d348da3a64ef08cf91aac`
+- AppTheory CDK tarball: `a227364b13cd23c85011a89802ca57fa623c6392c9448c03e0f0cc9e5dbfb2f1`
+- TableTheory TypeScript tarball: `f92279ab17f98eab85a30af7370b28efd1afd91d5d24ac81c0a4764de90422bc`
 
 ## Known Audit Exceptions
 
-FaceTheory does not repackage AWS dependencies. The `ts` workspace keeps `aws-cdk-lib@2.257.0` only to satisfy the exact
-`@theory-cloud/apptheory-cdk@1.13.2` peer used by reference constructs, and the `infra/apptheory-ssr-site` /
+There are no active `npm audit` exceptions for the current upstream baseline. `scripts/verify-npm-audit.sh` fails on any
+reported vulnerability in the `ts`, `infra/apptheory-ssr-site`, or `infra/apptheory-ssg-isr-site` workspaces.
+
+FaceTheory still does not repackage AWS dependencies. The `ts` workspace keeps `aws-cdk-lib@2.261.0` only to satisfy the
+exact `@theory-cloud/apptheory-cdk@1.16.1` peer used by reference constructs, and the `infra/apptheory-ssr-site` /
 `infra/apptheory-ssg-isr-site` workspaces are reference / example deployment shapes that consumer applications reproduce
-themselves. The `aws-cdk-lib` tarball bundles its own `node_modules/` for some transitives, and FaceTheory cannot ship a
-patched version of those without forking AWS CDK or breaking the AppTheory CDK peer. The exceptions below are narrowly
-scoped to one specific package name, one nested path inside `aws-cdk-lib/node_modules/`, one set of advisory URLs, and
-the explicitly named workspaces. Anything outside those gates is still treated as `FAIL` by
-`scripts/verify-npm-audit.sh`.
-
-### Active exceptions
-
-- **`brace-expansion`** — [GHSA-jxxr-4gwj-5jf2](https://github.com/advisories/GHSA-jxxr-4gwj-5jf2)
-  ("Large numeric range defeats documented `max` DoS protection"), moderate severity.
-  Present transitively at `node_modules/aws-cdk-lib/node_modules/brace-expansion` in the `ts` and
-  `infra/apptheory-*` workspaces because the pinned `aws-cdk-lib@2.257.0` tarball bundles its own copy. FaceTheory's
-  published package tarball does not ship `aws-cdk-lib` runtime code; the vulnerable copy is a dev/reference construct
-  dependency held to preserve the AppTheory CDK peer baseline. The exception will be removed once the AppTheory-compatible
-  CDK line vendors a patched `brace-expansion` (≥ `5.0.6`).
+themselves. If a future AppTheory-compatible CDK line reintroduces a bundled-transitive advisory, treat it as a normal
+security fix first; any exception must be narrow, documented here, and reviewed before merging.
 
 ### Recently cleared
 
-- **`fast-uri`** — AppTheory CDK `v1.13.2` requires `aws-cdk-lib@2.257.0`, and the infra example
-  lockfiles now resolve the previous nested `fast-uri` audit finding to the patched AWS CDK
-  dependency set. The `fast-uri` allowlist in `scripts/verify-npm-audit.sh` is kept as a
-  belt-and-suspenders guard against future regressions; remove it when `aws-cdk-lib` no
-  longer bundles `fast-uri` at all.
+- **`brace-expansion`** — AppTheory CDK `v1.16.1` requires `aws-cdk-lib@2.261.0`, and the npm audit baseline is now clean
+  across the `ts` and `infra/apptheory-*` workspaces.
+- **`fast-uri`** — AppTheory CDK `v1.16.1` requires `aws-cdk-lib@2.261.0`, and the infra example
+  lockfiles now resolve the previous nested `fast-uri` audit finding to the patched AWS CDK dependency set.
 
 ## Infra Lockfile Note
 
@@ -80,15 +69,15 @@ locks so `npm ci` can validate the AWS CDK package tree under npm 11.
 ```bash
   # AppTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.13.2/theory-cloud-apptheory-1.13.2.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.16.1/theory-cloud-apptheory-1.16.1.tgz
 
   # TableTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.13.2/theory-cloud-apptheory-cdk-1.13.2.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.16.1/theory-cloud-apptheory-cdk-1.16.1.tgz
 ```
 
 ## package.json Snippet (Pinned)
@@ -99,12 +88,12 @@ registry installs:
 ```json
 {
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.13.2/theory-cloud-apptheory-1.13.2.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz"
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.16.1/theory-cloud-apptheory-1.16.1.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz"
     }
   }
 }

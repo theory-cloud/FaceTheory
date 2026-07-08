@@ -3,7 +3,7 @@ import {
   type FaceTheoryIsrMetaStore,
   type FaceTheoryIsrMetaStoreConfig,
   type FaceTheoryIsrMeta,
-} from '@theory-cloud/tabletheory-ts';
+} from '@theory-cloud/tabletheory-ts/facetheory';
 
 import type {
   CommitIsrGenerationInput,
