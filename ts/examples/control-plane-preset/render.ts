@@ -4,8 +4,8 @@ import {
   CONTROL_PLANE_BOOTSTRAP_MODULE_PATH,
   CONTROL_PLANE_RESPONSIVE_PRIMITIVES_STYLESHEET_PATH,
   createControlPlaneApp,
-} from '../../src/control-plane.js';
-import { handleLambdaUrlEvent } from '../../src/lambda-url.js';
+} from '@theory-cloud/facetheory/control-plane';
+import { handleLambdaUrlEvent } from '@theory-cloud/facetheory';
 
 const args = new Map(
   process.argv.slice(2).map((arg) => {

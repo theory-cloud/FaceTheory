@@ -25,11 +25,17 @@
     "vue"
   ],
   "engines": {
-    "node": ">=24"
+    "node": ">=20"
   },
   "files": [
     "dist"
   ],
+  "bin": {
+    "facetheory": "./dist/create-cli.js",
+    "facetheory-create": "./dist/create-cli.js",
+    "facetheory-dev": "./dist/dev-cli.js",
+    "facetheory-doctor": "./dist/doctor-cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -59,6 +65,18 @@
       "types": "./dist/client/index.d.ts",
       "import": "./dist/client/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
+    },
+    "./adapter-csp": {
+      "types": "./dist/adapter-csp.d.ts",
+      "import": "./dist/adapter-csp.js"
+    },
+    "./dev": {
+      "types": "./dist/dev.d.ts",
+      "import": "./dist/dev.js"
+    },
     "./aws-s3": {
       "types": "./dist/aws-s3/index.d.ts",
       "import": "./dist/aws-s3/index.js"
@@ -74,6 +92,10 @@
     "./stitch-shell": {
       "types": "./dist/stitch-shell/index.d.ts",
       "import": "./dist/stitch-shell/index.js"
+    },
+    "./stitch-hosted-auth": {
+      "types": "./dist/stitch-hosted-auth/index.d.ts",
+      "import": "./dist/stitch-hosted-auth/index.js"
     },
     "./stitch-admin": {
       "types": "./dist/stitch-admin/index.d.ts",
@@ -172,7 +194,7 @@
     "antd": ">=5",
     "react": ">=18",
     "react-dom": ">=18",
-    "svelte": ">=4 <5.46.0 || >=5.55.7",
+    "svelte": ">=5.55.7",
     "vue": ">=3"
   },
   "peerDependenciesMeta": {
@@ -200,18 +222,26 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-svelte-sources.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint . --max-warnings=0",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "test": "npm run test:unit",
+    "dev": "npm run example:vite:ssr:dev",
+    "typecheck": "npm run build && tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . --max-warnings=0 && npm run verify:svelte:runes:self-test && npm run verify:svelte:runes",
+    "verify:svelte:runes": "bash scripts/verify-svelte-runes.sh",
+    "verify:svelte:runes:self-test": "bash scripts/verify-svelte-runes.sh --self-test",
+    "format": "prettier --write package.json README.md ../README.md ../docs/README.md ../docs/api-reference.md ../docs/getting-started.md ../docs/deprecation-policy.md ../docs/migration-guide.md ../docs/reference/render-modes.md ../docs/index.html ../docs/integrations/autheory.md ../docs/wizard-primitives.md ../docs/_config.yml ../docs/_data/nav.yml ../docs/_includes/toc.html ../.github/workflows/ci.yml && npm run verify:format-gate",
+    "format:check": "prettier --check package.json README.md ../README.md ../docs/README.md ../docs/api-reference.md ../docs/getting-started.md ../docs/deprecation-policy.md ../docs/migration-guide.md ../docs/reference/render-modes.md ../docs/index.html ../docs/integrations/autheory.md ../docs/wizard-primitives.md ../docs/_config.yml ../docs/_data/nav.yml ../docs/_includes/toc.html ../.github/workflows/ci.yml && npm run verify:format-gate",
+    "check": "npm run lint && npm run typecheck && npm run verify:examples:readmes && npm run test:unit",
+    "test": "npm run build && npm run test:unit",
     "test:unit": "tsx test/run-unit.ts",
     "ssg": "tsx src/ssg-cli.ts",
     "example:ssg:build": "tsx examples/ssg-basic/build.ts",
     "example:ssg:serve": "tsx examples/ssg-basic/serve-static.ts",
+    "example:vue:ssg:build": "vite build --config examples/vue-ssg/vite.config.ts && tsx examples/vue-ssg/build.ts",
+    "example:vue:ssg:serve": "tsx examples/vue-ssg/serve-static.ts",
     "example:buffered:serve": "tsx examples/react-ssr-buffered/node-server.ts",
     "example:streaming:serve": "tsx examples/react-ssr-streaming/node-server.ts",
+    "example:vue:streaming:serve": "tsx examples/vue-ssr-streaming/node-server.ts",
     "example:vite:ssr:build": "vite build --config examples/vite-ssr-react/vite.config.ts && vite build --ssr src/entry-server.tsx --config examples/vite-ssr-react/vite.config.ts",
+    "example:vite:ssr:dev": "node --import tsx src/dev-cli.ts --root examples/vite-ssr-react --entry src/entry-server.tsx --factory createViteSSRExampleDevApp --port 5174",
     "example:vite:ssr:serve": "tsx examples/vite-ssr-react/node-server.ts",
     "example:vite:vue:build": "vite build --config examples/vite-ssr-vue/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-ssr-vue/vite.config.ts",
     "example:vite:vue:serve": "tsx examples/vite-ssr-vue/node-server.ts",
@@ -226,21 +256,30 @@
     "example:responsive:svelte": "tsx examples/responsive-primitives-svelte/render.ts",
     "example:vite:svelte:strict-csp:build": "vite build --config examples/vite-strict-csp-svelte/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-strict-csp-svelte/vite.config.ts",
     "example:vite:svelte:strict-csp:serve": "tsx examples/vite-strict-csp-svelte/node-server.ts",
+    "example:vite:react:strict-csp:build": "vite build --config examples/vite-strict-csp-react/vite.config.ts && vite build --ssr src/entry-server.tsx --config examples/vite-strict-csp-react/vite.config.ts",
+    "example:vite:react:strict-csp:serve": "tsx examples/vite-strict-csp-react/node-server.ts",
+    "example:vite:vue:strict-csp:build": "vite build --config examples/vite-strict-csp-vue/vite.config.ts && vite build --ssr src/entry-server.ts --config examples/vite-strict-csp-vue/vite.config.ts",
+    "example:vite:vue:strict-csp:serve": "tsx examples/vite-strict-csp-vue/node-server.ts",
+    "example:spa-navigation:serve": "tsx examples/spa-navigation/node-server.ts",
     "guardrail:control-plane": "tsx test/unit/control-plane-guardrails.test.ts",
     "example:control-plane:client-fill:relaxed": "tsx examples/control-plane-preset/render.ts --mode=relaxed --delivery=client-fill",
     "example:control-plane:client-fill:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=client-fill",
     "example:control-plane:streaming:relaxed": "tsx examples/control-plane-preset/render.ts --mode=relaxed --delivery=streaming",
-    "example:control-plane:streaming:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=streaming"
+    "example:control-plane:streaming:strict": "tsx examples/control-plane-preset/render.ts --mode=strict --delivery=streaming",
+    "verify:examples:readmes": "node scripts/verify-example-readmes.mjs",
+    "coverage": "npm run build && c8 --reporter=text --reporter=lcov npm run test:unit",
+    "verify:format-gate": "node scripts/verify-format-gate.mjs"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1053.0",
+    "@aws-sdk/client-s3": "^3.1080.0",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/server": "^11.11.0",
     "@eslint/js": "^10.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.13.2/theory-cloud-apptheory-1.13.2.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.16.1/theory-cloud-apptheory-1.16.1.tgz",
+    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v1.16.1/theory-cloud-apptheory-cdk-1.16.1.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^24.12.4",
     "@types/react": "^19.2.15",
@@ -249,6 +288,10 @@
     "@typescript-eslint/parser": "^8.60.0",
     "@vue/server-renderer": "^3.5.34",
     "antd": "^6.4.3",
+    "aws-cdk-lib": "2.261.0",
+    "c8": "^11.0.0",
+    "constructs": "10.6.0",
+    "esbuild": "^0.28.1",
     "eslint": "^10.4.0",
     "globals": "^17.6.0",
     "jsdom": "^28.1.0",
@@ -263,7 +306,8 @@
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz"
     }
-  }
+  },
+  "sideEffects": false
 }

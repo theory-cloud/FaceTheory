@@ -7,8 +7,13 @@
     PackageSourceInputState,
   } from './types.js';
 
-  export let dropzone: CodeDropzoneProps;
-  export let onFiles: ((files: PackageSourceInputFileMeta[]) => void) | undefined = undefined;
+  let {
+    dropzone,
+    onFiles = undefined,
+  }: {
+    dropzone?: CodeDropzoneProps;
+    onFiles?: ((files: PackageSourceInputFileMeta[]) => void) | undefined;
+  } = $props();
 
   const STATE_LABEL_DEFAULTS: Record<PackageSourceInputState, string> = {
     idle: 'Awaiting source',
@@ -62,19 +67,28 @@
     onFiles(metaFromFileList(event.dataTransfer?.files ?? null));
   }
 
-  $: labelId = dropzone.label !== undefined ? `${dropzone.dropzoneId}-label` : undefined;
-  $: descriptionId = dropzone.description !== undefined ? `${dropzone.dropzoneId}-description` : undefined;
-  $: errorIds = (dropzone.errors ?? []).map((e: PackageSourceInputError) => `${dropzone.dropzoneId}-error-${e.id}`);
-  $: ariaDescribedBy =
+  const labelId = $derived(
+    dropzone.label !== undefined ? `${dropzone.dropzoneId}-label` : undefined,
+  );
+  const descriptionId = $derived(
+    dropzone.description !== undefined ? `${dropzone.dropzoneId}-description` : undefined,
+  );
+  const errorIds = $derived(
+    (dropzone.errors ?? []).map((e: PackageSourceInputError) => `${dropzone.dropzoneId}-error-${e.id}`),
+  );
+  const ariaDescribedBy = $derived(
     [descriptionId, ...errorIds]
       .filter((id): id is string => typeof id === 'string')
-      .join(' ') || undefined;
-  $: announceLabel = stateLabel(dropzone.state);
-  $: stateRole = isAlertState(dropzone.state)
-    ? 'alert'
-    : isStatusState(dropzone.state)
-      ? 'status'
-      : undefined;
+      .join(' ') || undefined,
+  );
+  const announceLabel = $derived(stateLabel(dropzone.state));
+  const stateRole = $derived(
+    isAlertState(dropzone.state)
+      ? 'alert'
+      : isStatusState(dropzone.state)
+        ? 'status'
+        : undefined,
+  );
 </script>
 
 <section
@@ -101,8 +115,8 @@
     data-dropzone-state={dropzone.state}
     aria-label={announceLabel}
     tabindex="0"
-    on:dragover={handleDragOver}
-    on:drop={handleDrop}
+    ondragover={handleDragOver}
+    ondrop={handleDrop}
   >
     <strong>{dropzone.emptyLabel ?? 'Drop files here'}</strong>
     <span>Files are parsed by TheoryMCP, not by FaceTheory.</span>

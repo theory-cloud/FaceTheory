@@ -1,11 +1,10 @@
 // Example sketch: React streaming SSR Face (body streamed, document wrapper handled by FaceApp).
 //
-// This is not included in `tsc` builds (examples are excluded from tsconfig).
 
 import * as React from 'react';
 
-import { createFaceApp } from '../../src/app.js';
-import { createReactStreamFace } from '../../src/adapters/react.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createReactStreamFace } from '@theory-cloud/facetheory/react';
 
 function Home() {
   return React.createElement('h1', null, 'FaceTheory + React (streaming SSR)');

@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { buildSsgSite } from '../../src/ssg.js';
+import { buildSsgSite } from '@theory-cloud/facetheory';
 
 import { faces } from './faces.js';
 

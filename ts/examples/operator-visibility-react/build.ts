@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { faceApp } from './handler.js';
-import type { FaceBody } from '../../src/types.js';
+import type { FaceBody } from '@theory-cloud/facetheory';
 
 async function collectBody(body: FaceBody): Promise<Uint8Array> {
   if (body instanceof Uint8Array) return body;

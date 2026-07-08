@@ -7,11 +7,19 @@
   } from './types.js';
   import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
-  export let title: unknown = 'Reconciliation plan';
-  export let description: unknown = undefined;
-  export let plan: WizardReconciliationPlan;
-  export let emptyLabel: unknown = 'No plan rows.';
-  export let onToggleRow: ((rowKey: string, nextExpanded: boolean) => void) | undefined = undefined;
+  let {
+    title = 'Reconciliation plan',
+    description = undefined,
+    plan,
+    emptyLabel = 'No plan rows.',
+    onToggleRow = undefined,
+  }: {
+    title?: unknown;
+    description?: unknown;
+    plan?: WizardReconciliationPlan;
+    emptyLabel?: unknown;
+    onToggleRow?: ((rowKey: string, nextExpanded: boolean) => void) | undefined;
+  } = $props();
 
   const REDACTED_MARKER = '[redacted]';
 
@@ -130,7 +138,7 @@
               aria-controls={detailPanelId}
               aria-label={`${expanded ? 'Hide' : 'Show'} details for ${statusLabel}`}
               data-row-toggle-key={row.key}
-              on:click={() => onToggleRow?.(row.key, !expanded)}
+              onclick={() => onToggleRow?.(row.key, !expanded)}
             >{expanded ? 'Hide details' : 'Show details'}</button>
             <div
               id={detailPanelId}

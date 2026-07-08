@@ -7,8 +7,7 @@
     StalenessState,
   } from './types.js';
 
-  export let metadata: OperatorVisibilityMetadata;
-  export let includeAuthority = true;
+  let { metadata, includeAuthority = true }: { metadata: OperatorVisibilityMetadata; includeAuthority?: boolean } = $props();
 
   const safeHrefBase = 'https://facetheory.invalid';
   const palette: Record<MetadataBadgeTone, { background: string; color: string }> = {
@@ -34,7 +33,7 @@
     },
   };
 
-  $: badges = metadataToBadges(metadata, includeAuthority);
+  const badges = $derived(metadataToBadges(metadata, includeAuthority));
 
   function metadataToBadges(
     source: OperatorVisibilityMetadata,

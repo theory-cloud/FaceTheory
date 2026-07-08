@@ -1,30 +1,22 @@
-# Vite SSR Example (Vue)
+# Vite SSR Vue Example
 
-Builds both:
+## Demonstrates
 
-- client assets + `manifest.json`
-- server bundle entrypoint
+This example builds a Vue SSR app with Vite client assets, a Vite server bundle, manifest-derived head tags, Vue render output, and a matching hydration bootstrap module.
 
-Then runs FaceTheory SSR using the manifest to inject preload/CSS/asset tags and hydration bootstrap.
-
-## Build
+## Run
 
 From `ts/`:
 
 ```bash
 npm run example:vite:vue:build
-```
-
-Outputs:
-
-- `ts/examples/vite-ssr-vue/dist/client/.vite/manifest.json`
-- `ts/examples/vite-ssr-vue/dist/client/assets/*`
-- `ts/examples/vite-ssr-vue/dist/server/entry-server.js`
-
-## Run
-
-```bash
 npm run example:vite:vue:serve
 ```
 
-Then open `http://localhost:4175/`.
+Open `http://localhost:4175/`.
+
+## Backs
+
+- `docs/adapters/vue.md` — Vue Vite SSR example.
+- `docs/api-reference.md` — Vite and hydration helpers.
+- Public package surfaces: Vite helpers from `@theory-cloud/facetheory` and Vue adapter exports.

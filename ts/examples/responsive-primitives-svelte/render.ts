@@ -6,9 +6,9 @@ import { pathToFileURL } from 'node:url';
 
 import { compile } from 'svelte/compiler';
 
-import { createFaceApp } from '../../src/app.js';
-import { createSvelteFace } from '../../src/svelte/index.js';
-import { RESPONSIVE_PRIMITIVES_CSS } from '../../src/responsive-primitives/index.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { createSvelteFace } from '@theory-cloud/facetheory/svelte';
+import { RESPONSIVE_PRIMITIVES_CSS } from '@theory-cloud/facetheory/responsive-primitives';
 
 async function compileComponent(name: string): Promise<unknown> {
   const componentPath = path.resolve(

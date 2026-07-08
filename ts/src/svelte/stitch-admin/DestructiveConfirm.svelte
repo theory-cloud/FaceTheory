@@ -1,16 +1,27 @@
 <script lang="ts">
-  export let title: unknown;
-  export let description: unknown = undefined;
-  export let requireText: string | undefined = undefined;
-  export let confirmLabel: unknown = undefined;
-  export let cancelLabel: unknown = undefined;
-  export let onCancel: (() => void) | undefined = undefined;
-  export let onConfirm: (() => void) | undefined = undefined;
-  export let loading = false;
+  let {
+    title,
+    description = undefined,
+    requireText = undefined,
+    confirmLabel = undefined,
+    cancelLabel = undefined,
+    onCancel = undefined,
+    onConfirm = undefined,
+    loading = false,
+  }: {
+    title?: unknown;
+    description?: unknown;
+    requireText?: string | undefined;
+    confirmLabel?: unknown;
+    cancelLabel?: unknown;
+    onCancel?: (() => void) | undefined;
+    onConfirm?: (() => void) | undefined;
+    loading?: boolean;
+  } = $props();
 
-  let typed = '';
+  let typed = $state('');
 
-  $: confirmable = requireText === undefined || typed === requireText;
+  const confirmable = $derived(requireText === undefined || typed === requireText);
 </script>
 
 <div
@@ -52,7 +63,7 @@
     <button
       type="button"
       disabled={loading}
-      on:click={onCancel}
+      onclick={onCancel}
       style="padding:10px 14px;border-radius:var(--stitch-radius-md, 6px);border:1px solid var(--stitch-color-outline-variant, #c8c4d5);background:transparent;cursor:pointer;"
     >
       {#if cancelLabel !== undefined}
@@ -64,7 +75,7 @@
     <button
       type="button"
       disabled={!confirmable || loading}
-      on:click={onConfirm}
+      onclick={onConfirm}
       style="padding:10px 14px;border-radius:var(--stitch-radius-md, 6px);border:none;background:var(--stitch-color-error, #ba1a1a);color:#ffffff;cursor:pointer;"
     >
       {#if loading}

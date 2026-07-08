@@ -1,10 +1,20 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { CalloutVariant } from '../../stitch-shell/callout-types.js';
 
-  export let variant: CalloutVariant = 'info';
-  export let title: unknown = undefined;
-  export let icon: unknown = undefined;
-  export let actions: unknown = undefined;
+  let {
+    variant = 'info',
+    title = undefined,
+    icon = undefined,
+    actions = undefined,
+    children,
+  }: {
+    variant?: CalloutVariant;
+    title?: unknown;
+    icon?: unknown;
+    actions?: unknown;
+    children?: Snippet;
+  } = $props();
 
   const palette: Record<
     CalloutVariant,
@@ -32,8 +42,19 @@
     },
   };
 
-  $: current = palette[variant];
-  $: role = variant === 'danger' || variant === 'warning' ? 'alert' : 'note';
+  const current = $derived(palette[variant]);
+  const role = $derived(
+    variant === 'danger' || variant === 'warning' ? 'alert' : 'note',
+  );
+
+  // `icon` and `actions` accept either a value (rendered as text) or a snippet
+  // (rendered as markup, e.g. a button/link filled via `{#snippet actions()}`).
+  const iconNode = $derived(
+    typeof icon === 'function' ? (icon as Snippet) : undefined,
+  );
+  const actionsNode = $derived(
+    typeof actions === 'function' ? (actions as Snippet) : undefined,
+  );
 </script>
 
 <div
@@ -41,13 +62,13 @@
   role={role}
   style={`display:flex;gap:12px;padding:12px 16px;border-left:3px solid ${current.accent};background:${current.background};color:${current.color};border-top-right-radius:var(--stitch-radius-md, 8px);border-bottom-right-radius:var(--stitch-radius-md, 8px);`}
 >
-  {#if $$slots.icon || icon !== undefined}
+  {#if icon !== undefined}
     <span
       class="facetheory-stitch-callout-icon"
       aria-hidden="true"
       style={`flex-shrink:0;display:inline-flex;align-items:center;color:${current.accent};font-size:18px;line-height:1;margin-top:2px;`}
     >
-      <slot name="icon">{#if icon !== undefined}{icon}{/if}</slot>
+      {#if iconNode}{@render iconNode()}{:else}{icon}{/if}
     </span>
   {/if}
 
@@ -64,22 +85,22 @@
       </p>
     {/if}
 
-    {#if $$slots.default}
+    {#if children}
       <div
         class="facetheory-stitch-callout-content"
         style="font-size:13px;line-height:1.5;color:inherit;"
       >
-        <slot />
+        {@render children()}
       </div>
     {/if}
   </div>
 
-  {#if $$slots.actions || actions !== undefined}
+  {#if actions !== undefined}
     <div
       class="facetheory-stitch-callout-actions"
       style="flex-shrink:0;display:flex;align-items:center;gap:8px;"
     >
-      <slot name="actions">{#if actions !== undefined}{actions}{/if}</slot>
+      {#if actionsNode}{@render actionsNode()}{:else}{actions}{/if}
     </div>
   {/if}
 </div>

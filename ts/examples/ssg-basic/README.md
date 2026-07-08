@@ -1,17 +1,22 @@
-# FaceTheory SSG Example
+# SSG Basic Example
 
-Build static output:
+## Demonstrates
+
+This example builds static FaceTheory HTML with `buildSsgSite()` and serves the generated files locally. It is the minimal SSG reference for route output, generated assets, and static-file serving.
+
+## Run
+
+From `ts/`:
 
 ```bash
-cd ts
 npm run example:ssg:build
-```
-
-Serve the generated files:
-
-```bash
-cd ts
 npm run example:ssg:serve
 ```
 
 Generated output lives in `examples/ssg-basic/dist-static`.
+
+## Backs
+
+- `docs/modes/ssg.md` — SSG build and serve workflow.
+- `docs/troubleshooting.md` — SSG CLI examples.
+- Public package surface: `buildSsgSite()` from `@theory-cloud/facetheory`.

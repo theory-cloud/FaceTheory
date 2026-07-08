@@ -1,21 +1,14 @@
 import * as React from 'react';
 import { Input } from 'antd';
 
+import {
+  authOtpInputClassName,
+  type OTPInputProps,
+} from '../../stitch-hosted-auth/index.js';
+
 const h = React.createElement;
 
-export interface OTPInputProps {
-  /** Number of characters to accept. Default 6. */
-  length?: number;
-  value?: string;
-  onChange?: (value: string) => void;
-  /** Fires when the last digit is entered (useful for auto-submit flows). */
-  onComplete?: (value: string) => void;
-  disabled?: boolean;
-  /** Visually marks the input invalid. Pairs with a caller-supplied error message. */
-  invalid?: boolean;
-  /** Autofocus the first character box on mount. Default `true`. */
-  autoFocus?: boolean;
-}
+export type { OTPInputProps } from '../../stitch-hosted-auth/index.js';
 
 /**
  * One-time-password input. Wraps AntD's `Input.OTP` with Stitch styling —
@@ -34,12 +27,7 @@ export function OTPInput(props: OTPInputProps): React.ReactElement {
     autoFocus = true,
   } = props;
 
-  const className = [
-    'facetheory-stitch-otp-input',
-    invalid ? 'facetheory-stitch-otp-input-invalid' : null,
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const className = authOtpInputClassName(invalid);
 
   const otpProps: React.ComponentProps<typeof Input.OTP> = {
     length,

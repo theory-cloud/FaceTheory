@@ -6,13 +6,20 @@ Head tags — title, meta, link, script, style — are emitted by FaceTheory in 
 
 ## The head primitive
 
-FaceTheory exposes three head helpers from the main entry:
+FaceTheory exposes the head primitive and helper-first authoring APIs from the
+main entry:
 
 ```typescript
 import {
-  renderFaceHead,
+  canonical,
+  jsonLd,
+  metaTag,
   normalizeHeadTags,
+  openGraph,
+  renderFaceHead,
   renderHeadTag,
+  titleTag,
+  twitterCard,
   type FaceHeadTag,
 } from '@theory-cloud/facetheory';
 ```
@@ -20,6 +27,11 @@ import {
 - `renderFaceHead(out, options)` — render the head section from a `FaceRenderResult`. Accepts an optional `cspNonce` and `allowedOrigin`.
 - `normalizeHeadTags(tags, options)` — canonicalize an array of head tags (de-duplicate, apply nonces).
 - `renderHeadTag(tag)` — serialize a single tag to HTML.
+- `titleTag(title, { template })` — create a deterministic `<title>`, optionally applying a `%s` title template.
+- `metaTag(name, content)` — create a named `<meta>` tag.
+- `openGraph(...)` / `twitterCard(...)` — create typed Open Graph and Twitter card meta groups.
+- `canonical(href)` — create a canonical same-origin or http(s) link tag.
+- `jsonLd(data, { nonce? })` — create a safe `application/ld+json` script tag for structured data.
 
 ## `FaceHeadTag` shape
 
@@ -36,15 +48,67 @@ type FaceHeadTag =
 Faces declare head tags through `FaceRenderResult.headTags`:
 
 ```typescript
+import {
+  canonical,
+  jsonLd,
+  metaTag,
+  openGraph,
+  titleTag,
+  twitterCard,
+} from '@theory-cloud/facetheory';
+
 return {
   html: '<h1>Hello</h1>',
   headTags: [
-    { type: 'title', text: 'Hello FaceTheory' },
-    { type: 'meta', attrs: { name: 'description', content: 'A FaceTheory page' } },
-    { type: 'link', attrs: { rel: 'stylesheet', href: '/assets/app.css' } },
+    titleTag('Hello', { template: '%s · FaceTheory' }),
+    metaTag('description', 'A FaceTheory page'),
+    ...openGraph({
+      title: 'Hello FaceTheory',
+      type: 'website',
+      url: 'https://app.example/',
+      image: '/assets/card.png',
+    }),
+    ...twitterCard({
+      card: 'summary_large_image',
+      title: 'Hello FaceTheory',
+      image: '/assets/card.png',
+    }),
+    canonical('/'),
+    jsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: 'Hello FaceTheory',
+    }),
   ],
 };
 ```
+
+Helpers return normal `FaceHeadTag` objects. They do not create a parallel head
+pipeline; de-duplication, nonce application, escaping, and stable ordering still
+come from `renderFaceHead()` / `normalizeHeadTags()`.
+
+For strict CSP routes that set `csp.inlineScripts === false`, JSON-LD is the one
+nonce-carried inline script body FaceTheory permits. Pass the request nonce to
+the renderer (`renderFaceHead(out, { cspNonce: ctx.request.cspNonce })`, or let
+`createFaceApp()` do that for Face responses). The JSON-LD tag must be
+`type="application/ld+json"` and carry the matching request nonce; inline
+hydration JSON and generic inline scripts still fail closed.
+
+## De-duplication
+
+`normalizeHeadTags()` de-duplicates tags that have a deterministic key:
+
+- the latest `<title>` wins;
+- meta tags key by `charset`, `name`, `property`, or `http-equiv`;
+- link tags key by `rel` + `href` + optional `as`;
+- script tags key by `src` or `id`;
+- style tags key by `id` or `data-emotion`.
+
+Tags without one of those keys are intentionally exempt from de-duplication and
+are emitted in order after charset/title normalization. That includes keyless
+JSON-LD tags, because pages often need multiple structured-data blocks. Add an
+`id` only when you want normal last-wins de-duplication for a specific JSON-LD
+block.
 
 ## The `raw` escape hatch
 

@@ -2,11 +2,17 @@
   import type { WizardPackageSummary } from './types.js';
   import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
-  export let title: unknown = undefined;
-  export let summary: WizardPackageSummary;
-  export let emptyLabel: unknown = 'No files in this package.';
+  let {
+    title = undefined,
+    summary,
+    emptyLabel = 'No files in this package.',
+  }: {
+    title?: unknown;
+    summary?: WizardPackageSummary;
+    emptyLabel?: unknown;
+  } = $props();
 
-  $: heading = title ?? summary.name;
+  const heading = $derived(title ?? summary.name);
 </script>
 
 <section

@@ -9,8 +9,7 @@
   } from './types.js';
   import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
-  export let grid: SelectableCardGrid;
-  export let onChange: (nextSelectedKeys: string[]) => void;
+  let { grid, onChange }: { grid: SelectableCardGrid; onChange: (nextSelectedKeys: string[]) => void } = $props();
 
   function isOptionDisabled(option: SelectableCardOption): boolean {
     return option.blocked === true || option.disabledReason !== undefined;
@@ -54,12 +53,12 @@
     }
   }
 
-  $: layout = (grid.layout ?? 'grid') as SelectableCardGridLayout;
-  $: size = (grid.size ?? 'md') as SelectableCardGridSize;
-  $: groupRole = grid.selection === 'single' ? 'radiogroup' : 'group';
-  $: labelId = grid.label !== undefined ? `${grid.groupId}-label` : undefined;
-  $: descriptionId =
-    grid.description !== undefined ? `${grid.groupId}-description` : undefined;
+  const layout = $derived((grid.layout ?? 'grid') as SelectableCardGridLayout);
+  const size = $derived((grid.size ?? 'md') as SelectableCardGridSize);
+  const groupRole = $derived(grid.selection === 'single' ? 'radiogroup' : 'group');
+  const labelId = $derived(grid.label !== undefined ? `${grid.groupId}-label` : undefined);
+  const descriptionId = $derived(
+    grid.description !== undefined ? `${grid.groupId}-description` : undefined);
 </script>
 
 <section
@@ -112,8 +111,8 @@
         data-option-disabled={disabled ? 'true' : 'false'}
         data-option-blocked={option.blocked === true ? 'true' : 'false'}
         data-option-recommended={option.recommended === true ? 'true' : 'false'}
-        on:click={() => !disabled && handleActivate(option)}
-        on:keydown={(event) => !disabled && handleKey(event, option)}
+        onclick={() => !disabled && handleActivate(option)}
+        onkeydown={(event) => !disabled && handleKey(event, option)}
       >
         <div class="facetheory-stitch-selectable-card-header">
           {#if option.icon !== undefined}

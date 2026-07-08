@@ -1,10 +1,17 @@
 <script lang="ts">
   import type { WizardEnablementChecklist, WizardEnablementItemStatus } from './types.js';
 
-  export let title: unknown = 'Enablement checklist';
-  export let description: unknown = undefined;
-  export let checklist: WizardEnablementChecklist;
-  export let emptyLabel: unknown = 'No checklist items.';
+  let {
+    title = 'Enablement checklist',
+    description = undefined,
+    checklist,
+    emptyLabel = 'No checklist items.',
+  }: {
+    title?: unknown;
+    description?: unknown;
+    checklist?: WizardEnablementChecklist;
+    emptyLabel?: unknown;
+  } = $props();
 
   const STATUS_LABEL: Record<WizardEnablementItemStatus, string> = {
     ready: 'Ready',
@@ -13,17 +20,19 @@
     'not-applicable': 'Not applicable',
   };
 
-  $: summary =
+  const summary = $derived(
     checklist.summaryLabel ??
     (checklist.items.length > 0
       ? `${checklist.items.filter((i) => i.status === 'ready').length} of ${checklist.items.length} ready`
-      : 'No checklist items');
-  $: allReady =
+      : 'No checklist items'),
+  );
+  const allReady = $derived(
     checklist.allReady === true
       ? 'true'
       : checklist.allReady === false
         ? 'false'
-        : 'unknown';
+        : 'unknown',
+  );
 </script>
 
 <section

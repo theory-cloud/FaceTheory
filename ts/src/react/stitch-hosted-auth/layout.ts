@@ -1,15 +1,16 @@
 import * as React from 'react';
 import { Typography } from 'antd';
 
+import {
+  resolveAuthPageBackground,
+  type AuthCardProps as SharedAuthCardProps,
+  type AuthPageLayoutProps as SharedAuthPageLayoutProps,
+} from '../../stitch-hosted-auth/index.js';
+
 const h = React.createElement;
 
-export interface AuthPageLayoutProps {
-  /** Brand mark rendered in the top-left (e.g. logo). */
-  brand?: React.ReactNode;
-  /** Background treatment. `gradient` applies the Stitch signature indigo gradient. */
-  background?: 'surface' | 'gradient';
-  /** Right-rail slot for legal / locale / help links rendered at the bottom. */
-  footer?: React.ReactNode;
+export interface AuthPageLayoutProps
+  extends Omit<SharedAuthPageLayoutProps<React.ReactNode>, 'children'> {
   children: React.ReactNode;
 }
 
@@ -23,15 +24,9 @@ export function AuthPageLayout(
 ): React.ReactElement {
   const { brand, background = 'surface', footer, children } = props;
 
-  const bgStyle: React.CSSProperties =
-    background === 'gradient'
-      ? {
-          background:
-            'linear-gradient(135deg, var(--stitch-color-primary, #1f108e) 0%, var(--stitch-color-primary-container, #3730a3) 100%)',
-        }
-      : {
-          background: 'var(--stitch-color-surface, #faf8ff)',
-        };
+  const bgStyle: React.CSSProperties = {
+    background: resolveAuthPageBackground(background),
+  };
 
   return h(
     'div',
@@ -86,13 +81,8 @@ export function AuthPageLayout(
   );
 }
 
-export interface AuthCardProps {
-  title: React.ReactNode;
-  description?: React.ReactNode;
-  /** Right-aligned secondary action slot inside the header (e.g. "Sign up"). */
-  headerAction?: React.ReactNode;
-  /** Footer slot rendered below the body (e.g. "Trouble signing in?"). */
-  footer?: React.ReactNode;
+export interface AuthCardProps
+  extends Omit<SharedAuthCardProps<React.ReactNode>, 'children'> {
   children: React.ReactNode;
 }
 

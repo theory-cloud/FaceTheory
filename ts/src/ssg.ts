@@ -1,4 +1,5 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { createFaceApp } from './app.js';
@@ -9,7 +10,7 @@ import type {
   FaceInlineHydration,
   FaceModule,
   FaceRenderResult,
-  Headers,
+  FaceHeaders,
 } from './types.js';
 import {
   normalizePath,
@@ -23,6 +24,8 @@ export interface BuildSsgSiteOptions {
   faces: FaceModule[];
   outDir: string;
   clean?: boolean;
+  concurrency?: number;
+  incremental?: boolean;
   trailingSlash?: SsgTrailingSlashPolicy;
   write404Fallback?: boolean;
   emitHydrationData?: boolean;
@@ -37,6 +40,23 @@ export interface SsgPageEntry {
   file: string;
   status: number;
   contentType: string;
+  hydrationDataFile?: string;
+  contentHash?: string;
+}
+
+export interface SsgFailedRoute {
+  routePattern: string;
+  path: string;
+  message: string;
+  status?: number;
+}
+
+export interface SsgSkippedRoute {
+  routePattern: string;
+  path: string;
+  file: string;
+  reason: 'content-hash-match';
+  contentHash: string;
   hydrationDataFile?: string;
 }
 
@@ -58,6 +78,8 @@ export interface BuildSsgSiteResult {
   manifestFile: string;
   pages: SsgPageEntry[];
   notFoundFile?: string;
+  failedRoutes?: SsgFailedRoute[];
+  skippedRoutes?: SsgSkippedRoute[];
 }
 
 interface SsgRouteSegment {
@@ -74,7 +96,46 @@ interface SsgHydrationSidecar {
   data: unknown;
 }
 
+type FaceApp = ReturnType<typeof createFaceApp>;
+
+type SsgPageBuildOutcome =
+  | {
+      ok: true;
+      entry: SsgPageEntry;
+      html: string;
+      skippedRoute?: SsgSkippedRoute;
+    }
+  | {
+      ok: false;
+      failure: SsgFailedRoute;
+    };
+
+class SsgRouteBuildError extends Error {
+  readonly status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'SsgRouteBuildError';
+    if (status !== undefined) {
+      this.status = status;
+    }
+  }
+}
+
+export class SsgBuildFailedError extends Error {
+  readonly failedRoutes: SsgFailedRoute[];
+  readonly result: BuildSsgSiteResult & { failedRoutes: SsgFailedRoute[] };
+
+  constructor(result: BuildSsgSiteResult & { failedRoutes: SsgFailedRoute[] }) {
+    super(formatSsgBuildFailureMessage(result.failedRoutes));
+    this.name = 'SsgBuildFailedError';
+    this.failedRoutes = result.failedRoutes;
+    this.result = result;
+  }
+}
+
 const DEFAULT_ASSET_MANIFEST_PATH = '.vite/manifest.json';
+const SSG_MANIFEST_FILE = '.facetheory/ssg-manifest.json';
 const DEFAULT_404_HTML = renderHTMLDocument({
   head: '<title>Not Found</title>',
   body: '<h1>Not Found</h1><template data-facetheory-ssg-404="true"></template>',
@@ -84,10 +145,12 @@ export async function buildSsgSite(
   options: BuildSsgSiteOptions,
 ): Promise<BuildSsgSiteResult> {
   const outDir = path.resolve(options.outDir);
-  const clean = options.clean ?? true;
+  const incremental = options.incremental ?? false;
+  const clean = incremental ? false : (options.clean ?? true);
   const trailingSlash = options.trailingSlash ?? 'always';
   const write404Fallback = options.write404Fallback ?? true;
   const emitHydrationData = options.emitHydrationData ?? false;
+  const concurrency = normalizeSsgConcurrency(options.concurrency ?? 1);
   const assetManifestPath =
     options.assetManifestPath ?? DEFAULT_ASSET_MANIFEST_PATH;
   const allowNetwork = options.allowNetwork ?? false;
@@ -96,6 +159,12 @@ export async function buildSsgSite(
   if (clean) {
     await rm(outDir, { recursive: true, force: true });
   }
+  const previousManifest = incremental
+    ? await readPreviousSsgManifest(outDir)
+    : null;
+  const previousPagesByPath = new Map(
+    (previousManifest?.pages ?? []).map((entry) => [entry.path, entry]),
+  );
   await mkdir(outDir, { recursive: true });
 
   const strictHydrationSidecars = new Map<string, SsgHydrationSidecar>();
@@ -108,74 +177,48 @@ export async function buildSsgSite(
   const plannedPages = await planSsgPages(options.faces);
 
   const builtPages: SsgPageEntry[] = [];
+  const failedRoutes: SsgFailedRoute[] = [];
+  const skippedRoutes: SsgSkippedRoute[] = [];
   const htmlByPath = new Map<string, string>();
 
-  await withFetchGuard(
+  const buildOutcomes = await withFetchGuard(
     {
       allowNetwork,
       ...(fetchImpl !== undefined ? { fetch: fetchImpl } : {}),
     },
-    async () => {
-      for (const page of plannedPages) {
-        const response = await app.handle({ method: 'GET', path: page.path });
-        if (response.status >= 500) {
-          const networkHint =
-            !allowNetwork && fetchImpl === undefined
-              ? ' Network access is disabled by default during SSG; mock fetch or set allowNetwork:true.'
-              : '';
-          throw new Error(
-            `SSG route "${page.path}" returned status ${response.status}; build aborted.${networkHint}`,
-          );
-        }
-        if (response.isBase64) {
-          throw new Error(
-            `SSG route "${page.path}" returned isBase64=true; only text/html responses are supported`,
-          );
-        }
-
-        const body = await collectBody(response.body);
-        const html = new TextDecoder().decode(body);
-        const file = ssgFilePathForRoute(page.path, trailingSlash);
-        const contentType =
-          firstHeaderValue(response.headers, 'content-type') ??
-          'text/html; charset=utf-8';
-
-        await writeOutFile(outDir, file, html);
-
-        const strictHydrationSidecar = strictHydrationSidecars.get(page.path);
-        let hydrationDataFile: string | undefined;
-        if (strictHydrationSidecar !== undefined) {
-          hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
-          await writeOutFile(
-            outDir,
-            hydrationDataFile,
-            `${safeJson(strictHydrationSidecar.data)}\n`,
-          );
-        } else if (emitHydrationData) {
-          const hydrationJson = extractHydrationDataJson(html);
-          if (hydrationJson !== null) {
-            hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
-            await writeOutFile(outDir, hydrationDataFile, `${hydrationJson}\n`);
-          }
-        }
-
-        const entry: SsgPageEntry = {
-          routePattern: page.routePattern,
-          path: page.path,
-          file,
-          status: response.status,
-          contentType,
-        };
-        if (hydrationDataFile !== undefined) {
-          entry.hydrationDataFile = hydrationDataFile;
-        }
-        builtPages.push(entry);
-        htmlByPath.set(page.path, html);
-      }
-    },
+    async () =>
+      mapWithConcurrency(plannedPages, concurrency, (page) => {
+        const previousEntry = previousPagesByPath.get(page.path);
+        return buildSsgPage({
+          app,
+          page,
+          outDir,
+          trailingSlash,
+          emitHydrationData,
+          strictHydrationSidecars,
+          incremental,
+          ...(previousEntry !== undefined ? { previousEntry } : {}),
+          allowNetwork,
+          hasFetchOverride: fetchImpl !== undefined,
+        });
+      }),
   );
 
+  for (const outcome of buildOutcomes) {
+    if (outcome.ok) {
+      builtPages.push(outcome.entry);
+      if (outcome.skippedRoute !== undefined) {
+        skippedRoutes.push(outcome.skippedRoute);
+      }
+      htmlByPath.set(outcome.entry.path, outcome.html);
+      continue;
+    }
+    failedRoutes.push(outcome.failure);
+  }
+
   builtPages.sort((left, right) => left.path.localeCompare(right.path));
+  failedRoutes.sort((left, right) => left.path.localeCompare(right.path));
+  skippedRoutes.sort((left, right) => left.path.localeCompare(right.path));
 
   let notFoundFile: string | undefined;
   if (write404Fallback) {
@@ -199,19 +242,32 @@ export async function buildSsgSite(
     manifest.notFoundFile = notFoundFile;
   }
 
-  const manifestFile = '.facetheory/ssg-manifest.json';
+  const manifestFile = SSG_MANIFEST_FILE;
   await writeOutFile(
     outDir,
     manifestFile,
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
 
-  return {
+  const result: BuildSsgSiteResult = {
     outDir,
     manifestFile,
     pages: builtPages,
     ...(notFoundFile !== undefined ? { notFoundFile } : {}),
+    ...(skippedRoutes.length > 0 ? { skippedRoutes } : {}),
   };
+
+  if (failedRoutes.length > 0) {
+    const failedResult: BuildSsgSiteResult & {
+      failedRoutes: SsgFailedRoute[];
+    } = {
+      ...result,
+      failedRoutes,
+    };
+    throw new SsgBuildFailedError(failedResult);
+  }
+
+  return result;
 }
 
 export async function planSsgPages(
@@ -278,6 +334,116 @@ export async function planSsgPages(
   return planned;
 }
 
+async function buildSsgPage(options: {
+  app: FaceApp;
+  page: PlannedPage;
+  outDir: string;
+  trailingSlash: SsgTrailingSlashPolicy;
+  emitHydrationData: boolean;
+  strictHydrationSidecars: Map<string, SsgHydrationSidecar>;
+  incremental: boolean;
+  previousEntry?: SsgPageEntry;
+  allowNetwork: boolean;
+  hasFetchOverride: boolean;
+}): Promise<SsgPageBuildOutcome> {
+  const {
+    app,
+    page,
+    outDir,
+    trailingSlash,
+    emitHydrationData,
+    strictHydrationSidecars,
+    incremental,
+    previousEntry,
+    allowNetwork,
+    hasFetchOverride,
+  } = options;
+
+  try {
+    const response = await app.handle({ method: 'GET', path: page.path });
+    if (response.status >= 500) {
+      const networkHint =
+        !allowNetwork && !hasFetchOverride
+          ? ' Network access is disabled by default during SSG; mock fetch or set allowNetwork:true.'
+          : '';
+      throw new SsgRouteBuildError(
+        `SSG route "${page.path}" returned status ${response.status}.${networkHint}`,
+        response.status,
+      );
+    }
+    if (response.isBase64) {
+      throw new SsgRouteBuildError(
+        `SSG route "${page.path}" returned isBase64=true; only text/html responses are supported`,
+      );
+    }
+
+    const body = await collectBody(response.body);
+    const html = new TextDecoder().decode(body);
+    const file = ssgFilePathForRoute(page.path, trailingSlash);
+    const contentType =
+      firstHeaderValue(response.headers, 'content-type') ??
+      'text/html; charset=utf-8';
+
+    const strictHydrationSidecar = strictHydrationSidecars.get(page.path);
+    let hydrationDataFile: string | undefined;
+    let hydrationDataContent: string | undefined;
+    if (strictHydrationSidecar !== undefined) {
+      hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
+      hydrationDataContent = `${safeJson(strictHydrationSidecar.data)}\n`;
+    } else if (emitHydrationData) {
+      const hydrationJson = extractHydrationDataJson(html);
+      if (hydrationJson !== null) {
+        hydrationDataFile = ssgHydrationDataFilePathForRoute(page.path);
+        hydrationDataContent = `${hydrationJson}\n`;
+      }
+    }
+
+    const contentHash = hashSsgRenderedOutput(html, hydrationDataContent);
+    const entry: SsgPageEntry = {
+      routePattern: page.routePattern,
+      path: page.path,
+      file,
+      status: response.status,
+      contentType,
+      contentHash,
+    };
+    if (hydrationDataFile !== undefined) {
+      entry.hydrationDataFile = hydrationDataFile;
+    }
+
+    const skippedRoute = await ssgSkippedRouteIfUnchanged({
+      incremental,
+      outDir,
+      entry,
+      html,
+      ...(hydrationDataContent !== undefined ? { hydrationDataContent } : {}),
+      ...(previousEntry !== undefined ? { previousEntry } : {}),
+    });
+
+    if (skippedRoute === undefined) {
+      await writeOutFile(outDir, file, html);
+      if (
+        hydrationDataFile !== undefined &&
+        hydrationDataContent !== undefined
+      ) {
+        await writeOutFile(outDir, hydrationDataFile, hydrationDataContent);
+      }
+    }
+
+    return {
+      ok: true,
+      entry,
+      html,
+      ...(skippedRoute !== undefined ? { skippedRoute } : {}),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      failure: failedRouteForError(page, error),
+    };
+  }
+}
+
 function withSsgStrictHydrationSidecars(
   faces: FaceModule[],
   sidecars: Map<string, SsgHydrationSidecar>,
@@ -327,6 +493,147 @@ function externalizeSsgHydration(
     dataUrl,
     bootstrapModule: hydration.bootstrapModule,
   };
+}
+
+function failedRouteForError(
+  page: PlannedPage,
+  error: unknown,
+): SsgFailedRoute {
+  const failure: SsgFailedRoute = {
+    routePattern: page.routePattern,
+    path: page.path,
+    message: errorMessage(error),
+  };
+  if (error instanceof SsgRouteBuildError && error.status !== undefined) {
+    failure.status = error.status;
+  }
+  return failure;
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function formatSsgBuildFailureMessage(failedRoutes: SsgFailedRoute[]): string {
+  const routeWord = failedRoutes.length === 1 ? 'route' : 'routes';
+  const routeList = failedRoutes.map((route) => route.path).join(', ');
+  const routeMessages = failedRoutes
+    .map((route) => `${route.path}: ${route.message}`)
+    .join('\n');
+  return `SSG build failed for ${failedRoutes.length} ${routeWord}: ${routeList}\n${routeMessages}`;
+}
+
+async function readPreviousSsgManifest(
+  outDir: string,
+): Promise<SsgManifest | null> {
+  const manifestPath = path.resolve(outDir, SSG_MANIFEST_FILE);
+  let raw: string;
+  try {
+    raw = await readFile(manifestPath, 'utf8');
+  } catch (error) {
+    if (errorHasCode(error, 'ENOENT')) return null;
+    throw error;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<SsgManifest>;
+    if (parsed.version !== 1 || !Array.isArray(parsed.pages)) return null;
+    return parsed as SsgManifest;
+  } catch {
+    return null;
+  }
+}
+
+function hashSsgRenderedOutput(
+  html: string,
+  hydrationDataContent: string | undefined,
+): string {
+  const hash = createHash('sha256');
+  hash.update('facetheory:ssg-output:v1\0html\0');
+  hash.update(html);
+  hash.update('\0hydration-data\0');
+  if (hydrationDataContent !== undefined) {
+    hash.update(hydrationDataContent);
+  }
+  return `sha256-${hash.digest('hex')}`;
+}
+
+async function ssgSkippedRouteIfUnchanged(options: {
+  incremental: boolean;
+  outDir: string;
+  entry: SsgPageEntry;
+  html: string;
+  hydrationDataContent?: string;
+  previousEntry?: SsgPageEntry;
+}): Promise<SsgSkippedRoute | undefined> {
+  const {
+    incremental,
+    outDir,
+    entry,
+    html,
+    hydrationDataContent,
+    previousEntry,
+  } = options;
+
+  if (!incremental) return undefined;
+  if (entry.contentHash === undefined) return undefined;
+  if (previousEntry?.contentHash !== entry.contentHash) return undefined;
+  if (previousEntry.file !== entry.file) return undefined;
+  if (previousEntry.hydrationDataFile !== entry.hydrationDataFile) {
+    return undefined;
+  }
+  if (!(await ssgOutputFileMatches(outDir, entry.file, html))) {
+    return undefined;
+  }
+  if (entry.hydrationDataFile !== undefined) {
+    if (hydrationDataContent === undefined) return undefined;
+    if (
+      !(await ssgOutputFileMatches(
+        outDir,
+        entry.hydrationDataFile,
+        hydrationDataContent,
+      ))
+    ) {
+      return undefined;
+    }
+  }
+
+  const skippedRoute: SsgSkippedRoute = {
+    routePattern: entry.routePattern,
+    path: entry.path,
+    file: entry.file,
+    reason: 'content-hash-match',
+    contentHash: entry.contentHash,
+  };
+  if (entry.hydrationDataFile !== undefined) {
+    skippedRoute.hydrationDataFile = entry.hydrationDataFile;
+  }
+  return skippedRoute;
+}
+
+async function ssgOutputFileMatches(
+  outDir: string,
+  relativePath: string,
+  expectedContent: string,
+): Promise<boolean> {
+  const absolutePath = path.resolve(outDir, relativePath);
+  assertSafeSsgOutputPath(outDir, relativePath, absolutePath);
+  try {
+    return (await readFile(absolutePath, 'utf8')) === expectedContent;
+  } catch (error) {
+    if (errorHasCode(error, 'ENOENT')) return false;
+    throw error;
+  }
+}
+
+function errorHasCode(error: unknown, code: string): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === code
+  );
 }
 
 export function ssgFilePathForRoute(
@@ -440,7 +747,7 @@ async function collectBody(body: FaceBody): Promise<Uint8Array> {
   return out;
 }
 
-function firstHeaderValue(headers: Headers, key: string): string | null {
+function firstHeaderValue(headers: FaceHeaders, key: string): string | null {
   const values = headers[key] ?? headers[key.toLowerCase()] ?? [];
   if (!values.length) return null;
   return values[0] ?? null;
@@ -496,10 +803,44 @@ function extractHydrationDataJson(html: string): string | null {
   return json.length > 0 ? json : null;
 }
 
-async function withFetchGuard(
+function normalizeSsgConcurrency(value: number): number {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error('SSG concurrency must be a positive integer');
+  }
+  return value;
+}
+
+async function mapWithConcurrency<T, U>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<U>,
+): Promise<U[]> {
+  if (items.length === 0) return [];
+
+  const results = new Array<U>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index] as T, index);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      await worker();
+    }),
+  );
+  return results;
+}
+
+async function withFetchGuard<T>(
   options: { allowNetwork: boolean; fetch?: typeof fetch },
-  fn: () => Promise<void>,
-): Promise<void> {
+  fn: () => Promise<T>,
+): Promise<T> {
   const globalRef = globalThis as { fetch?: typeof fetch };
   const originalFetch = globalRef.fetch;
 
@@ -524,7 +865,7 @@ async function withFetchGuard(
   }
 
   try {
-    await fn();
+    return await fn();
   } finally {
     if (originalFetch !== undefined) {
       globalRef.fetch = originalFetch;

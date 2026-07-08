@@ -1,17 +1,15 @@
 import * as React from 'react';
 
+import {
+  authConsentItemBackground,
+  authConsentItemOpacity,
+  type ConsentItemProps as SharedConsentItemProps,
+  type ConsentListProps as SharedConsentListProps,
+} from '../../stitch-hosted-auth/index.js';
+
 const h = React.createElement;
 
-export interface ConsentItemProps {
-  /** Short label (e.g. "Read your profile"). */
-  label: React.ReactNode;
-  /** Long-form description shown under the label. */
-  description?: React.ReactNode;
-  /** Leading icon glyph. */
-  icon?: React.ReactNode;
-  /** Mark as already granted (greys out the entry). */
-  granted?: boolean;
-}
+export type ConsentItemProps = SharedConsentItemProps<React.ReactNode>;
 
 /**
  * Single scope / permission line inside an OAuth consent screen. Rendered as
@@ -29,11 +27,9 @@ export function ConsentItem(props: ConsentItemProps): React.ReactElement {
         alignItems: 'flex-start',
         gap: '12px',
         padding: '12px 16px',
-        background: granted
-          ? 'var(--stitch-color-surface-container-low, #f2f3ff)'
-          : 'var(--stitch-color-surface-container-lowest, #ffffff)',
+        background: authConsentItemBackground(granted),
         borderRadius: 'var(--stitch-radius-md, 6px)',
-        opacity: granted ? 0.7 : 1,
+        opacity: authConsentItemOpacity(granted),
       },
     },
     icon !== undefined
@@ -81,7 +77,8 @@ export function ConsentItem(props: ConsentItemProps): React.ReactElement {
   );
 }
 
-export interface ConsentListProps {
+export interface ConsentListProps
+  extends Omit<SharedConsentListProps<React.ReactNode>, 'children'> {
   children: React.ReactNode;
 }
 

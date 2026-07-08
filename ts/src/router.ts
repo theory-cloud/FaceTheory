@@ -1,4 +1,4 @@
-import { normalizePath } from './types.js';
+import { normalizePath, type TrailingSlashPolicy } from './types.js';
 
 export interface RouteMatch {
   pattern: string;
@@ -9,6 +9,50 @@ export interface RouteMatch {
 interface CompiledRoute {
   pattern: string;
   segments: string[];
+}
+
+export interface RouterOptions {
+  trailingSlash?: TrailingSlashPolicy;
+}
+
+export function normalizeTrailingSlashPolicy(
+  value: TrailingSlashPolicy | undefined,
+): TrailingSlashPolicy {
+  if (value === undefined) return 'strict';
+  if (value === 'strict' || value === 'redirect' || value === 'normalize') {
+    return value;
+  }
+  throw new Error(
+    'trailingSlash must be one of strict, redirect, or normalize',
+  );
+}
+
+export function stripNonRootTrailingSlashes(path: string): string {
+  const normalized = normalizePath(path);
+  if (normalized === '/') return normalized;
+  let end = normalized.length;
+  while (end > 1 && normalized.charCodeAt(end - 1) === 47) end -= 1;
+  return normalized.slice(0, end);
+}
+
+export function canonicalizePathForTrailingSlashPolicy(
+  path: string,
+  policy: TrailingSlashPolicy,
+): string {
+  const normalized = normalizePath(path);
+  return policy === 'strict'
+    ? normalized
+    : stripNonRootTrailingSlashes(normalized);
+}
+
+export function redirectPathForTrailingSlashPolicy(
+  path: string,
+  policy: TrailingSlashPolicy,
+): string | null {
+  if (policy !== 'redirect') return null;
+  const normalized = normalizePath(path);
+  const canonical = stripNonRootTrailingSlashes(normalized);
+  return canonical === normalized ? null : canonical;
 }
 
 function splitPath(path: string): string[] {
@@ -255,14 +299,35 @@ function matchPath(
 
 export class Router {
   private readonly routes: CompiledRoute[] = [];
+  private readonly trailingSlash: TrailingSlashPolicy;
+
+  constructor(options: RouterOptions = {}) {
+    this.trailingSlash = normalizeTrailingSlashPolicy(options.trailingSlash);
+  }
 
   add(pattern: string): void {
-    const normalized = normalizePath(pattern);
+    const normalized = canonicalizePathForTrailingSlashPolicy(
+      pattern,
+      this.trailingSlash,
+    );
     this.routes.push({ pattern: normalized, segments: splitPath(normalized) });
   }
 
+  redirectPath(path: string): string | null {
+    const redirectPath = redirectPathForTrailingSlashPolicy(
+      path,
+      this.trailingSlash,
+    );
+    if (redirectPath === null) return null;
+    return this.match(redirectPath) ? redirectPath : null;
+  }
+
   match(path: string): RouteMatch | null {
-    const pathSegments = splitPath(path);
+    const pathSegments = splitPath(
+      this.trailingSlash === 'normalize'
+        ? stripNonRootTrailingSlashes(path)
+        : path,
+    );
 
     let best: {
       route: CompiledRoute;

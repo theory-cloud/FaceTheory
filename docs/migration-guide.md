@@ -9,9 +9,24 @@ This guide focuses on the supported migration paths into the current FaceTheory 
 ## When To Use This Guide
 
 Use this guide when you are:
+
 - replacing an ad hoc SSR handler with FaceTheory entrypoints
 - introducing SSG or ISR into an SSR-only FaceTheory app
 - updating AppTheory or TableTheory dependency pins
+
+## Versioned Migration Index
+
+Use this index to find the migration path by release line. Release Please updates version markers automatically; do not hand-edit `x-release-please-version` comments when adding migration notes.
+
+| From                                    | To          | Migration path                                                                            | Notes                                                                                                                          |
+| --------------------------------------- | ----------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| App-local SSR glue                      | Current 3.x | [Migration 1](#migration-1-ad-hoc-handler-to-canonical-aws-entrypoint)                    | Move request translation into `createFaceApp()` and the Lambda/AppTheory entrypoints.                                          |
+| SSR-only FaceTheory apps                | Current 3.x | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr)                      | Reclassify routes into the three server `FaceMode` values before adding SPA navigation.                                        |
+| ISR routes without tenant partitioning  | Current 3.x | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                             |
+| Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                      |
+| Svelte 4 adapter consumers              | v4.0.0      | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                  |
+| Deprecated 3.x public surface           | v4.0.0      | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated; `Headers` and `head.html` are removed; optional surfaces move to subpaths.                         |
+| Invalid 3.x Face contracts              | v4.0.0      | [Migration 10](#migration-10-v4-face-contract-construction-errors)                        | ISR Faces must set `revalidateSeconds` and parameterized SSG Faces must set `generateStaticParams()` before `createFaceApp()`. |
 
 ## Scope Guardrails
 
@@ -74,6 +89,7 @@ curl -I https://<cloudfront-domain>/isr-demo
 ```
 
 Expected:
+
 - `x-facetheory-isr: miss|hit|wait-hit|stale`
 
 ## Migration 4: Adopt ISR Tenant Fail-Closed Defaults
@@ -110,12 +126,14 @@ curl -I -H 'x-tenant-id: tenant-b' https://<cloudfront-domain>/tenant-isr-demo
 ```
 
 Expected:
+
 - tenant-invariant ISR returns `x-facetheory-isr: miss` and then `hit` or `wait-hit` on repeat requests
 - unpartitioned ISR with tenant boundary headers returns a deterministic server error and does not write ISR metadata
   or HTML cache entries
 - explicitly partitioned ISR keeps tenants separated and still reports normal `x-facetheory-isr` transitions
 
 Rollback:
+
 - switch affected tenant-varying routes back to `mode: 'ssr'`, or
 - strip tenant-like headers for routes proven to be tenant-invariant before they reach FaceTheory.
 
@@ -246,6 +264,115 @@ Rollback:
   claim it is strict no-inline
 - do not weaken the deployment CSP or publish a strict-CSP release claim without matching runtime, RC, and deployment
   evidence
+
+## Migration 8: Svelte 4 To Svelte 5 (v4.0.0)
+
+Use this path when upgrading a Svelte consumer from a FaceTheory 3.x line to v4.0.0. **v4.0.0 is a breaking release for the Svelte adapter: it requires Svelte `>=5.55.7` and drops Svelte 4 support.** The peer range moved from `>=4 <5.46.0 || >=5.55.7` to `>=5.55.7`. FaceTheory's bundled Stitch Svelte primitives (`stitch-shell`, `stitch-admin`, `stitch-hosted-auth`, `responsive-primitives`) are authored with Svelte 5 runes and no longer contain legacy `export let`, `$:`, `<slot>`, `$$slots`, `$$restProps`, or `on:` directives.
+
+1. Upgrade the app's Svelte peer to `>=5.55.7`:
+
+   ```bash
+   npm install svelte@^5.55.7
+   ```
+
+   The excluded `5.46.0`–`5.55.6` band and Svelte 4 are unsupported because they are not validated for deterministic Svelte SSR/hydration; `facetheory doctor` fails closed with a floor message if the installed Svelte is below `5.55.7`.
+
+2. Migrate your own Svelte components to runes (`$props`/`$state`/`$derived`, snippets and `{@render}` in place of `<slot>`, and `onclick=`-style event attributes). Svelte 5 compiles your components; FaceTheory renders them through `svelte/server`. Components that still use legacy syntax compile under Svelte 5's compatibility mode, but new authoring should use runes.
+
+3. **Named-slot authoring change.** If a template fills a migrated FaceTheory Stitch primitive's named slot (for example the Stitch `Shell`/`Topbar`/`PageFrame` slots), migrate legacy `slot="name"` fills and `<svelte:fragment slot="name">` blocks to Svelte 5 snippets such as `{#snippet name()}…{/snippet}`. Legacy named-slot fills do not bind to the migrated runes snippet props and can silently drop that content. FaceTheory's internal Svelte SSR fixtures baseline the migration against the locked compiler/output shape; they are not a general proof that legacy and runes compilers emit byte-identical marker bytes. Any visible HTML change or intentional compiler-marker drift is recorded in the release notes when the fixture baseline moves.
+
+4. Re-run local verification and rebuild the Svelte example:
+
+   ```bash
+   cd ts
+   npm run check
+   npm run example:vite:svelte:build
+   ```
+
+The `.render()` synchronous "bring-your-own-HTML" input to `createSvelteFace` (the `SvelteLegacySSRComponent` shape) is unchanged; only the Svelte 4 compiled-component path and its `svelte/server` deprecation-error fallback were removed.
+
+## Migration 9: v4 Public Surface Curation
+
+Use this path when upgrading a 3.x consumer that imported optional helpers or internal utilities from the root
+`@theory-cloud/facetheory` barrel. v4 curates the root barrel to the core runtime contract and keeps optional surfaces
+reachable through documented package subpaths.
+
+1. Replace root imports for optional surfaces with their subpaths:
+   - SPA navigation helpers: `@theory-cloud/facetheory/spa`
+   - OAC mutating-form transport helpers: `@theory-cloud/facetheory/oac-form`
+   - control-plane presets: `@theory-cloud/facetheory/control-plane`
+   - navigation-pending UI helpers: `@theory-cloud/facetheory/navigation-pending`
+   - adapter strict-CSP guards for adapter authors: `@theory-cloud/facetheory/adapter-csp`
+2. Stop importing internal routing and request-normalization helpers from the root barrel. The removed internal router
+   names are `Router`, `RouterOptions`, `RouteMatch`, `RoutePatternConflict`, `normalizeTrailingSlashPolicy`,
+   `stripNonRootTrailingSlashes`, `canonicalizePathForTrailingSlashPolicy`,
+   `redirectPathForTrailingSlashPolicy`, and `routePatternConflict`. The removed request-normalization helpers are
+   `normalizePath`, `trimLeadingSlashes`, `trimTrailingSlashes`, `trimOuterSlashes`, `canonicalizeHeaders`,
+   `parseQueryString`, `cloneQuery`, `parseCookiesFromHeaders`, and `cloneCookies`. Applications should pass normal
+   `FaceModule` routes and let `createFaceApp()` / the Lambda or AppTheory entrypoint normalize requests.
+3. Stop importing low-level head serialization helpers from the root barrel. Use structured `headTags`, helper
+   constructors such as `titleTag()`, `metaTag()`, `canonical()`, and `jsonLd()`, and the full `renderFaceHead()`
+   primitive when a test needs to inspect final head HTML.
+4. Stop importing `prepareUIIntegrations` from the package root. It was reachable through the old `export *` barrel but
+   is internal-only adapter-pipeline plumbing; v4 keeps that direct import inside FaceTheory and does not expose it as a
+   consumer package API.
+5. Replace the deprecated `Headers` type alias with `FaceHeaders`. The browser `Headers` class remains available from
+   the DOM runtime; FaceTheory's canonical request/response header map is only `FaceHeaders`.
+6. Replace `head.html` with the supported head channels:
+   - use `head: { title }` for the document title
+   - use structured `headTags` for meta/link/script/style/raw declarations
+   - use `styleTags` for adapter or integration style output
+7. Review any duplicate keyless head tags. v4 de-dupes keyless meta/link/script/style tags by their rendered
+   structure, so identical duplicates collapse while distinct JSON-LD blocks remain distinct.
+8. Remove any runtime import of control-plane guardrail scanners. The guardrail scanner is repository build/test
+   tooling and is no longer shipped as runtime API.
+9. Remove imports of `FaceContractWarningCode` and `FaceContractWarningLogRecord`. v4 no longer emits
+   `facetheory.app.contract.warning`; invalid Face contracts throw during `createFaceApp()` instead.
+
+Validation:
+
+```bash
+cd ts
+npm run typecheck
+```
+
+Rollback:
+
+- keep the previous pinned 3.x FaceTheory release tarball until all root imports have been migrated
+- do not add app-local re-export barrels that recreate the removed internal surface; they reintroduce the drift the v4
+  curation removes
+
+## Migration 10: v4 Face Contract Construction Errors
+
+Use this path when upgrading a 3.x app that relied on construction-time Face contract warnings. v4 makes those
+contracts fail-fast so an invalid render-mode declaration cannot reach deployment.
+
+1. Add `revalidateSeconds` to every `mode: 'isr'` Face. Choose a route-specific TTL that matches the rendered HTML's
+   freshness promise, or change the Face to `mode: 'ssr'` when it must render on every request.
+2. Add `generateStaticParams()` to every parameterized `mode: 'ssg'` Face. The function must enumerate every static
+   params object the build should emit.
+3. If a parameterized route cannot be enumerated at build time, change it to `mode: 'ssr'` for per-request rendering or
+   `mode: 'isr'` with an explicit `revalidateSeconds` value when blocking regeneration is safe.
+4. Remove observability handling for `facetheory.app.contract.warning`, `FaceContractWarningCode`, and
+   `FaceContractWarningLogRecord`. These names/events were v3 warning scaffolding; v4 reports the affected route in the
+   thrown `createFaceApp()` error message.
+5. If your log sink was typed against a v3 union that included `FaceContractWarningLogRecord`, replace that import with
+   `FaceAppLogRecord` (or a host-owned wider record type) and delete the `facetheory.app.contract.warning` switch case.
+   FaceTheory will only call the sink with request-completed or stream-error records in v4.
+
+Validation:
+
+```bash
+cd ts
+npm run typecheck
+npm test
+```
+
+Rollback:
+
+- keep the previous pinned 3.x FaceTheory release tarball until every Face satisfies the v4 contract
+- do not suppress construction errors in app-local factories; changing a mode or adding the missing contract field is
+  the migration
 
 ## Rollback Notes
 

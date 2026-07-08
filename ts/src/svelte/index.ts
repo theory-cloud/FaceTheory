@@ -1,5 +1,8 @@
 import { enforceAdapterStrictCspResult } from '../adapter-csp.js';
-import { prepareUIIntegrations } from '../types.js';
+import {
+  modeUsesRuntimeHydrationSidecars,
+  runAdapterRenderPipeline,
+} from '../adapter-pipeline.js';
 import type {
   FaceContext,
   FaceCspPolicy,
@@ -14,29 +17,50 @@ import type {
 } from '../types.js';
 
 export interface SvelteSSRRenderResult {
+  /** Server-rendered body fragment produced by Svelte. */
   html: string;
+  /** Optional CSS emitted by legacy/pre-rendered Svelte inputs. */
   css?: { code: string };
+  /** Optional raw Svelte head output; strict CSP rejects this in no-raw-head mode. */
   head?: string;
 }
 
+/**
+ * A synchronous "bring-your-own-HTML" render input: any object exposing a
+ * `render(props)` that returns pre-rendered `{ html, head?, css? }`. This is not
+ * a Svelte-4 compiled component (FaceTheory requires Svelte >=5.55.7); it is the
+ * escape hatch for callers supplying externally/hand-rendered markup. Compiled
+ * Svelte 5 components have no `.render()` and go through `svelte/server` instead.
+ */
 export interface SvelteLegacySSRComponent<Props = Record<string, unknown>> {
   render: (props?: Props) => SvelteSSRRenderResult;
 }
 
 export interface RenderSvelteOptions {
+  /** HTTP status for the rendered Face response. */
   status?: number;
+  /** Additional response headers merged into the Face response. */
   headers?: Record<string, string | string[]>;
+  /** Set-Cookie header values emitted with the response. */
   cookies?: string[];
+  /** Structured document head shortcut, usually `{ title }`. */
   head?: FaceHead;
+  /** Deterministic head tags emitted through FaceTheory's head primitive. */
   headTags?: FaceHeadTag[];
+  /** Deterministic style tags emitted by adapter integrations. */
   styleTags?: FaceStyleTag[];
+  /** Hydration payload or external sidecar reference for the client bootstrap. */
   hydration?: FaceHydration;
+  /** Strict-CSP policy requested by this render. */
   csp?: FaceCspPolicy;
+  /** Svelte UI integrations for wrapping render input and contributing head/styles. */
   integrations?: Array<SvelteUIIntegration>;
 }
 
 export interface SvelteRenderInput<Props = Record<string, unknown>> {
+  /** Compiled Svelte 5 component, or a synchronous pre-rendered legacy input. */
   component: unknown;
+  /** Props passed to the component during server rendering. */
   props?: Props;
   /**
    * Optional CSS text emitted at build time (Svelte 5 emits CSS in compile output, not server render output).
@@ -44,11 +68,19 @@ export interface SvelteRenderInput<Props = Record<string, unknown>> {
   cssText?: string;
 }
 
+/**
+ * Adapter-neutral integration hook specialized to Svelte render inputs.
+ */
 export type SvelteUIIntegration<
   Props extends Record<string, unknown> = Record<string, unknown>,
   TState = unknown,
 > = UIIntegration<SvelteRenderInput<Props>, TState>;
 
+/**
+ * Render a Svelte component/input through the buffered adapter path and return a
+ * FaceTheory `FaceRenderResult` with deterministic head, style, hydration, and
+ * strict-CSP validation.
+ */
 export async function renderSvelte<Props extends Record<string, unknown>>(
   ctx: FaceContext,
   input: SvelteRenderInput<Props>,
@@ -67,103 +99,66 @@ async function renderSvelteInternal<Props extends Record<string, unknown>>(
   options: RenderSvelteOptions,
   validationOptions: SvelteRenderValidationOptions = {},
 ): Promise<FaceRenderResult> {
-  const integrations = await prepareUIIntegrations<
+  return runAdapterRenderPipeline<
     SvelteRenderInput<Props>,
     SvelteUIIntegration<Props>
-  >((options.integrations ?? []) as Array<SvelteUIIntegration<Props>>, ctx);
+  >({
+    ctx,
+    tree: input,
+    options,
+    integrations: (options.integrations ?? []) as Array<
+      SvelteUIIntegration<Props>
+    >,
+    renderTree: async (currentInput) => {
+      const rendered = await renderSvelteInput(currentInput);
+      const headTags: FaceHeadTag[] = [];
+      const styleTags: FaceStyleTag[] = [];
 
-  let currentInput: SvelteRenderInput<Props> = input;
-  for (const { integration, state } of integrations) {
-    if (!integration.wrapTree) continue;
-    currentInput = integration.wrapTree(currentInput, ctx, state);
-  }
+      if (rendered.head) {
+        headTags.push({ type: 'raw', html: rendered.head });
+      }
+      const cssText = rendered.css?.code ?? currentInput.cssText;
+      if (cssText) {
+        styleTags.push({
+          cssText,
+          attrs: { 'data-svelte': 'true' },
+        });
+      }
 
-  const integrationHeadTags: FaceHeadTag[] = [];
-  const integrationStyleTags: FaceStyleTag[] = [];
-  for (const { integration, state } of integrations) {
-    if (!integration.contribute) continue;
-    const contribution = await integration.contribute(ctx, state);
-    if (contribution.headTags)
-      integrationHeadTags.push(...contribution.headTags);
-    if (contribution.styleTags)
-      integrationStyleTags.push(...contribution.styleTags);
-  }
+      return {
+        html: rendered.html,
+        headTags,
+        styleTags,
+      };
+    },
+    enforceStrictCsp: (out) => {
+      enforceAdapterStrictCspResult(out, {
+        adapterName: 'Svelte adapter',
+        deferHydrationValidation:
+          validationOptions.deferStrictCspHydrationValidation === true,
+      });
+    },
+  });
+}
 
-  let rendered: SvelteSSRRenderResult;
-
-  const maybeLegacy = currentInput.component as Partial<
+async function renderSvelteInput<Props extends Record<string, unknown>>(
+  input: SvelteRenderInput<Props>,
+): Promise<SvelteSSRRenderResult> {
+  // FaceTheory requires Svelte >=5.55.7. Compiled Svelte 5 components expose no
+  // static `.render()`, so they render through `svelte/server` below. The
+  // synchronous `.render()` fast path is retained only for
+  // `SvelteLegacySSRComponent` inputs (pre-rendered `{ html, head?, css? }`).
+  // The former Svelte 4->5 `.render()` deprecation-error fallback is removed
+  // with Svelte 4 support: under Svelte 5-only there is no legacy compiled
+  // component whose `.render()` would throw and need bridging to `svelte/server`.
+  const maybeLegacy = input.component as Partial<
     SvelteLegacySSRComponent<Props>
   >;
   if (typeof maybeLegacy.render === 'function') {
-    try {
-      rendered = maybeLegacy.render(currentInput.props);
-    } catch (err) {
-      if (!isSvelte5DeprecatedRenderError(err)) throw err;
-      rendered = await renderWithSvelteServer(
-        currentInput.component,
-        currentInput.props,
-      );
-    }
-  } else {
-    rendered = await renderWithSvelteServer(
-      currentInput.component,
-      currentInput.props,
-    );
+    return maybeLegacy.render(input.props);
   }
 
-  const headTags: FaceHeadTag[] = [
-    ...integrationHeadTags,
-    ...(options.headTags ?? []),
-  ];
-  const styleTags: FaceStyleTag[] = [
-    ...integrationStyleTags,
-    ...(options.styleTags ?? []),
-  ];
-
-  if (rendered.head) {
-    headTags.push({ type: 'raw', html: rendered.head });
-  }
-  const cssText = rendered.css?.code ?? currentInput.cssText;
-  if (cssText) {
-    styleTags.push({
-      cssText,
-      attrs: { 'data-svelte': 'true' },
-    });
-  }
-
-  let out: FaceRenderResult = { html: rendered.html };
-  if (options.status !== undefined) out.status = options.status;
-  if (options.headers !== undefined) out.headers = options.headers;
-  if (options.cookies !== undefined) out.cookies = options.cookies;
-  if (options.head !== undefined) out.head = options.head;
-  if (headTags.length) out.headTags = headTags;
-  if (styleTags.length) out.styleTags = styleTags;
-  if (options.hydration !== undefined) out.hydration = options.hydration;
-  if (options.csp !== undefined) out.csp = options.csp;
-
-  for (const { integration, state } of integrations) {
-    if (!integration.finalize) continue;
-    out = await integration.finalize(out, ctx, state);
-  }
-
-  enforceAdapterStrictCspResult(out, {
-    adapterName: 'Svelte adapter',
-    deferHydrationValidation:
-      validationOptions.deferStrictCspHydrationValidation === true,
-  });
-
-  return out;
-}
-
-function modeUsesRuntimeHydrationSidecars(mode: FaceMode): boolean {
-  return mode === 'ssr' || mode === 'isr' || mode === 'ssg';
-}
-
-function isSvelte5DeprecatedRenderError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  return err.message.includes(
-    'Component.render(...) is no longer valid in Svelte 5',
-  );
+  return renderWithSvelteServer(input.component, input.props);
 }
 
 async function renderWithSvelteServer<Props extends Record<string, unknown>>(
@@ -200,13 +195,18 @@ export interface SvelteFaceOptions<
   Data = unknown,
   Props extends Record<string, unknown> = Record<string, unknown>,
 > {
+  /** Route pattern registered with `createFaceApp()`. */
   route: string;
+  /** FaceTheory render mode for this Svelte Face. */
   mode: FaceMode;
+  /** Optional server-side data loader; cache behavior follows the selected mode. */
   load?: (ctx: FaceContext) => Promise<Data>;
+  /** Returns the Svelte render input for the request/build. */
   render: (
     ctx: FaceContext,
     data: Data,
   ) => SvelteRenderInput<Props> | Promise<SvelteRenderInput<Props>>;
+  /** Static or request-derived render options passed to `renderSvelte()`. */
   renderOptions?:
     | RenderSvelteOptions
     | ((
@@ -215,6 +215,10 @@ export interface SvelteFaceOptions<
       ) => RenderSvelteOptions | Promise<RenderSvelteOptions>);
 }
 
+/**
+ * Create a Svelte `FaceModule` while preserving FaceTheory's mode, hydration,
+ * head/style, and strict-CSP contracts.
+ */
 export function createSvelteFace<
   Data = unknown,
   Props extends Record<string, unknown> = Record<string, unknown>,

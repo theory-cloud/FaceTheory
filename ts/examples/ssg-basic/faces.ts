@@ -1,4 +1,4 @@
-import type { FaceModule } from '../../src/types.js';
+import type { FaceModule } from '@theory-cloud/facetheory';
 
 export const faces: FaceModule[] = [
   {

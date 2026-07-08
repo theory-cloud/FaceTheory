@@ -8,7 +8,7 @@
 
 <p align="center">
   <strong>The AWS-first TypeScript client-delivery framework for the Theory Cloud stack.</strong><br>
-  Deterministic SSR, SSG, blocking ISR, and SPA — across React, Vue, and Svelte.
+  Three deterministic server render modes (SSR, SSG, blocking ISR) plus the SPA client runtime — across React, Vue, and Svelte.
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@ FaceTheory is the **client-delivery layer** of the Theory Cloud stack. It render
 
 ## Status
 
-FaceTheory is pre-1.0 and under active development. The runtime covers SSR, SSG, and blocking ISR with adapter support for React, Vue, and Svelte. First production use is underway at [Pay Theory](https://paytheory.com) (checkout page). See [CHANGELOG](CHANGELOG.md) for release history.
+FaceTheory is a post-1.0 3.x runtime under active development. Post-1.0 SemVer discipline applies: breaking changes require explicit `feat!:` / `fix!:` commits, `BREAKING CHANGE:` notes, and migration guidance; deprecations follow the published [Deprecation Policy](docs/deprecation-policy.md). The runtime covers SSR, SSG, and blocking ISR with a SPA client runtime and adapter support for React, Vue, and Svelte. First production use is underway at [Pay Theory](https://paytheory.com) (checkout page). See [CHANGELOG](CHANGELOG.md) for release history.
 
 ## Install v3.8.1 <!-- x-release-please-version -->
 
@@ -63,18 +63,20 @@ npm install --save-exact \
 
 Add the framework peers that match your adapter surface:
 
-| Adapter | Peer install |
-|---------|--------------|
-| React          | `npm install react react-dom` |
-| React + AntD   | `npm install antd @emotion/react @emotion/cache @emotion/server` |
-| Vue            | `npm install vue @vue/server-renderer` |
-| Svelte         | `npm install svelte@^5.55.7` |
+| Adapter      | Peer install                                                     |
+| ------------ | ---------------------------------------------------------------- |
+| React        | `npm install react react-dom`                                    |
+| React + AntD | `npm install antd @emotion/react @emotion/cache @emotion/server` |
+| Vue          | `npm install vue @vue/server-renderer`                           |
+| Svelte       | `npm install svelte@^5.55.7`                                     |
+
+Packaging posture: FaceTheory is ESM-only, declares `sideEffects: false` after auditing published import subpaths, and requires Svelte `>=5.55.7` (Svelte 4 support was dropped in v4.0.0). CommonJS hosts should migrate to ESM or use dynamic `import()` at the boundary instead of `require()`.
 
 Optional companion packages from pinned GitHub releases:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.13.2/theory-cloud-apptheory-1.13.2.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v1.13.2/theory-cloud-apptheory-cdk-1.13.2.tgz`
-- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v1.10.1/theory-cloud-tabletheory-ts-1.10.1.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v1.16.1/theory-cloud-apptheory-1.16.1.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v1.16.1/theory-cloud-apptheory-cdk-1.16.1.tgz`
+- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v2.0.2/theory-cloud-tabletheory-ts-2.0.2.tgz`
 
 ## Quickstart
 
@@ -105,16 +107,25 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 `createLambdaUrlStreamingHandler()` expects Lambda's `awslambda.streamifyResponse` global at runtime. Outside Lambda, test request handling with `handleLambdaUrlEvent(app, event)` or pass the optional `awslambda` adapter explicitly.
 
+For the paved AWS deployment path, wrap the same `FaceApp` in AppTheory's `AppTheorySsrSite`: the SSR reference stack
+bundles a real `createFaceApp(...)` + `createAppTheoryFaceHandler({ app })` Lambda handler, and the SSG/ISR reference
+stack uses `AppTheorySsrSiteMode.SSG_ISR` for S3-primary HTML with Lambda fallback and TableTheory-backed ISR wiring.
+See the [CDK deployment walkthrough](https://facetheory.theorycloud.ai/cdk/) for scaffold → build → props → deploy →
+curl steps. Local synth/tests are deployment-shape proof only; do not claim live CloudFront proof without an authorized
+AWS deploy.
+
 The `v3.8.1` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
 
 ## At a glance
 
-| Render modes | 4 | SSR · SSG · blocking ISR · SPA |
-| ------------ | - | ------------------------------ |
-| Adapters     | 3 | React · Vue · Svelte |
-| Distribution | GitHub Releases | immutable, pinned |
-| Runtime      | Node ≥24 | TypeScript-only |
-| License      | Apache-2.0 | open source |
+| Surface             | Count           | Contract                                                  |
+| ------------------- | --------------- | --------------------------------------------------------- |
+| Server render modes | 3               | SSR · SSG · blocking ISR                                  |
+| SPA client runtime  | 1               | Same-origin navigation layered on a server-rendered shell |
+| Adapters            | 3               | React · Vue · Svelte                                      |
+| Distribution        | GitHub Releases | immutable, pinned                                         |
+| Runtime             | Node ≥20        | TypeScript-only                                           |
+| License             | Apache-2.0      | open source                                               |
 
 ## Resource Routes And Hydration Sidecars
 

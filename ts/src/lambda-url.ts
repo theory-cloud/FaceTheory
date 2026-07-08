@@ -1,6 +1,6 @@
 import { utf8 } from './bytes.js';
 import { createCspNonce } from './security.js';
-import type { FaceBody, FaceRequest, FaceResponse, Headers, Query } from './types.js';
+import type { FaceBody, FaceRequest, FaceResponse, FaceHeaders, Query } from './types.js';
 import { canonicalizeHeaders, parseCookiesFromHeaders, parseQueryString } from './types.js';
 
 export interface LambdaUrlHttpContext {
@@ -40,13 +40,29 @@ export interface LambdaUrlResponseMetadata {
 
 export interface LambdaResponseWriter {
   writeHead: (metadata: LambdaUrlResponseMetadata) => void;
-  write: (chunk: Uint8Array) => void;
-  end: () => void;
+  write: (chunk: Uint8Array) => boolean | void | Promise<boolean | void>;
+  drain?: () => Promise<void>;
+  end: () => void | Promise<void>;
 }
 
+type LambdaWritableStreamEvent = 'drain' | 'error' | 'close';
+type LambdaWritableStreamListener = (...args: unknown[]) => void;
+
 export interface LambdaWritableStream {
-  write: (chunk: Uint8Array | string) => void;
+  write: (chunk: Uint8Array | string) => boolean | void;
   end: (chunk?: Uint8Array | string) => void;
+  once?: (
+    event: LambdaWritableStreamEvent,
+    listener: LambdaWritableStreamListener,
+  ) => unknown;
+  off?: (
+    event: LambdaWritableStreamEvent,
+    listener: LambdaWritableStreamListener,
+  ) => unknown;
+  removeListener?: (
+    event: LambdaWritableStreamEvent,
+    listener: LambdaWritableStreamListener,
+  ) => unknown;
   setHeader?: (name: string, value: string | string[]) => void;
   statusCode?: number;
 }
@@ -157,16 +173,39 @@ export async function writeFaceResponseToLambdaWriter(
 
   if (response.body instanceof Uint8Array) {
     if (response.body.length > 0) {
-      writer.write(response.body);
+      await writeLambdaChunk(writer, response.body);
     }
-    writer.end();
+    await writer.end();
     return;
   }
 
   for await (const chunk of response.body) {
-    writer.write(chunk);
+    await writeLambdaChunk(writer, chunk);
   }
-  writer.end();
+  await writer.end();
+}
+
+async function writeLambdaChunk(
+  writer: LambdaResponseWriter,
+  chunk: Uint8Array,
+): Promise<void> {
+  const accepted = await writer.write(chunk);
+  if (accepted === false) {
+    await waitForWriterDrain(writer);
+  }
+}
+
+async function waitForWriterDrain(
+  writer: LambdaResponseWriter,
+): Promise<void> {
+  if (typeof writer.drain === 'function') {
+    await writer.drain();
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
 }
 
 export function createLambdaUrlStreamingHandler<
@@ -219,15 +258,93 @@ function createStreamWriter(
     }
   };
 
-  const write = (chunk: Uint8Array): void => {
-    stream.write(chunk);
+  const write = (chunk: Uint8Array): boolean | void => {
+    return stream.write(chunk);
   };
+
+  const drain = createStreamDrainWaiter(stream);
 
   const end = (): void => {
     stream.end();
   };
 
-  return { writeHead, write, end };
+  return drain ? { writeHead, write, drain, end } : { writeHead, write, end };
+}
+
+function createStreamDrainWaiter(
+  stream: LambdaWritableStream,
+): (() => Promise<void>) | undefined {
+  if (typeof stream.once !== 'function') return undefined;
+
+  let terminalError: Error | null = null;
+  let didClose = false;
+  const onTerminalError = (err: unknown): void => {
+    terminalError = normalizeStreamError(err);
+  };
+  const onTerminalClose = (): void => {
+    didClose = true;
+  };
+  stream.once('error', onTerminalError);
+  stream.once('close', onTerminalClose);
+
+  return async (): Promise<void> => {
+    if (terminalError) throw terminalError;
+    if (didClose) throw closedBeforeDrainError();
+
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const resolveOnce = (): void => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      };
+      const rejectOnce = (err: Error): void => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(err);
+      };
+      const onDrain = (): void => resolveOnce();
+      const onError = (err: unknown): void => {
+        rejectOnce(normalizeStreamError(err));
+      };
+      const onClose = (): void => {
+        rejectOnce(closedBeforeDrainError());
+      };
+      const cleanup = (): void => {
+        removeStreamListener(stream, 'drain', onDrain);
+        removeStreamListener(stream, 'error', onError);
+        removeStreamListener(stream, 'close', onClose);
+      };
+
+      stream.once?.('drain', onDrain);
+      stream.once?.('error', onError);
+      stream.once?.('close', onClose);
+    });
+  };
+}
+
+function removeStreamListener(
+  stream: LambdaWritableStream,
+  event: LambdaWritableStreamEvent,
+  listener: LambdaWritableStreamListener,
+): void {
+  if (typeof stream.off === 'function') {
+    stream.off(event, listener);
+    return;
+  }
+  stream.removeListener?.(event, listener);
+}
+
+function normalizeStreamError(err: unknown): Error {
+  return err instanceof Error
+    ? err
+    : new Error(`Lambda response stream error before drain: ${String(err)}`);
+}
+
+function closedBeforeDrainError(): Error {
+  return new Error('Lambda response stream closed before drain');
 }
 
 function getDefaultAwsLambdaGlobal(): AwsLambdaGlobalLike {
@@ -240,8 +357,8 @@ function getDefaultAwsLambdaGlobal(): AwsLambdaGlobalLike {
 
 function headersFromLambdaEvent(
   input: Record<string, string | undefined> | undefined,
-): Headers {
-  const headers: Headers = {};
+): FaceHeaders {
+  const headers: FaceHeaders = {};
   for (const [name, value] of Object.entries(input ?? {})) {
     const key = String(name).trim();
     if (!key || value === undefined) continue;
@@ -250,7 +367,7 @@ function headersFromLambdaEvent(
   return headers;
 }
 
-function appendCookieArrayToHeaders(headers: Headers, cookies: string[] | undefined): void {
+function appendCookieArrayToHeaders(headers: FaceHeaders, cookies: string[] | undefined): void {
   if (!cookies?.length) return;
 
   const cookieHeaderKey = findHeaderKey(headers, 'cookie') ?? 'cookie';
@@ -262,7 +379,7 @@ function appendCookieArrayToHeaders(headers: Headers, cookies: string[] | undefi
   }
 }
 
-function findHeaderKey(headers: Headers, lowerName: string): string | null {
+function findHeaderKey(headers: FaceHeaders, lowerName: string): string | null {
   for (const key of Object.keys(headers)) {
     if (key.trim().toLowerCase() === lowerName) return key;
   }

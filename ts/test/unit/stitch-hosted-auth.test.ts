@@ -3,6 +3,28 @@ import test from 'node:test';
 
 import * as React from 'react';
 
+import {
+  AUTH_INACTIVE_STEP_COLOR,
+  AUTH_ON_SURFACE_COLOR,
+  AUTH_ON_SURFACE_VARIANT_COLOR,
+  AUTH_PAGE_SURFACE_BACKGROUND,
+  AUTH_PRIMARY_COLOR,
+  AUTH_SIGNATURE_GRADIENT_BACKGROUND,
+  AUTH_SURFACE_CONTAINER_LOW_BACKGROUND,
+  AUTH_SURFACE_CONTAINER_LOWEST_BACKGROUND,
+  authConsentItemBackground,
+  authConsentItemOpacity,
+  authOtpInputClassName,
+  authStateClassName,
+  authStateRole,
+  authStateVariantPalette,
+  resolveAuthFlowStepState,
+  resolveAuthPageBackground,
+  splitAuthOtpValue,
+  updateAuthOtpValueAtIndex,
+  type AuthFlowStep,
+} from '../../src/stitch-hosted-auth/index.js';
+
 import { createFaceApp } from '../../src/app.js';
 import { createReactFace } from '../../src/adapters/react.js';
 import { createAntdIntegration } from '../../src/react/antd.js';
@@ -19,6 +41,68 @@ import {
 } from '../../src/react/stitch-hosted-auth/index.js';
 
 const h = React.createElement;
+
+
+test('stitch-hosted-auth shared core contract resolves deterministic values', () => {
+  const step = {
+    key: 'verify',
+    label: 'Verify',
+    description: 'Confirm the one-time code',
+  } satisfies AuthFlowStep<string>;
+
+  assert.deepEqual(step, {
+    key: 'verify',
+    label: 'Verify',
+    description: 'Confirm the one-time code',
+  });
+  assert.equal(resolveAuthPageBackground('surface'), AUTH_PAGE_SURFACE_BACKGROUND);
+  assert.equal(
+    resolveAuthPageBackground('gradient'),
+    AUTH_SIGNATURE_GRADIENT_BACKGROUND,
+  );
+  assert.deepEqual(resolveAuthFlowStepState(1, 1), {
+    isCurrent: true,
+    isCompleted: false,
+    dotColor: AUTH_PRIMARY_COLOR,
+    labelColor: AUTH_ON_SURFACE_COLOR,
+    labelFontWeight: 600,
+    ariaCurrent: 'step',
+  });
+  assert.deepEqual(resolveAuthFlowStepState(2, 1), {
+    isCurrent: false,
+    isCompleted: false,
+    dotColor: AUTH_INACTIVE_STEP_COLOR,
+    labelColor: AUTH_ON_SURFACE_VARIANT_COLOR,
+    labelFontWeight: 400,
+    ariaCurrent: undefined,
+  });
+  assert.equal(
+    authConsentItemBackground(true),
+    AUTH_SURFACE_CONTAINER_LOW_BACKGROUND,
+  );
+  assert.equal(
+    authConsentItemBackground(false),
+    AUTH_SURFACE_CONTAINER_LOWEST_BACKGROUND,
+  );
+  assert.equal(authConsentItemOpacity(true), 0.7);
+  assert.equal(authConsentItemOpacity(false), 1);
+  assert.equal(authStateRole('warning'), 'alert');
+  assert.equal(authStateRole('success'), undefined);
+  assert.equal(
+    authStateClassName('error'),
+    'facetheory-stitch-auth-state facetheory-stitch-auth-state-error',
+  );
+  assert.equal(
+    authStateVariantPalette('error').surface,
+    'var(--stitch-color-error-container, #ffdad6)',
+  );
+  assert.equal(
+    authOtpInputClassName(true),
+    'facetheory-stitch-otp-input facetheory-stitch-otp-input-invalid',
+  );
+  assert.deepEqual(splitAuthOtpValue('12', 4), ['1', '2', '', '']);
+  assert.equal(updateAuthOtpValueAtIndex('12', 4, 2, '9'), '129');
+});
 
 async function renderSSR(element: React.ReactElement): Promise<string> {
   const app = createFaceApp({

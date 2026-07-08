@@ -38,6 +38,72 @@ Expected result:
 - Type checking completes with no errors.
 - The unit suite passes.
 
+## Test Your Faces With `@theory-cloud/facetheory/testing`
+
+Consumer apps can unit-test a Face without constructing Lambda Function URL events or copying repository-only harnesses. The testing subpath is Node test tooling and is intentionally separate from the browser client helper surface:
+
+```ts
+import {
+  assertHydrationEquivalent,
+  buildFaceRequest,
+  renderFace,
+} from "@theory-cloud/facetheory/testing";
+
+const request = buildFaceRequest({
+  url: "https://checkout.example.test/checkout?cart=cart_test",
+  headers: { cookie: "session=test-session" },
+  cspNonce: "nonce-test",
+});
+
+const rendered = await renderFace(checkoutFace, { request });
+
+assert.equal(rendered.status, 200);
+assert.match(rendered.html, /Checkout/);
+
+await assertHydrationEquivalent({
+  html: rendered.html,
+  selector: "#root",
+  hydrate: async ({ document }) => {
+    // Wire the same framework hydrate call your client bootstrap uses.
+    // React example: hydrateRoot(document.getElementById("root")!, <App />)
+  },
+});
+```
+
+`buildFaceRequest()` returns a deterministic `FaceRequest` with a stable `x-request-id` and parses URL query strings for you. `renderFace()` accepts a `FaceModule`, an array of Faces, or an app-like object with `handle(request)` and returns the collected response body as `html`/`text` so tests can assert against complete documents.
+
+`assertHydrationEquivalent()` uses a jsdom-backed browser harness, installs browser globals for the duration of the assertion, captures `console.error`/`console.warn`, fails on framework hydration-mismatch messages, and compares the selected DOM subtree before and after the consumer-provided hydrate callback. It fails closed on unexpected `fetch()` by default; pass a fixture fetcher when a strict-CSP route intentionally loads external hydration data:
+
+```ts
+import {
+  assertHydrationEquivalent,
+  createStrictCspFixtureFetch,
+} from "@theory-cloud/facetheory/testing";
+
+const { fetcher } = createStrictCspFixtureFetch({
+  "/_facetheory/data/page.json": { cartId: "cart_test" },
+});
+
+await assertHydrationEquivalent({
+  html,
+  selector: "#root",
+  fetcher,
+  hydrate: async (ctx) => {
+    // Load external hydration data, then call the framework hydrate primitive.
+  },
+});
+```
+
+Strict-CSP test helpers are also exported for application suites that need the same no-inline assertions FaceTheory uses internally:
+
+```ts
+import { assertStrictCspDocument } from "@theory-cloud/facetheory/testing";
+
+await assertStrictCspDocument(rendered.html);
+```
+
+The DOM helpers dynamically load `jsdom`. Keep `jsdom` in the consuming test workspace's dev dependencies; it is not part of FaceTheory's browser/runtime contract.
+
 ## Focused Verification Paths
 
 Run these targeted flows when a change touches one delivery mode or adapter more than the rest of the runtime.
@@ -168,6 +234,39 @@ Local expected result:
 For documentation reviews, explicitly check the unsafe-claim boundary: these tests prove local runtime behavior and
 example wiring, not that a release has been published, a Simulacrum RC has been validated, or an AWS/customer deployment
 has succeeded.
+
+### Svelte SSR Fixture Harness
+
+```bash
+cd ts
+node --import tsx test/unit/svelte-ssr-fixtures.test.ts
+```
+
+Use this when changing:
+
+- Svelte Stitch or responsive primitive components
+- `createSvelteFace()` or Svelte adapter SSR behavior
+- fixture definitions or stored snapshots under `ts/test/fixtures/svelte-ssr/`
+- the Svelte compiler floor or lockfile version
+
+Local expected result:
+
+- every Svelte component in the fixture roots has exactly one definition and one stored snapshot
+- SSR, SSG, and ISR render the same body for each fixture
+- repeated SSR renders are byte-identical for the current fixture baseline
+
+These snapshots are tied to the current `svelte/compiler` output shape pinned by `ts/package-lock.json`. They are a
+baseline for FaceTheory's adapter/mode determinism and for reviewing the Svelte 5 runes migration; they are not a
+portable proof that legacy-Svelte and runes-compiled components emit byte-identical HTML forever. When snapshots are
+regenerated with `FACETHEORY_UPDATE_SVELTE_SSR_FIXTURES=1`, review compiler-owned comment/anchor marker drift
+separately from visible HTML drift and record intentional output changes in the migration or release notes.
+
+The harness uses a direct `svelte/compiler` path with a temporary `.mjs` module tree so wrapper fixtures can exercise
+default and named snippets through FaceTheory's adapter without depending on Vite/Rollup bundling. That direct path has
+narrow import rewrites for the current compiler output; if those assertions fail, update the harness before accepting a
+snapshot change. Production bundler behavior remains covered by the Vite Svelte example builds. Scratch directories use
+the ignored `.tmp-facetheory-svelte-ssr-fixtures-*` prefix so an interrupted run cannot accidentally stage generated
+modules.
 
 ### React SSR And Streaming
 

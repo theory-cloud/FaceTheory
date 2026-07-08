@@ -14,6 +14,10 @@ export function createCspNonce(bytes = 16): string {
   return randomBytes(size).toString('base64');
 }
 
+/**
+ * Options for constructing FaceTheory's strict CSP header, including the per-response
+ * nonce and bounded directive extensions.
+ */
 export interface StrictCspHeaderOptions {
   /**
    * Optional nonce for callers that intentionally allow FaceTheory-owned
@@ -21,10 +25,46 @@ export interface StrictCspHeaderOptions {
    * no-inline baseline for external hydration contracts.
    */
   cspNonce?: string | null;
+  /**
+   * Add source expressions to FaceTheory's canonical directives or append new
+   * directives. Values are individual CSP tokens; never include
+   * `'unsafe-inline'` or `'unsafe-eval'`.
+   */
+  directives?: StrictCspDirectiveExtensions;
 }
 
+/**
+ * Single CSP source expression accepted as an extension value after unsafe token and
+ * injection checks.
+ */
+export type StrictCspDirectiveValue = string;
+/**
+ * One or more CSP source expressions for a directive extension.
+ */
+export type StrictCspDirectiveValues =
+  | StrictCspDirectiveValue
+  | readonly StrictCspDirectiveValue[];
+/**
+ * Map of CSP directive names to additional source expressions appended to FaceTheory's
+ * strict same-origin defaults.
+ */
+export type StrictCspDirectiveExtensions = Record<
+  string,
+  StrictCspDirectiveValues | null | undefined
+>;
+
+/**
+ * Options for whole-document strict CSP validation, including the expected request
+ * nonce for nonce-carried JSON-LD head scripts.
+ */
 export interface StrictCspDocumentValidationOptions {
   policy?: FaceCspPolicy | undefined;
+  /**
+   * Optional nonce expected on nonce-carried JSON-LD scripts in `<head>`.
+   * FaceTheory's runtime already validates structured head tags against the
+   * request nonce; this option lets standalone callers get the same exact check.
+   */
+  cspNonce?: string | null;
 }
 
 const STRICT_CSP_DIRECTIVES: Array<[name: string, values: string[]]> = [
@@ -45,7 +85,13 @@ const SCRIPT_TAG_NAME = 'script';
 interface HtmlStartTag {
   attrs: string;
   end: number;
+  start: number;
   tagName: string;
+}
+
+interface HtmlAttribute {
+  name: string;
+  value: string | null;
 }
 
 /**
@@ -59,14 +105,25 @@ export function buildStrictCspHeader(
   options: StrictCspHeaderOptions = {},
 ): string {
   const nonce = normalizeCspNonce(options.cspNonce ?? null);
+  const extensions = normalizeStrictCspDirectiveExtensions(options.directives);
+  const emitted = new Set<string>();
 
-  return STRICT_CSP_DIRECTIVES.map(([name, baseValues]) => {
+  const baseDirectives = STRICT_CSP_DIRECTIVES.map(([name, baseValues]) => {
     const values = [...baseValues];
     if ((name === 'script-src' || name === 'style-src') && nonce) {
       values.push(`'nonce-${nonce}'`);
     }
-    return `${name} ${values.join(' ')}`;
-  }).join('; ');
+    appendUniqueValues(values, extensions.get(name) ?? []);
+    emitted.add(name);
+    return formatCspDirective(name, values);
+  });
+
+  const extensionDirectives = [...extensions.entries()]
+    .filter(([name]) => !emitted.has(name))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, values]) => formatCspDirective(name, values));
+
+  return [...baseDirectives, ...extensionDirectives].join('; ');
 }
 
 /**
@@ -94,7 +151,7 @@ export function validateStrictCspDocument(
   const documentHtml = String(html ?? '');
 
   if (policy?.inlineScripts === false) {
-    validateNoInlineScriptElements(documentHtml);
+    validateNoInlineScriptElements(documentHtml, options.cspNonce ?? null);
   }
   if (policy?.inlineStyles === false) {
     validateNoInlineStyleElements(documentHtml);
@@ -113,24 +170,115 @@ function normalizeCspNonce(nonce: string | null): string | null {
   return trimmed;
 }
 
-function validateNoInlineScriptElements(html: string): void {
-  const scriptStartTags: HtmlStartTag[] = [];
+function normalizeStrictCspDirectiveExtensions(
+  directives: StrictCspDirectiveExtensions | undefined,
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  if (!directives) return out;
+
+  for (const [rawName, rawValues] of Object.entries(directives)) {
+    if (rawValues === undefined || rawValues === null) continue;
+
+    const name = normalizeStrictCspDirectiveName(rawName);
+    const values = Array.isArray(rawValues) ? rawValues : [rawValues];
+    if (values.length === 0) {
+      throw new Error(
+        `FaceTheory strict CSP directive "${name}" must include at least one value`,
+      );
+    }
+
+    const normalizedValues = values.map((value) =>
+      normalizeStrictCspDirectiveValue(name, value),
+    );
+    const existing = out.get(name) ?? [];
+    appendUniqueValues(existing, normalizedValues);
+    out.set(name, existing);
+  }
+
+  return out;
+}
+
+function normalizeStrictCspDirectiveName(name: string): string {
+  const normalized = String(name ?? '').trim().toLowerCase();
+  if (!/^[a-z][a-z0-9-]*$/.test(normalized)) {
+    throw new Error(
+      `FaceTheory strict CSP directive name is invalid: "${String(name)}"`,
+    );
+  }
+  return normalized;
+}
+
+function normalizeStrictCspDirectiveValue(
+  directiveName: string,
+  value: string,
+): string {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) {
+    throw new Error(
+      `FaceTheory strict CSP directive "${directiveName}" contains an empty value`,
+    );
+  }
+  if (/[\s;]/.test(normalized)) {
+    throw new Error(
+      `FaceTheory strict CSP directive "${directiveName}" values must be individual CSP tokens without whitespace or semicolons`,
+    );
+  }
+
+  const lowerValue = normalized.toLowerCase();
+  if (lowerValue === "'unsafe-inline'" || lowerValue === 'unsafe-inline') {
+    throw new Error(
+      `FaceTheory strict CSP rejects 'unsafe-inline' in ${directiveName}; use external assets or FaceTheory-owned request nonces instead`,
+    );
+  }
+  if (lowerValue === "'unsafe-eval'" || lowerValue === 'unsafe-eval') {
+    throw new Error(
+      `FaceTheory strict CSP rejects 'unsafe-eval' in ${directiveName}; remove eval-like runtime code before using the strict CSP helper`,
+    );
+  }
+
+  return normalized;
+}
+
+function appendUniqueValues(target: string[], values: readonly string[]): void {
+  for (const value of values) {
+    if (!target.includes(value)) target.push(value);
+  }
+}
+
+function formatCspDirective(name: string, values: readonly string[]): string {
+  return `${name} ${values.join(' ')}`;
+}
+
+function validateNoInlineScriptElements(
+  html: string,
+  expectedNonce: string | null,
+): void {
+  const normalizedExpectedNonce = normalizeCspNonce(expectedNonce);
+  const scriptStartTags: Array<{
+    allowInlineBody: boolean;
+    tag: HtmlStartTag;
+  }> = [];
 
   for (const startTag of scanHtmlStartTags(html)) {
     const tagName = startTag.tagName.toLowerCase();
     if (tagName !== SCRIPT_TAG_NAME) continue;
 
-    scriptStartTags.push(startTag);
+    const allowInlineBody = isNonceCarriedHeadJsonLdScript(
+      html,
+      startTag,
+      normalizedExpectedNonce,
+    );
+    scriptStartTags.push({ allowInlineBody, tag: startTag });
 
-    if (!hasHtmlAttribute(startTag.attrs, 'src')) {
+    if (!hasHtmlAttribute(startTag.attrs, 'src') && !allowInlineBody) {
       throw new Error('FaceTheory strict CSP rejects inline script tags in document');
     }
   }
 
-  for (const startTag of scriptStartTags) {
+  for (const { allowInlineBody, tag: startTag } of scriptStartTags) {
     const bodyEnd = findScriptEndTagStart(html, startTag.end);
     const body = html.slice(startTag.end, bodyEnd);
-    if (body.trim().length > 0) {
+    if (!allowInlineBody && body.trim().length > 0) {
       throw new Error('FaceTheory strict CSP rejects inline script tags in document');
     }
   }
@@ -191,6 +339,7 @@ function* scanHtmlStartTags(html: string): Generator<HtmlStartTag> {
     yield {
       attrs: html.slice(nameEnd, tagEnd),
       end: tagEnd + 1,
+      start: tagStart,
       tagName: html.slice(nameStart, nameEnd),
     };
     cursor = tagEnd + 1;
@@ -234,11 +383,15 @@ function htmlStartsWithAsciiCaseInsensitive(
 }
 
 function isScriptEndTagBoundary(html: string, index: number): boolean {
+  return isHtmlTagCloseBoundary(html, index);
+}
+
+function isHtmlTagCloseBoundary(html: string, index: number): boolean {
   if (index >= html.length) return false;
 
   const code = html.charCodeAt(index);
-  // Script data only recognizes `</script` as an end tag when the name is
-  // followed by whitespace, `/`, or `>`; `=`/`-` remain script text.
+  // HTML end tags are recognized when the name is followed by whitespace, `/`,
+  // or `>`; `=`/`-` remain text.
   return code === 47 || code === 62 || isHtmlWhitespace(code);
 }
 
@@ -275,6 +428,14 @@ function hasHtmlAttribute(attrs: string, name: string): boolean {
   return false;
 }
 
+function readHtmlAttributeValue(attrs: string, name: string): string | null {
+  const expectedName = name.toLowerCase();
+  for (const attribute of scanHtmlAttributes(attrs)) {
+    if (attribute.name.toLowerCase() === expectedName) return attribute.value ?? '';
+  }
+  return null;
+}
+
 function findInlineEventAttribute(attrs: string): string | null {
   for (const attributeName of scanHtmlAttributeNames(attrs)) {
     if (/^on[a-z][\w:-]*$/i.test(attributeName)) return attributeName;
@@ -283,6 +444,12 @@ function findInlineEventAttribute(attrs: string): string | null {
 }
 
 function* scanHtmlAttributeNames(attrs: string): Generator<string> {
+  for (const attribute of scanHtmlAttributes(attrs)) {
+    yield attribute.name;
+  }
+}
+
+function* scanHtmlAttributes(attrs: string): Generator<HtmlAttribute> {
   let cursor = 0;
   while (cursor < attrs.length) {
     cursor = skipHtmlAttributeDelimiters(attrs, cursor);
@@ -294,24 +461,93 @@ function* scanHtmlAttributeNames(attrs: string): Generator<string> {
     }
 
     const attributeName = attrs.slice(nameStart, cursor);
-    if (attributeName) yield attributeName;
 
     cursor = skipHtmlWhitespace(attrs, cursor);
-    if (attrs[cursor] !== '=') continue;
+    if (attrs[cursor] !== '=') {
+      if (attributeName) yield { name: attributeName, value: null };
+      continue;
+    }
 
     cursor = skipHtmlWhitespace(attrs, cursor + 1);
     if (attrs[cursor] === '"' || attrs[cursor] === "'") {
       const quote = attrs[cursor] ?? '';
       cursor += 1;
+      const valueStart = cursor;
       while (cursor < attrs.length && attrs[cursor] !== quote) cursor += 1;
+      const value = attrs.slice(valueStart, cursor);
       if (cursor < attrs.length) cursor += 1;
+      if (attributeName) yield { name: attributeName, value };
       continue;
     }
 
+    const valueStart = cursor;
     while (cursor < attrs.length && !isHtmlWhitespace(attrs.charCodeAt(cursor))) {
       cursor += 1;
     }
+    const value = attrs.slice(valueStart, cursor);
+    if (attributeName) yield { name: attributeName, value };
   }
+}
+
+function isNonceCarriedHeadJsonLdScript(
+  html: string,
+  startTag: HtmlStartTag,
+  expectedNonce: string | null,
+): boolean {
+  if (!isInsideDocumentHead(html, startTag.start)) return false;
+  if (hasHtmlAttribute(startTag.attrs, 'src')) return false;
+
+  const type = readHtmlAttributeValue(startTag.attrs, 'type');
+  if (normalizeScriptType(type) !== 'application/ld+json') return false;
+
+  const nonce = readHtmlAttributeValue(startTag.attrs, 'nonce');
+  if (!nonce) return false;
+  if (expectedNonce && nonce !== expectedNonce) return false;
+  return true;
+}
+
+function normalizeScriptType(value: string | null): string {
+  const [mediaType = ''] = String(value ?? '').split(';', 1);
+  return mediaType.trim().toLowerCase();
+}
+
+function isInsideDocumentHead(html: string, tagStart: number): boolean {
+  let headOpenEnd: number | null = null;
+  for (const startTag of scanHtmlStartTags(html)) {
+    const tagName = startTag.tagName.toLowerCase();
+    if (tagName === 'head') {
+      headOpenEnd = startTag.end;
+      break;
+    }
+  }
+  if (headOpenEnd === null) return false;
+
+  const headCloseStart = findClosingTagStart(html, 'head', headOpenEnd);
+  if (headCloseStart === -1) return false;
+  return tagStart >= headOpenEnd && tagStart < headCloseStart;
+}
+
+function findClosingTagStart(
+  html: string,
+  tagName: string,
+  start: number,
+): number {
+  let cursor = start;
+  while (cursor < html.length) {
+    const closeStart = html.indexOf('</', cursor);
+    if (closeStart === -1) return -1;
+    const nameStart = closeStart + 2;
+    const nameEnd = nameStart + tagName.length;
+    if (
+      htmlStartsWithAsciiCaseInsensitive(html, nameStart, tagName) &&
+      isHtmlTagCloseBoundary(html, nameEnd) &&
+      findHtmlTagEnd(html, nameEnd) !== -1
+    ) {
+      return closeStart;
+    }
+    cursor = closeStart + 2;
+  }
+  return -1;
 }
 
 function skipHtmlAttributeDelimiters(value: string, start: number): number {

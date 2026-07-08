@@ -1,10 +1,9 @@
 // Example: AWS Lambda Function URL handler using the FaceTheory Lambda adapter.
 //
-// This is not included in `tsc` builds (examples are excluded from tsconfig).
 
-import { createFaceApp } from '../../src/app.js';
-import { streamFromString } from '../../src/bytes.js';
-import { createLambdaUrlStreamingHandler } from '../../src/lambda-url.js';
+import { createFaceApp } from '@theory-cloud/facetheory';
+import { streamFromString } from '@theory-cloud/facetheory';
+import { createLambdaUrlStreamingHandler } from '@theory-cloud/facetheory';
 
 export const faceApp = createFaceApp({
   faces: [

@@ -140,6 +140,7 @@ function installSvelteClientDomGlobals(dom: JSDOM): () => void {
     'MouseEvent',
     'CustomEvent',
     'MutationObserver',
+    'navigator',
     'SVGElement',
     'getComputedStyle',
   ]) {

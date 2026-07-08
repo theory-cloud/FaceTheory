@@ -1,10 +1,17 @@
 <script lang="ts">
   import type { WizardReconcileEntry, WizardReconcileSummary } from './types.js';
 
-  export let title: unknown = 'Reconcile summary';
-  export let description: unknown = undefined;
-  export let summary: WizardReconcileSummary;
-  export let emptyLabel: unknown = 'Nothing to reconcile.';
+  let {
+    title = 'Reconcile summary',
+    description = undefined,
+    summary,
+    emptyLabel = 'Nothing to reconcile.',
+  }: {
+    title?: unknown;
+    description?: unknown;
+    summary?: WizardReconcileSummary;
+    emptyLabel?: unknown;
+  } = $props();
 
   const REDACTED_MARKER = '[redacted]';
   const KIND_LABEL: Record<WizardReconcileEntry['kind'], string> = {

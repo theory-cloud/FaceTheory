@@ -4,6 +4,7 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { createControlPlaneApp } from '../../src/control-plane.js';
 import {
   createHostOwnedControlPlaneExampleApp,
   HOST_SUPPLIED_TABLETHEORY_SECTION_READ_CONTRACT,
@@ -52,4 +53,56 @@ test('control-plane host-contract example avoids client globals and time-varying
   assert.ok(!source.includes('document.'));
   assert.ok(!source.includes('@aws-sdk/client-dynamodb'));
   assert.ok(!source.includes('@aws-sdk/lib-dynamodb'));
+});
+
+
+test('control-plane sections report original load/render exceptions to onError', async () => {
+  const sectionError = new Error('sensitive control-plane section failure');
+  const observedErrors: Array<{ err: unknown; ctx: Record<string, unknown> }> = [];
+
+  const app = createControlPlaneApp({
+    gate: () => ({ ok: true }),
+    faces: [
+      {
+        route: '/',
+        sections: [
+          {
+            id: 'broken-section',
+            title: 'Broken section',
+            read: { bounded: true, tenantScoped: true },
+            errorHtml: '<p data-state="fallback">Section fallback</p>',
+            load: () => {
+              throw sectionError;
+            },
+            render: () => '<p>unreachable</p>',
+          },
+        ],
+      },
+    ],
+    faceApp: {
+      observability: {
+        onError: (err, ctx) =>
+          observedErrors.push({
+            err,
+            ctx: ctx as unknown as Record<string, unknown>,
+          }),
+      },
+    },
+  });
+
+  const response = await app.handle({
+    method: 'GET',
+    path: '/_facetheory/control-plane/sections/root-0/broken-section',
+    headers: { 'x-request-id': ['cp-error-1'] },
+  });
+  const body = await collect(response.body);
+
+  assert.equal(response.status, 200);
+  assert.ok(body.includes('Section fallback'));
+  assert.equal(body.includes('sensitive control-plane section failure'), false);
+  assert.equal(observedErrors.length, 1);
+  assert.equal(observedErrors[0]?.err, sectionError);
+  assert.equal(observedErrors[0]?.ctx.phase, 'control-plane-section');
+  assert.equal(observedErrors[0]?.ctx.sectionId, 'broken-section');
+  assert.equal(observedErrors[0]?.ctx.requestId, 'cp-error-1');
 });

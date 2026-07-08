@@ -2,10 +2,17 @@
   import type { WizardFinding, WizardFindingList, WizardFindingSeverity } from './types.js';
   import MetadataBadgeGroup from './MetadataBadgeGroup.svelte';
 
-  export let title: unknown = 'Validation findings';
-  export let description: unknown = undefined;
-  export let list: WizardFindingList;
-  export let emptyLabel: unknown = 'No findings reported.';
+  let {
+    title = 'Validation findings',
+    description = undefined,
+    list,
+    emptyLabel = 'No findings reported.',
+  }: {
+    title?: unknown;
+    description?: unknown;
+    list?: WizardFindingList;
+    emptyLabel?: unknown;
+  } = $props();
 
   const SEVERITY_LABEL: Record<WizardFindingSeverity, string> = {
     info: 'Info',
@@ -25,7 +32,7 @@
     );
   }
 
-  $: severityCounts = counts(list.findings);
+  const severityCounts = $derived(counts(list.findings));
 </script>
 
 <section

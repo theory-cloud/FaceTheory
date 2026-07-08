@@ -7,10 +7,17 @@
     WizardAuthorityContextStripSize,
   } from './types.js';
 
-  export let title: unknown = undefined;
-  export let description: unknown = undefined;
-  export let strip: WizardAuthorityContextStrip;
-  export let onCopyItem: ((itemKey: string, copyValue: string) => void) | undefined = undefined;
+  let {
+    title = undefined,
+    description = undefined,
+    strip,
+    onCopyItem = undefined,
+  }: {
+    title?: unknown;
+    description?: unknown;
+    strip: WizardAuthorityContextStrip;
+    onCopyItem?: ((itemKey: string, copyValue: string) => void) | undefined;
+  } = $props();
 
   const safeHrefBase = 'https://facetheory.invalid';
 
@@ -35,11 +42,11 @@
     return item.tone ?? 'neutral';
   }
 
-  $: layout = (strip.layout ?? 'auto') as WizardAuthorityContextStripLayout;
-  $: size = (strip.size ?? 'md') as WizardAuthorityContextStripSize;
-  $: wrap = strip.wrap !== false;
-  $: itemCount = strip.items.length;
-  $: ariaLabel = typeof title === 'string' ? title : 'Server-resolved context';
+  const layout = $derived((strip.layout ?? 'auto') as WizardAuthorityContextStripLayout);
+  const size = $derived((strip.size ?? 'md') as WizardAuthorityContextStripSize);
+  const wrap = $derived(strip.wrap !== false);
+  const itemCount = $derived(strip.items.length);
+  const ariaLabel = $derived(typeof title === 'string' ? title : 'Server-resolved context');
 </script>
 
 <section
@@ -129,7 +136,7 @@
                 aria-label={`Copy ${typeof item.label === 'string' ? item.label : `item ${item.key}`}`}
                 data-copy-item-key={item.key}
                 data-copy-value={copyVal}
-                on:click={() => onCopyItem?.(item.key, copyVal)}
+                onclick={() => onCopyItem?.(item.key, copyVal)}
               >Copy</button>
             {/if}
           </dd>

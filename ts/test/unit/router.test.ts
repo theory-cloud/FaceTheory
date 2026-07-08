@@ -58,3 +58,32 @@ test('router: {name*} matches empty', () => {
   assert.equal(m?.pattern, '/{rest*}');
   assert.equal(m?.proxy, undefined);
 });
+
+
+test('router: strict trailing-slash policy preserves exact matching', () => {
+  const r = new Router();
+  r.add('/docs');
+
+  assert.equal(r.match('/docs')?.pattern, '/docs');
+  assert.equal(r.match('/docs/'), null);
+  assert.equal(r.redirectPath('/docs/'), null);
+});
+
+test('router: redirect trailing-slash policy exposes canonical redirect paths', () => {
+  const r = new Router({ trailingSlash: 'redirect' });
+  r.add('/docs');
+
+  assert.equal(r.match('/docs')?.pattern, '/docs');
+  assert.equal(r.match('/docs/'), null);
+  assert.equal(r.redirectPath('/docs/'), '/docs');
+  assert.equal(r.redirectPath('/missing/'), null);
+});
+
+test('router: normalize trailing-slash policy matches both silently', () => {
+  const r = new Router({ trailingSlash: 'normalize' });
+  r.add('/docs');
+
+  assert.equal(r.match('/docs')?.pattern, '/docs');
+  assert.equal(r.match('/docs/')?.pattern, '/docs');
+  assert.equal(r.redirectPath('/docs/'), null);
+});

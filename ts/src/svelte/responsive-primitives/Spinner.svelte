@@ -6,18 +6,26 @@
     type SpinnerTone,
   } from '../../responsive-primitives/index.js';
 
-  export let label = 'Loading';
-  export let size: SpinnerSize = 'md';
-  export let tone: SpinnerTone = 'primary';
-  let className = '';
-  export { className as class };
+  let {
+    label = 'Loading',
+    size = 'md',
+    tone = 'primary',
+    class: className = '',
+    ...rest
+  }: {
+    label?: string;
+    size?: SpinnerSize;
+    tone?: SpinnerTone;
+    class?: string;
+    [key: string]: unknown;
+  } = $props();
 
-  $: pixelSize = spinnerSvgSize(size);
-  $: resolvedClass = spinnerClassName({ className, size, tone });
+  const pixelSize = $derived(spinnerSvgSize(size));
+  const resolvedClass = $derived(spinnerClassName({ className, size, tone }));
 </script>
 
 <span
-  {...$$restProps}
+  {...rest}
   class={resolvedClass}
   role="status"
   aria-label={label}

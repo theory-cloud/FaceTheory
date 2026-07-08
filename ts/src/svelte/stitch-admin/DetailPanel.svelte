@@ -1,11 +1,21 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import PropertyGrid from './PropertyGrid.svelte';
   import type { PropertyItem } from './types.js';
 
-  export let title: unknown = undefined;
-  export let description: unknown = undefined;
-  export let properties: PropertyItem[] = [];
-  export let columns = 2;
+  let {
+    title = undefined,
+    description = undefined,
+    properties = [],
+    columns = 2,
+    actions,
+  }: {
+    title?: unknown;
+    description?: unknown;
+    properties?: PropertyItem[];
+    columns?: number;
+    actions?: Snippet;
+  } = $props();
 </script>
 
 <section
@@ -33,7 +43,7 @@
         {/if}
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0;">
-        <slot name="actions" />
+        {@render actions?.()}
       </div>
     </header>
   {/if}

@@ -9,18 +9,54 @@ The `FaceModule` is the atomic unit of FaceTheory's routing model. A consumer de
 ## `FaceModule`
 
 ```typescript
-interface FaceModule {
+interface FaceModule<TData = unknown> {
   route: string;
   mode: FaceMode;
   generateStaticParams?: () => Promise<Array<Record<string, string>>>;
   revalidateSeconds?: number;
-  load?: (ctx: FaceContext) => Promise<unknown>;
-  render: (
+  load?: (ctx: FaceContext) => Promise<TData> | TData;
+  render(
     ctx: FaceContext,
-    data: unknown,
-  ) => Promise<FaceRenderResult> | FaceRenderResult;
+    data: TData,
+  ): Promise<FaceRenderResult> | FaceRenderResult;
 }
 ```
+
+Use `defineFace()` for the primary typed pattern. It returns the same
+`FaceModule<TData>` object at runtime while preserving the type inferred from
+`load` for `render`:
+
+```typescript
+import { defineFace } from '@theory-cloud/facetheory';
+
+const profileFace = defineFace({
+  route: '/profile',
+  mode: 'ssr',
+  load: async () => ({ displayName: 'Ada', loginCount: 7 }),
+  render: (_ctx, data) => ({
+    html: `<main>${data.displayName}: ${data.loginCount.toFixed(0)}</main>`,
+  }),
+});
+```
+
+No `data` parameter annotation is required in `render`; TypeScript knows it is
+`{ displayName: string; loginCount: number }` from the loader. If you prefer an
+explicit contract, annotate the Face directly:
+
+```typescript
+type ProfileData = { displayName: string; loginCount: number };
+
+const profileFace: FaceModule<ProfileData> = {
+  route: '/profile',
+  mode: 'ssr',
+  load: async () => ({ displayName: 'Ada', loginCount: 7 }),
+  render: (_ctx, data) => ({
+    html: `<main>${data.displayName}: ${data.loginCount.toFixed(0)}</main>`,
+  }),
+};
+```
+
+Untyped `FaceModule` remains valid and defaults `TData` to `unknown`.
 
 ### `route`
 
@@ -44,11 +80,11 @@ Used by `mode: 'isr'` to determine cache freshness. The cached entry is served u
 
 ### `load`
 
-Optional pre-render data loader. The return value is passed as the `data` argument to `render`.
+Optional pre-render data loader. The return value is passed as the typed `data` argument to `render`.
 
 ### `render`
 
-The render function. Receives the `FaceContext` and any `load`-returned data; returns a `FaceRenderResult` (synchronously or as a Promise).
+The render function. Receives the `FaceContext` and the `TData` value returned by `load`; returns a `FaceRenderResult` (synchronously or as a Promise).
 
 ## `FaceContext`
 
@@ -67,7 +103,7 @@ interface FaceRequest {
   method: string;
   path: string;
   query?: Query;
-  headers?: Headers;
+  headers?: FaceHeaders;
   cookies?: CookieMap;
   body?: Uint8Array;
   isBase64?: boolean;
@@ -80,12 +116,17 @@ interface FaceRequest {
 ```typescript
 interface FaceResponse {
   status: number;
-  headers: Headers;
+  headers: FaceHeaders;
   cookies: string[];
   body: FaceBody;       // Uint8Array | AsyncIterable<Uint8Array>
   isBase64: boolean;
 }
 ```
+
+`FaceHeaders` is the canonical request/response header map name:
+`Record<string, string[]>`. The old exported `Headers` alias is deprecated for
+new code and remains only as a 3.x compatibility bridge until the planned v4.0.0
+removal.
 
 ## `FaceRenderResult`
 

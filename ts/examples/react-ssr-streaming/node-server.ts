@@ -5,8 +5,9 @@ import { faceApp } from './handler.js';
 function toNodeHeaders(headers: Record<string, string[]>): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
   for (const [name, values] of Object.entries(headers)) {
-    if (!values.length) continue;
-    out[name] = values.length === 1 ? values[0] : values;
+    const first = values[0];
+    if (first === undefined) continue;
+    out[name] = values.length === 1 ? first : values;
   }
   return out;
 }

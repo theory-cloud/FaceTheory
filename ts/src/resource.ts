@@ -1,9 +1,10 @@
 import { utf8 } from './bytes.js';
+import { escapeJsonForHtml } from './html.js';
 import type {
   FaceResponse,
   FaceResponseHeaders,
   FaceResponseHeaderValue,
-  Headers,
+  FaceHeaders,
 } from './types.js';
 
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
@@ -111,7 +112,7 @@ interface ResourceResponseInput {
   cookies?: readonly string[] | undefined;
   cacheControl?: string | null | undefined;
   contentType: string | null;
-  protectedHeaders?: Headers | undefined;
+  protectedHeaders?: FaceHeaders | undefined;
   body: Uint8Array;
 }
 
@@ -154,8 +155,8 @@ function resourceResponse(input: ResourceResponseInput): FaceResponse {
 
 function normalizeResourceHeaders(
   input: FaceResponseHeaders | undefined,
-): Headers {
-  const headers: Headers = {};
+): FaceHeaders {
+  const headers: FaceHeaders = {};
   for (const [rawName, rawValue] of Object.entries(input ?? {})) {
     const name = normalizeHeaderName(rawName);
     const values = normalizeHeaderValues(rawValue);
@@ -214,8 +215,8 @@ function normalizeStatus(status: number): number {
   return normalized;
 }
 
-function sortHeaders(headers: Headers): Headers {
-  const sorted: Headers = {};
+function sortHeaders(headers: FaceHeaders): FaceHeaders {
+  const sorted: FaceHeaders = {};
   for (const key of Object.keys(headers).sort()) {
     sorted[key] = headers[key] ?? [];
   }
@@ -251,10 +252,5 @@ function safeResourceJson(value: unknown): string {
 
   // Mirrors html.safeJson so resource responses are safe beside HTML delivery
   // contexts such as hydration sidecars and script-adjacent fetch payloads.
-  return serialized
-    .replaceAll('<', '\\u003c')
-    .replaceAll('>', '\\u003e')
-    .replaceAll('&', '\\u0026')
-    .replaceAll('\u2028', '\\u2028')
-    .replaceAll('\u2029', '\\u2029');
+  return escapeJsonForHtml(serialized);
 }
