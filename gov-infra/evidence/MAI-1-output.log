@@ -2,4 +2,4 @@ Verifier: gov_check_maintainability
 Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
 Rubric ID: MAI-1
 
-ts-pack: PASS (theory-cloud-facetheory-3.8.1.tgz)
+ts-pack: PASS (theory-cloud-facetheory-4.0.0.tgz)
