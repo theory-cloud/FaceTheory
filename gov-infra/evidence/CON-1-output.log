@@ -2,5 +2,5 @@ Verifier: gov_check_consistency
 Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
 Rubric ID: CON-1
 
-version-alignment: PASS (4.0.0)
+version-alignment: PASS (4.0.1)
 go-version-pin: PASS (go1.26.5)

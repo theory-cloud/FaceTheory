@@ -7,13 +7,13 @@ This file records the currently pinned versions and the exact install strings we
 
 ## Pins
 
-- AppTheory (TypeScript): `v1.17.0`
-- AppTheory (CDK): `v1.17.0`
-- TableTheory (TypeScript): `v2.0.3`
+- AppTheory (TypeScript): `v1.17.1`
+- AppTheory (CDK): `v1.17.1`
+- TableTheory (TypeScript): `v2.0.4`
 
 ## Compatibility Impact
 
-The AppTheory `v1.17.0` runtime/CDK pins and the TableTheory `v2.0.3` TypeScript pin are a coordinated
+The AppTheory `v1.17.1` runtime/CDK pins and the TableTheory `v2.0.4` TypeScript pin are a coordinated
 FaceTheory compatibility baseline:
 
 - the AppTheory runtime pin keeps Lambda URL streaming and AppTheory integration examples on the same upstream release
@@ -36,26 +36,31 @@ and keep the single release lane intact.
 
 ## Release Asset SHA-256
 
-- AppTheory runtime tarball: `ef3029ae81a084bb85a97e4f0ee98d4d411ce9ea0fe359ecf9708d52f1e3b385`
-- AppTheory CDK tarball: `47d1bf7c118f4c7dbf738ef6a8a6974ef83248b11faa715ea43d2c78d25959d2`
-- TableTheory TypeScript tarball: `4927db06b2b6e05512c34d493f7d9029805b78b66f1fc6fab3ae533f41ef40f7`
+- AppTheory runtime tarball: `84fc53404a098502493078dbc910bbf64a866df6717668f27dd5f784fbf1258d`
+- AppTheory CDK tarball: `7480392034bac0acaa3b1c1bd8aea8ae5c69db701e506fb40ca31832705d7f77`
+- TableTheory TypeScript tarball: `185ea115043053bd87cf97cec7c203bb3b37405c85e2c25161bee585abe1b3c7`
 
 ## Known Audit Exceptions
 
-There are no active `npm audit` exceptions for the current upstream baseline. `scripts/verify-npm-audit.sh` fails on any
-reported vulnerability in the `ts`, `infra/apptheory-ssr-site`, or `infra/apptheory-ssg-isr-site` workspaces.
+One active `npm audit` exception remains for the current upstream baseline:
 
-FaceTheory still does not repackage AWS dependencies. The `ts` workspace keeps `aws-cdk-lib@2.261.0` only to satisfy the
-exact `@theory-cloud/apptheory-cdk@1.17.0` peer used by reference constructs, and the `infra/apptheory-ssr-site` /
-`infra/apptheory-ssg-isr-site` workspaces are reference / example deployment shapes that consumer applications reproduce
-themselves. If a future AppTheory-compatible CDK line reintroduces a bundled-transitive advisory, treat it as a normal
-security fix first; any exception must be narrow, documented here, and reviewed before merging.
+- **`brace-expansion@5.0.6` / `GHSA-3jxr-9vmj-r5cp`** — AppTheory CDK `v1.17.1` requires the exact
+  `aws-cdk-lib@2.261.0` peer. That AWS CDK tarball bundles `minimatch` and its own nested `brace-expansion@5.0.6`, so npm
+  overrides cannot replace the vulnerable copy. The path is used by the CDK infrastructure toolchain during synthesis;
+  FaceTheory does not ship it in rendered application or Lambda runtime output. We must wait for the AppTheory-compatible
+  AWS CDK bundle to include `brace-expansion@5.0.7` or newer rather than forking or repackaging an AWS dependency.
+
+`scripts/verify-npm-audit.sh` accepts that finding only when the package name, advisory URL, single nested
+`node_modules/aws-cdk-lib/node_modules/brace-expansion` path, affected workspace, and bundled version all match. The
+exception expires on `2026-08-05` for mandatory re-review, and the verifier fails if AWS CDK's bundled version changes so
+the exception cannot survive its upstream fix. Every other audit finding still fails in `ts`,
+`infra/apptheory-ssr-site`, and `infra/apptheory-ssg-isr-site`.
 
 ### Recently cleared
 
-- **`brace-expansion`** — AppTheory CDK `v1.17.0` requires `aws-cdk-lib@2.261.0`, and the npm audit baseline is now clean
-  across the `ts` and `infra/apptheory-*` workspaces.
-- **`fast-uri`** — AppTheory CDK `v1.17.0` requires `aws-cdk-lib@2.261.0`, and the infra example
+- **top-level `brace-expansion`** — non-bundled dependency paths resolve to fixed `brace-expansion@5.0.7`; only the exact
+  AWS CDK bundled path described above remains excepted.
+- **`fast-uri`** — AppTheory CDK `v1.17.1` requires `aws-cdk-lib@2.261.0`, and the infra example
   lockfiles now resolve the previous nested `fast-uri` audit finding to the patched AWS CDK dependency set.
 
 ## Infra Lockfile Note
@@ -69,15 +74,15 @@ locks so `npm ci` can validate the AWS CDK package tree under npm 11.
 ```bash
   # AppTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.17.0/theory-cloud-apptheory-1.17.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.17.1/theory-cloud-apptheory-1.17.1.tgz
 
   # TableTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v2.0.3/theory-cloud-tabletheory-ts-2.0.3.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v2.0.4/theory-cloud-tabletheory-ts-2.0.4.tgz
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v1.17.0/theory-cloud-apptheory-cdk-1.17.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v1.17.1/theory-cloud-apptheory-cdk-1.17.1.tgz
 ```
 
 ## package.json Snippet (Pinned)
@@ -88,12 +93,12 @@ registry installs:
 ```json
 {
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.17.0/theory-cloud-apptheory-1.17.0.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.3/theory-cloud-tabletheory-ts-2.0.3.tgz"
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v1.17.1/theory-cloud-apptheory-1.17.1.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.4/theory-cloud-tabletheory-ts-2.0.4.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.3/theory-cloud-tabletheory-ts-2.0.3.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.4/theory-cloud-tabletheory-ts-2.0.4.tgz"
     }
   }
 }
