@@ -51,12 +51,12 @@ FaceTheory is the **client-delivery layer** of the Theory Cloud stack. It render
 
 FaceTheory is a post-1.0 3.x runtime under active development. Post-1.0 SemVer discipline applies: breaking changes require explicit `feat!:` / `fix!:` commits, `BREAKING CHANGE:` notes, and migration guidance; deprecations follow the published [Deprecation Policy](docs/deprecation-policy.md). The runtime covers SSR, SSG, and blocking ISR with a SPA client runtime and adapter support for React, Vue, and Svelte. First production use is underway at [Pay Theory](https://paytheory.com) (checkout page). See [CHANGELOG](CHANGELOG.md) for release history.
 
-## Install v4.0.1 <!-- x-release-please-version -->
+## Install v4.0.2 <!-- x-release-please-version -->
 
 Install the exact GitHub release tarball:
 
 ```bash
-export FACETHEORY_VERSION=4.0.1 # x-release-please-version
+export FACETHEORY_VERSION=4.0.2 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -114,7 +114,7 @@ See the [CDK deployment walkthrough](https://facetheory.theorycloud.ai/cdk/) for
 curl steps. Local synth/tests are deployment-shape proof only; do not claim live CloudFront proof without an authorized
 AWS deploy.
 
-The `v4.0.1` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
+The `v4.0.2` GitHub release also ships the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle, which contains the canonical docs, runnable examples, and reference deployment stacks for offline use. <!-- x-release-please-version -->
 
 ## At a glance
 
