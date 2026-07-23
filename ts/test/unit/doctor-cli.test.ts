@@ -24,9 +24,9 @@ const FACE_PACKAGE = {
 };
 
 const APP_THEORY =
-  'https://github.com/theory-cloud/AppTheory/releases/download/v1.17.0/theory-cloud-apptheory-1.17.0.tgz';
+  'https://github.com/theory-cloud/AppTheory/releases/download/v1.17.1/theory-cloud-apptheory-1.17.1.tgz';
 const TABLE_THEORY =
-  'https://github.com/theory-cloud/TableTheory/releases/download/v2.0.3/theory-cloud-tabletheory-ts-2.0.3.tgz';
+  'https://github.com/theory-cloud/TableTheory/releases/download/v2.0.4/theory-cloud-tabletheory-ts-2.0.4.tgz';
 
 class CaptureStream extends Writable {
   public text = '';
@@ -199,7 +199,7 @@ test('facetheory doctor reports AppTheory/TableTheory override drift with a fix'
     assert.equal(exitCode, 1);
     assert.match(stdout.text, /AppTheory\/TableTheory override alignment is drifted/);
     assert.match(stdout.text, /Set overrides\["@theory-cloud\/apptheory"\]/);
-    assert.match(stdout.text, /theory-cloud-tabletheory-ts-2\.0\.3\.tgz/);
+    assert.match(stdout.text, /theory-cloud-tabletheory-ts-2\.0\.4\.tgz/);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
