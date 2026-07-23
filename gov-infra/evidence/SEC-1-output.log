@@ -2,7 +2,7 @@ Verifier: gov_check_security
 Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
 Rubric ID: SEC-1
 
-npm-audit: PASS (ts)
-npm-audit: PASS (infra/apptheory-ssr-site)
-npm-audit: PASS (infra/apptheory-ssg-isr-site)
+npm-audit: ALLOW (ts) brace-expansion@5.0.6 at node_modules/aws-cdk-lib/node_modules/brace-expansion; AWS CDK bundled dependency pending upstream fix (expires 2026-08-05)
+npm-audit: ALLOW (infra/apptheory-ssr-site) brace-expansion@5.0.6 at node_modules/aws-cdk-lib/node_modules/brace-expansion; AWS CDK bundled dependency pending upstream fix (expires 2026-08-05)
+npm-audit: ALLOW (infra/apptheory-ssg-isr-site) brace-expansion@5.0.6 at node_modules/aws-cdk-lib/node_modules/brace-expansion; AWS CDK bundled dependency pending upstream fix (expires 2026-08-05)
 workflow-action-pins: PASS
