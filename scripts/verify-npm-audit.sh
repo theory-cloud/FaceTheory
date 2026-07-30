@@ -36,17 +36,17 @@ const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const vulnerabilities = report.vulnerabilities || {};
 const entries = Object.entries(vulnerabilities);
 
-// GHSA-3jxr-9vmj-r5cp remains in the brace-expansion@5.0.6 copy bundled
-// inside aws-cdk-lib@2.261.0. AppTheory CDK v1.17.1 requires that exact CDK
+// GHSA-mh99-v99m-4gvg remains in the brace-expansion@5.0.7 copy bundled
+// inside aws-cdk-lib@2.262.2. AppTheory CDK v2.0.2 requires that exact CDK
 // peer, and npm overrides cannot replace dependencies bundled in the AWS
 // tarball. Keep this exception exact, visible, and short-lived: it applies to
 // the AWS CDK nested node only, never to another brace-expansion installation.
 const braceExpansionException = {
-  advisory: 'https://github.com/advisories/GHSA-3jxr-9vmj-r5cp',
+  advisory: 'https://github.com/advisories/GHSA-mh99-v99m-4gvg',
   node: 'node_modules/aws-cdk-lib/node_modules/brace-expansion',
-  version: '5.0.6',
-  awsCdkVersion: '2.261.0',
-  expiresOn: '2026-08-05',
+  version: '5.0.7',
+  awsCdkVersion: '2.262.2',
+  expiresOn: '2026-08-15',
   projects: new Set([
     'ts',
     'infra/apptheory-ssr-site',
