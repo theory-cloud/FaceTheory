@@ -1,5 +1,5 @@
 Verifier: gov_check_completeness
-Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
+Repository: /tmp/facetheory-aws-sdk-cdk-json-20260730
 Rubric ID: COM-1
 
 profile-descriptor: PASS
