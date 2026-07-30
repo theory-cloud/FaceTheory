@@ -1,5 +1,5 @@
 Verifier: gov_check_docs
-Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
+Repository: /tmp/facetheory-aws-sdk-cdk-json-20260730
 Rubric ID: DOC-1
 
 docs-profile: PASS
