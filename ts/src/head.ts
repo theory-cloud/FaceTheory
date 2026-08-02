@@ -1,4 +1,5 @@
 import { escapeHTML, renderAttributes, safeJson } from './html.js';
+import { normalizeTrailingDnsRootDotHostname } from './origin.js';
 import type {
   FaceAttributes,
   FaceCspPolicy,
@@ -151,7 +152,9 @@ function isExternalHydration(
 
 function normalizeAllowedOrigin(origin: string | URL | undefined): string | null {
   if (origin === undefined) return null;
-  return new URL(String(origin)).origin;
+  const parsed = new URL(String(origin));
+  normalizeTrailingDnsRootDotHostname(parsed);
+  return parsed.origin;
 }
 
 function isAbsoluteOrProtocolRelativeUrl(value: string): boolean {
@@ -191,6 +194,10 @@ function assertStrictSameOriginUrl(
     throw new Error(
       `FaceTheory strict CSP ${label} URL must be http(s) or same-origin: ${trimmed}`,
     );
+  }
+
+  if (!normalizeTrailingDnsRootDotHostname(parsed)) {
+    throw new Error(`FaceTheory strict CSP ${label} URL is invalid: ${trimmed}`);
   }
 
   if (!allowedOrigin) {

@@ -298,6 +298,146 @@ test('FaceApp: normalizes a trailing DNS root dot in the trusted original host',
   assert.equal(resp.status, 200);
 });
 
+test('FaceApp: normalizes a trailing DNS root dot in both host and canonical URL', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/symmetric-trailing-dot',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://real.example./articles/symmetric-trailing-dot',
+              },
+            },
+          ],
+          html: '<main>Symmetric trailing DNS root dot</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/symmetric-trailing-dot',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      'x-facetheory-original-host': ['real.example.'],
+    },
+  });
+
+  assert.equal(resp.status, 200);
+});
+
+test('FaceApp: rejects a second trailing DNS root dot in a canonical URL', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/double-trailing-dot',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://real.example../articles/double-trailing-dot',
+              },
+            },
+          ],
+          html: '<main>Double trailing DNS root dot</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/double-trailing-dot',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      'x-facetheory-original-host': ['real.example.'],
+    },
+  });
+
+  assert.equal(resp.status, 500);
+});
+
+test('FaceApp: rejects a second trailing DNS root dot in the request host', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/x',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://real.example./x',
+              },
+            },
+          ],
+          html: '<main>Double trailing DNS root dot in request host</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/x',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      'x-facetheory-original-host': ['real.example..'],
+    },
+  });
+
+  assert.equal(resp.status, 500);
+});
+
+test('FaceApp: trailing-dot normalization still rejects a cross-host canonical URL', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/trailing-dot-cross-host',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://other.example./articles/trailing-dot-cross-host',
+              },
+            },
+          ],
+          html: '<main>Trailing dot cross-host</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/trailing-dot-cross-host',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      'x-facetheory-original-host': ['real.example.'],
+    },
+  });
+
+  assert.equal(resp.status, 500);
+});
+
 test('FaceApp: AppTheory path rejects a spoofed generic origin', async () => {
   const app = createFaceApp({
     faces: [
@@ -442,6 +582,50 @@ test('FaceApp: trusted generic proxy uses rightmost values across header array e
   });
 
   assert.equal(resp.status, 200);
+});
+
+test('FaceApp: host fallback uses rightmost values across flattened header shapes', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/host-fallback-array',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://right.example/articles/host-fallback-array',
+              },
+            },
+          ],
+          html: '<main>Host fallback array</main>',
+        }),
+      },
+    ],
+  });
+
+  const arrayResp = await app.handle({
+    method: 'GET',
+    path: '/articles/host-fallback-array',
+    headers: {
+      host: ['left.example', 'right.example'],
+      'x-forwarded-proto': ['https'],
+    },
+  });
+  const commaJoinedResp = await app.handle({
+    method: 'GET',
+    path: '/articles/host-fallback-array',
+    headers: {
+      host: ['left.example,right.example'],
+      'x-forwarded-proto': ['https'],
+    },
+  });
+
+  assert.equal(arrayResp.status, 200);
+  assert.equal(commaJoinedResp.status, 200);
 });
 
 test('FaceApp: canonicalOrigin overrides all request-derived headers', async () => {
@@ -593,11 +777,19 @@ test('FaceApp: missing CloudFront protocol reports the trusted header-pair cause
   );
 });
 
-test('FaceApp: canonicalOrigin rejects non-origin URL components', () => {
+test('FaceApp: canonicalOrigin rejects non-origin URLs and a lone DNS root', () => {
   assert.throws(
     () =>
       createFaceApp({
         canonicalOrigin: 'https://reader.example/not-an-origin',
+        faces: [],
+      }),
+    /canonicalOrigin must be an absolute http\(s\) origin/,
+  );
+  assert.throws(
+    () =>
+      createFaceApp({
+        canonicalOrigin: 'https://.',
         faces: [],
       }),
     /canonicalOrigin must be an absolute http\(s\) origin/,

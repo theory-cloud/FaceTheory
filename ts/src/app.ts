@@ -27,6 +27,7 @@ import {
   type FaceRequestCompletedLogRecord,
   type FaceStreamErrorLogRecord,
 } from './ops.js';
+import { normalizeTrailingDnsRootDotHostname } from './origin.js';
 import {
   buildStrictCspHeader,
   requiresStrictCspDocumentValidation,
@@ -791,7 +792,8 @@ function allowedOriginForRequest(
     req,
     'x-forwarded-host',
   );
-  const host = forwardedHost || String(req.headers.host?.[0] ?? '').trim();
+  const host =
+    forwardedHost || rightmostCommaSeparatedHeaderValue(req, 'host');
   const origin = httpOriginFromParts(forwardedProto, host);
   return origin
     ? { origin, missingHint: '' }
@@ -855,9 +857,7 @@ function httpOriginFromUrl(value: string): string | undefined {
     ) {
       return undefined;
     }
-    if (url.hostname.endsWith('.') && url.hostname !== '.') {
-      url.hostname = url.hostname.slice(0, -1);
-    }
+    if (!normalizeTrailingDnsRootDotHostname(url)) return undefined;
     return url.origin;
   } catch {
     return undefined;
