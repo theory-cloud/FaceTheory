@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.0.5-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.0.4...v4.0.5-rc) (2026-08-02)
+
+
+### Bug Fixes
+
+* **deps:** adopt AppTheory v3.0.1 ([c4eb8a8](https://github.com/theory-cloud/FaceTheory/commit/c4eb8a81ba35dcb045656bff0fc26209f7f94bd9))
+* **deps:** adopt AppTheory v3.0.1 ([96b8798](https://github.com/theory-cloud/FaceTheory/commit/96b879860610ad684aa509ec92e1708c1d94a051))
+* **head:** address origin derivation residual lows ([71b37cf](https://github.com/theory-cloud/FaceTheory/commit/71b37cf9a5257cf663adfcd7a769699cf4aa327e))
+* **head:** flatten host fallback + symmetric trailing-dot normalization (THE-2815) ([756f1af](https://github.com/theory-cloud/FaceTheory/commit/756f1af615a2f5551c380dba685388c4b8390511))
+* **head:** flatten host fallback and trailing dots (THE-2815) ([b634dc2](https://github.com/theory-cloud/FaceTheory/commit/b634dc2ca9d6cdd937a2eb8d9e2632a152a882aa))
+* **head:** normalize allowed-origin trailing-dot symmetry ([a526684](https://github.com/theory-cloud/FaceTheory/commit/a5266847553cd94e4ba16e37699c7996c85610d3))
+* **head:** normalizeAllowedOrigin trailing-dot symmetry + guard regression test ([4c581c1](https://github.com/theory-cloud/FaceTheory/commit/4c581c14edb51c2e59c5ef0d1afb14c345f75086))
+* **head:** origin-derivation residual review lows (THE-2806) ([93318e5](https://github.com/theory-cloud/FaceTheory/commit/93318e51ce066f72d7c0e0d48ad596efd765eac8))
+
 ## [4.0.4-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.0.3...v4.0.4-rc) (2026-08-02)
 
 

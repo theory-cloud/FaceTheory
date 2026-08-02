@@ -2,10 +2,10 @@
 
 `@theory-cloud/facetheory` is a TypeScript runtime for three AWS-first server render modes (SSR, SSG, and blocking ISR) plus the SPA client runtime on Node.js `>=20`, with package exports for React, Vue, and Svelte adapters plus AppTheory and TableTheory integration surfaces.
 
-## Install v4.0.4 <!-- x-release-please-version -->
+## Install v4.0.5-rc <!-- x-release-please-version -->
 
 ```bash
-export FACETHEORY_VERSION=4.0.4 # x-release-please-version
+export FACETHEORY_VERSION=4.0.5-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -17,6 +17,12 @@ Install the peers that match your adapter surface:
 - Vue: `npm install vue @vue/server-renderer`
 - Svelte: `npm install svelte@^5.55.7`
 
+Contributors working in this repo: `ts/.npmrc` sets npm's `allow-remote=root`
+policy for npm 12 compatibility (npm 12 defaults to `allow-remote=none` and
+refuses the pinned AppTheory/TableTheory release-tarball dependencies with
+EALLOWREMOTE). That is intentionally narrower than `all`: only the URL
+dependencies declared by `ts/package.json` may be fetched.
+
 ## Packaging Posture
 
 FaceTheory is ESM-only. Import it from ESM Lambda handlers, Vite SSR entries, or bundlers; CommonJS `require()` callers should expect `ERR_REQUIRE_ESM` and should migrate to ESM or use dynamic `import()` at the boundary.
@@ -27,8 +33,8 @@ The Svelte peer range is `>=5.55.7`. FaceTheory v4.0.0 dropped Svelte 4 support 
 
 Optional companion packages:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v3.0.0/theory-cloud-apptheory-3.0.0.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v3.0.0/theory-cloud-apptheory-cdk-3.0.0.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v3.0.1/theory-cloud-apptheory-3.0.1.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v3.0.1/theory-cloud-apptheory-cdk-3.0.1.tgz`
 - TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v3.0.2/theory-cloud-tabletheory-ts-3.0.2.tgz`
 
 ## Minimal App
@@ -102,11 +108,11 @@ Every public subpath below is declared in `ts/package.json` and mirrored in `doc
 
 <!-- x-release-please-start-version -->
 
-- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v4.0.4/docs/getting-started.md)
-- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v4.0.4/docs/api-reference.md)
-- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v4.0.4/docs/core-patterns.md)
-- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v4.0.4/docs/testing-guide.md)
-- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v4.0.4/docs/cdk/README.md)
+- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v4.0.5-rc/docs/getting-started.md)
+- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v4.0.5-rc/docs/api-reference.md)
+- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v4.0.5-rc/docs/core-patterns.md)
+- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v4.0.5-rc/docs/testing-guide.md)
+- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v4.0.5-rc/docs/cdk/README.md)
 <!-- x-release-please-end -->
 
-The `v4.0.4` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->
+The `v4.0.5-rc` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->

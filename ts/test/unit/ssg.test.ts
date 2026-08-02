@@ -261,6 +261,52 @@ test('ssg: canonicalOrigin validates absolute canonical links during prerender',
   }
 });
 
+test('ssg: missing canonicalOrigin identifies the prerender origin cause', async () => {
+  const tempRoot = await mkdtemp(
+    path.join(tmpdir(), 'facetheory-ssg-missing-canonical-origin-'),
+  );
+  const outDir = path.resolve(tempRoot, 'out');
+
+  try {
+    await assert.rejects(
+      buildSsgSite({
+        faces: [
+          {
+            route: '/',
+            mode: 'ssg',
+            render: () => ({
+              csp: {
+                inlineScripts: false,
+                inlineStyles: false,
+                rawHead: false,
+              },
+              headTags: [
+                {
+                  type: 'link',
+                  attrs: {
+                    rel: 'canonical',
+                    href: 'https://static.example/',
+                  },
+                },
+              ],
+              html: '<main>Static canonical</main>',
+            }),
+          },
+        ],
+        outDir,
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof SsgBuildFailedError);
+        assert.match(error.message, /configure canonicalOrigin/);
+        assert.doesNotMatch(error.message, /Network access is disabled/);
+        return true;
+      },
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('ssg: incremental builds skip unchanged route outputs', async () => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-incremental-'));
   const outDir = path.resolve(tempRoot, 'out');

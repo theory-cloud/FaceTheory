@@ -53,16 +53,32 @@ in this precedence order:
 
 The AppTheory-specific headers use the first comma-delimited value because the
 reference edge owns and emits a singleton viewer value. The generic
-`x-forwarded-*` fallback uses the rightmost comma-delimited value, assuming a
-trusted proxy strips or overwrites client values or appends its authoritative
-value at the right. **Do not treat generic forwarded headers from a direct or
-untrusted client as a security input.** Configure `canonicalOrigin` instead.
+`x-forwarded-*`/`host` fallback uses the rightmost comma-delimited value,
+assuming a trusted proxy strips or overwrites client values or appends its
+authoritative value at the right. Repeated header array elements, including
+`host`, are flattened with the same comma-join semantics as Lambda URL events
+before that rightmost value is selected. **Do not treat generic forwarded
+headers from a direct or untrusted client as a security input.** Configure
+`canonicalOrigin` instead.
 
 The selected source fails closed: malformed protocols, userinfo, paths,
 queries, fragments, or incomplete header pairs produce no allowed origin; a
 lower-precedence header cannot rescue a malformed AppTheory-specific source.
 Absolute same-origin links then remain rejected rather than being validated
 against a doubtful origin. Relative head URLs are unchanged.
+
+FaceTheory normalizes exactly one trailing DNS root dot from both the selected
+host and the compared head URL hostname before strict same-origin comparison,
+so dotted and dotless forms of `real.example` resolve symmetrically. A lone
+root label or multiple trailing dots remain invalid. This is an explicit
+availability decision: the valid dotted and dotless names are DNS-equivalent,
+and retaining the dot let a canonical URL self-DoS with a 500. Before
+normalization, this was not a shared-cache poisoning path in the reference
+deployment because the
+original-host headers participate in the reference CloudFront HTML cache
+policy's cache key and FaceTheory rejects 5xx regeneration results before
+storing them. This is the CloudFront cache key, not FaceTheory's
+`defaultIsrCacheKey`, which does not include original-host headers.
 
 SSG has no viewer request from which to derive an origin. Pass the same option
 to `buildSsgSite({ canonicalOrigin })` when an SSG Face emits an absolute

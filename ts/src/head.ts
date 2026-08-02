@@ -1,4 +1,5 @@
 import { escapeHTML, renderAttributes, safeJson } from './html.js';
+import { normalizeTrailingDnsRootDotHostname } from './origin.js';
 import type {
   FaceAttributes,
   FaceCspPolicy,
@@ -151,7 +152,9 @@ function isExternalHydration(
 
 function normalizeAllowedOrigin(origin: string | URL | undefined): string | null {
   if (origin === undefined) return null;
-  return new URL(String(origin)).origin;
+  const parsed = new URL(String(origin));
+  normalizeTrailingDnsRootDotHostname(parsed);
+  return parsed.origin;
 }
 
 function isAbsoluteOrProtocolRelativeUrl(value: string): boolean {
@@ -159,6 +162,13 @@ function isAbsoluteOrProtocolRelativeUrl(value: string): boolean {
 }
 
 const STRICT_CSP_SAME_ORIGIN_SENTINEL = 'https://facetheory.invalid';
+
+export class StrictCspAllowedOriginRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StrictCspAllowedOriginRequiredError';
+  }
+}
 
 function assertStrictSameOriginUrl(
   value: string,
@@ -186,6 +196,10 @@ function assertStrictSameOriginUrl(
     );
   }
 
+  if (!normalizeTrailingDnsRootDotHostname(parsed)) {
+    throw new Error(`FaceTheory strict CSP ${label} URL is invalid: ${trimmed}`);
+  }
+
   if (!allowedOrigin) {
     if (
       !isAbsoluteOrProtocolRelativeUrl(trimmed) &&
@@ -194,7 +208,7 @@ function assertStrictSameOriginUrl(
       return;
     }
 
-    throw new Error(
+    throw new StrictCspAllowedOriginRequiredError(
       `FaceTheory strict CSP ${label} URL must be same-origin or relative: ${trimmed}`,
     );
   }

@@ -327,6 +327,21 @@ print("gemini-absence: PASS")
 PY
 }
 
+check_infra_snapshot_templates() {
+  local started_at=${SECONDS}
+  require_cmd_or_blocked make || return $?
+  require_cmd_or_blocked node || return $?
+  require_cmd_or_blocked npm || return $?
+
+  echo "infra-synth-snapshots: running"
+  if ! make infra-snapshot-test; then
+    echo "infra-synth-snapshots: FAIL ($((SECONDS - started_at))s)" >&2
+    echo "Remediation: run make ts-build, then npm run test:update in each affected infra package and commit the regenerated snapshots." >&2
+    return 1
+  fi
+  echo "infra-synth-snapshots: PASS ($((SECONDS - started_at))s)"
+}
+
 # --- Rubric verifier functions ---
 
 gov_check_quality() {
@@ -334,6 +349,7 @@ gov_check_quality() {
   make ts-typecheck
   make ts-lint
   make ts-test
+  check_infra_snapshot_templates
 }
 
 gov_check_consistency() {
@@ -559,6 +575,10 @@ run_check "SEC-1" "Security" "gov_check_security"
 run_check "CMP-1" "Compliance" "gov_check_compliance"
 run_check "MAI-1" "Maintainability" "gov_check_maintainability"
 run_check "DOC-1" "Docs" "gov_check_docs"
+
+if ! grep -E '^infra-synth-snapshots: (PASS|FAIL)|^Remediation:' "${EVIDENCE_DIR}/QUA-1-output.log"; then
+  echo "infra-synth-snapshots: NOT RUN (QUA-1 stopped before the snapshot gate)"
+fi
 
 write_report
 validate_gov_rubric_report_v1
