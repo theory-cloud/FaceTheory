@@ -45,10 +45,16 @@ import { buildSsgSite } from '@theory-cloud/facetheory';
 import { faces } from './app.js';
 
 await buildSsgSite({
+  canonicalOrigin: 'https://www.example.com',
   faces,
   outDir: './dist-static',
 });
 ```
+
+`canonicalOrigin` is required when a strict-CSP SSG Face emits an absolute
+same-origin head URL, such as an absolute canonical link. Prerendering has no
+viewer headers, so FaceTheory cannot reconstruct that origin from a request.
+Relative head URLs do not require this option.
 
 The CLI form is `npm run ssg` (defined in `ts/package.json` as `tsx src/ssg-cli.ts`). See `ts/examples/ssg-basic/` for a working end-to-end build + serve.
 

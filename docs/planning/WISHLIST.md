@@ -20,8 +20,10 @@ packages) to be production-ready on AWS while keeping portability and contract t
 - **Response header/cookie semantics**: explicit merging rules for `set-cookie`, multi-value headers, and how they behave
   in streaming mode (headers must be finalized before body chunks).
 - **Cache header helpers**: small utilities for `cache-control`, `etag`, `vary`, and “SSR vs SSG vs ISR” defaults.
-- **CloudFront-aware request normalization**: convenience helpers for canonical origin URL reconstruction
-  (`host`, `x-forwarded-proto`, `x-forwarded-host`) and client IP handling.
+- ~~**CloudFront-aware canonical origin reconstruction**~~: completed in FaceTheory by consuming
+  `x-facetheory-original-host` / `x-apptheory-original-host` with `cloudfront-forwarded-proto`, with an explicit
+  `canonicalOrigin` override and a documented trusted-proxy fallback. Client IP normalization remains a separate
+  AppTheory wishlist item.
 
 ### P2 (broader AWS resource/event support)
 
