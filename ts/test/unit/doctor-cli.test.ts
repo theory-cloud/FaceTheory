@@ -24,7 +24,7 @@ const FACE_PACKAGE = {
 };
 
 const APP_THEORY =
-  'https://github.com/theory-cloud/AppTheory/releases/download/v3.0.0/theory-cloud-apptheory-3.0.0.tgz';
+  'https://github.com/theory-cloud/AppTheory/releases/download/v3.0.1/theory-cloud-apptheory-3.0.1.tgz';
 const TABLE_THEORY =
   'https://github.com/theory-cloud/TableTheory/releases/download/v3.0.2/theory-cloud-tabletheory-ts-3.0.2.tgz';
 
