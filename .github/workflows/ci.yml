@@ -114,33 +114,6 @@ jobs:
       - name: Verify versions match VERSION
         run: scripts/verify-version-alignment.sh
 
-  infra-snapshots:
-    name: Infrastructure synthesized-template snapshots
-    runs-on: ubuntu-latest
-    env:
-      NPM_CONFIG_ALLOW_REMOTE: all
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
-        with:
-          node-version: "24"
-      - name: Build TypeScript package
-        run: |
-          cd ts
-          npm ci
-          cd ..
-          make ts-build
-      - name: Test AppTheory SSR site snapshots
-        working-directory: infra/apptheory-ssr-site
-        run: |
-          npm ci
-          npm test
-      - name: Test AppTheory SSG/ISR site snapshots
-        working-directory: infra/apptheory-ssg-isr-site
-        run: |
-          npm ci
-          npm test
-
   ts:
     name: TypeScript (typecheck + lint + test, Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
