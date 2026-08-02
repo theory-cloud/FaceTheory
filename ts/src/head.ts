@@ -152,7 +152,9 @@ function isExternalHydration(
 
 function normalizeAllowedOrigin(origin: string | URL | undefined): string | null {
   if (origin === undefined) return null;
-  return new URL(String(origin)).origin;
+  const parsed = new URL(String(origin));
+  normalizeTrailingDnsRootDotHostname(parsed);
+  return parsed.origin;
 }
 
 function isAbsoluteOrProtocolRelativeUrl(value: string): boolean {
