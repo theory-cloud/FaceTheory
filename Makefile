@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test ts-coverage ts-examples-readmes docs-export-map verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin verify-ci-rubric-enforced verify-deterministic-builds build-release-assets ensure-release-branches test-ensure-release-branches test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test ts-coverage ts-examples-readmes infra-snapshot-test docs-export-map verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin verify-ci-rubric-enforced verify-deterministic-builds build-release-assets ensure-release-branches test-ensure-release-branches test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
 
 ts-build:
 	cd ts && npm run build
@@ -23,6 +23,10 @@ ts-coverage:
 
 ts-examples-readmes:
 	cd ts && npm run verify:examples:readmes
+
+infra-snapshot-test: ts-build
+	cd infra/apptheory-ssr-site && npm ci && npm test
+	cd infra/apptheory-ssg-isr-site && npm ci && npm test
 
 docs-export-map:
 	./scripts/verify-docs-export-map.sh
