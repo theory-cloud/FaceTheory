@@ -33,6 +33,41 @@ import {
 - `canonical(href)` — create a canonical same-origin or http(s) link tag.
 - `jsonLd(data, { nonce? })` — create a safe `application/ld+json` script tag for structured data.
 
+## Canonical origin for strict head validation
+
+Strict CSP validates absolute head URLs against one canonical origin. When
+`createFaceApp()` renders a Face, it supplies `renderFaceHead()` with an origin
+in this precedence order:
+
+1. `createFaceApp({ canonicalOrigin })`, normalized to an exact `http(s)`
+   origin. This explicit value overrides every request header and is the
+   supported choice for direct Function URL/dev-server deployments and for a
+   single-origin app that does not trust a forwarding proxy.
+2. `x-facetheory-original-host` plus `cloudfront-forwarded-proto`. The
+   AppTheory CloudFront Function writes the viewer host into the
+   FaceTheory-specific header, so this is the reference AWS path.
+3. `x-apptheory-original-host` plus `cloudfront-forwarded-proto`, as the
+   compatibility fallback when the FaceTheory-specific header is absent.
+4. `x-forwarded-host` (falling back to `host`) plus `x-forwarded-proto` for
+   non-AppTheory proxies and local development.
+
+The AppTheory-specific headers use the first comma-delimited value because the
+reference edge owns and emits a singleton viewer value. The generic
+`x-forwarded-*` fallback uses the rightmost comma-delimited value, assuming a
+trusted proxy strips or overwrites client values or appends its authoritative
+value at the right. **Do not treat generic forwarded headers from a direct or
+untrusted client as a security input.** Configure `canonicalOrigin` instead.
+
+The selected source fails closed: malformed protocols, userinfo, paths,
+queries, fragments, or incomplete header pairs produce no allowed origin; a
+lower-precedence header cannot rescue a malformed AppTheory-specific source.
+Absolute same-origin links then remain rejected rather than being validated
+against a doubtful origin. Relative head URLs are unchanged.
+
+SSG has no viewer request from which to derive an origin. Pass the same option
+to `buildSsgSite({ canonicalOrigin })` when an SSG Face emits an absolute
+canonical or other absolute same-origin head URL.
+
 ## `FaceHeadTag` shape
 
 ```typescript

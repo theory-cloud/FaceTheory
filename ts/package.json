@@ -1,6 +1,6 @@
 {
   "name": "@theory-cloud/facetheory",
-  "version": "4.0.3-rc",
+  "version": "4.0.3",
   "description": "AWS-first SSR, SSG, and blocking ISR runtime for Node.js with React, Vue, and Svelte adapters.",
   "license": "Apache-2.0",
   "type": "module",
@@ -277,9 +277,9 @@
     "@emotion/server": "^11.11.0",
     "@eslint/js": "^10.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v2.0.2/theory-cloud-apptheory-2.0.2.tgz",
-    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v2.0.2/theory-cloud-apptheory-cdk-2.0.2.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.6/theory-cloud-tabletheory-ts-2.0.6.tgz",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v3.0.0/theory-cloud-apptheory-3.0.0.tgz",
+    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v3.0.0/theory-cloud-apptheory-cdk-3.0.0.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.2/theory-cloud-tabletheory-ts-3.0.2.tgz",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^24.12.4",
     "@types/react": "^19.2.15",
@@ -288,7 +288,7 @@
     "@typescript-eslint/parser": "^8.60.0",
     "@vue/server-renderer": "^3.5.34",
     "antd": "^6.4.3",
-    "aws-cdk-lib": "2.262.2",
+    "aws-cdk-lib": "2.263.0",
     "c8": "^11.0.0",
     "constructs": "10.8.0",
     "esbuild": "^0.28.1",
@@ -306,7 +306,7 @@
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v2.0.6/theory-cloud-tabletheory-ts-2.0.6.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.2/theory-cloud-tabletheory-ts-3.0.2.tgz"
     },
     "brace-expansion": "5.0.9",
     "postcss": "8.5.25"

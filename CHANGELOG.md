@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.0.3](https://github.com/theory-cloud/FaceTheory/compare/v4.0.2...v4.0.3) (2026-07-30)
+
+
+### Bug Fixes
+
+* **deps:** update AppTheory and TableTheory pins ([6883f52](https://github.com/theory-cloud/FaceTheory/commit/6883f52004dbb6e4fa486791d5da331c4df083ea))
+* **deps:** update AWS SDK clients and json ([642f3f0](https://github.com/theory-cloud/FaceTheory/commit/642f3f06634d02877f5a39de5bf9c1fdf18ae8af))
+* **deps:** update AWS SDK clients and json ([2e464b1](https://github.com/theory-cloud/FaceTheory/commit/2e464b1b8d29b39e19d6fb5dee0f5341a95d656c))
+
 ## [4.0.2](https://github.com/theory-cloud/FaceTheory/compare/v4.0.1...v4.0.2) (2026-07-23)
 
 

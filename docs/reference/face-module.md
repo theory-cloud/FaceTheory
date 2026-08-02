@@ -202,6 +202,7 @@ function createFaceApp(options: FaceAppOptions): FaceApp;
 
 interface FaceAppOptions {
   faces: FaceModule[];
+  canonicalOrigin?: string | URL;
   resources?: FaceResourceRoute[];
   isr?: FaceIsrOptions;
   ssrHydrationSidecars?: FaceSsrHydrationSidecarOptions;
@@ -209,6 +210,12 @@ interface FaceAppOptions {
   strictCsp?: FaceStrictCspOptions;
 }
 ```
+
+`canonicalOrigin` is the explicit public `http(s)` origin used by strict head
+URL validation. It overrides request-derived proxy headers and is the origin
+source used by SSG when passed through `buildSsgSite({ canonicalOrigin })`.
+See [Deterministic head emission](../features/head.md#canonical-origin-for-strict-head-validation)
+for header precedence and the trusted-proxy assumption.
 
 The returned `FaceApp` exposes `handle(request: FaceRequest): Promise<FaceResponse>`.
 
