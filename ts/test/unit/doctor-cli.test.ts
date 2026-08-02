@@ -199,7 +199,7 @@ test('facetheory doctor reports AppTheory/TableTheory override drift with a fix'
     assert.equal(exitCode, 1);
     assert.match(stdout.text, /AppTheory\/TableTheory override alignment is drifted/);
     assert.match(stdout.text, /Set overrides\["@theory-cloud\/apptheory"\]/);
-    assert.match(stdout.text, /theory-cloud-tabletheory-ts-2\.0\.6\.tgz/);
+    assert.match(stdout.text, /theory-cloud-tabletheory-ts-3\.0\.2\.tgz/);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
