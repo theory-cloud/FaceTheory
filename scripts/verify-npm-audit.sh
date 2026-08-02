@@ -37,10 +37,10 @@ const vulnerabilities = report.vulnerabilities || {};
 const entries = Object.entries(vulnerabilities);
 
 // GHSA-mh99-v99m-4gvg remains in the brace-expansion@5.0.7 copy bundled
-// inside aws-cdk-lib@2.262.2. AppTheory CDK v2.0.2 requires that exact CDK
-// peer, and npm overrides cannot replace dependencies bundled in the AWS
-// tarball. Keep this exception exact, visible, and short-lived: it applies to
-// the AWS CDK nested node only, never to another brace-expansion installation.
+// inside the SSR example's aws-cdk-lib@2.262.2. That example still consumes
+// AppTheory CDK v2.0.2, and npm overrides cannot replace dependencies bundled
+// in the AWS tarball. Keep this exception exact, visible, and short-lived: it
+// applies to the AWS CDK nested node only, never to another installation.
 const braceExpansionException = {
   advisory: 'https://github.com/advisories/GHSA-mh99-v99m-4gvg',
   node: 'node_modules/aws-cdk-lib/node_modules/brace-expansion',
@@ -48,9 +48,7 @@ const braceExpansionException = {
   awsCdkVersion: '2.262.2',
   expiresOn: '2026-08-15',
   projects: new Set([
-    'ts',
     'infra/apptheory-ssr-site',
-    'infra/apptheory-ssg-isr-site',
   ]),
 };
 
@@ -73,6 +71,8 @@ function isAllowedBundledBraceExpansion(name, vulnerability) {
 }
 
 function validateBundledBraceExpansionException() {
+  if (!braceExpansionException.projects.has(project)) return;
+
   const today = new Date().toISOString().slice(0, 10);
   if (today > braceExpansionException.expiresOn) {
     throw new Error(
