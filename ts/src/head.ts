@@ -160,6 +160,13 @@ function isAbsoluteOrProtocolRelativeUrl(value: string): boolean {
 
 const STRICT_CSP_SAME_ORIGIN_SENTINEL = 'https://facetheory.invalid';
 
+export class StrictCspAllowedOriginRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StrictCspAllowedOriginRequiredError';
+  }
+}
+
 function assertStrictSameOriginUrl(
   value: string,
   label: string,
@@ -194,7 +201,7 @@ function assertStrictSameOriginUrl(
       return;
     }
 
-    throw new Error(
+    throw new StrictCspAllowedOriginRequiredError(
       `FaceTheory strict CSP ${label} URL must be same-origin or relative: ${trimmed}`,
     );
   }

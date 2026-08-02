@@ -263,6 +263,41 @@ test('FaceApp: FaceTheory original host wins over AppTheory and spoofed generic 
   );
 });
 
+test('FaceApp: normalizes a trailing DNS root dot in the trusted original host', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/trailing-dot',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://real.example/articles/trailing-dot',
+              },
+            },
+          ],
+          html: '<main>Trailing DNS root dot</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/trailing-dot',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      'x-facetheory-original-host': ['real.example.'],
+    },
+  });
+
+  assert.equal(resp.status, 200);
+});
+
 test('FaceApp: AppTheory path rejects a spoofed generic origin', async () => {
   const app = createFaceApp({
     faces: [
@@ -373,6 +408,42 @@ test('FaceApp: trusted generic proxy uses rightmost forwarded values', async () 
   assert.equal(resp.status, 200);
 });
 
+test('FaceApp: trusted generic proxy uses rightmost values across header array elements', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/generic-proxy-array',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://trusted-proxy.example/articles/generic-proxy-array',
+              },
+            },
+          ],
+          html: '<main>Generic trusted proxy array</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/generic-proxy-array',
+    headers: {
+      host: ['abc123xyz.lambda-url.us-east-1.on.aws'],
+      'x-forwarded-host': ['attacker.example', 'trusted-proxy.example'],
+      'x-forwarded-proto': ['http', 'https'],
+    },
+  });
+
+  assert.equal(resp.status, 200);
+});
+
 test('FaceApp: canonicalOrigin overrides all request-derived headers', async () => {
   const app = createFaceApp({
     canonicalOrigin: new URL('https://configured.example/'),
@@ -469,6 +540,57 @@ test('FaceApp: malformed AppTheory origin headers fail closed without generic fa
       assert.equal(resp.status, 500);
     });
   }
+});
+
+test('FaceApp: missing CloudFront protocol reports the trusted header-pair cause', async () => {
+  let observedError: unknown;
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/missing-cloudfront-proto',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://reader.example/articles/missing-cloudfront-proto',
+              },
+            },
+          ],
+          html: '<main>Missing CloudFront protocol</main>',
+        }),
+      },
+    ],
+    observability: {
+      onError: (error) => {
+        observedError = error;
+      },
+    },
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/missing-cloudfront-proto',
+    headers: {
+      'x-facetheory-original-host': ['reader.example'],
+      'x-forwarded-host': ['reader.example'],
+      'x-forwarded-proto': ['https'],
+    },
+  });
+
+  assert.equal(resp.status, 500);
+  const message = observedError instanceof Error ? observedError.message : '';
+  assert.match(
+    message,
+    /x-facetheory-original-host header is present, but cloudfront-forwarded-proto is missing/,
+  );
+  assert.match(
+    message,
+    /configure canonicalOrigin or restore the complete trusted header pair/,
+  );
 });
 
 test('FaceApp: canonicalOrigin rejects non-origin URL components', () => {
