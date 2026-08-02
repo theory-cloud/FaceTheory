@@ -72,6 +72,12 @@ import {
  */
 export interface FaceAppOptions {
   faces: FaceModule[];
+  /**
+   * Explicit public origin used for strict same-origin head validation. This
+   * takes precedence over request-derived proxy headers and is required when
+   * prerendering absolute canonical URLs.
+   */
+  canonicalOrigin?: string | URL;
   resources?: FaceResourceRoute[];
   isr?: FaceIsrOptions;
   ssrHydrationSidecars?: FaceSsrHydrationSidecarOptions;
@@ -227,9 +233,11 @@ export class FaceApp {
   private readonly observability: FaceAppObservabilityHooks | null;
   private readonly strictCspMaxStreamingBodyBytes: number;
   private readonly trailingSlash: TrailingSlashPolicy;
+  private readonly canonicalOrigin: string | undefined;
   private coldStartPending = true;
 
   constructor(options: FaceAppOptions) {
+    this.canonicalOrigin = normalizeCanonicalOrigin(options.canonicalOrigin);
     this.trailingSlash = normalizeTrailingSlashPolicy(options.trailingSlash);
     this.router = new Router({ trailingSlash: this.trailingSlash });
     this.faceByPattern = new Map();
@@ -456,6 +464,7 @@ export class FaceApp {
             preparedOut,
             normalizedReq,
             this.strictCspMaxStreamingBodyBytes,
+            this.canonicalOrigin,
             {
               hooks,
               method: normalizedReq.method,
@@ -715,6 +724,108 @@ function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
     isBase64: Boolean(req.isBase64),
     cspNonce: req.cspNonce ?? null,
   };
+}
+
+function allowedOriginForRequest(
+  req: Readonly<Required<FaceRequest>>,
+  canonicalOrigin: string | undefined,
+): string | undefined {
+  if (canonicalOrigin !== undefined) return canonicalOrigin;
+
+  const cloudFrontProto = firstCommaSeparatedHeaderValue(
+    req,
+    'cloudfront-forwarded-proto',
+  ).toLowerCase();
+  const faceTheoryOriginalHost = firstCommaSeparatedHeaderValue(
+    req,
+    'x-facetheory-original-host',
+  );
+  if (faceTheoryOriginalHost) {
+    return httpOriginFromParts(cloudFrontProto, faceTheoryOriginalHost);
+  }
+
+  const appTheoryOriginalHost = firstCommaSeparatedHeaderValue(
+    req,
+    'x-apptheory-original-host',
+  );
+  if (appTheoryOriginalHost) {
+    return httpOriginFromParts(cloudFrontProto, appTheoryOriginalHost);
+  }
+
+  // Generic forwarding headers are safe only when a trusted proxy strips or
+  // overwrites client-supplied values. The rightmost comma-delimited value is
+  // the trusted proxy's appended value under that deployment contract. Direct
+  // or otherwise untrusted deployments should configure canonicalOrigin.
+  const forwardedProto = rightmostCommaSeparatedHeaderValue(
+    req,
+    'x-forwarded-proto',
+  ).toLowerCase();
+  const forwardedHost = rightmostCommaSeparatedHeaderValue(
+    req,
+    'x-forwarded-host',
+  );
+  const host = forwardedHost || String(req.headers.host?.[0] ?? '').trim();
+
+  return httpOriginFromParts(forwardedProto, host);
+}
+
+function firstCommaSeparatedHeaderValue(
+  req: Readonly<Required<FaceRequest>>,
+  name: string,
+): string {
+  return String(req.headers[name]?.[0] ?? '').split(',')[0]?.trim() ?? '';
+}
+
+function rightmostCommaSeparatedHeaderValue(
+  req: Readonly<Required<FaceRequest>>,
+  name: string,
+): string {
+  return String(req.headers[name]?.[0] ?? '').split(',').at(-1)?.trim() ?? '';
+}
+
+function normalizeCanonicalOrigin(
+  value: string | URL | undefined,
+): string | undefined {
+  if (value === undefined) return undefined;
+
+  const origin = httpOriginFromUrl(String(value).trim());
+  if (origin !== undefined) return origin;
+
+  throw new Error(
+    'canonicalOrigin must be an absolute http(s) origin without userinfo, path, query, or fragment',
+  );
+}
+
+function httpOriginFromParts(
+  protocol: string,
+  host: string,
+): string | undefined {
+  if ((protocol !== 'http' && protocol !== 'https') || !host) {
+    return undefined;
+  }
+
+  return httpOriginFromUrl(`${protocol}://${host}`);
+}
+
+function httpOriginFromUrl(value: string): string | undefined {
+  if (!value) return undefined;
+
+  try {
+    const url = new URL(value);
+    if (
+      (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+      url.username ||
+      url.password ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash
+    ) {
+      return undefined;
+    }
+    return url.origin;
+  } catch {
+    return undefined;
+  }
 }
 
 function ensureRequestId(headers: FaceHeaders): void {
@@ -993,6 +1104,7 @@ async function toHTTPResponse(
   out: FaceRenderResult,
   req: Readonly<Required<FaceRequest>>,
   strictCspMaxStreamingBodyBytes: number,
+  canonicalOrigin: string | undefined,
   streamTelemetry?: StreamErrorTelemetryContext,
 ): Promise<FaceResponse> {
   const status = out.status ?? 200;
@@ -1004,7 +1116,11 @@ async function toHTTPResponse(
   }
   applyStrictCspResponseHeader(headers, out.csp, req.cspNonce);
 
-  const head = renderFaceHead(out, { cspNonce: req.cspNonce });
+  const allowedOrigin = allowedOriginForRequest(req, canonicalOrigin);
+  const head = renderFaceHead(out, {
+    cspNonce: req.cspNonce,
+    ...(allowedOrigin ? { allowedOrigin } : {}),
+  });
   const documentParts = withDocumentShell(out);
 
   if (typeof out.html === 'string') {

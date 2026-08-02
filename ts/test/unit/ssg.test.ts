@@ -219,6 +219,48 @@ test('ssg: static + param routes produce deterministic files and manifest', asyn
   }
 });
 
+test('ssg: canonicalOrigin validates absolute canonical links during prerender', async () => {
+  const tempRoot = await mkdtemp(
+    path.join(tmpdir(), 'facetheory-ssg-canonical-origin-'),
+  );
+  const outDir = path.resolve(tempRoot, 'out');
+
+  try {
+    const result = await buildSsgSite({
+      canonicalOrigin: 'https://static.example',
+      faces: [
+        {
+          route: '/',
+          mode: 'ssg',
+          render: () => ({
+            csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+            headTags: [
+              {
+                type: 'link',
+                attrs: {
+                  rel: 'canonical',
+                  href: 'https://static.example/',
+                },
+              },
+            ],
+            html: '<main>Static canonical</main>',
+          }),
+        },
+      ],
+      outDir,
+    });
+
+    assert.equal(result.pages.length, 1);
+    const html = await readFile(path.resolve(outDir, 'index.html'), 'utf8');
+    assert.match(
+      html,
+      /<link href="https:\/\/static\.example\/" rel="canonical">/,
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('ssg: incremental builds skip unchanged route outputs', async () => {
   const tempRoot = await mkdtemp(path.join(tmpdir(), 'facetheory-ssg-incremental-'));
   const outDir = path.resolve(tempRoot, 'out');

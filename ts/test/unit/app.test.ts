@@ -102,6 +102,386 @@ test('FaceApp: renders HTML with title', async () => {
   assert.ok(body.includes('<div>hi</div>'));
 });
 
+test('FaceApp: strict CSP allows same-origin absolute canonical links from the request origin', async () => {
+  const canonicalHref = 'https://www.payexample.com/articles/loaded';
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/loaded',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            { type: 'link', attrs: { rel: 'canonical', href: canonicalHref } },
+          ],
+          html: '<main>Loaded article</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/loaded',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      'cloudfront-viewer-address': ['203.0.113.8:443'],
+      host: ['abc123xyz.lambda-url.us-east-1.on.aws'],
+      'x-apptheory-original-host': ['www.payexample.com'],
+      'x-apptheory-original-uri': ['/articles/loaded'],
+      'x-facetheory-original-host': ['www.payexample.com'],
+      'x-facetheory-original-uri': ['/articles/loaded'],
+      'x-request-id': ['reference-header-probe'],
+    },
+  });
+
+  assert.equal(resp.status, 200);
+  assert.match(
+    decodeBody(resp.body as Uint8Array),
+    /<link href="https:\/\/www\.payexample\.com\/articles\/loaded" rel="canonical">/,
+  );
+});
+
+test('FaceApp: strict CSP rejects cross-origin absolute head links from the request origin', async () => {
+  let observedError: unknown;
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/cross-origin',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://syndicated.example/articles/original',
+              },
+            },
+          ],
+          html: '<main>Cross-origin article</main>',
+        }),
+      },
+    ],
+    observability: {
+      onError: (err) => {
+        observedError = err;
+      },
+    },
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/cross-origin',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      host: ['abc123xyz.lambda-url.us-east-1.on.aws'],
+      'x-facetheory-original-host': ['reader.example'],
+    },
+  });
+
+  assert.equal(resp.status, 500);
+  assert.match(
+    observedError instanceof Error ? observedError.message : '',
+    /strict CSP link href URL resolved cross-origin/,
+  );
+});
+
+test('FaceApp: strict CSP continues to allow relative head links', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/relative',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: { rel: 'canonical', href: '/articles/relative' },
+            },
+          ],
+          html: '<main>Relative article</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/relative',
+  });
+
+  assert.equal(resp.status, 200);
+  assert.match(
+    decodeBody(resp.body as Uint8Array),
+    /<link href="\/articles\/relative" rel="canonical">/,
+  );
+});
+
+test('FaceApp: FaceTheory original host wins over AppTheory and spoofed generic headers', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/precedence',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://viewer.example/articles/precedence',
+              },
+            },
+          ],
+          html: '<main>Origin precedence</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/precedence',
+    headers: {
+      'cloudfront-forwarded-proto': ['https, http'],
+      host: ['abc123xyz.lambda-url.us-east-1.on.aws'],
+      'x-apptheory-original-host': ['apptheory.example'],
+      'x-facetheory-original-host': ['viewer.example, ignored.example'],
+      'x-forwarded-host': ['attacker.example'],
+      'x-forwarded-proto': ['https'],
+    },
+  });
+
+  assert.equal(resp.status, 200);
+  assert.match(
+    decodeBody(resp.body as Uint8Array),
+    /<link href="https:\/\/viewer\.example\/articles\/precedence" rel="canonical">/,
+  );
+});
+
+test('FaceApp: AppTheory path rejects a spoofed generic origin', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/spoofed-origin',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://attacker.example/articles/spoofed-origin',
+              },
+            },
+          ],
+          html: '<main>Spoofed origin</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/spoofed-origin',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      host: ['abc123xyz.lambda-url.us-east-1.on.aws'],
+      'x-facetheory-original-host': ['viewer.example'],
+      'x-forwarded-host': ['attacker.example'],
+      'x-forwarded-proto': ['https'],
+    },
+  });
+
+  assert.equal(resp.status, 500);
+});
+
+test('FaceApp: AppTheory original host is the compatibility fallback', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/apptheory-origin',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://apptheory.example/articles/apptheory-origin',
+              },
+            },
+          ],
+          html: '<main>AppTheory origin</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/apptheory-origin',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      host: ['abc123xyz.lambda-url.us-east-1.on.aws'],
+      'x-apptheory-original-host': ['apptheory.example'],
+    },
+  });
+
+  assert.equal(resp.status, 200);
+});
+
+test('FaceApp: trusted generic proxy uses rightmost forwarded values', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/generic-proxy',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://trusted-proxy.example/articles/generic-proxy',
+              },
+            },
+          ],
+          html: '<main>Generic trusted proxy</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/generic-proxy',
+    headers: {
+      host: ['abc123xyz.lambda-url.us-east-1.on.aws'],
+      'x-forwarded-host': ['attacker.example, trusted-proxy.example'],
+      'x-forwarded-proto': ['http, https'],
+    },
+  });
+
+  assert.equal(resp.status, 200);
+});
+
+test('FaceApp: canonicalOrigin overrides all request-derived headers', async () => {
+  const app = createFaceApp({
+    canonicalOrigin: new URL('https://configured.example/'),
+    faces: [
+      {
+        route: '/articles/configured-origin',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://configured.example/articles/configured-origin',
+              },
+            },
+          ],
+          html: '<main>Configured origin</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/configured-origin',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      host: ['abc123xyz.lambda-url.us-east-1.on.aws'],
+      'x-apptheory-original-host': ['apptheory.example'],
+      'x-facetheory-original-host': ['viewer.example'],
+      'x-forwarded-host': ['attacker.example'],
+      'x-forwarded-proto': ['https'],
+    },
+  });
+
+  assert.equal(resp.status, 200);
+});
+
+test('FaceApp: malformed AppTheory origin headers fail closed without generic fallback', async (t) => {
+  const cases = [
+    {
+      name: 'userinfo',
+      host: 'attacker@reader.example',
+      protocol: 'https',
+    },
+    { name: 'path', host: 'reader.example/path', protocol: 'https' },
+    { name: 'query', host: 'reader.example?tenant=other', protocol: 'https' },
+    { name: 'fragment', host: 'reader.example#other', protocol: 'https' },
+    { name: 'protocol', host: 'reader.example', protocol: 'ftp' },
+  ];
+
+  for (const testCase of cases) {
+    await t.test(`rejects ${testCase.name}`, async () => {
+      const app = createFaceApp({
+        faces: [
+          {
+            route: '/articles/rejected-origin',
+            mode: 'ssr',
+            render: () => ({
+              csp: {
+                inlineScripts: false,
+                inlineStyles: false,
+                rawHead: false,
+              },
+              headTags: [
+                {
+                  type: 'link',
+                  attrs: {
+                    rel: 'canonical',
+                    href: 'https://reader.example/articles/rejected-origin',
+                  },
+                },
+              ],
+              html: '<main>Rejected origin</main>',
+            }),
+          },
+        ],
+      });
+
+      const resp = await app.handle({
+        method: 'GET',
+        path: '/articles/rejected-origin',
+        headers: {
+          'cloudfront-forwarded-proto': [testCase.protocol],
+          host: ['reader.example'],
+          'x-facetheory-original-host': [testCase.host],
+          'x-forwarded-host': ['reader.example'],
+          'x-forwarded-proto': ['https'],
+        },
+      });
+
+      assert.equal(resp.status, 500);
+    });
+  }
+});
+
+test('FaceApp: canonicalOrigin rejects non-origin URL components', () => {
+  assert.throws(
+    () =>
+      createFaceApp({
+        canonicalOrigin: 'https://reader.example/not-an-origin',
+        faces: [],
+      }),
+    /canonicalOrigin must be an absolute http\(s\) origin/,
+  );
+});
+
 test('FaceApp: typed FaceModule load data flows into render', async () => {
   type ProfileData = {
     name: string;
