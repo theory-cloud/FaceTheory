@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.0.4](https://github.com/theory-cloud/FaceTheory/compare/v4.0.3...v4.0.4) (2026-08-02)
+
+
+### Bug Fixes
+
+* **deps:** adopt AppTheory v3 pins ([63ae910](https://github.com/theory-cloud/FaceTheory/commit/63ae9103817fd38906e572c2ee3735bcddb007d2))
+* **deps:** adopt AppTheory v3 pins ([a184149](https://github.com/theory-cloud/FaceTheory/commit/a184149d6cea5ab0a2bdd99652174ae91fb62bfb))
+* **deps:** align SSR example and pin documentation ([803cf59](https://github.com/theory-cloud/FaceTheory/commit/803cf593c399ca84c28c619c28d74f59637c0030))
+* **head:** forward request origin to head renderer ([3220625](https://github.com/theory-cloud/FaceTheory/commit/3220625fb0ef81287a87c21c669aeb995e50c41b))
+* **head:** forward request origin to head renderer ([efc56a6](https://github.com/theory-cloud/FaceTheory/commit/efc56a64383ebd985757df148f02b67e46f8238a))
+* **head:** trust AppTheory origin headers ([dbd742a](https://github.com/theory-cloud/FaceTheory/commit/dbd742a2e89a84bb75e73e044ee7bdc9d9f6509d))
+* **test:** align doctor pin assertion ([1d5ace7](https://github.com/theory-cloud/FaceTheory/commit/1d5ace718c5be2a9bf132e11210782a903901de1))
+
 ## [4.0.3](https://github.com/theory-cloud/FaceTheory/compare/v4.0.2...v4.0.3) (2026-07-30)
 
 
