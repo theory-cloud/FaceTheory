@@ -717,6 +717,43 @@ function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
   };
 }
 
+function allowedOriginForRequest(
+  req: Readonly<Required<FaceRequest>>,
+): string | undefined {
+  const forwardedProto = String(
+    req.headers['x-forwarded-proto']?.[0] ?? '',
+  )
+    .split(',', 1)[0]
+    ?.trim()
+    .toLowerCase();
+  const forwardedHost = String(
+    req.headers['x-forwarded-host']?.[0] ?? '',
+  )
+    .split(',', 1)[0]
+    ?.trim();
+  const host = forwardedHost || String(req.headers.host?.[0] ?? '').trim();
+
+  if ((forwardedProto !== 'http' && forwardedProto !== 'https') || !host) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(`${forwardedProto}://${host}`);
+    if (
+      url.username ||
+      url.password ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash
+    ) {
+      return undefined;
+    }
+    return url.origin;
+  } catch {
+    return undefined;
+  }
+}
+
 function ensureRequestId(headers: FaceHeaders): void {
   const existing = headers[REQUEST_ID_HEADER] ?? [];
   const first = String(existing[0] ?? '').trim();
@@ -1004,7 +1041,11 @@ async function toHTTPResponse(
   }
   applyStrictCspResponseHeader(headers, out.csp, req.cspNonce);
 
-  const head = renderFaceHead(out, { cspNonce: req.cspNonce });
+  const allowedOrigin = allowedOriginForRequest(req);
+  const head = renderFaceHead(out, {
+    cspNonce: req.cspNonce,
+    ...(allowedOrigin ? { allowedOrigin } : {}),
+  });
   const documentParts = withDocumentShell(out);
 
   if (typeof out.html === 'string') {

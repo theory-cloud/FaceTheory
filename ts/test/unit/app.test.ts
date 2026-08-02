@@ -102,6 +102,117 @@ test('FaceApp: renders HTML with title', async () => {
   assert.ok(body.includes('<div>hi</div>'));
 });
 
+test('FaceApp: strict CSP allows same-origin absolute canonical links from the request origin', async () => {
+  const canonicalHref = 'https://reader.example/articles/loaded';
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/loaded',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            { type: 'link', attrs: { rel: 'canonical', href: canonicalHref } },
+          ],
+          html: '<main>Loaded article</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/loaded',
+    headers: {
+      host: ['reader.example'],
+      'x-forwarded-proto': ['https'],
+    },
+  });
+
+  assert.equal(resp.status, 200);
+  assert.match(
+    decodeBody(resp.body as Uint8Array),
+    /<link href="https:\/\/reader\.example\/articles\/loaded" rel="canonical">/,
+  );
+});
+
+test('FaceApp: strict CSP rejects cross-origin absolute head links from the request origin', async () => {
+  let observedError: unknown;
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/cross-origin',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://syndicated.example/articles/original',
+              },
+            },
+          ],
+          html: '<main>Cross-origin article</main>',
+        }),
+      },
+    ],
+    observability: {
+      onError: (err) => {
+        observedError = err;
+      },
+    },
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/cross-origin',
+    headers: {
+      host: ['reader.example'],
+      'x-forwarded-proto': ['https'],
+    },
+  });
+
+  assert.equal(resp.status, 500);
+  assert.match(
+    observedError instanceof Error ? observedError.message : '',
+    /strict CSP link href URL resolved cross-origin/,
+  );
+});
+
+test('FaceApp: strict CSP continues to allow relative head links', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/articles/relative',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: { rel: 'canonical', href: '/articles/relative' },
+            },
+          ],
+          html: '<main>Relative article</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/articles/relative',
+  });
+
+  assert.equal(resp.status, 200);
+  assert.match(
+    decodeBody(resp.body as Uint8Array),
+    /<link href="\/articles\/relative" rel="canonical">/,
+  );
+});
+
 test('FaceApp: typed FaceModule load data flows into render', async () => {
   type ProfileData = {
     name: string;
