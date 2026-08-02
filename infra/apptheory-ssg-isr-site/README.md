@@ -35,6 +35,12 @@ npm test
 npm run synth
 ```
 
+`./.npmrc` sets npm's `allow-remote=root` policy for npm 12 compatibility
+(npm 12 defaults to `allow-remote=none` and refuses the pinned
+AppTheory/TableTheory release-tarball dependencies with EALLOWREMOTE).
+That is intentionally narrower than `all`: only the URL dependencies
+declared by this package's `package.json` may be fetched.
+
 ## Deployment Notes
 
 - Use the canonical AWS deployment and operations docs for routing, cache, and smoke-test expectations.

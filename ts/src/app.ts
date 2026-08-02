@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
 import { utf8 } from './bytes.js';
-import { renderFaceHead } from './head.js';
+import {
+  renderFaceHead,
+  StrictCspAllowedOriginRequiredError,
+} from './head.js';
 import {
   renderHTMLDocument,
   streamHTMLDocument,
@@ -24,6 +27,7 @@ import {
   type FaceRequestCompletedLogRecord,
   type FaceStreamErrorLogRecord,
 } from './ops.js';
+import { normalizeTrailingDnsRootDotHostname } from './origin.js';
 import {
   buildStrictCspHeader,
   requiresStrictCspDocumentValidation,
@@ -726,11 +730,18 @@ function normalizeRequest(req: FaceRequest): Required<FaceRequest> {
   };
 }
 
+interface RequestAllowedOrigin {
+  origin?: string;
+  missingHint: string;
+}
+
 function allowedOriginForRequest(
   req: Readonly<Required<FaceRequest>>,
   canonicalOrigin: string | undefined,
-): string | undefined {
-  if (canonicalOrigin !== undefined) return canonicalOrigin;
+): RequestAllowedOrigin {
+  if (canonicalOrigin !== undefined) {
+    return { origin: canonicalOrigin, missingHint: '' };
+  }
 
   const cloudFrontProto = firstCommaSeparatedHeaderValue(
     req,
@@ -741,7 +752,17 @@ function allowedOriginForRequest(
     'x-facetheory-original-host',
   );
   if (faceTheoryOriginalHost) {
-    return httpOriginFromParts(cloudFrontProto, faceTheoryOriginalHost);
+    const origin = httpOriginFromParts(
+      cloudFrontProto,
+      faceTheoryOriginalHost,
+    );
+    return origin
+      ? { origin, missingHint: '' }
+      : {
+          missingHint: cloudFrontProto
+            ? 'The trusted x-facetheory-original-host and cloudfront-forwarded-proto headers did not form a valid http(s) origin; configure canonicalOrigin or correct the trusted header pair.'
+            : 'The trusted x-facetheory-original-host header is present, but cloudfront-forwarded-proto is missing; configure canonicalOrigin or restore the complete trusted header pair.',
+        };
   }
 
   const appTheoryOriginalHost = firstCommaSeparatedHeaderValue(
@@ -749,7 +770,14 @@ function allowedOriginForRequest(
     'x-apptheory-original-host',
   );
   if (appTheoryOriginalHost) {
-    return httpOriginFromParts(cloudFrontProto, appTheoryOriginalHost);
+    const origin = httpOriginFromParts(cloudFrontProto, appTheoryOriginalHost);
+    return origin
+      ? { origin, missingHint: '' }
+      : {
+          missingHint: cloudFrontProto
+            ? 'The trusted x-apptheory-original-host and cloudfront-forwarded-proto headers did not form a valid http(s) origin; configure canonicalOrigin or correct the trusted header pair.'
+            : 'The trusted x-apptheory-original-host header is present, but cloudfront-forwarded-proto is missing; configure canonicalOrigin or restore the complete trusted header pair.',
+        };
   }
 
   // Generic forwarding headers are safe only when a trusted proxy strips or
@@ -764,9 +792,15 @@ function allowedOriginForRequest(
     req,
     'x-forwarded-host',
   );
-  const host = forwardedHost || String(req.headers.host?.[0] ?? '').trim();
-
-  return httpOriginFromParts(forwardedProto, host);
+  const host =
+    forwardedHost || rightmostCommaSeparatedHeaderValue(req, 'host');
+  const origin = httpOriginFromParts(forwardedProto, host);
+  return origin
+    ? { origin, missingHint: '' }
+    : {
+        missingHint:
+          'No trusted request origin could be derived; configure canonicalOrigin or provide a complete trusted host/protocol header pair.',
+      };
 }
 
 function firstCommaSeparatedHeaderValue(
@@ -780,7 +814,8 @@ function rightmostCommaSeparatedHeaderValue(
   req: Readonly<Required<FaceRequest>>,
   name: string,
 ): string {
-  return String(req.headers[name]?.[0] ?? '').split(',').at(-1)?.trim() ?? '';
+  const flattened = (req.headers[name] ?? []).map(String).join(',');
+  return flattened.split(',').at(-1)?.trim() ?? '';
 }
 
 function normalizeCanonicalOrigin(
@@ -822,6 +857,7 @@ function httpOriginFromUrl(value: string): string | undefined {
     ) {
       return undefined;
     }
+    if (!normalizeTrailingDnsRootDotHostname(url)) return undefined;
     return url.origin;
   } catch {
     return undefined;
@@ -1117,10 +1153,25 @@ async function toHTTPResponse(
   applyStrictCspResponseHeader(headers, out.csp, req.cspNonce);
 
   const allowedOrigin = allowedOriginForRequest(req, canonicalOrigin);
-  const head = renderFaceHead(out, {
-    cspNonce: req.cspNonce,
-    ...(allowedOrigin ? { allowedOrigin } : {}),
-  });
+  let head: string;
+  try {
+    head = renderFaceHead(out, {
+      cspNonce: req.cspNonce,
+      ...(allowedOrigin.origin
+        ? { allowedOrigin: allowedOrigin.origin }
+        : {}),
+    });
+  } catch (error) {
+    if (
+      error instanceof StrictCspAllowedOriginRequiredError &&
+      !allowedOrigin.origin
+    ) {
+      throw new StrictCspAllowedOriginRequiredError(
+        `${error.message}. ${allowedOrigin.missingHint}`,
+      );
+    }
+    throw error;
+  }
   const documentParts = withDocumentShell(out);
 
   if (typeof out.html === 'string') {

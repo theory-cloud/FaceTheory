@@ -170,6 +170,7 @@ export async function buildSsgSite(
   await mkdir(outDir, { recursive: true });
 
   const strictHydrationSidecars = new Map<string, SsgHydrationSidecar>();
+  const renderErrorsByPath = new Map<string, unknown>();
   const app = createFaceApp({
     faces: withSsgStrictHydrationSidecars(
       options.faces,
@@ -178,6 +179,13 @@ export async function buildSsgSite(
     ...(options.canonicalOrigin !== undefined
       ? { canonicalOrigin: options.canonicalOrigin }
       : {}),
+    observability: {
+      onError: (error, context) => {
+        if (context.mode === 'ssg' && context.phase === 'render') {
+          renderErrorsByPath.set(context.path, error);
+        }
+      },
+    },
   });
   const plannedPages = await planSsgPages(options.faces);
 
@@ -205,6 +213,11 @@ export async function buildSsgSite(
           ...(previousEntry !== undefined ? { previousEntry } : {}),
           allowNetwork,
           hasFetchOverride: fetchImpl !== undefined,
+          takeRenderError: () => {
+            const error = renderErrorsByPath.get(page.path);
+            renderErrorsByPath.delete(page.path);
+            return error;
+          },
         });
       }),
   );
@@ -350,6 +363,7 @@ async function buildSsgPage(options: {
   previousEntry?: SsgPageEntry;
   allowNetwork: boolean;
   hasFetchOverride: boolean;
+  takeRenderError: () => unknown;
 }): Promise<SsgPageBuildOutcome> {
   const {
     app,
@@ -362,11 +376,19 @@ async function buildSsgPage(options: {
     previousEntry,
     allowNetwork,
     hasFetchOverride,
+    takeRenderError,
   } = options;
 
   try {
     const response = await app.handle({ method: 'GET', path: page.path });
     if (response.status >= 500) {
+      const renderError = takeRenderError();
+      if (renderError !== undefined) {
+        throw new SsgRouteBuildError(
+          `SSG route "${page.path}" failed during render: ${errorMessage(renderError)}`,
+          response.status,
+        );
+      }
       const networkHint =
         !allowNetwork && !hasFetchOverride
           ? ' Network access is disabled by default during SSG; mock fetch or set allowNetwork:true.'

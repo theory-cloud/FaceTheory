@@ -471,6 +471,55 @@ test('head: strict CSP allows same-origin relative and absolute script src/link 
   assert.ok(absoluteHead.includes('href="https://app.example/assets/app.css"'));
 });
 
+test('head: strict CSP normalizes a dotted allowed origin for dotted and dotless URLs', () => {
+  for (const href of [
+    'https://real.example./articles/canonical',
+    'https://real.example/articles/canonical',
+  ]) {
+    const head = renderFaceHead(
+      {
+        html: '<div>ok</div>',
+        csp: {
+          inlineScripts: false,
+          inlineStyles: false,
+          rawHead: false,
+        },
+        headTags: [{ type: 'link', attrs: { rel: 'canonical', href } }],
+      },
+      { allowedOrigin: 'https://real.example.' },
+    );
+
+    assert.ok(head.includes(`href="${href}"`));
+  }
+});
+
+test('head: strict CSP rejects a second trailing DNS root dot on both origins', () => {
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://real.example../x',
+              },
+            },
+          ],
+        },
+        { allowedOrigin: 'https://real.example..' },
+      ),
+    /link href URL is invalid/,
+  );
+});
+
 test('head: strict CSP rejects unsafe and canonical cross-origin script src/link href URLs', () => {
   const csp = {
     inlineScripts: false,
