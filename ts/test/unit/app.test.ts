@@ -368,6 +368,41 @@ test('FaceApp: rejects a second trailing DNS root dot in a canonical URL', async
   assert.equal(resp.status, 500);
 });
 
+test('FaceApp: rejects a second trailing DNS root dot in the request host', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/x',
+        mode: 'ssr',
+        render: () => ({
+          csp: { inlineScripts: false, inlineStyles: false, rawHead: false },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://real.example./x',
+              },
+            },
+          ],
+          html: '<main>Double trailing DNS root dot in request host</main>',
+        }),
+      },
+    ],
+  });
+
+  const resp = await app.handle({
+    method: 'GET',
+    path: '/x',
+    headers: {
+      'cloudfront-forwarded-proto': ['https'],
+      'x-facetheory-original-host': ['real.example..'],
+    },
+  });
+
+  assert.equal(resp.status, 500);
+});
+
 test('FaceApp: trailing-dot normalization still rejects a cross-host canonical URL', async () => {
   const app = createFaceApp({
     faces: [
