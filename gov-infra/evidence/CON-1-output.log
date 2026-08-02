@@ -1,6 +1,6 @@
 Verifier: gov_check_consistency
-Repository: /tmp/facetheory-aws-sdk-cdk-json-20260730
+Repository: /tmp/facetheory-the2803-rubric-uhyzr17p/FaceTheory
 Rubric ID: CON-1
 
-version-alignment: PASS (4.0.2)
+version-alignment: PASS (4.0.3)
 go-version-pin: PASS (go1.26.5)

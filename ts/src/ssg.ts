@@ -23,6 +23,8 @@ export type SsgTrailingSlashPolicy = 'always' | 'never';
 export interface BuildSsgSiteOptions {
   faces: FaceModule[];
   outDir: string;
+  /** Public origin used to validate absolute head URLs during prerendering. */
+  canonicalOrigin?: string | URL;
   clean?: boolean;
   concurrency?: number;
   incremental?: boolean;
@@ -173,6 +175,9 @@ export async function buildSsgSite(
       options.faces,
       strictHydrationSidecars,
     ),
+    ...(options.canonicalOrigin !== undefined
+      ? { canonicalOrigin: options.canonicalOrigin }
+      : {}),
   });
   const plannedPages = await planSsgPages(options.faces);
 

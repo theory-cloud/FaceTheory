@@ -12,13 +12,19 @@
     "synth": "tsx scripts/synth.ts"
   },
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v2.0.2/theory-cloud-apptheory-2.0.2.tgz",
-    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v2.0.2/theory-cloud-apptheory-cdk-2.0.2.tgz",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v3.0.0/theory-cloud-apptheory-3.0.0.tgz",
+    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v3.0.0/theory-cloud-apptheory-cdk-3.0.0.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.2/theory-cloud-tabletheory-ts-3.0.2.tgz",
     "@types/node": "^24.12.4",
-    "aws-cdk-lib": "2.262.2",
+    "aws-cdk-lib": "2.263.0",
     "constructs": "10.8.0",
     "esbuild": "^0.28.1",
     "tsx": "^4.22.3",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@theory-cloud/apptheory": {
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.2/theory-cloud-tabletheory-ts-3.0.2.tgz"
+    }
   }
 }
