@@ -57,6 +57,14 @@ npm run example:vite:svelte:build && npm run example:vite:svelte:serve
 
 Breaking an example without fixing the example in the same commit is a regression.
 
+### Infrastructure snapshot tests
+
+Changes under `ts/src` that are reachable from an infrastructure bundle can stale
+the synthesized-template snapshots. Run `make infra-snapshot-test` to verify them.
+To regenerate stale snapshots, run `make ts-build`, then run `npm run test:update`
+in each affected package under `infra/apptheory-ssr-site` or
+`infra/apptheory-ssg-isr-site`, and commit the regenerated snapshots.
+
 ### Authoring documentation
 
 Documentation lives under `docs/` and is published through GitHub Pages at <https://facetheory.theorycloud.ai/>. The site is a Jekyll build configured in `docs/_config.yml`; the framework-agnostic chrome (layouts, includes, CSS, JS) is shared across Theory Cloud frameworks.
