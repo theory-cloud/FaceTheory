@@ -1,4 +1,5 @@
 import { escapeHTML, renderAttributes, safeJson } from './html.js';
+import { normalizeTrailingDnsRootDotHostname } from './origin.js';
 import type {
   FaceAttributes,
   FaceCspPolicy,
@@ -191,6 +192,10 @@ function assertStrictSameOriginUrl(
     throw new Error(
       `FaceTheory strict CSP ${label} URL must be http(s) or same-origin: ${trimmed}`,
     );
+  }
+
+  if (!normalizeTrailingDnsRootDotHostname(parsed)) {
+    throw new Error(`FaceTheory strict CSP ${label} URL is invalid: ${trimmed}`);
   }
 
   if (!allowedOrigin) {
