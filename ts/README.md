@@ -17,6 +17,12 @@ Install the peers that match your adapter surface:
 - Vue: `npm install vue @vue/server-renderer`
 - Svelte: `npm install svelte@^5.55.7`
 
+Contributors working in this repo: `ts/.npmrc` sets npm's `allow-remote=root`
+policy for npm 12 compatibility (npm 12 defaults to `allow-remote=none` and
+refuses the pinned AppTheory/TableTheory release-tarball dependencies with
+EALLOWREMOTE). That is intentionally narrower than `all`: only the URL
+dependencies declared by `ts/package.json` may be fetched.
+
 ## Packaging Posture
 
 FaceTheory is ESM-only. Import it from ESM Lambda handlers, Vite SSR entries, or bundlers; CommonJS `require()` callers should expect `ERR_REQUIRE_ESM` and should migrate to ESM or use dynamic `import()` at the boundary.
