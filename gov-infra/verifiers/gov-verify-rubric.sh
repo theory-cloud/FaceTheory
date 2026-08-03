@@ -353,9 +353,27 @@ gov_check_quality() {
 }
 
 gov_check_consistency() {
+  local failures=0
+  local materialized_surface
   require_cmd_or_blocked python3 || return $?
   scripts/verify-version-alignment.sh
   run_with_pinned_go_toolchain scripts/verify-go-version-pin.sh
+
+  for materialized_surface in \
+    ".codex/steward.md" \
+    ".codex/theorymcp/" \
+    ".theorymcp/"; do
+    if git -C "${REPO_ROOT}" ls-files --error-unmatch -- "${materialized_surface}" >/dev/null 2>&1; then
+      echo "FAIL: TheoryCloud materialization must not be tracked: ${materialized_surface}"
+      failures=$((failures + 1))
+    fi
+    if ! git -C "${REPO_ROOT}" check-ignore -q -- "${materialized_surface}"; then
+      echo "FAIL: TheoryCloud materialization must be covered by .gitignore: ${materialized_surface}"
+      failures=$((failures + 1))
+    fi
+  done
+
+  [[ ${failures} -eq 0 ]]
 }
 
 gov_check_completeness() {
