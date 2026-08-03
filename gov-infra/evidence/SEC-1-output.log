@@ -1,8 +1,11 @@
 Verifier: gov_check_security
-Repository: /tmp/facetheory-the2803-rubric-uhyzr17p/FaceTheory
+Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
 Rubric ID: SEC-1
 
+npm-audit: ALLOW (ts) brace-expansion via GHSA-rgw5-rvv9-x895
 npm-audit: PASS (ts)
+npm-audit: ALLOW (infra/apptheory-ssr-site) brace-expansion via GHSA-rgw5-rvv9-x895
 npm-audit: PASS (infra/apptheory-ssr-site)
+npm-audit: ALLOW (infra/apptheory-ssg-isr-site) brace-expansion via GHSA-rgw5-rvv9-x895
 npm-audit: PASS (infra/apptheory-ssg-isr-site)
 workflow-action-pins: PASS

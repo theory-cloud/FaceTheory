@@ -1,6 +1,6 @@
 Verifier: gov_check_consistency
-Repository: /tmp/facetheory-the2803-rubric-uhyzr17p/FaceTheory
+Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
 Rubric ID: CON-1
 
-version-alignment: PASS (4.0.3)
+version-alignment: PASS (4.0.5)
 go-version-pin: PASS (go1.26.5)
