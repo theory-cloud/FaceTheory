@@ -1,5 +1,5 @@
 Verifier: gov_check_compliance
-Repository: /tmp/facetheory-the2803-rubric-uhyzr17p/FaceTheory
+Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
 Rubric ID: CMP-1
 
 ci-rubric: PASS
