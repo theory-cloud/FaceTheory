@@ -29,6 +29,7 @@ ts/*.tgz
 .mcp.json
 .claude
 .agents/
+.kimi-code/
 GEMINI.md
 
 # Jekyll docs build artifacts (GitHub Pages site under docs/)

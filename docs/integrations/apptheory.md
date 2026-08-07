@@ -22,14 +22,14 @@ FaceTheory imports from AppTheory; AppTheory does not import from FaceTheory. Cr
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v3.0.1/theory-cloud-apptheory-3.0.1.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v3.0.2/theory-cloud-apptheory-3.0.2.tgz
 ```
 
 For CDK deployments add the CDK companion tarball:
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v3.0.1/theory-cloud-apptheory-cdk-3.0.1.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v3.0.2/theory-cloud-apptheory-cdk-3.0.2.tgz
 ```
 
 ## The AppTheory entry point
