@@ -42,3 +42,4 @@ docs/.bundle/
 # Local TheoryCloud agent materialization
 .claude/
 .theorymcp/
+AGENTS.md
