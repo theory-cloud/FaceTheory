@@ -275,6 +275,7 @@ check_gov_docs() {
   require_cmd_or_blocked python3 || return $?
   python3 <<'PY'
 from pathlib import Path
+import subprocess
 import sys
 
 failures = []
@@ -289,11 +290,6 @@ checks = {
         "govern_lifecycle_turn",
         "bc41187efb6f5b3c3bfb4d9295836d4e071941d7",
     ],
-    "AGENTS.md": [
-        "GEMINI.md is intentionally absent",
-        "theorycloud_governance_profile.v0.1",
-        "software_repo_gov_infra",
-    ],
 }
 for path, needles in checks.items():
     file_path = Path(path)
@@ -305,8 +301,61 @@ for path, needles in checks.items():
         if needle not in text:
             failures.append(f"{path}: missing {needle!r}")
 
-if Path("GEMINI.md").exists():
-    failures.append("GEMINI.md must remain absent; the absence is the documented decision")
+# TACTICAL (replaced-by-wave): materialization fidelity, see factory docs/049
+# AGENTS.md and GEMINI.md are materialized content, not tracked state. A CI
+# checkout contains only tracked files, so on-disk-existence assertions on
+# materialized paths are not merge-order independent: an untracked gitignored
+# AGENTS.md is always absent in CI post-untrack, and a locally materialized
+# GEMINI.md is always present locally. The rules below keep the committed-state
+# decisions while passing in either state:
+# - AGENTS.md: PASS when it exists on disk (local materialization or pre-untrack
+#   tracked state; content claims are then verified) OR a .gitignore rule covers
+#   it. FAIL only when neither holds.
+# - GEMINI.md: PASS when absent on disk (CI / not materialized) OR present only
+#   as untracked, gitignored materialization. FAIL when tracked, or present
+#   without a .gitignore rule covering it.
+gitignore_lines = [
+    line.strip()
+    for line in Path(".gitignore").read_text(encoding="utf-8").splitlines()
+]
+
+def gitignore_covers(name):
+    return name in gitignore_lines or f"/{name}" in gitignore_lines
+
+def git_tracked(name):
+    return (
+        subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", name],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    )
+
+agents_md = Path("AGENTS.md")
+agents_md_needles = [
+    "GEMINI.md is intentionally absent",
+    "theorycloud_governance_profile.v0.1",
+    "software_repo_gov_infra",
+]
+if agents_md.is_file():
+    text = agents_md.read_text(encoding="utf-8")
+    for needle in agents_md_needles:
+        if needle not in text:
+            failures.append(f"AGENTS.md: missing {needle!r}")
+elif not gitignore_covers("AGENTS.md"):
+    failures.append("missing AGENTS.md and no .gitignore rule covers AGENTS.md")
+else:
+    print(
+        "SKIP (replaced-by-wave): AGENTS.md materialized/absent in CI; "
+        "content claims pending relocation to a tracked gov-infra surface"
+    )
+
+gemini_md = Path("GEMINI.md")
+if git_tracked("GEMINI.md"):
+    failures.append("GEMINI.md must remain untracked; the absence from tracked state is the documented decision")
+elif gemini_md.exists() and not gitignore_covers("GEMINI.md"):
+    failures.append("GEMINI.md present on disk without a .gitignore rule covering it")
 if "GEMINI.md" not in Path(".gitignore").read_text(encoding="utf-8"):
     failures.append(".gitignore must continue to ignore local GEMINI.md materialization")
 
