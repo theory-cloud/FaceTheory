@@ -5,6 +5,16 @@
 #
 # Usage from repository root:
 #   bash gov-infra/verifiers/gov-verify-rubric.sh
+#
+# Exit codes:
+#   0 - All rubric items PASS
+#   1 - One or more rubric items FAIL or BLOCKED
+#   2 - Script error (missing dependencies, invalid config, etc.)
+#
+# Provenance note: git_head is emitted only when this repository is the resolved
+# Git worktree root and HEAD is a 40-hex SHA-1 object ID. It is omitted when
+# git/the intended Git tree is unavailable and in SHA-256 object-format
+# repositories, whose longer object IDs are not yet in the schema.
 
 set -euo pipefail
 
@@ -38,50 +48,6 @@ repo_relative_path() {
   fi
 }
 
-is_valid_report_timestamp() {
-  local value="$1"
-  [[ "${value}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || return 1
-  python3 - "${value}" <<'PY'
-from datetime import datetime
-import sys
-value = sys.argv[1]
-try:
-    parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
-except ValueError:
-    sys.exit(1)
-if parsed.strftime("%Y-%m-%dT%H:%M:%SZ") != value:
-    sys.exit(1)
-PY
-}
-
-read_existing_report_timestamp() {
-  [[ -f "${REPORT_PATH}" ]] || return 0
-  python3 - "${REPORT_PATH}" <<'PY'
-import json
-import sys
-from pathlib import Path
-try:
-    value = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8")).get("timestamp", "")
-except Exception:
-    value = ""
-if isinstance(value, str):
-    print(value)
-PY
-}
-
-select_report_timestamp() {
-  local supplied="${GOV_REPORT_TIMESTAMP:-}"
-  local existing=""
-  existing="$(read_existing_report_timestamp 2>/dev/null || true)"
-  if is_valid_report_timestamp "${supplied}" 2>/dev/null; then
-    printf '%s' "${supplied}"
-  elif is_valid_report_timestamp "${existing}" 2>/dev/null; then
-    printf '%s' "${existing}"
-  else
-    date -u +%Y-%m-%dT%H:%M:%SZ
-  fi
-}
-
 read_pack_field() {
   local field="$1"
   python3 - "${GOV_INFRA}/pack.json" "${field}" <<'PY'
@@ -103,6 +69,17 @@ require_cmd_or_blocked() {
   local name="$1"
   if ! command -v "${name}" >/dev/null 2>&1; then
     echo "BLOCKED: missing required tool: ${name}" >&2
+    return 2
+  fi
+}
+
+require_intended_git_worktree_or_blocked() {
+  require_cmd_or_blocked git || return $?
+
+  local git_toplevel
+  git_toplevel="$(git -C "${REPO_ROOT}" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -z "${git_toplevel}" || "${git_toplevel}" != "${REPO_ROOT}" ]]; then
+    echo "BLOCKED: repository root is not the intended Git worktree root" >&2
     return 2
   fi
 }
@@ -275,6 +252,7 @@ check_gov_docs() {
   require_cmd_or_blocked python3 || return $?
   python3 <<'PY'
 from pathlib import Path
+import subprocess
 import sys
 
 failures = []
@@ -289,11 +267,6 @@ checks = {
         "govern_lifecycle_turn",
         "bc41187efb6f5b3c3bfb4d9295836d4e071941d7",
     ],
-    "AGENTS.md": [
-        "GEMINI.md is intentionally absent",
-        "theorycloud_governance_profile.v0.1",
-        "software_repo_gov_infra",
-    ],
 }
 for path, needles in checks.items():
     file_path = Path(path)
@@ -305,8 +278,61 @@ for path, needles in checks.items():
         if needle not in text:
             failures.append(f"{path}: missing {needle!r}")
 
-if Path("GEMINI.md").exists():
-    failures.append("GEMINI.md must remain absent; the absence is the documented decision")
+# TACTICAL (replaced-by-wave): materialization fidelity, see factory docs/049
+# AGENTS.md and GEMINI.md are materialized content, not tracked state. A CI
+# checkout contains only tracked files, so on-disk-existence assertions on
+# materialized paths are not merge-order independent: an untracked gitignored
+# AGENTS.md is always absent in CI post-untrack, and a locally materialized
+# GEMINI.md is always present locally. The rules below keep the committed-state
+# decisions while passing in either state:
+# - AGENTS.md: PASS when it exists on disk (local materialization or pre-untrack
+#   tracked state; content claims are then verified) OR a .gitignore rule covers
+#   it. FAIL only when neither holds.
+# - GEMINI.md: PASS when absent on disk (CI / not materialized) OR present only
+#   as untracked, gitignored materialization. FAIL when tracked, or present
+#   without a .gitignore rule covering it.
+gitignore_lines = [
+    line.strip()
+    for line in Path(".gitignore").read_text(encoding="utf-8").splitlines()
+]
+
+def gitignore_covers(name):
+    return name in gitignore_lines or f"/{name}" in gitignore_lines
+
+def git_tracked(name):
+    return (
+        subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", name],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    )
+
+agents_md = Path("AGENTS.md")
+agents_md_needles = [
+    "GEMINI.md is intentionally absent",
+    "theorycloud_governance_profile.v0.1",
+    "software_repo_gov_infra",
+]
+if agents_md.is_file():
+    text = agents_md.read_text(encoding="utf-8")
+    for needle in agents_md_needles:
+        if needle not in text:
+            failures.append(f"AGENTS.md: missing {needle!r}")
+elif not gitignore_covers("AGENTS.md"):
+    failures.append("missing AGENTS.md and no .gitignore rule covers AGENTS.md")
+else:
+    print(
+        "SKIP (replaced-by-wave): AGENTS.md materialized/absent in CI; "
+        "content claims pending relocation to a tracked gov-infra surface"
+    )
+
+gemini_md = Path("GEMINI.md")
+if git_tracked("GEMINI.md"):
+    failures.append("GEMINI.md must remain untracked; the absence from tracked state is the documented decision")
+elif gemini_md.exists() and not gitignore_covers("GEMINI.md"):
+    failures.append("GEMINI.md present on disk without a .gitignore rule covering it")
 if "GEMINI.md" not in Path(".gitignore").read_text(encoding="utf-8"):
     failures.append(".gitignore must continue to ignore local GEMINI.md materialization")
 
@@ -355,6 +381,7 @@ gov_check_quality() {
 gov_check_consistency() {
   local failures=0
   local materialized_surface
+  require_intended_git_worktree_or_blocked || return $?
   require_cmd_or_blocked python3 || return $?
   scripts/verify-version-alignment.sh
   run_with_pinned_go_toolchain scripts/verify-go-version-pin.sh
@@ -406,6 +433,7 @@ gov_check_maintainability() {
 }
 
 gov_check_docs() {
+  require_intended_git_worktree_or_blocked || return $?
   check_gov_docs
 }
 
@@ -414,7 +442,19 @@ FAIL_COUNT=0
 BLOCKED_COUNT=0
 PACK_VERSION="$(read_pack_field packVersion)"
 PACK_DIGEST="$(read_pack_field packDigest)"
-REPORT_TIMESTAMP="$(select_report_timestamp)"
+REPORT_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+REPORT_GIT_HEAD=""
+if command -v git >/dev/null 2>&1; then
+  REPORT_GIT_HEAD_CANDIDATE="$(git rev-parse --verify HEAD 2>/dev/null || true)"
+  REPORT_GIT_TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ "${REPORT_GIT_TOPLEVEL}" == "${REPO_ROOT}" && "${REPORT_GIT_HEAD_CANDIDATE}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    REPORT_GIT_HEAD="${REPORT_GIT_HEAD_CANDIDATE}"
+  fi
+fi
+REPORT_GIT_HEAD_JSON=""
+if [[ -n "${REPORT_GIT_HEAD}" ]]; then
+  printf -v REPORT_GIT_HEAD_JSON '  "git_head": "%s",\n' "${REPORT_GIT_HEAD}"
+fi
 declare -a RESULTS=()
 
 record_result() {
@@ -485,6 +525,7 @@ write_report() {
     printf '  "$schema": "%s",\n' "$(json_escape "${REPORT_SCHEMA_URI}")"
     printf '  "schemaVersion": "%s",\n' "$(json_escape "${REPORT_SCHEMA_VERSION}")"
     printf '  "timestamp": "%s",\n' "$(json_escape "${REPORT_TIMESTAMP}")"
+    printf '%s' "${REPORT_GIT_HEAD_JSON}"
     printf '  "pack": {"version": "%s", "digest": "%s"},\n' "$(json_escape "${PACK_VERSION}")" "$(json_escape "${PACK_DIGEST}")"
     printf '  "project": {"name": "FaceTheory", "slug": "facetheory"},\n'
     printf '  "summary": {"status": "%s", "pass": %d, "fail": %d, "blocked": %d},\n' "${status}" "${PASS_COUNT}" "${FAIL_COUNT}" "${BLOCKED_COUNT}"
@@ -515,20 +556,25 @@ schema_uri = sys.argv[2]
 report = json.loads(report_path.read_text(encoding="utf-8"))
 errors = []
 
-allowed_top = {"$schema", "schemaVersion", "timestamp", "pack", "project", "summary", "results"}
+required_top = {"$schema", "schemaVersion", "timestamp", "pack", "project", "summary", "results"}
+allowed_top = required_top | {"git_head"}
 allowed_result = {"id", "category", "status", "message", "evidencePath"}
 allowed_categories = {
     "Quality", "Consistency", "Completeness", "Security", "Compliance", "Maintainability", "Docs"
 }
 expected_ids = ["QUA-1", "CON-1", "COM-1", "SEC-1", "CMP-1", "MAI-1", "DOC-1"]
-if set(report) != allowed_top:
-    errors.append(f"top-level keys must be exactly {sorted(allowed_top)}, got {sorted(report)}")
+if not required_top.issubset(report) or not set(report).issubset(allowed_top):
+    errors.append(
+        f"top-level keys must include {sorted(required_top)} and may include git_head; got {sorted(report)}"
+    )
 if report.get("$schema") != schema_uri:
     errors.append("$schema mismatch")
 if report.get("schemaVersion") != "gov_rubric_report.v1":
     errors.append("schemaVersion must be gov_rubric_report.v1")
 if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", str(report.get("timestamp", ""))):
     errors.append("timestamp must be UTC seconds precision")
+if "git_head" in report and not re.fullmatch(r"[0-9a-fA-F]{40}", str(report["git_head"])):
+    errors.append("git_head must be a 40-hex SHA-1 object ID when present")
 pack = report.get("pack")
 if not isinstance(pack, dict) or set(pack) != {"version", "digest"}:
     errors.append("pack must contain exactly version and digest")
