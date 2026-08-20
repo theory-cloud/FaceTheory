@@ -74,9 +74,9 @@ Packaging posture: FaceTheory is ESM-only, declares `sideEffects: false` after a
 
 Optional companion packages from pinned GitHub releases:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v3.0.2/theory-cloud-apptheory-3.0.2.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v3.0.2/theory-cloud-apptheory-cdk-3.0.2.tgz`
-- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v3.0.4/theory-cloud-tabletheory-ts-3.0.4.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v3.1.0/theory-cloud-apptheory-3.1.0.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v3.1.0/theory-cloud-apptheory-cdk-3.1.0.tgz`
+- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v3.0.5/theory-cloud-tabletheory-ts-3.0.5.tgz`
 
 ## Quickstart
 
