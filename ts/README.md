@@ -2,10 +2,10 @@
 
 `@theory-cloud/facetheory` is a TypeScript runtime for three AWS-first server render modes (SSR, SSG, and blocking ISR) plus the SPA client runtime on Node.js `>=20`, with package exports for React, Vue, and Svelte adapters plus AppTheory and TableTheory integration surfaces.
 
-## Install v4.0.6 <!-- x-release-please-version -->
+## Install v4.0.7-rc <!-- x-release-please-version -->
 
 ```bash
-export FACETHEORY_VERSION=4.0.6 # x-release-please-version
+export FACETHEORY_VERSION=4.0.7-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -108,11 +108,11 @@ Every public subpath below is declared in `ts/package.json` and mirrored in `doc
 
 <!-- x-release-please-start-version -->
 
-- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v4.0.6/docs/getting-started.md)
-- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v4.0.6/docs/api-reference.md)
-- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v4.0.6/docs/core-patterns.md)
-- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v4.0.6/docs/testing-guide.md)
-- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v4.0.6/docs/cdk/README.md)
+- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v4.0.7-rc/docs/getting-started.md)
+- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v4.0.7-rc/docs/api-reference.md)
+- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v4.0.7-rc/docs/core-patterns.md)
+- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v4.0.7-rc/docs/testing-guide.md)
+- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v4.0.7-rc/docs/cdk/README.md)
 <!-- x-release-please-end -->
 
-The `v4.0.6` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->
+The `v4.0.7-rc` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->
