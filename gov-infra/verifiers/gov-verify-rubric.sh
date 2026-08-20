@@ -73,6 +73,17 @@ require_cmd_or_blocked() {
   fi
 }
 
+require_intended_git_worktree_or_blocked() {
+  require_cmd_or_blocked git || return $?
+
+  local git_toplevel
+  git_toplevel="$(git -C "${REPO_ROOT}" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -z "${git_toplevel}" || "${git_toplevel}" != "${REPO_ROOT}" ]]; then
+    echo "BLOCKED: repository root is not the intended Git worktree root" >&2
+    return 2
+  fi
+}
+
 file_sha256() {
   local file_path="$1"
   if command -v sha256sum >/dev/null 2>&1; then
@@ -370,6 +381,7 @@ gov_check_quality() {
 gov_check_consistency() {
   local failures=0
   local materialized_surface
+  require_intended_git_worktree_or_blocked || return $?
   require_cmd_or_blocked python3 || return $?
   scripts/verify-version-alignment.sh
   run_with_pinned_go_toolchain scripts/verify-go-version-pin.sh
