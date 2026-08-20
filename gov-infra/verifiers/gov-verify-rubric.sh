@@ -433,6 +433,7 @@ gov_check_maintainability() {
 }
 
 gov_check_docs() {
+  require_intended_git_worktree_or_blocked || return $?
   check_gov_docs
 }
 
