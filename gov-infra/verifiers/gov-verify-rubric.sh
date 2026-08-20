@@ -6,6 +6,11 @@
 # Usage from repository root:
 #   bash gov-infra/verifiers/gov-verify-rubric.sh
 #
+# Exit codes:
+#   0 - All rubric items PASS
+#   1 - One or more rubric items FAIL or BLOCKED
+#   2 - Script error (missing dependencies, invalid config, etc.)
+#
 # Provenance note: git_head is emitted only when this repository is the resolved
 # Git worktree root and HEAD is a 40-hex SHA-1 object ID. It is omitted when
 # git/the intended Git tree is unavailable and in SHA-256 object-format
