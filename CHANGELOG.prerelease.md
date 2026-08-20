@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.0.7-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.0.6...v4.0.7-rc) (2026-08-20)
+
+
+### Bug Fixes
+
+* **deps:** align AppTheory and TableTheory pins ([ff50017](https://github.com/theory-cloud/FaceTheory/commit/ff50017882b85d50cea955e210b5540c9e1d8b3f))
+* **deps:** align AppTheory v3.1.0 and TableTheory v3.0.5 pins ([10fc319](https://github.com/theory-cloud/FaceTheory/commit/10fc319e8de509b763779f53450a8a7b8d33b2c3))
+* **deps:** bump nanoid 3.3.16 -&gt; 3.3.18 for GHSA-2v37-7h3g-55p8 ([acc7268](https://github.com/theory-cloud/FaceTheory/commit/acc7268c4285a793a1980e44fb9dbdb910d0d70c))
+* **gov-infra:** block DOC-1 outside intended worktree ([9700d9c](https://github.com/theory-cloud/FaceTheory/commit/9700d9c5aae11f1df1e6fb0761a3ca974c76eb07))
+* **gov-infra:** block Git checks outside repo root ([27fc1e3](https://github.com/theory-cloud/FaceTheory/commit/27fc1e335edce6b9b6d7abb8dc09148a5b10389b))
+* **gov-infra:** make DOC-1 materialized-path assertions merge-order independent ([c5ee212](https://github.com/theory-cloud/FaceTheory/commit/c5ee2126e491e927d9b7b1187911a8dd0cd5b1bd))
+* **gov-infra:** refresh rubric report provenance ([dd0fcd4](https://github.com/theory-cloud/FaceTheory/commit/dd0fcd41243d6417d924a46ffd8f43fa8a992e8f))
+* materialization hygiene — untrack AGENTS.md, DOC-1 fidelity patch, nanoid bump ([fa47c14](https://github.com/theory-cloud/FaceTheory/commit/fa47c143f6e9912160c09fe9fd0981218e551d31))
+
 ## [4.0.6-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.0.5...v4.0.6-rc) (2026-08-07)
 
 
