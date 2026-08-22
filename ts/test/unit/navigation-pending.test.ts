@@ -506,6 +506,41 @@ test('navigation pending: skips form submits that never navigate this document',
       html: '<form action="/next" method="get" target="_self"><button>Go</button></form>',
       name: 'target _self still navigates this document',
     },
+    {
+      expectPending: false,
+      html: '<form action="/save" method="DIALOG"><button>Close</button></form>',
+      name: 'method dialog keyword is case-insensitive',
+    },
+    {
+      expectPending: true,
+      html: '<form action="/next" method="get" target="_SELF"><button>Go</button></form>',
+      name: 'target _self keyword is case-insensitive',
+    },
+    {
+      expectPending: false,
+      html: '<form action="/next" method="get" target="_BLANK"><button>Go</button></form>',
+      name: 'target blank keyword is case-insensitive',
+    },
+    {
+      expectPending: false,
+      html: '<form action="/save" method="dialog"><button formmethod="">Close</button></form>',
+      name: 'empty formmethod falls back to the form method',
+    },
+    {
+      expectPending: false,
+      html: '<form action="/next" method="get" target="_blank"><button formtarget="">Go</button></form>',
+      name: 'empty formtarget falls back to the form target',
+    },
+    {
+      expectPending: true,
+      html: '<form action="/save" method=" dialog "><button>Save</button></form>',
+      name: 'padded dialog method is not the dialog keyword',
+    },
+    {
+      expectPending: false,
+      html: '<form action="/next" method="get" target=" _self "><button>Go</button></form>',
+      name: 'padded _self target is not a same-document keyword',
+    },
   ];
 
   for (const classifiedCase of cases) {
@@ -611,6 +646,11 @@ test('navigation pending: served bootstrap source keeps form handling observe-on
       <form id="dialog-override" action="/save" method="post"><button formmethod="dialog">Close</button></form>
       <form id="new-tab" action="/next" method="get" target="_blank"><button>Go</button></form>
       <form id="framed" action="/next" method="get"><button formtarget="results-frame">Go</button></form>
+      <form id="dialog-uppercase" action="/save" method="DIALOG"><button>Close</button></form>
+      <form id="blank-uppercase" action="/next" method="get" target="_BLANK"><button>Go</button></form>
+      <form id="padded-target" action="/next" method="get" target=" _self "><button>Go</button></form>
+      <form id="self-uppercase" action="/next" method="get" target="_SELF"><button>Go</button></form>
+      <form id="padded-method" action="/save" method=" dialog "><button>Save</button></form>
     </body>`,
     {
       url: 'https://control.lab.theorymcp.ai/agents',
@@ -695,6 +735,18 @@ test('navigation pending: served bootstrap source keeps form handling observe-on
         form: doc.getElementById('framed') as HTMLFormElement,
         name: 'bootstrap submitter formtarget',
       },
+      {
+        form: doc.getElementById('dialog-uppercase') as HTMLFormElement,
+        name: 'bootstrap method DIALOG keyword is case-insensitive',
+      },
+      {
+        form: doc.getElementById('blank-uppercase') as HTMLFormElement,
+        name: 'bootstrap target _BLANK keyword is case-insensitive',
+      },
+      {
+        form: doc.getElementById('padded-target') as HTMLFormElement,
+        name: 'bootstrap padded _self target is not a same-document keyword',
+      },
     ];
     for (const skippedCase of skippedBootstrapCases) {
       const skippedSubmitter = skippedCase.form.querySelector('button');
@@ -728,6 +780,52 @@ test('navigation pending: served bootstrap source keeps form handling observe-on
         doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID),
         null,
         skippedCase.name,
+      );
+    }
+
+    // Keyword matching is case-insensitive but exact: an uppercase _SELF
+    // target still navigates this document, while a padded method is not the
+    // dialog keyword and resolves to the GET fallback navigation. The shipped
+    // bootstrap source marks both exactly like the TS module does.
+    const markedBootstrapCases: Array<{
+      form: HTMLFormElement;
+      name: string;
+    }> = [
+      {
+        form: doc.getElementById('self-uppercase') as HTMLFormElement,
+        name: 'bootstrap target _SELF keyword is case-insensitive',
+      },
+      {
+        form: doc.getElementById('padded-method') as HTMLFormElement,
+        name: 'bootstrap padded dialog method is not the dialog keyword',
+      },
+    ];
+    for (const markedCase of markedBootstrapCases) {
+      const markedSubmitter = markedCase.form.querySelector('button');
+      assert.ok(
+        markedSubmitter instanceof win.HTMLButtonElement,
+        markedCase.name,
+      );
+
+      const markedDispatched = markedCase.form.dispatchEvent(
+        new win.SubmitEvent('submit', {
+          bubbles: true,
+          cancelable: true,
+          submitter: markedSubmitter,
+        }),
+      );
+      assert.equal(markedDispatched, true, markedCase.name);
+
+      await flushMicrotasks();
+
+      assert.equal(
+        markedCase.form.getAttribute('data-facetheory-navigation-pending'),
+        'form',
+        markedCase.name,
+      );
+      assert.ok(
+        doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID),
+        markedCase.name,
       );
     }
 

@@ -26,7 +26,7 @@ const FORM_OPT_OUT_ATTR=${JSON.stringify(NAVIGATION_PENDING_FORM_OPT_OUT_ATTRIBU
 function sameOriginUrl(href){try{const url=new URL(href,window.location.href);return url.origin===window.location.origin?url:null;}catch{return null;}}
 function acceptedAnchor(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.altKey||event.ctrlKey||event.shiftKey)return null;const target=event.target instanceof Element?event.target.closest('a[href]'):null;if(!(target instanceof HTMLAnchorElement))return null;if(target.target&&target.target.toLowerCase()!=='_self')return null;if(target.hasAttribute('download')||target.hasAttribute('data-facetheory-reload'))return null;const rel=(target.getAttribute('rel')||'').toLowerCase().split(/\\s+/);if(rel.includes('external'))return null;const url=sameOriginUrl(target.href);if(!url||url.href===window.location.href)return null;return target;}
 function submitAttr(form,submitter,submitterName,formName){const override=submitter?submitter.getAttribute(submitterName):null;return override||form.getAttribute(formName)||'';}
-function navigatesSameDocument(form,submitter){if(submitAttr(form,submitter,'formmethod','method').trim().toLowerCase()==='dialog')return false;const target=submitAttr(form,submitter,'formtarget','target').trim().toLowerCase();return target===''||target==='_self';}
+function navigatesSameDocument(form,submitter){if(submitAttr(form,submitter,'formmethod','method').toLowerCase()==='dialog')return false;const target=submitAttr(form,submitter,'formtarget','target').toLowerCase();return target===''||target==='_self';}
 function isIndicator(el){return el instanceof HTMLElement&&el.getAttribute(INDICATOR_ATTR)==='true';}
 function indicatorElement(id){const existing=document.getElementById(id);if(isIndicator(existing))return existing;if(!existing){const el=document.createElement('div');el.id=id;return el;}for(let i=1;i<1000;i+=1){const candidate=id+'-'+String(i);const next=document.getElementById(candidate);if(isIndicator(next))return next;if(!next){const el=document.createElement('div');el.id=candidate;console.warn('FaceTheory navigation pending indicator id "'+id+'" already belongs to a non-indicator element; using "'+candidate+'" instead.');return el;}}throw new Error('FaceTheory navigation pending could not allocate indicator id');}
 function afterDispatch(fn){if(typeof queueMicrotask==='function'){queueMicrotask(fn);return;}if(typeof Promise==='function'){Promise.resolve().then(fn);return;}setTimeout(fn,0);}
@@ -457,7 +457,11 @@ function effectiveSubmitAttribute(
   formAttribute: string,
 ): string {
   // A submitter's formmethod/formtarget overrides the form's own attribute
-  // only when it is present and non-empty.
+  // only when it is present and non-empty. Per spec, attribute presence
+  // alone governs (a present-but-empty formmethod is the invalid-value
+  // default GET, not the form's method); falling back to the form attribute
+  // anyway is a deliberate conservative fallback — it errs toward not
+  // marking pending, so no stuck state can result.
   const override = submitter
     ? submitter.getAttribute(submitterAttribute)
     : null;
@@ -478,13 +482,13 @@ function submitNavigatesSameDocument(
     'formmethod',
     'method',
   );
-  if (method.trim().toLowerCase() === 'dialog') return false;
+  if (method.toLowerCase() === 'dialog') return false;
   const target = effectiveSubmitAttribute(
     form,
     submitter,
     'formtarget',
     'target',
   );
-  const normalizedTarget = target.trim().toLowerCase();
+  const normalizedTarget = target.toLowerCase();
   return normalizedTarget === '' || normalizedTarget === '_self';
 }
