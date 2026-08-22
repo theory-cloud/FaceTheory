@@ -822,7 +822,7 @@ export const CONTROL_PLANE_STYLESHEET = `${RESPONSIVE_PRIMITIVES_CSS}
   font-weight: 700;
 }
 
-.facetheory-navigation-pending-control[aria-busy='true'] {
+.facetheory-navigation-pending-control[data-facetheory-navigation-pending] {
   cursor: progress;
 }
 

@@ -23,7 +23,7 @@ Optional:
 Use the CLI from the pinned GitHub Release tarball to create an adapter-specific starter before hand-writing any hydration code:
 
 ```bash
-export FACETHEORY_VERSION=4.0.7-rc # x-release-please-version
+export FACETHEORY_VERSION=4.0.7 # x-release-please-version
 npx --package \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz" \
   facetheory create my-app --adapter react
@@ -49,7 +49,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=4.0.7-rc # x-release-please-version
+export FACETHEORY_VERSION=4.0.7 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -75,7 +75,7 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v3.1.0/theory-cloud-apptheory-3.1.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v3.3.0/theory-cloud-apptheory-3.3.0.tgz
 
 npm install --save-exact \
   https://github.com/theory-cloud/TableTheory/releases/download/v3.0.5/theory-cloud-tabletheory-ts-3.0.5.tgz
@@ -632,7 +632,7 @@ Important ISR default:
 
 ## Reference Bundle
 
-The `v4.0.7-rc` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v4.0.7` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples
