@@ -13,6 +13,8 @@ export const NAVIGATION_PENDING_REDUCED_MOTION_ATTRIBUTE =
   'data-facetheory-reduced-motion';
 export const NAVIGATION_PENDING_INDICATOR_ATTRIBUTE =
   'data-facetheory-navigation-pending-indicator';
+export const NAVIGATION_PENDING_FORM_OPT_OUT_ATTRIBUTE =
+  'data-facetheory-no-pending';
 export const DEFAULT_NAVIGATION_PENDING_INDICATOR_ID =
   'facetheory-navigation-pending';
 export const DEFAULT_NAVIGATION_PENDING_TEXT = 'Loading…';
@@ -20,12 +22,16 @@ export const DEFAULT_NAVIGATION_PENDING_TEXT = 'Loading…';
 export const NAVIGATION_PENDING_BOOTSTRAP_SOURCE = `const NAV_ATTR=${JSON.stringify(NAVIGATION_PENDING_ATTRIBUTE)};
 const INDICATOR_ATTR=${JSON.stringify(NAVIGATION_PENDING_INDICATOR_ATTRIBUTE)};
 const DEFAULT_INDICATOR_ID=${JSON.stringify(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID)};
+const FORM_OPT_OUT_ATTR=${JSON.stringify(NAVIGATION_PENDING_FORM_OPT_OUT_ATTRIBUTE)};
 function sameOriginUrl(href){try{const url=new URL(href,window.location.href);return url.origin===window.location.origin?url:null;}catch{return null;}}
 function acceptedAnchor(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.altKey||event.ctrlKey||event.shiftKey)return null;const target=event.target instanceof Element?event.target.closest('a[href]'):null;if(!(target instanceof HTMLAnchorElement))return null;if(target.target&&target.target.toLowerCase()!=='_self')return null;if(target.hasAttribute('download')||target.hasAttribute('data-facetheory-reload'))return null;const rel=(target.getAttribute('rel')||'').toLowerCase().split(/\\s+/);if(rel.includes('external'))return null;const url=sameOriginUrl(target.href);if(!url||url.href===window.location.href)return null;return target;}
+function submitAttr(form,submitter,submitterName,formName){const override=submitter?submitter.getAttribute(submitterName):null;return override||form.getAttribute(formName)||'';}
+function navigatesSameDocument(form,submitter){if(submitAttr(form,submitter,'formmethod','method').toLowerCase()==='dialog')return false;const target=submitAttr(form,submitter,'formtarget','target').toLowerCase();return target===''||target==='_self';}
 function isIndicator(el){return el instanceof HTMLElement&&el.getAttribute(INDICATOR_ATTR)==='true';}
 function indicatorElement(id){const existing=document.getElementById(id);if(isIndicator(existing))return existing;if(!existing){const el=document.createElement('div');el.id=id;return el;}for(let i=1;i<1000;i+=1){const candidate=id+'-'+String(i);const next=document.getElementById(candidate);if(isIndicator(next))return next;if(!next){const el=document.createElement('div');el.id=candidate;console.warn('FaceTheory navigation pending indicator id "'+id+'" already belongs to a non-indicator element; using "'+candidate+'" instead.');return el;}}throw new Error('FaceTheory navigation pending could not allocate indicator id');}
-function showPending(source,targets){for(const target of targets){target.setAttribute(NAV_ATTR,source);target.setAttribute('aria-busy','true');target.classList.add('facetheory-navigation-pending-control');}const el=indicatorElement(DEFAULT_INDICATOR_ID);el.textContent='Loading…';el.setAttribute('role','status');el.setAttribute('aria-live','polite');el.setAttribute('aria-atomic','true');el.setAttribute(NAV_ATTR,source);el.setAttribute(INDICATOR_ATTR,'true');el.classList.add('facetheory-navigation-pending-pill');if(!el.parentNode)(document.body||document.documentElement).appendChild(el);}
-function startNavigationPending(){document.addEventListener('click',event=>{const anchor=acceptedAnchor(event);if(anchor)showPending('link',[anchor]);});document.addEventListener('submit',event=>{const form=event.target instanceof HTMLFormElement?event.target:null;if(!form)return;const targets=[form];if(event.submitter instanceof HTMLElement)targets.push(event.submitter);showPending('form',targets);},true);}`;
+function afterDispatch(fn){if(typeof queueMicrotask==='function'){queueMicrotask(fn);return;}if(typeof Promise==='function'){Promise.resolve().then(fn);return;}setTimeout(fn,0);}
+function showPending(source,targets){for(const target of targets){target.setAttribute(NAV_ATTR,source);target.classList.add('facetheory-navigation-pending-control');}const el=indicatorElement(DEFAULT_INDICATOR_ID);el.textContent='Loading…';el.setAttribute('role','status');el.setAttribute('aria-live','polite');el.setAttribute('aria-atomic','true');el.setAttribute(NAV_ATTR,source);el.setAttribute(INDICATOR_ATTR,'true');el.classList.add('facetheory-navigation-pending-pill');if(!el.parentNode)(document.body||document.documentElement).appendChild(el);}
+function startNavigationPending(){document.addEventListener('click',event=>{const anchor=acceptedAnchor(event);if(anchor)showPending('link',[anchor]);});document.addEventListener('submit',event=>{const form=event.target instanceof HTMLFormElement?event.target:null;if(!form)return;afterDispatch(()=>{if(event.defaultPrevented||form.hasAttribute(FORM_OPT_OUT_ATTR))return;const submitter=event.submitter instanceof HTMLElement?event.submitter:null;if(!navigatesSameDocument(form,submitter))return;const targets=[form];if(submitter)targets.push(submitter);showPending('form',targets);});},true);}`;
 
 export interface NavigationPendingClassNames {
   form?: string;
@@ -161,15 +167,29 @@ export function startNavigationPending(
     const form = readSubmitForm(submitEvent);
     if (!form) return;
 
-    const targets: Array<{ element: Element; role: 'form' | 'submitter' }> = [
-      { element: form, role: 'form' },
-    ];
-    const submitter = readSubmitter(submitEvent);
-    if (submitter) {
-      targets.push({ element: submitter, role: 'submitter' });
-    }
+    // The submit listener is capture-phase, so it runs before application
+    // handlers can call preventDefault(). Defer the pending decision until
+    // dispatch completes: submits the application handled itself (AJAX) or
+    // opted out of pending UI never surface a pending state, so they cannot
+    // get stuck when no navigation follows. Submits that never navigate
+    // this document (method="dialog", non-_self targets) are skipped the
+    // same way the anchor classifier skips non-_self links.
+    schedulePostDispatch(win, () => {
+      if (submitEvent.defaultPrevented) return;
+      if (form.hasAttribute(NAVIGATION_PENDING_FORM_OPT_OUT_ATTRIBUTE)) return;
 
-    showPending('form', targets);
+      const submitter = readSubmitter(submitEvent);
+      if (!submitNavigatesSameDocument(form, submitter)) return;
+
+      const targets: Array<{ element: Element; role: 'form' | 'submitter' }> = [
+        { element: form, role: 'form' },
+      ];
+      if (submitter) {
+        targets.push({ element: submitter, role: 'submitter' });
+      }
+
+      showPending('form', targets);
+    });
   };
 
   const handleLifecycleCleanup = (): void => {
@@ -343,16 +363,15 @@ function markPendingElement(
   classNames: ResolvedNavigationPendingClassNames,
   snapshots: ElementSnapshot[],
 ): void {
+  // Observe-only posture: application-owned elements are marked with the
+  // framework-namespaced attribute and classes only. Shared ARIA state such
+  // as aria-busy is never written onto app-owned nodes; the accessible
+  // signal is the framework-owned indicator pill (role="status").
   snapshots.push(
-    snapshotElement(element, [
-      'aria-busy',
-      'class',
-      NAVIGATION_PENDING_ATTRIBUTE,
-    ]),
+    snapshotElement(element, ['class', NAVIGATION_PENDING_ATTRIBUTE]),
   );
 
   element.setAttribute(NAVIGATION_PENDING_ATTRIBUTE, role);
-  element.setAttribute('aria-busy', 'true');
   element.classList.add(classNames.pendingControl);
 
   if (role === 'link') {
@@ -409,6 +428,18 @@ function prefersReducedMotion(win: Window): boolean {
   }
 }
 
+function schedulePostDispatch(win: Window, callback: () => void): void {
+  if (typeof queueMicrotask === 'function') {
+    queueMicrotask(callback);
+    return;
+  }
+  if (typeof Promise === 'function') {
+    Promise.resolve().then(callback);
+    return;
+  }
+  win.setTimeout(callback, 0);
+}
+
 function readSubmitForm(event: SubmitEvent): HTMLFormElement | null {
   return isElementWithTag(event.target, 'form')
     ? (event.target as HTMLFormElement)
@@ -417,4 +448,47 @@ function readSubmitForm(event: SubmitEvent): HTMLFormElement | null {
 
 function readSubmitter(event: SubmitEvent): HTMLElement | null {
   return isElement(event.submitter) ? (event.submitter as HTMLElement) : null;
+}
+
+function effectiveSubmitAttribute(
+  form: HTMLFormElement,
+  submitter: HTMLElement | null,
+  submitterAttribute: string,
+  formAttribute: string,
+): string {
+  // A submitter's formmethod/formtarget overrides the form's own attribute
+  // only when it is present and non-empty. Per spec, attribute presence
+  // alone governs (a present-but-empty formmethod is the invalid-value
+  // default GET, not the form's method); falling back to the form attribute
+  // anyway is a deliberate conservative fallback — it errs toward not
+  // marking pending, so no stuck state can result.
+  const override = submitter
+    ? submitter.getAttribute(submitterAttribute)
+    : null;
+  return override || form.getAttribute(formAttribute) || '';
+}
+
+function submitNavigatesSameDocument(
+  form: HTMLFormElement,
+  submitter: HTMLElement | null,
+): boolean {
+  // method="dialog" runs the dialog-close activation behavior instead of a
+  // navigation, and a non-_self target navigates a different browsing
+  // context; neither fires this document's lifecycle cleanup, so marking
+  // them pending could stick forever.
+  const method = effectiveSubmitAttribute(
+    form,
+    submitter,
+    'formmethod',
+    'method',
+  );
+  if (method.toLowerCase() === 'dialog') return false;
+  const target = effectiveSubmitAttribute(
+    form,
+    submitter,
+    'formtarget',
+    'target',
+  );
+  const normalizedTarget = target.toLowerCase();
+  return normalizedTarget === '' || normalizedTarget === '_self';
 }
