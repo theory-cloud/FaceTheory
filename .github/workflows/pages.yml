@@ -4,18 +4,32 @@
 # Builds the Jekyll site under docs/ and deploys it to GitHub Pages.
 #
 # TRIGGER POLICY:
-#   - release.yml / release-pr.yml ......... trigger on `main`
-#   - prerelease.yml / prerelease-pr.yml ... trigger on `premain`
-#   - theorycloud-facetheory-subtree-publish.yml .. triggers on `premain` AND `main`
-#   - pages.yml (this file) ................ triggers on `main` ONLY
+#   - pages.yml (this file) triggers on `release: published` (stable releases
+#     only — prereleases are filtered out at the job level) and on manual
+#     `workflow_dispatch` re-deploys.
 #
-# Production Pages publication follows FaceTheory's documented release
-# funnel. Docs may iterate on `staging`, but the public custom-domain site
-# updates only after changes reach the release-gated `main` branch. The
-# custom docs domain is mounted at the domain root. Defensive `if:
-# github.ref == 'refs/heads/main'` guards on every job make accidental
-# non-main runs (e.g. via a manual workflow_dispatch from a feature branch)
-# a no-op.
+# Why release-triggered instead of branch-push? The previous policy built on
+# every `main` push, which raced release-please and stayed one version behind:
+# the site's version pill and runtime install commands are stamped from
+# hand-maintained pins in docs/_config.yml (`version_pill: "v3.x"`,
+# `vX.Y.Z` placeholder install URLs) that no release workflow ever touched.
+# Publishing from the release event payload fixes the staleness at the source.
+#
+# The build checks out the release tag itself — it never runs from a mutable
+# branch head:
+#   - release events: `github.event.release.tag_name`
+#   - workflow_dispatch: the latest published NON-prerelease release, resolved
+#     via `gh release view` (GitHub's "latest" release excludes prereleases)
+#
+# A Jekyll config override (docs/_config_versions.yml, git-ignored) is generated
+# from the resolved tag by scripts/generate-docs-version-override.rb and merged
+# into the build with `--config _config.yml,_config_versions.yml`. Jekyll
+# deep-merges hashes but REPLACES arrays wholesale, so the override carries the
+# complete `tabletheory.runtimes` array with every install string stamped. The
+# checked-in docs/_config.yml stays untouched as the local-preview fallback.
+#
+# Accepted caveat: docs-only fixes wait for the next release (or a manual
+# workflow_dispatch), because Pages no longer rebuilds on branch pushes.
 #
 # This workflow is independent of release.yml / prerelease.yml /
 # ci.yml — it never publishes packages, never mutates tags,
@@ -24,12 +38,11 @@
 name: pages
 
 on:
-  # Main is the only branch that publishes the production Pages site.
-  push:
-    branches: [main]
+  release:
+    types: [published]
   # Manual re-deploy (e.g. after rotating the Pages environment, or to
-  # republish the current main docs after an infrastructure-only event).
-  # Defensive `if:` guards still enforce main-only at the job level.
+  # republish a docs-only fix without cutting a release). The tag is resolved
+  # to the latest published non-prerelease release at run time.
   workflow_dispatch:
 
 permissions:
@@ -38,9 +51,9 @@ permissions:
 # Coalesce in-flight deploys: GitHub Actions keeps at most one running
 # and one pending run per concurrency group by default. With
 # `cancel-in-progress: false`, the running deploy finishes, but a newer
-# queued main deploy replaces any older pending deploy. The site
-# therefore converges on the latest main commit instead of publishing
-# every intermediate commit.
+# queued release-triggered deploy replaces any older pending deploy. The
+# site therefore converges on the latest published release instead of
+# publishing every intermediate release.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -51,12 +64,32 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    # Belt-and-suspenders: even if someone invokes workflow_dispatch from
-    # a non-main ref, the job no-ops rather than building stale content.
-    if: github.ref == 'refs/heads/main'
+    # Stable releases only; prerelease publications and everything else no-op.
+    if: (github.event_name == 'release' && github.event.release.prerelease == false) || github.event_name == 'workflow_dispatch'
     steps:
+      - name: Resolve release tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            resolved_tag="${{ github.event.release.tag_name }}"
+          else
+            # workflow_dispatch: latest published non-prerelease release.
+            # `gh release view` without a tag resolves GitHub's "latest"
+            # release, which excludes drafts and prereleases.
+            resolved_tag="$(gh release view --repo theory-cloud/FaceTheory --json tagName --jq .tagName)"
+          fi
+          if [[ -z "${resolved_tag}" ]]; then
+            echo "could not resolve a release tag" >&2
+            exit 1
+          fi
+          echo "tag=${resolved_tag}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
@@ -69,12 +102,20 @@ jobs:
         id: pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
 
+      - name: Generate version override
+        run: |
+          ruby scripts/generate-docs-version-override.rb \
+            --config docs/_config.yml \
+            --tag "${{ steps.tag.outputs.tag }}" \
+            --output docs/_config_versions.yml
+
       - name: Jekyll build
         working-directory: docs
         env:
           JEKYLL_ENV: production
         run: |
           bundle exec jekyll build \
+            --config _config.yml,_config_versions.yml \
             --source . \
             --destination ./_site \
             --baseurl ""
@@ -100,7 +141,7 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    if: github.ref == 'refs/heads/main'
+    if: (github.event_name == 'release' && github.event.release.prerelease == false) || github.event_name == 'workflow_dispatch'
     environment:
       name: github-pages
       url: https://facetheory.theorycloud.ai/
