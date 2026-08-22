@@ -832,8 +832,10 @@ Observe-only marking policy:
 Form submissions are classified after application submit handlers have run, mirroring the anchor click classification:
 
 - a `preventDefault()`'d submit (AJAX) never surfaces pending state, so application-handled submits cannot leave a stuck pill or marks when no navigation follows
+- `<form method="dialog">` submits (including a submitter `formmethod="dialog"` override) and submits whose effective target (the form `target` or the submitter `formtarget`) is anything other than `_self` never surface pending state, because they do not navigate this document, mirroring how the anchor classifier treats non-`_self` targets
 - a submit that still navigates surfaces the pending pill and marks even if application handlers call `stopPropagation()`
 - add `data-facetheory-no-pending` to a `<form>` to opt out of pending UI entirely, matching the `data-facetheory-reload` affordance anchors use to opt out of FaceTheory navigation handling
+- a submit whose navigation is blocked outside FaceTheory's visibility, for example by a Content-Security-Policy `form-action` directive, clears on the next `pageshow`, `pagehide`, or `visibilitychange` lifecycle event
 
 ## Document Shell Attrs
 

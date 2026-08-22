@@ -465,6 +465,107 @@ test('navigation pending: forms can opt out with data-facetheory-no-pending', as
   }
 });
 
+test('navigation pending: skips form submits that never navigate this document', async () => {
+  const cases: Array<{
+    expectPending: boolean;
+    html: string;
+    name: string;
+  }> = [
+    {
+      expectPending: false,
+      html: '<form action="/save" method="dialog"><button>Close</button></form>',
+      name: 'method dialog',
+    },
+    {
+      expectPending: false,
+      html: '<form action="/save" method="post"><button formmethod="dialog">Close</button></form>',
+      name: 'submitter formmethod dialog overrides form method',
+    },
+    {
+      expectPending: true,
+      html: '<form action="/save" method="post"><button>Save</button></form>',
+      name: 'submitter without formmethod keeps the form method',
+    },
+    {
+      expectPending: false,
+      html: '<form action="/next" method="get" target="_blank"><button>Go</button></form>',
+      name: 'target blank',
+    },
+    {
+      expectPending: false,
+      html: '<form action="/next" method="get" target="results-frame"><button>Go</button></form>',
+      name: 'named form target',
+    },
+    {
+      expectPending: false,
+      html: '<form action="/next" method="get"><button formtarget="results-frame">Go</button></form>',
+      name: 'submitter formtarget overrides form target',
+    },
+    {
+      expectPending: true,
+      html: '<form action="/next" method="get" target="_self"><button>Go</button></form>',
+      name: 'target _self still navigates this document',
+    },
+  ];
+
+  for (const classifiedCase of cases) {
+    const dom = new JSDOM(
+      `<!doctype html><body>${classifiedCase.html}</body>`,
+      {
+        url: 'https://control.lab.theorymcp.ai/agents',
+      },
+    );
+
+    try {
+      const win = dom.window as unknown as DomWindow;
+      const doc = dom.window.document;
+      const form = doc.querySelector('form');
+      const submitter = doc.querySelector('button');
+      assert.ok(
+        form instanceof dom.window.HTMLFormElement,
+        classifiedCase.name,
+      );
+      assert.ok(
+        submitter instanceof dom.window.HTMLButtonElement,
+        classifiedCase.name,
+      );
+
+      const controller = startNavigationPending({ document: doc, window: win });
+      const dispatched = form.dispatchEvent(
+        new dom.window.SubmitEvent('submit', {
+          bubbles: true,
+          cancelable: true,
+          submitter,
+        }),
+      );
+
+      assert.equal(dispatched, true, classifiedCase.name);
+
+      await flushMicrotasks();
+
+      assert.equal(
+        controller.isPending(),
+        classifiedCase.expectPending,
+        classifiedCase.name,
+      );
+      assert.equal(
+        form.hasAttribute(NAVIGATION_PENDING_ATTRIBUTE),
+        classifiedCase.expectPending,
+        classifiedCase.name,
+      );
+      assert.equal(
+        doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID) !== null,
+        classifiedCase.expectPending,
+        classifiedCase.name,
+      );
+
+      controller.stop();
+    } finally {
+      dom.window.close();
+    }
+  }
+});
+
 test('navigation pending: capture-phase submit classification survives app stopPropagation', async () => {
   const dom = new JSDOM(
     '<!doctype html><form action="/agents/new" method="post"><button>Create</button></form>',
@@ -506,6 +607,10 @@ test('navigation pending: served bootstrap source keeps form handling observe-on
       <form id="ajax" action="/agents/invite" method="post"><button>Invite</button></form>
       <form id="navigating" action="/agents/new" method="post"><button>Create</button></form>
       <form id="opted-out" action="/agents/new" method="post" ${NAVIGATION_PENDING_FORM_OPT_OUT_ATTRIBUTE}><button>Create</button></form>
+      <form id="dialog-form" action="/save" method="dialog"><button>Close</button></form>
+      <form id="dialog-override" action="/save" method="post"><button formmethod="dialog">Close</button></form>
+      <form id="new-tab" action="/next" method="get" target="_blank"><button>Go</button></form>
+      <form id="framed" action="/next" method="get"><button formtarget="results-frame">Go</button></form>
     </body>`,
     {
       url: 'https://control.lab.theorymcp.ai/agents',
@@ -519,7 +624,9 @@ test('navigation pending: served bootstrap source keeps form handling observe-on
 
     // Execute the exact served bootstrap source inside the jsdom realm so
     // the shipped control-plane string is tested, not just the TS module.
-    win.eval(`${NAVIGATION_PENDING_BOOTSTRAP_SOURCE}\nstartNavigationPending();`);
+    win.eval(
+      `${NAVIGATION_PENDING_BOOTSTRAP_SOURCE}\nstartNavigationPending();`,
+    );
 
     const ajaxForm = doc.getElementById('ajax');
     const navigatingForm = doc.getElementById('navigating');
@@ -538,9 +645,15 @@ test('navigation pending: served bootstrap source keeps form handling observe-on
     await flushMicrotasks();
 
     // A preventDefault()'d AJAX submit leaves no pending state at all.
-    assert.equal(ajaxForm.hasAttribute('data-facetheory-navigation-pending'), false);
+    assert.equal(
+      ajaxForm.hasAttribute('data-facetheory-navigation-pending'),
+      false,
+    );
     assert.equal(ajaxForm.getAttribute('aria-busy'), null);
-    assert.equal(doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID), null);
+    assert.equal(
+      doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID),
+      null,
+    );
 
     const optedOutDispatched = optedOutForm.dispatchEvent(
       new win.SubmitEvent('submit', { bubbles: true, cancelable: true }),
@@ -554,7 +667,69 @@ test('navigation pending: served bootstrap source keeps form handling observe-on
       optedOutForm.hasAttribute('data-facetheory-navigation-pending'),
       false,
     );
-    assert.equal(doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID), null);
+    assert.equal(
+      doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID),
+      null,
+    );
+
+    // Submits that never navigate this document (method="dialog", including
+    // a submitter formmethod override, and non-_self targets) are skipped by
+    // the shipped bootstrap source exactly like the TS module skips them.
+    const skippedBootstrapCases: Array<{
+      form: HTMLFormElement;
+      name: string;
+    }> = [
+      {
+        form: doc.getElementById('dialog-form') as HTMLFormElement,
+        name: 'bootstrap method dialog',
+      },
+      {
+        form: doc.getElementById('dialog-override') as HTMLFormElement,
+        name: 'bootstrap submitter formmethod dialog',
+      },
+      {
+        form: doc.getElementById('new-tab') as HTMLFormElement,
+        name: 'bootstrap target blank',
+      },
+      {
+        form: doc.getElementById('framed') as HTMLFormElement,
+        name: 'bootstrap submitter formtarget',
+      },
+    ];
+    for (const skippedCase of skippedBootstrapCases) {
+      const skippedSubmitter = skippedCase.form.querySelector('button');
+      assert.ok(
+        skippedSubmitter instanceof win.HTMLButtonElement,
+        skippedCase.name,
+      );
+
+      const skippedDispatched = skippedCase.form.dispatchEvent(
+        new win.SubmitEvent('submit', {
+          bubbles: true,
+          cancelable: true,
+          submitter: skippedSubmitter,
+        }),
+      );
+      assert.equal(skippedDispatched, true, skippedCase.name);
+
+      await flushMicrotasks();
+
+      assert.equal(
+        skippedCase.form.hasAttribute('data-facetheory-navigation-pending'),
+        false,
+        skippedCase.name,
+      );
+      assert.equal(
+        skippedCase.form.getAttribute('aria-busy'),
+        null,
+        skippedCase.name,
+      );
+      assert.equal(
+        doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID),
+        null,
+        skippedCase.name,
+      );
+    }
 
     const navigatingDispatched = navigatingForm.dispatchEvent(
       new win.SubmitEvent('submit', { bubbles: true, cancelable: true }),
@@ -570,7 +745,9 @@ test('navigation pending: served bootstrap source keeps form handling observe-on
       'form',
     );
     assert.equal(navigatingForm.getAttribute('aria-busy'), null);
-    const indicator = doc.getElementById(DEFAULT_NAVIGATION_PENDING_INDICATOR_ID);
+    const indicator = doc.getElementById(
+      DEFAULT_NAVIGATION_PENDING_INDICATOR_ID,
+    );
     assert.ok(indicator instanceof win.HTMLElement);
     assert.equal(indicator.textContent, 'Loading…');
     assert.equal(indicator.getAttribute('role'), 'status');
