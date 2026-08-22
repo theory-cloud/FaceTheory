@@ -228,13 +228,14 @@ If using stable keys:
 ### GitHub Pages publication posture
 
 Production documentation at <https://facetheory.theorycloud.ai/> is release-gated. The `.github/workflows/pages.yml`
-workflow deploys GitHub Pages only from `main`; documentation changes still enter through `staging` like normal
-FaceTheory work and reach the public site after the `staging` → `premain` → `main` release funnel.
+workflow triggers on `release: published` (non-prerelease releases only) and on manual `workflow_dispatch`; the build
+checks out the release tag itself rather than a mutable branch head. The site updates automatically whenever a stable
+release publishes, and manual re-deploys are available for docs-only fixes between releases.
 
 The Pages deploy job is the only job with `pages: write` and `id-token: write`, and both the build and deploy jobs keep
-job-level `github.ref == 'refs/heads/main'` guards so manual dispatch from a non-`main` ref is a no-op. Do not repoint
-production Pages publication to broad `staging` unless the repository also records an explicit, reviewed protected
-deployment posture for that environment.
+job-level guards based on the event name and the release `prerelease` flag, so prerelease publications and unrelated
+events no-op. Do not broaden the Pages environment's allowed refs or return to branch-push publication without
+recording an explicit, reviewed protected deployment posture for that environment.
 
 ### Strict CSP RC and stable release handoff
 
