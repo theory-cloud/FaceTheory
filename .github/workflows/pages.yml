@@ -73,12 +73,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            resolved_tag="${{ github.event.release.tag_name }}"
+            # Read the tag from the event payload file with jq rather than
+            # interpolating github.event.release.tag_name into bash, so an
+            # attacker-influenceable value can never become shell source.
+            resolved_tag="$(jq -r .release.tag_name "$GITHUB_EVENT_PATH")"
           else
             # workflow_dispatch: latest published non-prerelease release.
             # `gh release view` without a tag resolves GitHub's "latest"
             # release, which excludes drafts and prereleases.
-            resolved_tag="$(gh release view --repo theory-cloud/FaceTheory --json tagName --jq .tagName)"
+            resolved_tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
           fi
           if [[ -z "${resolved_tag}" ]]; then
             echo "could not resolve a release tag" >&2
@@ -119,6 +122,23 @@ jobs:
             --source . \
             --destination ./_site \
             --baseurl ""
+
+      - name: Verify stamped version in built site
+        working-directory: docs
+        env:
+          # Tag comes from the release payload / `gh release view`, so pass it
+          # through the environment rather than interpolating it into bash.
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          asset="theory-cloud-facetheory-${TAG#v}.tgz"
+          if ! grep -qF "${asset}" _site/index.html; then
+            echo "expected stamped install asset '${asset}' in _site/index.html; the version override did not reach the landing page" >&2
+            exit 1
+          fi
+          if grep -qF 'vX.Y.Z' _site/index.html; then
+            echo "found literal 'vX.Y.Z' placeholder in _site/index.html; the version override did not stamp the landing page" >&2
+            exit 1
+          fi
 
       - name: Verify custom-domain root paths
         working-directory: docs
