@@ -23,7 +23,7 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
 ```bash
-export FACETHEORY_VERSION=4.0.7 # x-release-please-version
+export FACETHEORY_VERSION=4.0.8-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -818,6 +818,24 @@ Recommended host pattern:
 - export `hydrateFaceNavigation(context)` from the client bootstrap module when you need persistent app state across navigations
 - rely on the default module reload only as a compatibility fallback for existing entry modules that hydrate by top-level side effect
 - keep SPA navigation same-origin; redirects to another origin and remote hydration modules fail closed
+
+## Navigation Pending
+
+`startNavigationPending` (and the control-plane bootstrap module) surfaces a fixed-position status pill while an accepted same-origin link click or form submission is navigating, and marks the navigation source while the pending state is live. Pending state clears on `pageshow`, `pagehide`, and `visibilitychange`.
+
+Observe-only marking policy:
+
+- navigation sources are marked only with the framework-namespaced `data-facetheory-navigation-pending` attribute and `facetheory-navigation-pending-*` classes
+- FaceTheory never writes shared ARIA state such as `aria-busy` onto application-owned elements; the accessible signal is the framework-owned `role="status"` / `aria-live="polite"` pill
+- application handlers keep full submit authority; FaceTheory never calls `preventDefault()` or mutates `action`/`method`
+
+Form submissions are classified after application submit handlers have run, mirroring the anchor click classification:
+
+- a `preventDefault()`'d submit (AJAX) never surfaces pending state, so application-handled submits cannot leave a stuck pill or marks when no navigation follows
+- `<form method="dialog">` submits (including a submitter `formmethod="dialog"` override) and submits whose effective target (the form `target` or the submitter `formtarget`) is anything other than `_self` never surface pending state, because they do not navigate this document, mirroring how the anchor classifier treats non-`_self` targets
+- a submit that still navigates surfaces the pending pill and marks even if application handlers call `stopPropagation()`
+- add `data-facetheory-no-pending` to a `<form>` to opt out of pending UI entirely, matching the `data-facetheory-reload` affordance anchors use to opt out of FaceTheory navigation handling
+- a submit whose navigation is blocked outside FaceTheory's visibility, for example by a Content-Security-Policy `form-action` directive, clears on the next `pageshow`, `pagehide`, or `visibilitychange` lifecycle event
 
 ## Document Shell Attrs
 
