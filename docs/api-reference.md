@@ -819,6 +819,22 @@ Recommended host pattern:
 - rely on the default module reload only as a compatibility fallback for existing entry modules that hydrate by top-level side effect
 - keep SPA navigation same-origin; redirects to another origin and remote hydration modules fail closed
 
+## Navigation Pending
+
+`startNavigationPending` (and the control-plane bootstrap module) surfaces a fixed-position status pill while an accepted same-origin link click or form submission is navigating, and marks the navigation source while the pending state is live. Pending state clears on `pageshow`, `pagehide`, and `visibilitychange`.
+
+Observe-only marking policy:
+
+- navigation sources are marked only with the framework-namespaced `data-facetheory-navigation-pending` attribute and `facetheory-navigation-pending-*` classes
+- FaceTheory never writes shared ARIA state such as `aria-busy` onto application-owned elements; the accessible signal is the framework-owned `role="status"` / `aria-live="polite"` pill
+- application handlers keep full submit authority; FaceTheory never calls `preventDefault()` or mutates `action`/`method`
+
+Form submissions are classified after application submit handlers have run, mirroring the anchor click classification:
+
+- a `preventDefault()`'d submit (AJAX) never surfaces pending state, so application-handled submits cannot leave a stuck pill or marks when no navigation follows
+- a submit that still navigates surfaces the pending pill and marks even if application handlers call `stopPropagation()`
+- add `data-facetheory-no-pending` to a `<form>` to opt out of pending UI entirely, matching the `data-facetheory-reload` affordance anchors use to opt out of FaceTheory navigation handling
+
 ## Document Shell Attrs
 
 `FaceRenderResult` can set document-level attrs directly:
