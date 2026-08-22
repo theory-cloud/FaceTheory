@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.0.8](https://github.com/theory-cloud/FaceTheory/compare/v4.0.7...v4.0.8) (2026-08-22)
+
+
+### Bug Fixes
+
+* **deps:** align coordinated apptheory pin set to v3.3.0 ([85618a3](https://github.com/theory-cloud/FaceTheory/commit/85618a3452c1d26f8659bec43256478b30f164f4))
+* **deps:** align ts apptheory dev pin to v3.3.0 ([3bbc2cf](https://github.com/theory-cloud/FaceTheory/commit/3bbc2cfd57a10f6f2631e93490cafd826d8f9e92))
+* **deps:** align ts apptheory-cdk dev pin to v3.3.0 ([30a535d](https://github.com/theory-cloud/FaceTheory/commit/30a535d80b5db2b27ca7748b6e41233c4c50ce74))
+* **deps:** bump AppTheory infra pins to v3.3.0 ([40b0a38](https://github.com/theory-cloud/FaceTheory/commit/40b0a38bd285bf009bda96ceca730d35bbbfce6c))
+* **deps:** bump AppTheory infra pins to v3.3.0 ([00f8840](https://github.com/theory-cloud/FaceTheory/commit/00f884015a226b8700282a1ff106ee705b544fa4))
+* **navigation-pending:** classify form submits after app handlers run ([11b8d28](https://github.com/theory-cloud/FaceTheory/commit/11b8d28e915cfff52150fb011d006d78d2d99bb8)), closes [#436](https://github.com/theory-cloud/FaceTheory/issues/436)
+* **navigation-pending:** match form method and target keywords exactly ([a487302](https://github.com/theory-cloud/FaceTheory/commit/a48730245c7314890ee3f1048146aeea4a8352a8))
+* **navigation-pending:** skip dialog-method and non-_self form submits ([b416d47](https://github.com/theory-cloud/FaceTheory/commit/b416d47c659a07531e52052c7c420b0c7dd7600a))
+
 ## [4.0.7](https://github.com/theory-cloud/FaceTheory/compare/v4.0.6...v4.0.7) (2026-08-20)
 
 
