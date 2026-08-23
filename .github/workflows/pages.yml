@@ -4,33 +4,82 @@
 # Builds the Jekyll site under docs/ and deploys it to GitHub Pages.
 #
 # TRIGGER POLICY:
-#   - release.yml / release-pr.yml ......... trigger on `main`
-#   - prerelease.yml / prerelease-pr.yml ... trigger on `premain`
-#   - theorycloud-facetheory-subtree-publish.yml .. triggers on `premain` AND `main`
-#   - pages.yml (this file) ................ triggers on `main` ONLY
+#   - push to `main`: republish the production docs line from the main
+#     head, stamped with the latest published stable release.
+#   - `workflow_dispatch` with an explicit `tag` input: dispatched by
+#     release.yml immediately after it publishes a stable release, so the
+#     site deploys the just-published tag's docs stamped with that tag —
+#     never the previous release. The dispatch must target the tag ref
+#     itself (release.yml hands off with `--ref <tag>`); the resolve step
+#     enforces that the tag input matches the run ref and names a
+#     published stable release. Manual dispatch works too: dispatch from
+#     the tag ref and pass `tag`, or omit `tag` to redeploy the current
+#     ref's docs stamped with the latest stable release.
 #
-# Production Pages publication follows FaceTheory's documented release
-# funnel. Docs may iterate on `staging`, but the public custom-domain site
-# updates only after changes reach the release-gated `main` branch. The
-# custom docs domain is mounted at the domain root. Defensive `if:
-# github.ref == 'refs/heads/main'` guards on every job make accidental
-# non-main runs (e.g. via a manual workflow_dispatch from a feature branch)
-# a no-op.
+# A release-please PR merge pushes `main`, so the push trigger rebuilds at
+# release time; the release itself is published moments later by
+# release.yml, whose dispatch then re-deploys from the exact tag. The site
+# converges on the new release automatically within minutes.
+#
+# Why not `release: published`? Releases here are published by
+# release-please with the default GITHUB_TOKEN (no PAT secret exists, and
+# none may be introduced), and GitHub never triggers new workflow runs from
+# GITHUB_TOKEN-created events — a release-event trigger would never fire
+# and the site would only update via manual dispatch. workflow_dispatch is
+# one of the two event kinds the built-in token IS allowed to create, so
+# release.yml hands off explicitly:
+# `gh workflow run pages.yml --ref <tag> -f tag=<tag>` from a job holding
+# only `actions: write`. No secrets, no manual steps.
+#
+# Version stamping: the build resolves a tag — the `tag` input, or (push /
+# bare manual dispatch) the latest published non-prerelease release via
+# `gh release view` — then generates docs/_config_versions.yml via
+# scripts/generate-docs-version-override.rb and builds with
+# `--config _config.yml,_config_versions.yml`. Jekyll deep-merges config
+# hashes but REPLACES arrays wholesale, so the override carries the complete
+# tabletheory.runtimes array with every `vX.Y.Z` / `X.Y.Z` placeholder in
+# each install string stamped (asset filenames strip the leading `v`). The
+# checked-in docs/_config.yml keeps the placeholders and remains the
+# local-preview fallback; the override is git-ignored.
+#
+# The build tree is always the run's own ref (github.sha): the dispatch
+# tag input is never used as a checkout ref (an input-derived checkout is
+# a cache-poisoning risk), so the resolve step instead enforces tag ==
+# run ref.
+#
+# The generator runs from the checkout: it is present on `main`/`staging`
+# and on every release tag cut after this workflow lands. Dispatching with
+# a tag older than that fails fast in the generator step — deploy such tags
+# by dispatching without `tag` instead.
+#
+# The github-pages environment's deployment policy accepts the `main` and
+# `staging` branches and `v*` tag refs, which covers every trigger above; a
+# manual dispatch from any other ref is rejected by the environment policy.
 #
 # This workflow is independent of release.yml / prerelease.yml /
 # ci.yml — it never publishes packages, never mutates tags,
 # and never touches the release manifests.
+#
+# Security invariants: the workflow token stays read-only except the
+# pages write + id-token granted to the deploy job; the build checks out
+# the run's own ref only, and the dispatch tag is validated to match the
+# run ref and to name a published stable release (never a draft or
+# prerelease); the override is generated only from that validated tag or
+# the resolved release tag; no secrets are introduced; checkout
+# credentials are not persisted and the build writes no caches.
 # =============================================================
 name: pages
 
 on:
-  # Main is the only branch that publishes the production Pages site.
   push:
     branches: [main]
-  # Manual re-deploy (e.g. after rotating the Pages environment, or to
-  # republish the current main docs after an infrastructure-only event).
-  # Defensive `if:` guards still enforce main-only at the job level.
+  # Explicit stable tag deploy (release.yml handoff) or manual re-deploy.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Stable release tag to deploy (e.g. v3.12.0). Set by release.yml after publishing; leave empty to redeploy this ref's docs stamped with the latest stable release."
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -38,9 +87,9 @@ permissions:
 # Coalesce in-flight deploys: GitHub Actions keeps at most one running
 # and one pending run per concurrency group by default. With
 # `cancel-in-progress: false`, the running deploy finishes, but a newer
-# queued main deploy replaces any older pending deploy. The site
-# therefore converges on the latest main commit instead of publishing
-# every intermediate commit.
+# queued deploy replaces any older pending deploy. The site therefore
+# converges on the latest state instead of publishing every intermediate
+# build.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -51,23 +100,102 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    # Belt-and-suspenders: even if someone invokes workflow_dispatch from
-    # a non-main ref, the job no-ops rather than building stale content.
-    if: github.ref == 'refs/heads/main'
+    # Pushes deploy from main only (defense in depth behind the branch
+    # trigger); dispatches are ref-gated by the environment policy.
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     steps:
+      - name: Resolve deploy tag
+        id: tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${TAG_INPUT}" ]]; then
+            # release.yml hands off the tag it just published; manual
+            # dispatch may name any stable tag. Prereleases never publish.
+            # Read the input from the environment rather than interpolating
+            # it into bash, so an attacker-influenceable value can never
+            # become shell source.
+            if [[ ! "${TAG_INPUT}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "tag input '${TAG_INPUT}' is not a stable vX.Y.Z tag" >&2
+              exit 1
+            fi
+            # The build checks out the run's own ref (github.sha), never
+            # the tag input — CodeQL treats an input-derived checkout ref
+            # as untrusted even when regex-validated. The tag input must
+            # therefore BE the run's ref tag: release.yml dispatches with
+            # --ref <tag>, so this holds automatically; manual dispatches
+            # must target the tag ref too.
+            if [[ "${GITHUB_REF_TYPE}" != "tag" || "${GITHUB_REF_NAME}" != "${TAG_INPUT}" ]]; then
+              echo "tag input '${TAG_INPUT}' does not match the run ref (${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}); dispatch this workflow from the ${TAG_INPUT} tag instead (gh workflow run pages.yml --ref ${TAG_INPUT} -f tag=${TAG_INPUT})" >&2
+              exit 1
+            fi
+            # The dispatch tag must name a real published stable release:
+            # `gh release view` fails for missing tags (set -e aborts);
+            # drafts and prereleases are refused explicitly.
+            release_meta="$(gh release view "${TAG_INPUT}" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease)"
+            if [[ "$(jq -r '.isDraft' <<<"${release_meta}")" == "true" || "$(jq -r '.isPrerelease' <<<"${release_meta}")" == "true" ]]; then
+              echo "tag input '${TAG_INPUT}' is a draft or prerelease release; refusing to deploy" >&2
+              exit 1
+            fi
+            tag="${TAG_INPUT}"
+          else
+            # Push or bare manual dispatch: build this ref's docs and stamp
+            # them with the latest published non-prerelease release
+            # (`gh release view` resolves GitHub's "latest" release, which
+            # excludes drafts and prereleases).
+            tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
+          fi
+          if [[ -z "${tag}" || "${tag}" == "null" ]]; then
+            echo "could not resolve a published release tag" >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          # Build the run's own ref: the dispatch tag's commit (release
+          # handoff) or the triggering branch head. An input-derived
+          # checkout ref is a cache-poisoning risk — CodeQL flags it even
+          # when regex-validated — so the tag input never selects the
+          # tree; the resolve step enforces tag == run ref instead.
+          ref: ${{ github.sha }}
+          # The workflow never pushes git; dropping persisted credentials
+          # keeps the scoped token from leaking into any build step.
+          persist-credentials: false
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1.310.0
         with:
           ruby-version: "3.3"
-          bundler-cache: true
+          # No bundler cache: a dispatch-input-driven build writing a
+          # cache is the cache-poisoning surface CodeQL flags; the slower
+          # bundle install is accepted.
           working-directory: docs
+
+      - name: Install Jekyll dependencies
+        # Without bundler-cache, setup-ruby installs Ruby but no gems;
+        # install the Gemfile explicitly so the build step's bundle exec
+        # finds jekyll on a cold runner.
+        working-directory: docs
+        run: bundle install
 
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+
+      - name: Generate version override
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          ruby scripts/generate-docs-version-override.rb \
+            --tag "${TAG}" \
+            --config docs/_config.yml \
+            --output docs/_config_versions.yml
 
       - name: Jekyll build
         working-directory: docs
@@ -75,9 +203,25 @@ jobs:
           JEKYLL_ENV: production
         run: |
           bundle exec jekyll build \
+            --config _config.yml,_config_versions.yml \
             --source . \
             --destination ./_site \
             --baseurl ""
+
+      - name: Verify stamped version in built site
+        working-directory: docs
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          asset="theory-cloud-facetheory-${TAG#v}.tgz"
+          if ! grep -qF "${asset}" _site/index.html; then
+            echo "expected stamped install asset '${asset}' in _site/index.html; the version override did not reach the landing page" >&2
+            exit 1
+          fi
+          if grep -qF 'vX.Y.Z' _site/index.html; then
+            echo "found literal 'vX.Y.Z' placeholder in _site/index.html; the version override did not stamp the landing page" >&2
+            exit 1
+          fi
 
       - name: Verify custom-domain root paths
         working-directory: docs
@@ -100,7 +244,8 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    if: github.ref == 'refs/heads/main'
+    # Same guard as the build job.
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     environment:
       name: github-pages
       url: https://facetheory.theorycloud.ai/

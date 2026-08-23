@@ -94,3 +94,5 @@ registry installs:
   }
 }
 ```
+
+Note: the mismatch is intentional — AppTheory v3.3.0 declares `@theory-cloud/tabletheory-ts` v3.0.6 transitively, while the `overrides` block above pins v3.0.5 as FaceTheory's validated baseline.
