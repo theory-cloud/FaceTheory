@@ -119,8 +119,9 @@ edit_on_github: false
   >
     {%- comment -%} Install strings are stamped from the release-tagged config
     override (pages.yml → scripts/generate-docs-version-override.rb); the static
-    _data copy above carries only the tab chrome (icon/lang/snippet). {%- endcomment -%}
-    {%- assign rt = site.tabletheory.runtimes | where: "id", r.id | first -%}
+    _data copy above carries only the tab chrome (icon/lang/snippet). {%-
+    endcomment -%} {%- assign rt = site.tabletheory.runtimes | where: "id", r.id
+    | first -%}
     <p
       class="tc-body-sm"
       style="
