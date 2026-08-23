@@ -228,13 +228,16 @@ If using stable keys:
 ### GitHub Pages publication posture
 
 Production documentation at <https://facetheory.theorycloud.ai/> is release-gated. The `.github/workflows/pages.yml`
-workflow triggers on `release: published` (non-prerelease releases only) and on manual `workflow_dispatch`; the build
-checks out the release tag itself rather than a mutable branch head. The site updates automatically whenever a stable
-release publishes, and manual re-deploys are available for docs-only fixes between releases.
+workflow deploys on every push to `main` and, automatically, right after each stable release publishes: release.yml
+dispatches pages.yml with the exact tag (`workflow_dispatch` is the one event kind the built-in GITHUB_TOKEN may
+create, so no PAT or other secret is involved), and the build checks out that tag rather than a mutable branch head.
+The site therefore updates automatically whenever a stable release publishes — stamped with the release that just
+shipped, never the previous one — and manual `workflow_dispatch` re-deploys are available for docs-only fixes
+between releases.
 
-The Pages deploy job is the only job with `pages: write` and `id-token: write`, and both the build and deploy jobs keep
-job-level guards based on the event name and the release `prerelease` flag, so prerelease publications and unrelated
-events no-op. Do not broaden the Pages environment's allowed refs or return to branch-push publication without
+The Pages deploy job is the only job with `pages: write` and `id-token: write`, and both the build and deploy jobs
+keep job-level guards so only `main` pushes and dispatches deploy; dispatch tag inputs are validated as stable
+`vX.Y.Z` tags, so prereleases never publish the site. Do not broaden the Pages environment's allowed refs without
 recording an explicit, reviewed protected deployment posture for that environment.
 
 ### Strict CSP RC and stable release handoff
