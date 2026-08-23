@@ -176,6 +176,13 @@ jobs:
           # bundle install is accepted.
           working-directory: docs
 
+      - name: Install Jekyll dependencies
+        # Without bundler-cache, setup-ruby installs Ruby but no gems;
+        # install the Gemfile explicitly so the build step's bundle exec
+        # finds jekyll on a cold runner.
+        working-directory: docs
+        run: bundle install
+
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
