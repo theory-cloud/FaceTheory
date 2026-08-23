@@ -27,6 +27,9 @@
 # deep-merges hashes but REPLACES arrays wholesale, so the override carries the
 # complete `tabletheory.runtimes` array with every install string stamped. The
 # checked-in docs/_config.yml stays untouched as the local-preview fallback.
+# The generator itself is materialized from this workflow's own ref (never from
+# the tag checkout): release tags cut before this workflow promoted do not
+# contain it.
 #
 # Accepted caveat: docs-only fixes wait for the next release (or a manual
 # workflow_dispatch), because Pages no longer rebuilds on branch pushes.
@@ -107,10 +110,13 @@ jobs:
 
       - name: Generate version override
         run: |
-          ruby scripts/generate-docs-version-override.rb \
-            --config docs/_config.yml \
-            --tag "${{ steps.tag.outputs.tag }}" \
-            --output docs/_config_versions.yml
+          set -euo pipefail
+          # The generator ships with this workflow's ref — release tags cut before
+          # this workflow promoted do NOT contain it, so never read it from the
+          # tag checkout.
+          git fetch origin "${GITHUB_REF_NAME}" --depth=1
+          git show "FETCH_HEAD:scripts/generate-docs-version-override.rb" > /tmp/generate-docs-version-override.rb
+          ruby /tmp/generate-docs-version-override.rb --tag "${{ steps.tag.outputs.tag }}" --config docs/_config.yml --output docs/_config_versions.yml
 
       - name: Jekyll build
         working-directory: docs
