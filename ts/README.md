@@ -33,9 +33,9 @@ The Svelte peer range is `>=5.55.7`. FaceTheory v4.0.0 dropped Svelte 4 support 
 
 Optional companion packages:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v3.3.0/theory-cloud-apptheory-3.3.0.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v3.3.0/theory-cloud-apptheory-cdk-3.3.0.tgz`
-- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v3.0.5/theory-cloud-tabletheory-ts-3.0.5.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v4.1.0/theory-cloud-apptheory-4.1.0.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v4.1.0/theory-cloud-apptheory-cdk-4.1.0.tgz`
+- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v3.0.6/theory-cloud-tabletheory-ts-3.0.6.tgz`
 
 ## Minimal App
 
