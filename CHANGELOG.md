@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.0.9](https://github.com/theory-cloud/FaceTheory/compare/v4.0.8...v4.0.9) (2026-08-25)
+
+
+### Bug Fixes
+
+* **ci:** build pages deploy from the run ref, not the dispatch input ([f2443f3](https://github.com/theory-cloud/FaceTheory/commit/f2443f3835e6ce7cc5b6a40d282d0132f89dae3c))
+* **ci:** install docs gems before jekyll build in pages workflow ([9efaf0a](https://github.com/theory-cloud/FaceTheory/commit/9efaf0aaabd4ad0592deb05a04036dfa2c8c9471))
+* **deps:** pin AppTheory v4.1.0 ([5e05b2c](https://github.com/theory-cloud/FaceTheory/commit/5e05b2c4c9a59dd39ef0a6d22d865d55aedc92b0))
+* **deps:** pin AppTheory v4.1.0 ([dbf24f9](https://github.com/theory-cloud/FaceTheory/commit/dbf24f972268eaae8e1f4c6bf218d50fc02ffbdf))
+* **deps:** pin TableTheory v3.0.6 ([3e25001](https://github.com/theory-cloud/FaceTheory/commit/3e25001f2ffdaaacfb68cb71bd4afe09a16fbb16))
+
 ## [4.0.8](https://github.com/theory-cloud/FaceTheory/compare/v4.0.7...v4.0.8) (2026-08-22)
 
 
