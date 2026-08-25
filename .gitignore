@@ -38,6 +38,7 @@ docs/.jekyll-cache/
 docs/.jekyll-metadata
 docs/vendor/
 docs/.bundle/
+docs/_config_versions.yml
 
 # Local TheoryCloud agent materialization
 .claude/

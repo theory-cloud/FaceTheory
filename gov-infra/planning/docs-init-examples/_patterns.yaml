@@ -37,9 +37,9 @@ patterns:
     correct_example: |
       # CORRECT: install pinned release assets
       npm install --save-exact \
-        https://github.com/theory-cloud/AppTheory/releases/download/v3.3.0/theory-cloud-apptheory-3.3.0.tgz
+        https://github.com/theory-cloud/AppTheory/releases/download/v4.1.0/theory-cloud-apptheory-4.1.0.tgz
       npm install --save-exact \
-        https://github.com/theory-cloud/TableTheory/releases/download/v3.0.5/theory-cloud-tabletheory-ts-3.0.5.tgz
+        https://github.com/theory-cloud/TableTheory/releases/download/v3.0.6/theory-cloud-tabletheory-ts-3.0.6.tgz
     anti_patterns:
       - name: "Floating upstream versions"
         why: "FaceTheory docs and examples are validated against explicit upstream pins."
