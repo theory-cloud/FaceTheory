@@ -9,11 +9,11 @@ This file records the currently pinned versions and the exact install strings we
 
 - AppTheory (TypeScript): `v4.1.0`
 - AppTheory (CDK): `v4.1.0`
-- TableTheory (TypeScript): `v3.0.5`
+- TableTheory (TypeScript): `v3.0.6`
 
 ## Compatibility Impact
 
-The AppTheory `v4.1.0` runtime/CDK pins and the TableTheory `v3.0.5` TypeScript pin are a coordinated
+The AppTheory `v4.1.0` runtime/CDK pins and the TableTheory `v3.0.6` TypeScript pin are a coordinated
 FaceTheory compatibility baseline:
 
 - the AppTheory runtime pin keeps Lambda URL streaming and AppTheory integration examples on the same upstream release
@@ -38,7 +38,7 @@ and keep the single release lane intact.
 
 - AppTheory runtime tarball: `76b2b821cc8cd7923ebc93c6e8a849c7d4c2c7eebc13c88442e0fbec123f88a3`
 - AppTheory CDK tarball: `a5b7b610577033a3db2e546930290a15272f93d01442d240b070ea29e4710692`
-- TableTheory TypeScript tarball: `dfe97bc7931962c4df33b96bbfb89531123b81d723c4860c68704c3b6954b8a6`
+- TableTheory TypeScript tarball: `36a422c8516149fb894391cff952db1603d19df89de858cd660bba826021cf70`
 
 ## Known Audit Exceptions
 
@@ -69,7 +69,7 @@ npm install --save-exact \
 
   # TableTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v3.0.5/theory-cloud-tabletheory-ts-3.0.5.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v3.0.6/theory-cloud-tabletheory-ts-3.0.6.tgz
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
@@ -85,14 +85,14 @@ registry installs:
 {
   "devDependencies": {
     "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v4.1.0/theory-cloud-apptheory-4.1.0.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.5/theory-cloud-tabletheory-ts-3.0.5.tgz"
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.6/theory-cloud-tabletheory-ts-3.0.6.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.5/theory-cloud-tabletheory-ts-3.0.5.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.6/theory-cloud-tabletheory-ts-3.0.6.tgz"
     }
   }
 }
 ```
 
-Note: the mismatch is intentional — AppTheory v4.1.0 declares `@theory-cloud/tabletheory-ts` v3.0.6 transitively, while the `overrides` block above pins v3.0.5 as FaceTheory's validated baseline.
+Note: AppTheory v4.1.0 declares `@theory-cloud/tabletheory-ts` v3.0.6 transitively, and the `overrides` block above pins the same v3.0.6 tarball — the override matches the transitive requirement.
