@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.0.10-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.0.9...v4.0.10-rc) (2026-09-03)
+
+
+### Bug Fixes
+
+* **ci:** pass repo context to pages deploy dispatch ([dec60ca](https://github.com/theory-cloud/FaceTheory/commit/dec60cacefa3d2dade538b69f343f76f8e676809))
+* **ci:** pass repo context to pages deploy dispatch ([6411fb3](https://github.com/theory-cloud/FaceTheory/commit/6411fb3f57368e860f01c1b028dc971e2b6de2ed))
+* **deps:** align AppTheory v4.2.3 release-asset pins ([0bf911c](https://github.com/theory-cloud/FaceTheory/commit/0bf911c0f951321f3dc9bfbf002c345f01d460b6))
+* **deps:** align AppTheory v4.2.3 release-asset pins ([ae8e6a1](https://github.com/theory-cloud/FaceTheory/commit/ae8e6a170c0cefe2c0070aa1a4482fc728a84a49))
+* **deps:** resolve @humanfs/node advisory in ts lockfile ([2a4a571](https://github.com/theory-cloud/FaceTheory/commit/2a4a571753e5d4bfbde049993cfd20fd58f4f442))
+
 ## [4.0.9-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.0.8...v4.0.9-rc) (2026-08-25)
 
 
