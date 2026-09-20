@@ -1,0 +1,80 @@
+# Dependabot candidate-PR configuration.
+#
+# Dependabot opens grouped `chore(deps)` PRs. A `chore(deps)` commit does not, on
+# its own, meet this repo's staging release-eligibility expectations, so these PRs
+# are not merged as-is. Instead the steward consolidates the underlying updates --
+# in particular security updates -- into a single signed `fix(deps)` PR.
+#
+# This config exists so that a security alert automatically produces a candidate PR
+# with a visible, reviewable diff to consolidate from, instead of sitting without a
+# remediation PR (which is how the 2026-09 alert backlog accumulated).
+#
+# Every ecosystem targets `staging`, the normal feature and release-prep branch.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: "/ts"
+    target-branch: staging
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    groups:
+      ts-runtime:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: "/infra/apptheory-ssg-isr-site"
+    target-branch: staging
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "09:30"
+      timezone: America/New_York
+    open-pull-requests-limit: 3
+    groups:
+      infra-sites:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: "/infra/apptheory-ssr-site"
+    target-branch: staging
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "10:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 3
+    groups:
+      infra-sites:
+        patterns: ["*"]
+
+  - package-ecosystem: bundler
+    directory: "/docs"
+    target-branch: staging
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 3
+    groups:
+      docs:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: staging
+    schedule:
+      interval: weekly
+      day: thursday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]
