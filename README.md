@@ -76,7 +76,7 @@ Optional companion packages from pinned GitHub releases:
 
 - AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v4.2.3/theory-cloud-apptheory-4.2.3.tgz`
 - AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v4.2.3/theory-cloud-apptheory-cdk-4.2.3.tgz`
-- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v3.0.6/theory-cloud-tabletheory-ts-3.0.6.tgz`
+- TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v3.0.7/theory-cloud-tabletheory-ts-3.0.7.tgz`
 
 ## Quickstart
 
