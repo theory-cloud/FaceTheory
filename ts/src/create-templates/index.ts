@@ -63,7 +63,7 @@ function renderPackageJson(ctx: CreateTemplateContext): string {
     constructs: dependencyVersion(ctx, 'constructs', '10.8.0'),
     esbuild: dependencyVersion(ctx, 'esbuild', '^0.28.1'),
     tsx: dependencyVersion(ctx, 'tsx', '^4.22.3'),
-    typescript: dependencyVersion(ctx, 'typescript', '^5.9.3'),
+    typescript: dependencyVersion(ctx, 'typescript', '^6.0.3'),
     vite: dependencyVersion(ctx, 'vite', '^8'),
   };
 
