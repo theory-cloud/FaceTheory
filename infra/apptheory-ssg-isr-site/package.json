@@ -12,17 +12,17 @@
     "synth": "tsx scripts/synth.ts"
   },
   "devDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1098.0",
-    "@aws-sdk/client-s3": "^3.1098.0",
+    "@aws-sdk/client-dynamodb": "^3.1135.0",
+    "@aws-sdk/client-s3": "^3.1135.0",
     "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v4.2.3/theory-cloud-apptheory-4.2.3.tgz",
     "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v4.2.3/theory-cloud-apptheory-cdk-4.2.3.tgz",
     "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.7/theory-cloud-tabletheory-ts-3.0.7.tgz",
-    "@types/node": "^24.12.4",
+    "@types/node": "^26.6.1",
     "aws-cdk-lib": "2.265.0",
-    "constructs": "10.8.0",
-    "esbuild": "^0.28.1",
-    "tsx": "^4.22.3",
-    "typescript": "^6.0.3"
+    "constructs": "10.8.1",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
