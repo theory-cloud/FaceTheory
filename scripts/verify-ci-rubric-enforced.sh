@@ -140,17 +140,21 @@ require_contains \
   "infra/apptheory-ssg-isr-site/package-lock.json" \
   "node engines floor gate must scan infra/apptheory-ssg-isr-site/package-lock.json"
 require_contains "${ci}" "run: bash scripts/verify-lambda-runtime-deprecations.sh" "CI must gate deprecated Lambda runtimes at PR time"
+# The scanned-surface pins are quote-anchored deliberately. The bare paths also
+# appear in the checker's header comment, so an unanchored needle is satisfied
+# by that prose even after both surface lists are emptied; anchoring on the
+# quoted array element pins the constant instead of the comment.
 require_contains \
   "scripts/check-lambda-runtime-deprecations.mjs" \
-  "infra/apptheory-ssr-site/src/stack.ts" \
+  '"infra/apptheory-ssr-site/src/stack.ts",' \
   "deprecated runtime gate must scan infra/apptheory-ssr-site/src/stack.ts"
 require_contains \
   "scripts/check-lambda-runtime-deprecations.mjs" \
-  "infra/apptheory-ssg-isr-site/src/stack.ts" \
+  '"infra/apptheory-ssg-isr-site/src/stack.ts",' \
   "deprecated runtime gate must scan infra/apptheory-ssg-isr-site/src/stack.ts"
 require_contains \
   "scripts/check-lambda-runtime-deprecations.mjs" \
-  "ts/src/create-templates/index.ts" \
+  '"ts/src/create-templates/index.ts",' \
   "deprecated runtime gate must scan ts/src/create-templates/index.ts"
 require_contains "${ci}" "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1" "CI rubric job must upload governance evidence with the pinned upload-artifact action"
 require_contains "${ci}" "path: gov-infra/evidence/" "CI rubric job must upload gov-infra/evidence/"
