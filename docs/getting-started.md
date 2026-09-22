@@ -193,7 +193,7 @@ const assetsBucket = new s3.Bucket(this, "AssetsBucket", {
 });
 
 const ssrFunction = new NodejsFunction(this, "SsrFunction", {
-  runtime: lambda.Runtime.NODEJS_20_X,
+  runtime: lambda.Runtime.NODEJS_24_X,
   entry: "src/handler.ts",
   handler: "handler",
   timeout: Duration.seconds(10),

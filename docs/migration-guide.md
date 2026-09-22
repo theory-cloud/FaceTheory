@@ -13,20 +13,22 @@ Use this guide when you are:
 - replacing an ad hoc SSR handler with FaceTheory entrypoints
 - introducing SSG or ISR into an SSR-only FaceTheory app
 - updating AppTheory or TableTheory dependency pins
+- moving a deployed stack or a generated project off the deprecated `nodejs20.x` Lambda runtime
 
 ## Versioned Migration Index
 
 Use this index to find the migration path by release line. Release Please updates version markers automatically; do not hand-edit `x-release-please-version` comments when adding migration notes.
 
-| From                                    | To          | Migration path                                                                            | Notes                                                                                                                          |
-| --------------------------------------- | ----------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| App-local SSR glue                      | Current 3.x | [Migration 1](#migration-1-ad-hoc-handler-to-canonical-aws-entrypoint)                    | Move request translation into `createFaceApp()` and the Lambda/AppTheory entrypoints.                                          |
-| SSR-only FaceTheory apps                | Current 3.x | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr)                      | Reclassify routes into the three server `FaceMode` values before adding SPA navigation.                                        |
-| ISR routes without tenant partitioning  | Current 3.x | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                             |
-| Inline hydration / raw head workarounds | Current 3.x | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                      |
-| Svelte 4 adapter consumers              | v4.0.0      | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                  |
-| Deprecated 3.x public surface           | v4.0.0      | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated; `Headers` and `head.html` are removed; optional surfaces move to subpaths.                         |
-| Invalid 3.x Face contracts              | v4.0.0      | [Migration 10](#migration-10-v4-face-contract-construction-errors)                        | ISR Faces must set `revalidateSeconds` and parameterized SSG Faces must set `generateStaticParams()` before `createFaceApp()`. |
+| From                                    | To           | Migration path                                                                            | Notes                                                                                                                                    |
+| --------------------------------------- | ------------ | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| App-local SSR glue                      | Current 3.x  | [Migration 1](#migration-1-ad-hoc-handler-to-canonical-aws-entrypoint)                    | Move request translation into `createFaceApp()` and the Lambda/AppTheory entrypoints.                                                    |
+| SSR-only FaceTheory apps                | Current 3.x  | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr)                      | Reclassify routes into the three server `FaceMode` values before adding SPA navigation.                                                  |
+| ISR routes without tenant partitioning  | Current 3.x  | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                                       |
+| Inline hydration / raw head workarounds | Current 3.x  | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                                |
+| Svelte 4 adapter consumers              | v4.0.0       | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                            |
+| Deprecated 3.x public surface           | v4.0.0       | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated; `Headers` and `head.html` are removed; optional surfaces move to subpaths.                                   |
+| Invalid 3.x Face contracts              | v4.0.0       | [Migration 10](#migration-10-v4-face-contract-construction-errors)                        | ISR Faces must set `revalidateSeconds` and parameterized SSG Faces must set `generateStaticParams()` before `createFaceApp()`.           |
+| `nodejs20.x` Lambda stacks              | `nodejs24.x` | [Migration 11](#migration-11-node-20-to-node-24-lambda-runtime)                           | Support-contract update, not a breaking API change: regenerate or edit the one runtime line and redeploy before the AWS creation cutoff. |
 
 ## Scope Guardrails
 
@@ -373,6 +375,51 @@ Rollback:
 - keep the previous pinned 3.x FaceTheory release tarball until every Face satisfies the v4 contract
 - do not suppress construction errors in app-local factories; changing a mode or adding the missing contract field is
   the migration
+
+## Migration 11: Node 20 To Node 24 Lambda Runtime
+
+Use this path when a deployed stack or a generated project still declares the `nodejs20.x` Lambda runtime. This is a
+support-contract update rather than a breaking API migration: no FaceTheory import, Face mode, or render contract
+changes, so the release that carries it is a non-breaking `feat(...)` rather than a `feat!:`.
+
+Nothing is retroactively fixed. The reference stacks and the `facetheory create` scaffold now emit `nodejs24.x`, but a
+project that was already generated, and a stack that was already deployed, keep whatever runtime their own
+`infra/stack.ts` declares until an operator changes it.
+
+1. Regenerate the generated project's `infra/stack.ts` from the current scaffold, or edit the single `runtime:` line in
+   place:
+
+   ```ts
+   runtime: lambda.Runtime.NODEJS_24_X,
+   ```
+
+2. Redeploy the stack.
+3. Confirm the deployed function reports `nodejs24.x`.
+
+Two AWS deadlines matter, and they are not the same date:
+
+- **2027-02-01 - new stacks are blocked.** AWS disables _creation_ of `nodejs20.x` functions. Updating an existing
+  function in place still works before this date, but a new stack, a new region, or a disaster-recovery rebuild cannot
+  be created on `nodejs20.x` at all. Treat this as the real deadline.
+- **2027-03-03 - updates stop.** AWS stops `nodejs20.x` _updates_ entirely. An in-place `cdk deploy` that only changes
+  the runtime works until this date and not after it.
+
+The `nodejs20.x` deprecation date itself was 2026-04-30, which is why CDK already emits a synth-time warning for any
+stack that still declares it. `scripts/verify-lambda-runtime-deprecations.sh` turns that warning into a gate failure for
+the surfaces this repository owns.
+
+Validation:
+
+```bash
+cd <app>
+npx cdk diff   # the SsrFunction runtime change should be the only Lambda change
+npx cdk deploy
+```
+
+Rollback:
+
+- reverting the one `runtime:` line still deploys in place until 2027-03-03, but it does not restore the ability to
+  create a new `nodejs20.x` stack after 2027-02-01, so a rollback here is short-term only
 
 ## Rollback Notes
 
