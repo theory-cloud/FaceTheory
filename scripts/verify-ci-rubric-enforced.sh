@@ -127,6 +127,18 @@ require_contains "${ci}" "scripts/verify-release-train-promotion.sh" "release tr
 require_contains "${ci}" "  rubric:" "CI must define the full rubric job"
 require_contains "${ci}" "run: bash gov-infra/verifiers/gov-verify-rubric.sh" "CI rubric job must run the gov-infra verifier"
 require_contains "${ci}" "run: bash scripts/verify-node-engines-floor.sh" "CI must run the node engines floor gate at PR time"
+require_contains \
+  "scripts/check-node-engines-floor.mjs" \
+  "ts/package-lock.json" \
+  "node engines floor gate must scan ts/package-lock.json"
+require_contains \
+  "scripts/check-node-engines-floor.mjs" \
+  "infra/apptheory-ssr-site/package-lock.json" \
+  "node engines floor gate must scan infra/apptheory-ssr-site/package-lock.json"
+require_contains \
+  "scripts/check-node-engines-floor.mjs" \
+  "infra/apptheory-ssg-isr-site/package-lock.json" \
+  "node engines floor gate must scan infra/apptheory-ssg-isr-site/package-lock.json"
 require_contains "${ci}" "uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4" "CI rubric job must upload governance evidence with the pinned upload-artifact action"
 require_contains "${ci}" "path: gov-infra/evidence/" "CI rubric job must upload gov-infra/evidence/"
 require_contains "${ci}" "run_full_rubric:" "manual CI dispatch must expose an explicit full-rubric toggle"

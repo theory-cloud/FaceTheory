@@ -27,6 +27,13 @@
 // gate outright, and every `||` alternative is parsed before any is evaluated,
 // so strictness never depends on the order of the alternatives.
 //
+// A range admits the floor only when some concrete release (a version with no
+// prerelease component) satisfies it, and prereleases of the line's upper edge
+// sort above every release on the line: `>=23.0.0-0` admits no 22.x release
+// even though 23.0.0-0 itself lies above 22.0.0. Bounds are therefore
+// normalized to the release edge they delimit before the bands are compared,
+// which keeps the predicate exact in release space.
+//
 // ===========================================================================
 // Scope
 // ===========================================================================
@@ -38,14 +45,17 @@
 // fails the gate, since the project itself would then install on a runtime the
 // repository no longer supports.
 //
-// Fail-closed cases: a lockfile that is missing or unparseable, a lockfile
-// without a `packages` map, a non-string engines.node, and any range the
-// matcher does not model.
+// Fail-closed cases: a lockfile that is missing or unparseable, a `packages`
+// map that is absent, not an object, or empty, a root entry without a project
+// engines.node floor, an `engines` field that is present but not an object, a
+// non-string engines.node, and any range the matcher does not model.
 //
 // The lockfile set is hardcoded and there is no exception list, no waiver flag,
 // and no way to point the scan at a narrower set: every entry in scope is
-// judged. `--self-test` is the only argument, and it runs the matcher's
-// self-test plus synthetic-lockfile proofs before the real scan.
+// judged. EXPECTED_LOCKFILES is an independent copy of that set, so the
+// self-test fails when LOCKFILES is narrowed. `--self-test` is the only
+// argument, and it runs the matcher's self-test plus synthetic-lockfile proofs
+// before the real scan.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -56,6 +66,14 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const NODE_FLOOR_MAJOR = 22;
 
 const LOCKFILES = [
+  "ts/package-lock.json",
+  "infra/apptheory-ssr-site/package-lock.json",
+  "infra/apptheory-ssg-isr-site/package-lock.json",
+];
+
+// The scanned set, restated independently of LOCKFILES so the self-test catches
+// a scan scope that was narrowed instead of widened.
+const EXPECTED_LOCKFILES = [
   "ts/package-lock.json",
   "infra/apptheory-ssr-site/package-lock.json",
   "infra/apptheory-ssg-isr-site/package-lock.json",
@@ -288,33 +306,65 @@ function parseBranches(rawRange) {
     .map((branch) => branchBounds(branch));
 }
 
-function intersectsBand(bounds, band) {
-  const lower = maxLower(bounds.lower, band.lower);
-  const upper = minUpper(bounds.upper, band.upper);
-  if (lower === null || upper === null) return true;
-  const order = compareVersions(lower.version, upper.version);
-  if (order < 0) return true;
-  return order === 0 && lower.inclusive && upper.inclusive;
+// === release-space intersection ============================================
+// A band is a pair of version bounds; `null` means unbounded on that side. The
+// bounds are compared over concrete releases, so a prerelease bound collapses
+// to the release edge it delimits:
+//   lower `23.0.0-x` inclusive -> `23.0.0` inclusive (23.0.0 is the first release >= it)
+//   lower `23.0.0-x` exclusive -> `23.0.0` inclusive (23.0.0 is the first release > it)
+//   upper `23.0.0-x` inclusive -> `23.0.0` exclusive (no release <= it reaches 23.0.0)
+//   upper `23.0.0-x` exclusive -> `23.0.0` exclusive (no release lies between them)
+
+function toReleaseLower(bound) {
+  if (bound === null || bound.version.prerelease === null) return bound;
+  return { version: { ...bound.version, prerelease: null }, inclusive: true };
+}
+
+function toReleaseUpper(bound) {
+  if (bound === null || bound.version.prerelease === null) return bound;
+  return { version: { ...bound.version, prerelease: null }, inclusive: false };
+}
+
+const ZERO_RELEASE = { major: 0, minor: 0, patch: 0, prerelease: null };
+
+// Smallest concrete release admitted by an already-normalized lower bound.
+function firstRelease(lower) {
+  if (lower.inclusive) return lower.version;
+  return bump(lower.version, "patch");
+}
+
+// True when some concrete release satisfies both the range bounds and the band.
+function bandAdmitsRelease(bounds, band) {
+  const lower = maxLower(toReleaseLower(bounds.lower), toReleaseLower(band.lower));
+  const upper = minUpper(toReleaseUpper(bounds.upper), toReleaseUpper(band.upper));
+  if (upper === null) return true;
+  if (lower === null) {
+    // The band's upper edge is itself a release, so it witnesses the band
+    // unless it is exclusive at the 0.0.0 floor.
+    return upper.inclusive || compareVersions(upper.version, ZERO_RELEASE) > 0;
+  }
+  const order = compareVersions(firstRelease(lower), upper.version);
+  return upper.inclusive ? order <= 0 : order < 0;
 }
 
 // True when the range admits at least one release on the floor's major line,
-// i.e. when it intersects [floorMajor.0.0, (floorMajor + 1).0.0).
+// i.e. when a release in [floorMajor.0.0, (floorMajor + 1).0.0) satisfies it.
 function rangeAdmitsFloorMajor(rawRange, floorMajor) {
   const band = {
     lower: { version: { major: floorMajor, minor: 0, patch: 0, prerelease: null }, inclusive: true },
     upper: { version: { major: floorMajor + 1, minor: 0, patch: 0, prerelease: null }, inclusive: false },
   };
-  return parseBranches(rawRange).some((bounds) => intersectsBand(bounds, band));
+  return parseBranches(rawRange).some((bounds) => bandAdmitsRelease(bounds, band));
 }
 
-// True when the range admits any release below the floor line, i.e. when it
-// intersects [0.0.0, floorMajor.0.0).
+// True when the range admits any release below the floor line, i.e. when a
+// release in [0.0.0, floorMajor.0.0) satisfies it.
 function rangeAdmitsBelowFloorMajor(rawRange, floorMajor) {
   const band = {
     lower: null,
     upper: { version: { major: floorMajor, minor: 0, patch: 0, prerelease: null }, inclusive: false },
   };
-  return parseBranches(rawRange).some((bounds) => intersectsBand(bounds, band));
+  return parseBranches(rawRange).some((bounds) => bandAdmitsRelease(bounds, band));
 }
 
 // === scan ==================================================================
@@ -341,6 +391,12 @@ function readPackages(label) {
   if (packages === undefined || typeof packages !== "object" || packages === null) {
     throw new GateFailure(`${label} is missing its packages map`);
   }
+  if (Array.isArray(packages)) {
+    throw new GateFailure(`${label} packages must be an object, not an array`);
+  }
+  if (Object.keys(packages).length === 0) {
+    throw new GateFailure(`${label} packages map is empty`);
+  }
   return packages;
 }
 
@@ -354,7 +410,14 @@ function scanLockfile(label, floorMajor) {
   };
 
   for (const [packagePath, entry] of Object.entries(readPackages(label))) {
-    const declared = entry?.engines?.node;
+    const engines = entry?.engines;
+    if (engines === undefined || engines === null) continue;
+    if (typeof engines !== "object" || Array.isArray(engines)) {
+      throw new GateFailure(
+        `${label} ${packagePath || "<root>"} declares a non-object engines (${JSON.stringify(engines)})`,
+      );
+    }
+    const declared = engines.node;
     if (declared === undefined || declared === null) continue;
     if (typeof declared !== "string") {
       throw new GateFailure(
@@ -388,6 +451,14 @@ function scanLockfile(label, floorMajor) {
           `scripts/check-node-engines-floor.mjs does not model (${err.message}); ${UNMODELLED_GRAMMAR_HINT}`,
       );
     }
+  }
+
+  // A root that declares no floor is not a root without a floor: it admits
+  // every release the repository no longer supports, so it fails closed.
+  if (outcome.projectFloor === null) {
+    throw new GateFailure(
+      `${label} does not declare engines.node for its root entry (the project's own floor)`,
+    );
   }
 
   return outcome;
@@ -443,6 +514,12 @@ const MATCHER_CASES = [
   ["<23", NODE_FLOOR_MAJOR, true],
   ["<23.0.0", NODE_FLOOR_MAJOR, true],
   ["~22.1.0", NODE_FLOOR_MAJOR, true],
+  // Prerelease bounds on the floor line itself still admit floor releases.
+  [">=22.0.0-0", NODE_FLOOR_MAJOR, true],
+  [">=22.13.0-0", NODE_FLOOR_MAJOR, true],
+  ["<=23.0.0-0", NODE_FLOOR_MAJOR, true],
+  [">=22.0.0-0 <23.0.0", NODE_FLOOR_MAJOR, true],
+  ["<23.0.0-0", NODE_FLOOR_MAJOR, true],
   // Ranges that exclude the floor major.
   [">=24", NODE_FLOOR_MAJOR, false],
   [">24", NODE_FLOOR_MAJOR, false],
@@ -457,6 +534,19 @@ const MATCHER_CASES = [
   ["<22", NODE_FLOOR_MAJOR, false],
   ["<=21", NODE_FLOOR_MAJOR, false],
   ["21 - 21.9", NODE_FLOOR_MAJOR, false],
+  // Prereleases of the next line's release sort above every floor release, so
+  // they admit no floor release and must fail.
+  [">=23.0.0-0", NODE_FLOOR_MAJOR, false],
+  ["23.0.0-0", NODE_FLOOR_MAJOR, false],
+  ["=23.0.0-rc.0", NODE_FLOOR_MAJOR, false],
+  ["v23.0.0-0", NODE_FLOOR_MAJOR, false],
+  ["^23.0.0-alpha", NODE_FLOOR_MAJOR, false],
+  ["~23.0.0-beta", NODE_FLOOR_MAJOR, false],
+  [">23.0.0-0", NODE_FLOOR_MAJOR, false],
+  [">23.0.0-beta.1", NODE_FLOOR_MAJOR, false],
+  [">=23.0.0-0 <23.0.0", NODE_FLOOR_MAJOR, false],
+  // Exclusive bounds on adjacent releases admit no release either.
+  [">22.0.0 <22.0.1", NODE_FLOOR_MAJOR, false],
   // The drift class against a lower floor: this is what the gate exists to catch.
   [">=22", 20, false],
   [">=20", 20, true],
@@ -478,8 +568,19 @@ const ROOT_FLOOR_CASES = [
   ["", true],
   ["^18", true],
   [">=20.19.0 || >=22", true],
+  // A prerelease bound at the floor edge admits no release below the floor.
+  [">=22.0.0-0", false],
+  [">=22.0.0-0 <23.0.0", false],
+  ["^22.0.0-0", false],
+  [">=23.0.0-0", false],
+  // Mirror cases: a prerelease upper bound still admits earlier releases.
+  ["<22.0.0-0", true],
+  ["<=21.9.9-0", true],
 ];
 
+// Synthetic lockfiles driven through the real scan path: some must report
+// violations, and every fail-closed case must throw a GateFailure whose message
+// names the rule that fired, so a mutation that weakens one rule is caught.
 const SYNTHETIC_CASES = [
   {
     name: "dependency-excludes-floor",
@@ -489,6 +590,14 @@ const SYNTHETIC_CASES = [
       "node_modules/floor-on-line": { version: "0.0.1", engines: { node: ">=20" } },
     },
     expectedViolations: ["dependency node_modules/floor-too-high >=24"],
+  },
+  {
+    name: "dependency-excludes-floor-by-prerelease",
+    packages: {
+      "": { engines: { node: ">=22" } },
+      "node_modules/floor-too-high": { version: "1.2.3", engines: { node: ">=23.0.0-0" } },
+    },
+    expectedViolations: ["dependency node_modules/floor-too-high >=23.0.0-0"],
   },
   {
     name: "dependency-admits-floor",
@@ -509,22 +618,99 @@ const SYNTHETIC_CASES = [
     },
     expectedViolations: ["project <root> >=20"],
   },
+  {
+    name: "missing-lockfile",
+    missing: true,
+    expectFailureReason: "could not read lockfile",
+  },
+  {
+    name: "unparseable-lockfile",
+    text: "{not json",
+    expectFailureReason: "could not parse lockfile",
+  },
+  {
+    name: "packages-map-absent",
+    text: '{"lockfileVersion":3}',
+    expectFailureReason: "missing its packages map",
+  },
+  {
+    name: "packages-map-is-array",
+    text: '{"lockfileVersion":3,"packages":[]}',
+    expectFailureReason: "packages must be an object, not an array",
+  },
+  {
+    name: "packages-map-is-empty",
+    text: '{"lockfileVersion":3,"packages":{}}',
+    expectFailureReason: "packages map is empty",
+  },
+  {
+    name: "non-string-engines-node",
+    packages: {
+      "": { engines: { node: ">=22" } },
+      "node_modules/numeric-node": { version: "1.0.0", engines: { node: 24 } },
+    },
+    expectFailureReason: "non-string engines.node",
+  },
+  {
+    name: "non-object-engines",
+    packages: {
+      "": { engines: { node: ">=22" } },
+      "node_modules/string-engines": { version: "1.0.0", engines: ">=24" },
+    },
+    expectFailureReason: "non-object engines",
+  },
+  {
+    name: "root-without-engines-node",
+    packages: {
+      "": { name: "floorless" },
+      "node_modules/floor-on-line": { version: "0.0.1", engines: { node: ">=24" } },
+    },
+    expectFailureReason: "does not declare engines.node for its root entry",
+  },
+  {
+    name: "root-entry-absent",
+    packages: {
+      "node_modules/floor-on-line": { version: "0.0.1", engines: { node: ">=24" } },
+    },
+    expectFailureReason: "does not declare engines.node for its root entry",
+  },
 ];
 
 function selfTestViolationLabel(violation) {
   return `${violation.kind} ${violation.packagePath || "<root>"} ${violation.declared}`;
 }
 
-function writeSyntheticLockfile(tempDir, name, packages) {
-  const file = path.join(tempDir, name, "package-lock.json");
+function selfTestLockfilePath(tempDir, name) {
+  return path.join(tempDir, name, "package-lock.json");
+}
+
+function writeSyntheticLockfile(tempDir, scenario) {
+  const file = selfTestLockfilePath(tempDir, scenario.name);
+  if (scenario.missing === true) return file;
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify({ lockfileVersion: 3, packages }, null, 2));
+  const text =
+    scenario.text ?? JSON.stringify({ lockfileVersion: 3, packages: scenario.packages }, null, 2);
+  fs.writeFileSync(file, text);
   return file;
 }
 
 function runSelfTest() {
   const failures = [];
   let matcherCases = 0;
+
+  const scopeCases = 1;
+  const scopeMatches =
+    LOCKFILES.length === EXPECTED_LOCKFILES.length &&
+    LOCKFILES.every((label, index) => label === EXPECTED_LOCKFILES[index]);
+  if (!scopeMatches) {
+    failures.push(
+      `scanned lockfile set must be exactly ${JSON.stringify(EXPECTED_LOCKFILES)}, ` +
+        `got ${JSON.stringify(LOCKFILES)}`,
+    );
+  }
+  console.log(
+    `  self-test scan scope: ${scopeMatches ? `lockfiles ${LOCKFILES.length}` : "NOT THE EXPECTED SET"}`,
+  );
 
   for (const [rawRange, floorMajor, expected] of MATCHER_CASES) {
     matcherCases += 1;
@@ -573,24 +759,45 @@ function runSelfTest() {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "facetheory-node-engines-floor-"));
   try {
     for (const scenario of SYNTHETIC_CASES) {
-      const file = writeSyntheticLockfile(tempDir, scenario.name, scenario.packages);
-      let observed;
+      const file = writeSyntheticLockfile(tempDir, scenario);
+      let violations;
       try {
-        observed = scanLockfile(file, NODE_FLOOR_MAJOR).violations.map(selfTestViolationLabel);
+        violations = scanLockfile(file, NODE_FLOOR_MAJOR).violations.map(selfTestViolationLabel);
       } catch (err) {
-        failures.push(`synthetic lockfile ${scenario.name} threw ${err.message}`);
+        if (scenario.expectFailureReason === undefined) {
+          failures.push(`synthetic lockfile ${scenario.name} threw ${err.message}`);
+          console.log(`  self-test synthetic ${scenario.name}: UNEXPECTED FAILURE`);
+          continue;
+        }
+        if (!(err instanceof GateFailure) || !err.message.includes(scenario.expectFailureReason)) {
+          failures.push(
+            `synthetic lockfile ${scenario.name} must fail closed with ` +
+              `${JSON.stringify(scenario.expectFailureReason)}, got ${err.name}: ${err.message}`,
+          );
+          console.log(`  self-test synthetic ${scenario.name}: FAIL CLOSED FOR THE WRONG REASON`);
+          continue;
+        }
+        console.log(`  self-test synthetic ${scenario.name}: FAIL CLOSED (${scenario.expectFailureReason})`);
+        continue;
+      }
+      if (scenario.expectFailureReason !== undefined) {
+        failures.push(
+          `synthetic lockfile ${scenario.name} must fail closed with ` +
+            `${JSON.stringify(scenario.expectFailureReason)}, got violations ${JSON.stringify(violations)}`,
+        );
+        console.log(`  self-test synthetic ${scenario.name}: PASSED OPEN`);
         continue;
       }
       const expected = scenario.expectedViolations;
-      const matched = observed.length === expected.length && observed.every((value, i) => value === expected[i]);
+      const matched = violations.length === expected.length && violations.every((value, i) => value === expected[i]);
       if (!matched) {
         failures.push(
           `synthetic lockfile ${scenario.name} expected violations ${JSON.stringify(expected)}, ` +
-            `got ${JSON.stringify(observed)}`,
+            `got ${JSON.stringify(violations)}`,
         );
       }
       console.log(
-        `  self-test synthetic ${scenario.name}: ${observed.length === 0 ? "PASS" : `FAIL ${observed.join("; ")}`}`,
+        `  self-test synthetic ${scenario.name}: ${violations.length === 0 ? "PASS" : `FAIL ${violations.join("; ")}`}`,
       );
     }
   } finally {
@@ -600,11 +807,12 @@ function runSelfTest() {
   if (failures.length > 0) {
     for (const failure of failures) console.error(`  self-test: ${failure}`);
     throw new GateFailure(
-      `self-test failed (${failures.length} failures across ${matcherCases + SYNTHETIC_CASES.length} cases)`,
+      `self-test failed (${failures.length} failures across ` +
+        `${matcherCases + scopeCases + SYNTHETIC_CASES.length} cases)`,
     );
   }
 
-  return { matcherCases, syntheticCases: SYNTHETIC_CASES.length };
+  return { matcherCases, scopeCases, syntheticCases: SYNTHETIC_CASES.length };
 }
 
 // === entry point ===========================================================
@@ -631,9 +839,9 @@ function main() {
   const distinctRanges = new Set(outcomes.flatMap((outcome) => [...outcome.distinctRanges])).size;
 
   for (const outcome of outcomes) {
-    const declared = outcome.projectFloor === null ? "<none>" : JSON.stringify(outcome.projectFloor);
     console.log(
-      `  ${outcome.label} project engines.node ${declared} (${outcome.dependencyRanges} dependency engine ranges)`,
+      `  ${outcome.label} project engines.node ${JSON.stringify(outcome.projectFloor)} ` +
+        `(${outcome.dependencyRanges} dependency engine ranges)`,
     );
   }
 
@@ -648,7 +856,8 @@ function main() {
   }
 
   const selfTestSummary = selfTestCounts
-    ? `self-test ${selfTestCounts.matcherCases} matcher cases + ${selfTestCounts.syntheticCases} synthetic lockfiles; `
+    ? `self-test ${selfTestCounts.matcherCases + selfTestCounts.scopeCases} matcher and scope cases ` +
+      `+ ${selfTestCounts.syntheticCases} synthetic lockfiles; `
     : "";
   console.log(
     `node-engines-floor: PASS (${selfTestSummary}floor Node ${NODE_FLOOR_MAJOR}.x; ` +
