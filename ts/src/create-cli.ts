@@ -238,7 +238,7 @@ async function createContext(
     adapter,
     appName: appNameFromTarget(targetDir),
     packageName: packageNameFromTarget(targetDir),
-    nodeEngine: manifest.engines?.node ?? '>=20',
+    nodeEngine: manifest.engines?.node ?? '>=22',
     facetheoryTarball: faceTheoryTarball(manifest.version),
     appTheoryTarball,
     appTheoryCdkTarball: appTheoryCdkTarball(appTheoryTarball),
