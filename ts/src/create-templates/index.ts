@@ -252,7 +252,7 @@ export class FaceTheoryStarterStack extends Stack {
     });
 
     const ssrFunction = new NodejsFunction(this, 'SsrFunction', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.resolve(projectRoot, 'src/handler.ts'),
       handler: 'handler',
       timeout: Duration.seconds(10),

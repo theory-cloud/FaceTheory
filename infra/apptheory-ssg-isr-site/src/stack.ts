@@ -46,7 +46,7 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
     });
 
     const ssrFunction = new NodejsFunction(this, 'SsrFunction', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.resolve(__dirname, './ssr-handler.ts'),
       handler: 'handler',
       timeout: Duration.seconds(10),
