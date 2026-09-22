@@ -1,5 +1,3 @@
 # FaceTheory gov-infra supply-chain allowlist
 #
 # Add exact finding IDs only, with a short justification comment above each entry.
-# New advisory; no fixed aws-cdk release available; operator-authorized exception 2026-08-03 pending upstream fix.
-GHSA-rgw5-rvv9-x895
