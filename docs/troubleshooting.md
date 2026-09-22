@@ -10,7 +10,7 @@ Use this guide for recurring setup, build, and runtime failures that already hav
 
 | Symptom                                                               | Likely cause                                                                                  | Where to look                                                            |
 | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `npm ci` or scripts fail early                                        | Node.js is below the required baseline                                                        | `ts/package.json` (`engines.node: >=20`)                                 |
+| `npm ci` or scripts fail early                                        | Node.js is below the required baseline                                                        | `ts/package.json` (`engines.node: >=22`)                                 |
 | `npm run ssg` exits with usage errors                                 | Missing or invalid CLI flags                                                                  | `docs/api-reference.md` and `ts/src/ssg-cli.ts`                          |
 | SSG build fails during page generation                                | Network access was attempted without opting in                                                | `buildSsgSite()` and SSG fetch guard behavior                            |
 | SSG build fails with dot-segment output errors                        | `generateStaticParams()` returned `.` / `..` path segments                                    | `ts/src/ssg.ts` path validation and route params                         |
@@ -88,7 +88,7 @@ Symptoms:
 
 Cause:
 
-- FaceTheory requires Node.js `>=20`.
+- FaceTheory requires Node.js `>=22`. The floor moved from 20 to 22 when Node 20 reached end of life in April 2026.
 
 Solution:
 

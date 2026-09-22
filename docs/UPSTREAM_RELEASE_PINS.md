@@ -51,6 +51,9 @@ audit exit fails the verifier.
 - **bundled `brace-expansion`** — `aws-cdk-lib@2.265.0` bundles fixed `brace-expansion@5.0.9`, so the temporary
   `GHSA-mh99-v99m-4gvg` audit exception has been retired across all three projects.
 - **top-level `brace-expansion`** — non-bundled dependency paths resolve to fixed `brace-expansion@5.0.9`.
+- **`brace-expansion` 4.x/5.x DoS (`GHSA-rgw5-rvv9-x895`)** — cleared at `brace-expansion@5.0.9`, the patched floor for that
+  line, in every lockfile. The gov-infra supply-chain allowlist entry was removed rather than re-granted, so the allowlist
+  grants no exceptions and `scripts/verify-npm-audit.sh` fails on any finding that appears.
 - **`fast-uri`** — AppTheory CDK `v4.2.3` requires `aws-cdk-lib@2.265.0`, and the infra example
   lockfiles now resolve the previous nested `fast-uri` audit finding to the patched AWS CDK dependency set.
 
