@@ -139,6 +139,19 @@ require_contains \
   "scripts/check-node-engines-floor.mjs" \
   "infra/apptheory-ssg-isr-site/package-lock.json" \
   "node engines floor gate must scan infra/apptheory-ssg-isr-site/package-lock.json"
+require_contains "${ci}" "run: bash scripts/verify-lambda-runtime-deprecations.sh" "CI must gate deprecated Lambda runtimes at PR time"
+require_contains \
+  "scripts/check-lambda-runtime-deprecations.mjs" \
+  "infra/apptheory-ssr-site/src/stack.ts" \
+  "deprecated runtime gate must scan infra/apptheory-ssr-site/src/stack.ts"
+require_contains \
+  "scripts/check-lambda-runtime-deprecations.mjs" \
+  "infra/apptheory-ssg-isr-site/src/stack.ts" \
+  "deprecated runtime gate must scan infra/apptheory-ssg-isr-site/src/stack.ts"
+require_contains \
+  "scripts/check-lambda-runtime-deprecations.mjs" \
+  "ts/src/create-templates/index.ts" \
+  "deprecated runtime gate must scan ts/src/create-templates/index.ts"
 require_contains "${ci}" "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1" "CI rubric job must upload governance evidence with the pinned upload-artifact action"
 require_contains "${ci}" "path: gov-infra/evidence/" "CI rubric job must upload gov-infra/evidence/"
 require_contains "${ci}" "run_full_rubric:" "manual CI dispatch must expose an explicit full-rubric toggle"

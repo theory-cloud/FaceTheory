@@ -139,6 +139,8 @@ jobs:
           make ts-coverage
       - name: Verify node dependency engines admit the Node floor
         run: bash scripts/verify-node-engines-floor.sh
+      - name: Verify Lambda runtimes are not deprecated
+        run: bash scripts/verify-lambda-runtime-deprecations.sh
       - name: Upload TypeScript coverage report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
