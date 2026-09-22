@@ -92,7 +92,7 @@ for position, start in enumerate(step_starts):
         continue
     end = step_starts[position + 1] if position + 1 < len(step_starts) else len(job_lines)
     step_text = "\n".join(job_lines[start:end])
-    if "uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2" not in step_text:
+    if "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1" not in step_text:
         continue
     missing = [
         needle
@@ -139,7 +139,7 @@ require_contains \
   "scripts/check-node-engines-floor.mjs" \
   "infra/apptheory-ssg-isr-site/package-lock.json" \
   "node engines floor gate must scan infra/apptheory-ssg-isr-site/package-lock.json"
-require_contains "${ci}" "uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4" "CI rubric job must upload governance evidence with the pinned upload-artifact action"
+require_contains "${ci}" "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1" "CI rubric job must upload governance evidence with the pinned upload-artifact action"
 require_contains "${ci}" "path: gov-infra/evidence/" "CI rubric job must upload gov-infra/evidence/"
 require_contains "${ci}" "run_full_rubric:" "manual CI dispatch must expose an explicit full-rubric toggle"
 require_contains "${ci}" "default: true" "manual CI dispatch must continue to run the full rubric by default"
