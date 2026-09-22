@@ -113,6 +113,7 @@ Every public subpath below is declared in `ts/package.json` and mirrored in `doc
 - [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v4.0.10/docs/core-patterns.md)
 - [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v4.0.10/docs/testing-guide.md)
 - [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v4.0.10/docs/cdk/README.md)
+
 <!-- x-release-please-end -->
 
 The `v4.0.10` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->
