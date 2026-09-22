@@ -137,6 +137,8 @@ jobs:
           make docs-export-map
           make ts-test
           make ts-coverage
+      - name: Verify node dependency engines admit the Node floor
+        run: bash scripts/verify-node-engines-floor.sh
       - name: Upload TypeScript coverage report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
