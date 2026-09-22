@@ -45,6 +45,13 @@
 // runtime, so the gate cannot be neutered by deleting a line or by switching a
 // surface to a runtime value the model cannot read.
 //
+// "Declares a runtime" means the same thing to the coverage walk and to the
+// per-surface scan, and it covers the receiver forms a real surface uses:
+// `lambda.Runtime.X`, a named import's `Runtime.X`, and either of those aliased
+// to a local name. A surface that binds the namespace and then hides the member
+// behind an index, a lookup table, or a helper declares nothing the model can
+// read, which fails closed rather than passing unjudged.
+//
 // Two directories are deliberately outside the walk, for stated reasons rather
 // than convenience:
 //
@@ -184,7 +191,57 @@ function fail(message) {
 // while `lambda.Runtime.fromString(...)` is not: a method's argument is judged
 // by the literal rule below, and an unmodelled dynamic runtime leaves the
 // surface without a declaration, which fails closed on its own.
-const ENUM_DECLARATION_RE = /\blambda\.Runtime\.([A-Z][A-Z0-9_]*)\b/g;
+//
+// The receiver is read in three forms, because requiring the literal text
+// `lambda.Runtime.` left the other two declaring nothing at all:
+//
+//   lambda.Runtime.NODEJS_20_X   a `lambda` namespace import's member
+//   Runtime.NODEJS_20_X          a named import: `import { Runtime } from ...`
+//   R.NODEJS_20_X                either of the above aliased to a local name:
+//                                `const R = lambda.Runtime`, or
+//                                `import { Runtime as R } from ...`
+//
+// A new undeclared surface written in either of the last two idioms was
+// invisible to the classifier and to the coverage walk alike, so it passed the
+// gate without ever being judged. The receiver list is therefore built per
+// surface: the two fixed receivers plus whatever aliases that surface binds.
+const RUNTIME_NAMESPACE_RECEIVERS = ["lambda\\.Runtime", "Runtime"];
+
+// An alias is a binding, never a declaration: an enum member still has to
+// follow it. A surface that binds the namespace and then hides the member ends
+// up with no readable declaration, which is the fail-closed outcome this gate
+// wants rather than a reason to widen further.
+const RUNTIME_NAMESPACE_ALIAS_RES = [
+  // const R = lambda.Runtime   /   let R = Runtime
+  /\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:lambda\.Runtime|Runtime)\b(?!\s*\.)/g,
+  // import { Runtime as R } from 'aws-cdk-lib/aws-lambda'
+  /\bimport\s*\{[^}]*?\bRuntime\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)[^}]*?\}\s*from\s*["'][^"']*aws-lambda["']/g,
+];
+
+// Every runtime enum this gate models is SCREAMING_CASE, and that is what keeps
+// the widened receiver prefix from swallowing unrelated `Runtime.` namespaces:
+// Node's inspector domain spells its members `Runtime.ScriptId` and
+// `Runtime.StackTrace`, which do not match. The two non-Lambda runtime strings
+// this repository synthesizes (`cloudfront-js-2.0` for CloudFront Functions and
+// CDK's `python3.13` custom-resource provider) are quoted literals, so the enum
+// rule never sees them either - and both live in the excluded snapshots.
+const ENUM_MEMBER_NAME = "([A-Z][A-Z0-9_]*)";
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// The enum-member pattern for one surface: the fixed receivers first, so
+// `lambda.Runtime.NODEJS_20_X` is consumed whole rather than re-matching as the
+// bare `Runtime.NODEJS_20_X` inside it, then that surface's aliases.
+function enumDeclarationPattern(text) {
+  const aliases = new Set();
+  for (const pattern of RUNTIME_NAMESPACE_ALIAS_RES) {
+    for (const match of text.matchAll(pattern)) aliases.add(match[1]);
+  }
+  const receivers = [...RUNTIME_NAMESPACE_RECEIVERS, ...[...aliases].sort().map(escapeRegExp)];
+  return new RegExp(`\\b(${receivers.join("|")})\\.${ENUM_MEMBER_NAME}\\b`, "g");
+}
 
 // Quoted strings that could be a runtime identifier. Deliberately loose - the
 // predicate below decides, so a candidate that is not a runtime is simply not a
@@ -214,14 +271,17 @@ function lineOf(text, index) {
 // Collects every runtime declaration in a surface's text, in source order, as
 // { line, form, identifier, enumName }. `identifier` is null when the form
 // could not be resolved to a runtime, and `enumName` is null for literal forms.
+// `form` is the receiver exactly as written, so a violation reports the idiom
+// the surface actually used rather than the one the gate prefers.
 function collectDeclarations(text) {
   const declarations = [];
-  for (const match of text.matchAll(ENUM_DECLARATION_RE)) {
-    const enumName = match[1];
+  for (const match of text.matchAll(enumDeclarationPattern(text))) {
+    const receiver = match[1];
+    const enumName = match[2];
     declarations.push({
       index: match.index,
       line: lineOf(text, match.index),
-      form: `lambda.Runtime.${enumName}`,
+      form: `${receiver}.${enumName}`,
       enumName,
       identifier: LAMBDA_RUNTIME_ENUMS.get(enumName) ?? null,
     });
@@ -427,6 +487,41 @@ const CLASSIFIER_CASES = [
     text: 'runtime: lambda.Runtime.NODEJS_24_X,\nconst a = "node_modules";\nconst b = "assets";\nconst c = ">=22";\nconst d = "go.mod";\nconst e = "vite";\nconst f = "1.2.3";\n',
     expected: [],
   },
+  // The receiver forms a named import and a local alias introduce. Before the
+  // widened receiver prefix each of these surfaces declared nothing, so a file
+  // written this way escaped both the classifier and the coverage walk.
+  {
+    name: "deprecated-runtime-through-a-named-import",
+    text: "import { Runtime } from 'aws-cdk-lib/aws-lambda';\n\nnew NodejsFunction(this, 'SsrFunction', {\n  runtime: Runtime.NODEJS_20_X,\n});\n",
+    expected: ["deprecated"],
+  },
+  {
+    name: "supported-runtime-through-a-named-import",
+    text: "import { Runtime } from 'aws-cdk-lib/aws-lambda';\nruntime: Runtime.NODEJS_24_X,\n",
+    expected: [],
+  },
+  {
+    name: "deprecated-runtime-through-an-aliased-namespace",
+    text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst R = lambda.Runtime;\nruntime: R.NODEJS_20_X,\n",
+    expected: ["deprecated"],
+  },
+  {
+    name: "supported-runtime-through-an-aliased-namespace",
+    text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst R = lambda.Runtime;\nruntime: R.NODEJS_24_X,\n",
+    expected: [],
+  },
+  {
+    name: "deprecated-runtime-through-a-renamed-named-import",
+    text: "import { Runtime as R } from 'aws-cdk-lib/aws-lambda';\nruntime: R.NODEJS_18_X,\n",
+    expected: ["deprecated"],
+  },
+  // A surface that was declared and then switched idiom is still caught: the
+  // scaffold template below is one half of a real scanned surface.
+  {
+    name: "scaffold-template-switching-to-a-named-import",
+    text: "export const INFRA_STACK = `\nimport { Runtime } from 'aws-cdk-lib/aws-lambda';\n  runtime: Runtime.NODEJS_20_X,\n`;\n",
+    expected: ["deprecated"],
+  },
 ];
 
 const FAIL_CLOSED_CASES = [
@@ -438,6 +533,19 @@ const FAIL_CLOSED_CASES = [
   {
     name: "surface-of-only-quoted-non-runtimes",
     text: 'const a = "node_modules";\nconst b = "1.2.3";\n',
+    expectFailureReason: "declares no modelled Lambda runtime",
+  },
+  // Binding the namespace and then hiding the member is not a way to declare
+  // nothing and still pass: the surface has no readable declaration, so it fails
+  // closed on the same rule that catches an obfuscated surface.
+  {
+    name: "named-import-with-an-unreadable-member",
+    text: "import { Runtime } from 'aws-cdk-lib/aws-lambda';\nruntime: Runtime[legacyRuntimeName],\n",
+    expectFailureReason: "declares no modelled Lambda runtime",
+  },
+  {
+    name: "aliased-namespace-with-an-unreadable-member",
+    text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst R = lambda.Runtime;\nruntime: R[process.env.FACETHEORY_RUNTIME],\n",
     expectFailureReason: "declares no modelled Lambda runtime",
   },
 ];
