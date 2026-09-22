@@ -23,4 +23,27 @@ npm-audit: PASS (infra/apptheory-ssg-isr-site)
   infra/apptheory-ssr-site/package-lock.json project engines.node ">=24" (111 dependency engine ranges)
   infra/apptheory-ssg-isr-site/package-lock.json project engines.node ">=24" (213 dependency engine ranges)
 node-engines-floor: PASS (self-test 82 matcher and scope cases + 13 synthetic lockfiles; floor Node 22.x; lockfiles 3; dependency engine ranges 773; distinct ranges 73)
+  self-test scan scope: surfaces 3
+  self-test coverage scope: roots 2
+  self-test coverage walk: 3 surfaces
+  self-test synthetic supported-pinned-runtime: PASS
+  self-test synthetic supported-floor-runtime: PASS
+  self-test synthetic deprecated-runtime: FAIL deprecated
+  self-test synthetic deprecated-runtime-older-than-the-minimum: FAIL deprecated
+  self-test synthetic deprecated-runtime-in-a-scaffold-template-literal: FAIL deprecated
+  self-test synthetic unpinned-moving-alias: FAIL unpinned-alias
+  self-test synthetic unmodelled-enum: FAIL unmodelled-enum
+  self-test synthetic unmodelled-runtime-literal: FAIL unmodelled-runtime
+  self-test synthetic deprecated-runtime-literal: FAIL deprecated
+  self-test synthetic supported-runtime-literal: PASS
+  self-test synthetic provided-al2023-literal: FAIL unmodelled-runtime
+  self-test synthetic every-declaration-is-judged: FAIL deprecated; deprecated
+  self-test synthetic quoted-strings-that-are-not-runtimes: PASS
+  self-test synthetic surface-without-a-declaration: FAIL CLOSED (declares no modelled Lambda runtime)
+  self-test synthetic surface-of-only-quoted-non-runtimes: FAIL CLOSED (declares no modelled Lambda runtime)
+  self-test missing surface: FAIL CLOSED (could not read scanned surface)
+  infra/apptheory-ssr-site/src/stack.ts declares 1 Lambda runtime(s)
+  infra/apptheory-ssg-isr-site/src/stack.ts declares 1 Lambda runtime(s)
+  ts/src/create-templates/index.ts declares 1 Lambda runtime(s)
+lambda-runtime-deprecations: PASS (self-test 16 synthetic surfaces + 2 scope cases; surfaces 3; declarations 3; deprecated set 11; supported nodejs22.x, nodejs24.x)
 workflow-action-pins: PASS
