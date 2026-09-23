@@ -94,12 +94,18 @@
 // runtime; and any file inside SCAN_ROOTS that declares a Lambda runtime without
 // being a declared surface.
 //
+// A coverage walk that cannot run is a gate failure in its own right, and it
+// reports as this gate's FAIL line rather than as an uncaught stack trace: a
+// missing scan root means the scope was never checked, which is the one outcome
+// this gate must never present as a passing scan.
+//
 // The scope is owned by this checker and there is no allowlist, no waiver flag,
 // and no exception list. EXPECTED_SCANNED_SURFACES and EXPECTED_SCAN_ROOTS are
 // independent copies of the scope, so the self-test fails when either is
 // narrowed. `--self-test` is the only argument, and it runs the classifier
 // self-test plus synthetic surfaces driven through the real read path before
 // the real scan.
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -889,15 +895,64 @@ function runSelfTest() {
     }
   }
 
+  // The entry-point error boundary is in main(), so it can only be pinned by
+  // running the entry point. This probe copies the checker into a scratch
+  // repository whose second scan root is absent, runs the bare path there, and
+  // asserts the child reported this gate's own FAIL line: a coverage walk that
+  // cannot run must never present itself as a passing scan, and an uncaught
+  // GateFailure stack trace is not that FAIL line.
+  const entryPointProbes = 1;
+  try {
+    const scratchRoot = fs.mkdtempSync(path.join(os.tmpdir(), "facetheory-lambda-entry-point-"));
+    try {
+      const scratchScripts = path.join(scratchRoot, "scripts");
+      fs.mkdirSync(scratchScripts, { recursive: true });
+      fs.copyFileSync(
+        fileURLToPath(import.meta.url),
+        path.join(scratchScripts, "check-lambda-runtime-deprecations.mjs"),
+      );
+      // The first scan root exists and is empty, so the walk reaches the absent
+      // root instead of stopping at the first one.
+      fs.mkdirSync(path.join(scratchRoot, SCAN_ROOTS[0]));
+      const probe = spawnSync(
+        process.execPath,
+        [path.join(scratchScripts, "check-lambda-runtime-deprecations.mjs")],
+        { encoding: "utf8" },
+      );
+      const output = `${probe.stdout ?? ""}${probe.stderr ?? ""}`;
+      const reportedMissingRoot =
+        /lambda-runtime-deprecations: FAIL \(scan root \S+ is missing/.test(output);
+      const stackFrames = /\n\s+at /.test(output);
+      if (probe.status !== 1 || !reportedMissingRoot || stackFrames) {
+        failures.push(
+          `an entry point whose coverage walk cannot run must report the gate FAIL line with no ` +
+            `stack frames; got exit ${probe.status}, FAIL line ` +
+            `${reportedMissingRoot ? "present" : "absent"}, stack frames ` +
+            `${stackFrames ? "present" : "absent"}: ${output.trim()}`,
+        );
+        console.log("  self-test entry point without a coverage scan root: NOT A GATE FAILURE");
+      } else {
+        console.log(
+          "  self-test entry point without a coverage scan root: FAIL CLOSED (gate FAIL line, no stack frames)",
+        );
+      }
+    } finally {
+      fs.rmSync(scratchRoot, { recursive: true, force: true });
+    }
+  } catch (err) {
+    failures.push(`entry-point probe threw ${err.name}: ${err.message}`);
+    console.log("  self-test entry point without a coverage scan root: UNEXPECTED FAILURE");
+  }
+
   if (failures.length > 0) {
     for (const failure of failures) console.error(`  self-test: ${failure}`);
     throw new GateFailure(
-      `self-test failed (${failures.length} failures across ${classifierCases} synthetic surfaces ` +
-        `plus ${scopeCases} scope cases)`,
+      `self-test failed (${failures.length} failures across ${classifierCases} synthetic surfaces, ` +
+        `${scopeCases} scope cases, and ${entryPointProbes} entry-point probe)`,
     );
   }
 
-  return { classifierCases, scopeCases };
+  return { classifierCases, scopeCases, entryPointProbes };
 }
 
 // === entry point ===========================================================
@@ -924,8 +979,19 @@ function main() {
 
   if (!selfTest) {
     // The coverage walk is what makes an unmodelled surface fail closed; it runs
-    // on every real scan, not only under --self-test.
-    const discovered = collectDeclarationSurfaces();
+    // on every real scan, not only under --self-test. It carries the same error
+    // boundary as the surface scan below, because a walk that cannot run - a scan
+    // root that is missing, an unreadable tree - is a gate failure that has to
+    // report as this gate's FAIL line. Without the boundary the GateFailure
+    // escaped main() and node printed an uncaught stack trace instead, which is
+    // not a report any consumer of this gate can read.
+    let discovered;
+    try {
+      discovered = collectDeclarationSurfaces();
+    } catch (err) {
+      if (err instanceof GateFailure) fail(err.message);
+      throw err;
+    }
     const expected = [...SCANNED_SURFACES].sort();
     const undeclared = discovered.filter((label) => !SCANNED_SURFACES.includes(label));
     if (undeclared.length > 0) {
@@ -968,7 +1034,8 @@ function main() {
   }
 
   const selfTestSummary = selfTestCounts
-    ? `self-test ${selfTestCounts.classifierCases} synthetic surfaces + ${selfTestCounts.scopeCases} scope cases; `
+    ? `self-test ${selfTestCounts.classifierCases} synthetic surfaces + ` +
+      `${selfTestCounts.scopeCases} scope cases + ${selfTestCounts.entryPointProbes} entry-point probe; `
     : "";
   console.log(
     `lambda-runtime-deprecations: PASS (${selfTestSummary}surfaces ${outcomes.length}; ` +
