@@ -47,10 +47,27 @@
 //
 // "Declares a runtime" means the same thing to the coverage walk and to the
 // per-surface scan, and it covers the receiver forms a real surface uses:
-// `lambda.Runtime.X`, a named import's `Runtime.X`, and either of those aliased
-// to a local name. A surface that binds the namespace and then hides the member
-// behind an index, a lookup table, or a helper declares nothing the model can
-// read, which fails closed rather than passing unjudged.
+// `lambda.Runtime.X`, a named import's `Runtime.X`, `lambda['Runtime'].X`, a
+// renamed destructure's `const { Runtime: RT } = lambda` with `RT.X`, and
+// either of the first two aliased to a local name through any number of hops
+// (`const R = lambda.Runtime`, then `const R2 = R`). A surface that binds the
+// namespace and then hides the member behind a computed index, a lookup table,
+// or a helper declares nothing the model can read, which fails closed rather
+// than passing unjudged.
+//
+// A quoted literal is a declaration only as the argument of `fromString` on one
+// of those receivers. Scoping it that way is what keeps the rule honest in both
+// directions: an unmodelled argument (`fromString('rust1.0')`, or a family with
+// no version such as `fromString('provided')`) is recorded and fails closed
+// instead of vanishing, while a runtime-shaped string that is not a runtime
+// argument - a log message, a description, `'nodejs22.x'` beside a genuinely
+// dynamic `fromString(config.runtime)` - is no longer read as a declaration
+// that rescues the surface. Two consequences are deliberate rather than
+// oversights: `fromString` with a non-literal argument declares nothing
+// readable, and a call whose receiver is not traceable to a Runtime binding
+// (a bare `fromString('nodejs18.x')` in a helper) is not read either. Both leave
+// the surface without the declaration that would otherwise be judged, so they
+// end in the same fail-closed rule as an obfuscated surface.
 //
 // Two directories are deliberately outside the walk, for stated reasons rather
 // than convenience:
@@ -72,9 +89,15 @@
 //
 // Fail-closed cases: a surface that is missing, unreadable, or declares no
 // modelled runtime; a runtime literal in a modelled shape whose family or value
-// is not modelled; a declaration that names an unpinned moving alias rather
-// than a pinned runtime; and any file inside SCAN_ROOTS that declares a Lambda
-// runtime without being a declared surface.
+// is not modelled, including a `fromString` argument that resolves to no runtime
+// at all; a declaration that names an unpinned moving alias rather than a pinned
+// runtime; and any file inside SCAN_ROOTS that declares a Lambda runtime without
+// being a declared surface.
+//
+// A coverage walk that cannot run is a gate failure in its own right, and it
+// reports as this gate's FAIL line rather than as an uncaught stack trace: a
+// missing scan root means the scope was never checked, which is the one outcome
+// this gate must never present as a passing scan.
 //
 // The scope is owned by this checker and there is no allowlist, no waiver flag,
 // and no exception list. EXPECTED_SCANNED_SURFACES and EXPECTED_SCAN_ROOTS are
@@ -82,6 +105,7 @@
 // narrowed. `--self-test` is the only argument, and it runs the classifier
 // self-test plus synthetic surfaces driven through the real read path before
 // the real scan.
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -192,68 +216,150 @@ function fail(message) {
 // by the literal rule below, and an unmodelled dynamic runtime leaves the
 // surface without a declaration, which fails closed on its own.
 //
-// The receiver is read in three forms, because requiring the literal text
-// `lambda.Runtime.` left the other two declaring nothing at all:
+// The receiver is read in five forms, because requiring the literal text
+// `lambda.Runtime.` left the others declaring nothing at all:
 //
 //   lambda.Runtime.NODEJS_20_X   a `lambda` namespace import's member
 //   Runtime.NODEJS_20_X          a named import: `import { Runtime } from ...`
-//   R.NODEJS_20_X                either of the above aliased to a local name:
-//                                `const R = lambda.Runtime`, or
-//                                `import { Runtime as R } from ...`
+//   lambda['Runtime'].NODEJS_20_X
+//                                 that member read through a quoted index
+//   R.NODEJS_20_X                 any of the above aliased to a local name:
+//                                 `const R = lambda.Runtime`,
+//                                 `import { Runtime as R } from ...`,
+//                                 `const { Runtime: R } = lambda`, or a second
+//                                 hop, `const R2 = R` where `R` is an alias
+//   R.fromString('nodejs20.x')    a runtime literal passed to the enum factory
 //
-// A new undeclared surface written in either of the last two idioms was
-// invisible to the classifier and to the coverage walk alike, so it passed the
-// gate without ever being judged. The receiver list is therefore built per
-// surface: the two fixed receivers plus whatever aliases that surface binds.
+// A new undeclared surface written in any of those idioms was invisible to the
+// classifier and to the coverage walk alike, so it passed the gate without ever
+// being judged. The receiver list is therefore built per surface: the fixed
+// receivers plus whatever names that surface binds.
+//
+// What stays outside the model, deliberately and now by measurement rather than
+// by omission: a member read through a computed key (`R[process.env.NAME]`), a
+// runtime hidden behind a lookup table or a helper, a `['Runtime']` read bound
+// to a local name and used later, an enum member read as `R['NODEJS_20_X']`, and
+// a bare `fromString('nodejs20.x')` on no receiver. None of them yields a
+// declaration, so a surface written that way fails closed on the "declares no
+// modelled Lambda runtime" rule instead of passing unjudged.
 const RUNTIME_NAMESPACE_RECEIVERS = ["lambda\\.Runtime", "Runtime"];
 
-// An alias is a binding, never a declaration: an enum member still has to
-// follow it. A surface that binds the namespace and then hides the member ends
-// up with no readable declaration, which is the fail-closed outcome this gate
-// wants rather than a reason to widen further.
-const RUNTIME_NAMESPACE_ALIAS_RES = [
+// Names a surface binds to the Runtime enum (`R` beside `R.NODEJS_20_X`) or to
+// the aws-lambda namespace itself (`L` beside `L['Runtime'].NODEJS_20_X`). A
+// binding is never a declaration: an enum member still has to follow it. A
+// surface that binds the namespace and then hides the member ends up with no
+// readable declaration, which is the fail-closed outcome this gate wants rather
+// than a reason to widen further.
+//
+// Each form carries the same lookahead, and that lookahead is what keeps a hop a
+// hop: `const R2 = R` is an alias of the receiver, while `const V = R.NODEJS_20_X`
+// and `const R = lambda.Runtime['NODEJS_20_X']` bind a runtime value and must not
+// be chased into a receiver.
+const BINDING_NOT_FOLLOWED_BY_A_MEMBER = String.raw`(?![\s]*[.[])`;
+const RUNTIME_RECEIVER_BINDING_RES = [
   // const R = lambda.Runtime   /   let R = Runtime
-  /\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:lambda\.Runtime|Runtime)\b(?!\s*\.)/g,
+  new RegExp(
+    String.raw`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:lambda\.Runtime|Runtime)\b${BINDING_NOT_FOLLOWED_BY_A_MEMBER}`,
+    "g",
+  ),
   // import { Runtime as R } from 'aws-cdk-lib/aws-lambda'
   /\bimport\s*\{[^}]*?\bRuntime\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)[^}]*?\}\s*from\s*["'][^"']*aws-lambda["']/g,
+  // const { Runtime: R } = lambda
+  /\b(?:const|let|var)\s*\{[^}]*?\bRuntime\s*:\s*([A-Za-z_$][A-Za-z0-9_$]*)[^}]*?\}\s*=/g,
 ];
 
+const RUNTIME_NAMESPACE_BINDING_RES = [
+  // import * as lambda from 'aws-cdk-lib/aws-lambda'
+  /\bimport\s+\*\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+from\s*["'][^"']*aws-lambda["']/g,
+];
+
+// `const R2 = R`: one binding of another. Chased to a fixed point, so an alias of
+// an alias is still a receiver.
+const RUNTIME_BINDING_HOP_RE = new RegExp(
+  String.raw`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*([A-Za-z_$][A-Za-z0-9_$]*)\b${BINDING_NOT_FOLLOWED_BY_A_MEMBER}`,
+  "g",
+);
+
+// The receiver alternation for one surface: every `['Runtime']` index form of a
+// namespace binding, the two fixed receivers, then every local name bound to the
+// enum. `lambda` is in the namespace set unconditionally, because the fixed
+// receiver list already reads its `lambda.Runtime` member as text rather than as
+// something to resolve through an import.
+function runtimeReceiverAlternation(text) {
+  const receivers = new Set();
+  for (const pattern of RUNTIME_RECEIVER_BINDING_RES) {
+    for (const match of text.matchAll(pattern)) receivers.add(match[1]);
+  }
+  const namespaces = new Set(["lambda"]);
+  for (const pattern of RUNTIME_NAMESPACE_BINDING_RES) {
+    for (const match of text.matchAll(pattern)) namespaces.add(match[1]);
+  }
+  for (;;) {
+    let changed = false;
+    for (const match of text.matchAll(RUNTIME_BINDING_HOP_RE)) {
+      const [target, source] = [match[1], match[2]];
+      if (receivers.has(source) && !receivers.has(target)) {
+        receivers.add(target);
+        changed = true;
+      } else if (namespaces.has(source) && !namespaces.has(target)) {
+        namespaces.add(target);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  const indexForms = [...namespaces]
+    .sort()
+    .map((name) => `${escapeRegExp(name)}\\s*\\[\\s*["']Runtime["']\\s*\\]`);
+  return [
+    ...indexForms,
+    ...RUNTIME_NAMESPACE_RECEIVERS,
+    ...[...receivers].sort().map(escapeRegExp),
+  ].join("|");
+}
+
 // Every runtime enum this gate models is SCREAMING_CASE, and that is what keeps
-// the widened receiver prefix from swallowing unrelated `Runtime.` namespaces:
+// the widened receiver list from swallowing unrelated `Runtime.` namespaces:
 // Node's inspector domain spells its members `Runtime.ScriptId` and
-// `Runtime.StackTrace`, which do not match. The two non-Lambda runtime strings
-// this repository synthesizes (`cloudfront-js-2.0` for CloudFront Functions and
-// CDK's `python3.13` custom-resource provider) are quoted literals, so the enum
-// rule never sees them either - and both live in the excluded snapshots.
+// `Runtime.StackTrace`, which do not match. The quoted-index form is equally
+// narrow: it only matches a literal `'Runtime'` key, and `inspector` is not a
+// namespace binding, so `inspector['Runtime']` stays outside the model. The two
+// non-Lambda runtime strings this repository synthesizes (`cloudfront-js-2.0`
+// for CloudFront Functions and CDK's `python3.13` custom-resource provider) are
+// quoted literals, and the literal rule reads them only as arguments of
+// `Runtime.fromString`; both live in the excluded snapshots.
 const ENUM_MEMBER_NAME = "([A-Z][A-Z0-9_]*)";
 
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// The enum-member pattern for one surface: the fixed receivers first, so
-// `lambda.Runtime.NODEJS_20_X` is consumed whole rather than re-matching as the
-// bare `Runtime.NODEJS_20_X` inside it, then that surface's aliases.
+// The enum-member pattern for one surface.
 function enumDeclarationPattern(text) {
-  const aliases = new Set();
-  for (const pattern of RUNTIME_NAMESPACE_ALIAS_RES) {
-    for (const match of text.matchAll(pattern)) aliases.add(match[1]);
-  }
-  const receivers = [...RUNTIME_NAMESPACE_RECEIVERS, ...[...aliases].sort().map(escapeRegExp)];
-  return new RegExp(`\\b(${receivers.join("|")})\\.${ENUM_MEMBER_NAME}\\b`, "g");
+  return new RegExp(`\\b(${runtimeReceiverAlternation(text)})\\.${ENUM_MEMBER_NAME}\\b`, "g");
 }
 
-// Quoted strings that could be a runtime identifier. Deliberately loose - the
-// predicate below decides, so a candidate that is not a runtime is simply not a
-// declaration. It must be loose rather than an alternation of family names so
-// that an unfamiliar runtime family still reaches the classifier and fails
-// closed instead of being invisible.
-const QUOTED_LITERAL_RE = /["'`]([a-z][a-z0-9._-]{2,})["'`]/g;
+// The runtime-literal pattern for one surface: the argument of `fromString` on a
+// receiver that surface binds. The value pattern is deliberately loose - the
+// predicate below decides - so an unfamiliar runtime family still reaches the
+// classifier instead of being invisible. The receiver is what keeps the rule
+// scoped: without it, this repository's own
+// `s3deploy.CacheControl.fromString('public,max-age=0')` would be read as a
+// Lambda declaration.
+function literalDeclarationPattern(text) {
+  return new RegExp(
+    `\\b(${runtimeReceiverAlternation(text)})\\.fromString\\s*\\(\\s*["'\`]([^"'\`]+)["'\`]`,
+    "g",
+  );
+}
 
-// The identifier a quoted string names, or null when it is not runtime-shaped.
-// A runtime identifier is a known family followed by a version component, so
-// `nodejs20.x` and `provided.al2023` are declarations while `node_modules`,
-// `assets`, and `go.mod` are not.
+// The identifier a `fromString` argument names, or null when the argument is not
+// runtime-shaped. A modelled runtime identifier is a known family followed by a
+// version component, so `nodejs20.x` and `provided.al2023` resolve while
+// `node_modules`, `assets`, and `go.mod` do not - and neither does a family this
+// gate does not model (`rust1.0`), nor a family with no version at all
+// (`provided`). Returning null for those is what makes them fail closed rather
+// than disappear.
 function runtimeIdentifierFromLiteral(value) {
   const match = /^([a-z][a-z0-9-]*?)(\.al[0-9]+|[0-9][0-9A-Za-z._-]*)$/.exec(value);
   if (match === null) return null;
@@ -269,10 +375,13 @@ function lineOf(text, index) {
 }
 
 // Collects every runtime declaration in a surface's text, in source order, as
-// { line, form, identifier, enumName }. `identifier` is null when the form
-// could not be resolved to a runtime, and `enumName` is null for literal forms.
-// `form` is the receiver exactly as written, so a violation reports the idiom
-// the surface actually used rather than the one the gate prefers.
+// { line, form, identifier, enumName, literal }. `identifier` is null when the
+// form could not be resolved to a modelled runtime, and that is a declaration
+// all the same: it is what makes an unmodelled name fail closed instead of
+// dropping out of the count. `enumName` is null for literal forms and `literal`
+// is null for enum forms. `form` is the receiver and member exactly as written,
+// so a violation reports the idiom the surface actually used rather than the one
+// the gate prefers.
 function collectDeclarations(text) {
   const declarations = [];
   for (const match of text.matchAll(enumDeclarationPattern(text))) {
@@ -283,18 +392,19 @@ function collectDeclarations(text) {
       line: lineOf(text, match.index),
       form: `${receiver}.${enumName}`,
       enumName,
+      literal: null,
       identifier: LAMBDA_RUNTIME_ENUMS.get(enumName) ?? null,
     });
   }
-  for (const match of text.matchAll(QUOTED_LITERAL_RE)) {
-    const identifier = runtimeIdentifierFromLiteral(match[1]);
-    if (identifier === null) continue;
+  for (const match of text.matchAll(literalDeclarationPattern(text))) {
+    const literal = match[2];
     declarations.push({
       index: match.index,
       line: lineOf(text, match.index),
-      form: `"${match[1]}"`,
+      form: `${match[1]}.fromString("${literal}")`,
       enumName: null,
-      identifier,
+      literal,
+      identifier: runtimeIdentifierFromLiteral(literal),
     });
   }
   declarations.sort((left, right) => left.index - right.index);
@@ -317,6 +427,22 @@ function classifyDeclaration(declaration) {
     };
   }
   if (declaration.identifier === null) {
+    // Two ways to be unreadable, and both fail closed on their own reason: an
+    // enum name this gate has no mapping for, and a `fromString` argument that
+    // resolves to no modelled runtime at all. The second is the one an
+    // unmodelled family used to escape through, so it is named as a literal
+    // rather than reported as an enum with a null name.
+    if (declaration.literal !== null) {
+      return {
+        kind: "unmodelled-literal",
+        line: declaration.line,
+        form: declaration.form,
+        detail:
+          `passes '${declaration.literal}' to fromString, which resolves to no runtime this gate ` +
+          `models: its family is not in LAMBDA_RUNTIME_FAMILIES, or it carries no version; ` +
+          `${UNMODELLED_DECLARATION_HINT}`,
+      };
+    }
     return {
       kind: "unmodelled-enum",
       line: declaration.line,
@@ -522,6 +648,66 @@ const CLASSIFIER_CASES = [
     text: "export const INFRA_STACK = `\nimport { Runtime } from 'aws-cdk-lib/aws-lambda';\n  runtime: Runtime.NODEJS_20_X,\n`;\n",
     expected: ["deprecated"],
   },
+  // An unmodelled `fromString` argument must be a declaration that fails closed.
+  // Before the literal rule was scoped to `fromString` on a Runtime receiver
+  // these two surfaces declared nothing at all: the argument resolved to no
+  // runtime and was dropped, so an unmodelled runtime was invisible rather than
+  // judged.
+  {
+    name: "unmodelled-family-literal",
+    text: "runtime: lambda.Runtime.fromString('rust1.0'),\n",
+    expected: ["unmodelled-literal"],
+  },
+  {
+    name: "runtime-literal-without-a-version",
+    text: "runtime: lambda.Runtime.fromString('provided'),\n",
+    expected: ["unmodelled-literal"],
+  },
+  // The other direction: a runtime-shaped string that is not a `fromString`
+  // argument is not a declaration, so it cannot be judged in place of a dynamic
+  // runtime. Before the fix this surface was reported as declaring the stray
+  // literal, which is a false violation the surface never wrote.
+  {
+    name: "stray-runtime-literal-is-not-a-declaration",
+    text:
+      "runtime: lambda.Runtime.fromString(config.runtime),\n" +
+      "const releaseNote = 'nodejs18.x';\n" +
+      "runtime: lambda.Runtime.NODEJS_24_X,\n",
+    expected: [],
+  },
+  // The receiver idioms the enum rule now reads. Each of these declared nothing
+  // before, in the classifier and in the coverage walk alike, so a surface
+  // written this way passed the gate without ever being judged.
+  {
+    name: "deprecated-runtime-through-a-second-hop-alias",
+    text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst R = lambda.Runtime;\nconst R2 = R;\nruntime: R2.NODEJS_20_X,\n",
+    expected: ["deprecated"],
+  },
+  {
+    name: "supported-runtime-through-a-second-hop-alias",
+    text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst R = lambda.Runtime;\nconst R2 = R;\nruntime: R2.NODEJS_24_X,\n",
+    expected: [],
+  },
+  {
+    name: "deprecated-runtime-through-a-quoted-index",
+    text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nruntime: lambda['Runtime'].NODEJS_20_X,\n",
+    expected: ["deprecated"],
+  },
+  {
+    name: "supported-runtime-through-a-quoted-index",
+    text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nruntime: lambda['Runtime'].NODEJS_24_X,\n",
+    expected: [],
+  },
+  {
+    name: "deprecated-runtime-through-a-renamed-destructure",
+    text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst { Runtime: RT } = lambda;\nruntime: RT.NODEJS_20_X,\n",
+    expected: ["deprecated"],
+  },
+  {
+    name: "supported-runtime-through-a-renamed-destructure",
+    text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst { Runtime: RT } = lambda;\nruntime: RT.NODEJS_24_X,\n",
+    expected: [],
+  },
 ];
 
 const FAIL_CLOSED_CASES = [
@@ -546,6 +732,24 @@ const FAIL_CLOSED_CASES = [
   {
     name: "aliased-namespace-with-an-unreadable-member",
     text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst R = lambda.Runtime;\nruntime: R[process.env.FACETHEORY_RUNTIME],\n",
+    expectFailureReason: "declares no modelled Lambda runtime",
+  },
+  // D1, the false-declaration direction. A dynamic `fromString` declares nothing
+  // readable, and an unrelated runtime-shaped string must not stand in for it.
+  // Before the literal rule was scoped, the stray literal WAS the declaration, so
+  // this surface was judged as declaring a supported runtime and passed.
+  {
+    name: "dynamic-fromString-rescued-by-a-stray-runtime-literal",
+    text: "runtime: lambda.Runtime.fromString(config.runtime),\nconst releaseNote = 'nodejs22.x';\n",
+    expectFailureReason: "declares no modelled Lambda runtime",
+  },
+  // Lock-in for the same rule rather than a pin of the defect: a non-literal
+  // argument was already not a declaration before the fix. It is here so that a
+  // future rule which read bare quoted strings again could not reintroduce the
+  // rescue above without turning this case red.
+  {
+    name: "dynamic-fromString-with-no-literal-at-all",
+    text: "runtime: lambda.Runtime.fromString(config.runtime),\n",
     expectFailureReason: "declares no modelled Lambda runtime",
   },
 ];
@@ -691,15 +895,64 @@ function runSelfTest() {
     }
   }
 
+  // The entry-point error boundary is in main(), so it can only be pinned by
+  // running the entry point. This probe copies the checker into a scratch
+  // repository whose second scan root is absent, runs the bare path there, and
+  // asserts the child reported this gate's own FAIL line: a coverage walk that
+  // cannot run must never present itself as a passing scan, and an uncaught
+  // GateFailure stack trace is not that FAIL line.
+  const entryPointProbes = 1;
+  try {
+    const scratchRoot = fs.mkdtempSync(path.join(os.tmpdir(), "facetheory-lambda-entry-point-"));
+    try {
+      const scratchScripts = path.join(scratchRoot, "scripts");
+      fs.mkdirSync(scratchScripts, { recursive: true });
+      fs.copyFileSync(
+        fileURLToPath(import.meta.url),
+        path.join(scratchScripts, "check-lambda-runtime-deprecations.mjs"),
+      );
+      // The first scan root exists and is empty, so the walk reaches the absent
+      // root instead of stopping at the first one.
+      fs.mkdirSync(path.join(scratchRoot, SCAN_ROOTS[0]));
+      const probe = spawnSync(
+        process.execPath,
+        [path.join(scratchScripts, "check-lambda-runtime-deprecations.mjs")],
+        { encoding: "utf8" },
+      );
+      const output = `${probe.stdout ?? ""}${probe.stderr ?? ""}`;
+      const reportedMissingRoot =
+        /lambda-runtime-deprecations: FAIL \(scan root \S+ is missing/.test(output);
+      const stackFrames = /\n\s+at /.test(output);
+      if (probe.status !== 1 || !reportedMissingRoot || stackFrames) {
+        failures.push(
+          `an entry point whose coverage walk cannot run must report the gate FAIL line with no ` +
+            `stack frames; got exit ${probe.status}, FAIL line ` +
+            `${reportedMissingRoot ? "present" : "absent"}, stack frames ` +
+            `${stackFrames ? "present" : "absent"}: ${output.trim()}`,
+        );
+        console.log("  self-test entry point without a coverage scan root: NOT A GATE FAILURE");
+      } else {
+        console.log(
+          "  self-test entry point without a coverage scan root: FAIL CLOSED (gate FAIL line, no stack frames)",
+        );
+      }
+    } finally {
+      fs.rmSync(scratchRoot, { recursive: true, force: true });
+    }
+  } catch (err) {
+    failures.push(`entry-point probe threw ${err.name}: ${err.message}`);
+    console.log("  self-test entry point without a coverage scan root: UNEXPECTED FAILURE");
+  }
+
   if (failures.length > 0) {
     for (const failure of failures) console.error(`  self-test: ${failure}`);
     throw new GateFailure(
-      `self-test failed (${failures.length} failures across ${classifierCases} synthetic surfaces ` +
-        `plus ${scopeCases} scope cases)`,
+      `self-test failed (${failures.length} failures across ${classifierCases} synthetic surfaces, ` +
+        `${scopeCases} scope cases, and ${entryPointProbes} entry-point probe)`,
     );
   }
 
-  return { classifierCases, scopeCases };
+  return { classifierCases, scopeCases, entryPointProbes };
 }
 
 // === entry point ===========================================================
@@ -726,8 +979,19 @@ function main() {
 
   if (!selfTest) {
     // The coverage walk is what makes an unmodelled surface fail closed; it runs
-    // on every real scan, not only under --self-test.
-    const discovered = collectDeclarationSurfaces();
+    // on every real scan, not only under --self-test. It carries the same error
+    // boundary as the surface scan below, because a walk that cannot run - a scan
+    // root that is missing, an unreadable tree - is a gate failure that has to
+    // report as this gate's FAIL line. Without the boundary the GateFailure
+    // escaped main() and node printed an uncaught stack trace instead, which is
+    // not a report any consumer of this gate can read.
+    let discovered;
+    try {
+      discovered = collectDeclarationSurfaces();
+    } catch (err) {
+      if (err instanceof GateFailure) fail(err.message);
+      throw err;
+    }
     const expected = [...SCANNED_SURFACES].sort();
     const undeclared = discovered.filter((label) => !SCANNED_SURFACES.includes(label));
     if (undeclared.length > 0) {
@@ -770,7 +1034,8 @@ function main() {
   }
 
   const selfTestSummary = selfTestCounts
-    ? `self-test ${selfTestCounts.classifierCases} synthetic surfaces + ${selfTestCounts.scopeCases} scope cases; `
+    ? `self-test ${selfTestCounts.classifierCases} synthetic surfaces + ` +
+      `${selfTestCounts.scopeCases} scope cases + ${selfTestCounts.entryPointProbes} entry-point probe; `
     : "";
   console.log(
     `lambda-runtime-deprecations: PASS (${selfTestSummary}surfaces ${outcomes.length}; ` +
