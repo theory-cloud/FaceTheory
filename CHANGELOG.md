@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.1.1](https://github.com/theory-cloud/FaceTheory/compare/v4.1.0...v4.1.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* **create:** emit narrow allow-remote .npmrc in scaffolded apps ([9c8ff0d](https://github.com/theory-cloud/FaceTheory/commit/9c8ff0d0db9d7be36993ac6760241d1d8bc0458b))
+* **create:** emit narrow allow-remote .npmrc in scaffolded apps ([aac26c7](https://github.com/theory-cloud/FaceTheory/commit/aac26c7bf0e37f5f6ba88c56527e1e2f3b36c2d7))
+* **deps:** move upstream pin to AppTheory v4.4.0 ([71eccb8](https://github.com/theory-cloud/FaceTheory/commit/71eccb8e074cf0bd9bdbade77c968a5cb5eefd00))
+* **deps:** move upstream pin to AppTheory v4.4.0 ([a7dc0cc](https://github.com/theory-cloud/FaceTheory/commit/a7dc0cc292b4d1cf929058d3889b419dbff851be))
+
 ## [4.1.0](https://github.com/theory-cloud/FaceTheory/compare/v4.0.10...v4.1.0) (2026-09-24)
 
 
