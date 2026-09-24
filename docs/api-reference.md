@@ -14,7 +14,7 @@ Package:
 
 Runtime:
 
-- Node.js `>=20`
+- Node.js `>=22`
 
 Primary package exports are defined in `ts/package.json`. The repository also includes a local SSG CLI entrypoint used by `npm run ssg`.
 
@@ -23,7 +23,7 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
 ```bash
-export FACETHEORY_VERSION=4.0.10 # x-release-please-version
+export FACETHEORY_VERSION=4.1.0-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```

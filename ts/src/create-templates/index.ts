@@ -63,7 +63,7 @@ function renderPackageJson(ctx: CreateTemplateContext): string {
     constructs: dependencyVersion(ctx, 'constructs', '10.8.0'),
     esbuild: dependencyVersion(ctx, 'esbuild', '^0.28.1'),
     tsx: dependencyVersion(ctx, 'tsx', '^4.22.3'),
-    typescript: dependencyVersion(ctx, 'typescript', '^5.9.3'),
+    typescript: dependencyVersion(ctx, 'typescript', '^6.0.3'),
     vite: dependencyVersion(ctx, 'vite', '^8'),
   };
 
@@ -252,7 +252,7 @@ export class FaceTheoryStarterStack extends Stack {
     });
 
     const ssrFunction = new NodejsFunction(this, 'SsrFunction', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.resolve(projectRoot, 'src/handler.ts'),
       handler: 'handler',
       timeout: Duration.seconds(10),

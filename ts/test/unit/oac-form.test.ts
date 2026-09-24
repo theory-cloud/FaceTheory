@@ -303,11 +303,12 @@ test('oac form transport: binds the default browser fetch to window', async () =
     });
     form.dispatchEvent(event);
 
-    await flushEventLoop();
+    await waitForAssertion(() => {
+      assert.equal(calls.length, 1);
+    });
 
     assert.equal(event.defaultPrevented, true);
     assert.deepEqual(errors, []);
-    assert.equal(calls.length, 1);
     assert.equal(
       calls[0]?.input,
       'https://control.lab.theorymcp.ai/agents/new',
@@ -885,10 +886,12 @@ test('oac form transport: navigates same-origin redirected responses through the
       cancelable: true,
     });
     form.dispatchEvent(event);
-    await flushEventLoop();
+
+    await waitForAssertion(() => {
+      assert.deepEqual(assigned, ['https://example.test/done']);
+    });
 
     assert.equal(event.defaultPrevented, true);
-    assert.deepEqual(assigned, ['https://example.test/done']);
   } finally {
     dom.window.close();
   }
@@ -1030,15 +1033,17 @@ test('oac form transport: replaces the document for same-origin HTML responses',
       cancelable: true,
     });
     form.dispatchEvent(event);
-    await flushEventLoop();
+
+    await waitForAssertion(() => {
+      assert.equal(dom.window.document.title, 'Invalid');
+      assert.equal(
+        dom.window.document.body.textContent?.trim(),
+        'Title is required',
+      );
+      assert.deepEqual(replaced, ['https://example.test/save']);
+    });
 
     assert.equal(event.defaultPrevented, true);
-    assert.equal(dom.window.document.title, 'Invalid');
-    assert.equal(
-      dom.window.document.body.textContent?.trim(),
-      'Title is required',
-    );
-    assert.deepEqual(replaced, ['https://example.test/save']);
   } finally {
     dom.window.close();
   }

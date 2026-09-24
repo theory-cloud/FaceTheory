@@ -331,7 +331,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "b0b4aae9e874923294989cd92f0332b9be7f139a400fc50e5634f05b6974427a.zip"
+          "S3Key": "cc49aa7b750c773661bb37b3fcbcde8e4ca7c23dc6ff6dbf8f7900a1efa74c9a.zip"
         },
         "Environment": {
           "Variables": {
@@ -350,7 +350,7 @@
             "Arn"
           ]
         },
-        "Runtime": "nodejs20.x",
+        "Runtime": "nodejs24.x",
         "Timeout": 10
       },
       "DependsOn": [
@@ -562,11 +562,14 @@
     "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536": {
       "Type": "AWS::Lambda::Function",
       "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
         "Code": {
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "97e9ebf0b174a5c8f7faa505739022b7f509edddffcab9211dcd08b759944c4f.zip"
+          "S3Key": "35328da138f26fbd9160297abc9a2522d93dbf75878cd5114a9c050419fc1ce0.zip"
         },
         "Environment": {
           "Variables": {
@@ -579,6 +582,7 @@
             "Ref": "AssetsDeploymentImmutableAwsCliLayer40CE6A61"
           }
         ],
+        "MemorySize": 1024,
         "Role": {
           "Fn::GetAtt": [
             "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",

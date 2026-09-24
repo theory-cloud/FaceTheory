@@ -411,6 +411,8 @@ gov_check_security() {
   require_cmd_or_blocked node || return $?
   require_cmd_or_blocked npm || return $?
   scripts/verify-npm-audit.sh
+  scripts/verify-node-engines-floor.sh
+  scripts/verify-lambda-runtime-deprecations.sh
   check_actions_pinned_to_sha
 }
 

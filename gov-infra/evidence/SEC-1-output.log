@@ -5,4 +5,65 @@ Rubric ID: SEC-1
 npm-audit: PASS (ts)
 npm-audit: PASS (infra/apptheory-ssr-site)
 npm-audit: PASS (infra/apptheory-ssg-isr-site)
+  self-test scan scope: lockfiles 3
+  self-test synthetic dependency-excludes-floor: FAIL dependency node_modules/floor-too-high >=24
+  self-test synthetic dependency-excludes-floor-by-prerelease: FAIL dependency node_modules/floor-too-high >=23.0.0-0
+  self-test synthetic dependency-admits-floor: PASS
+  self-test synthetic project-floor-below-floor: FAIL project <root> >=20
+  self-test synthetic missing-lockfile: FAIL CLOSED (could not read lockfile)
+  self-test synthetic unparseable-lockfile: FAIL CLOSED (could not parse lockfile)
+  self-test synthetic packages-map-absent: FAIL CLOSED (missing its packages map)
+  self-test synthetic packages-map-is-array: FAIL CLOSED (packages must be an object, not an array)
+  self-test synthetic packages-map-is-empty: FAIL CLOSED (packages map is empty)
+  self-test synthetic non-string-engines-node: FAIL CLOSED (non-string engines.node)
+  self-test synthetic non-object-engines: FAIL CLOSED (non-object engines)
+  self-test synthetic root-without-engines-node: FAIL CLOSED (does not declare engines.node for its root entry)
+  self-test synthetic root-entry-absent: FAIL CLOSED (does not declare engines.node for its root entry)
+  ts/package-lock.json project engines.node ">=22" (311 dependency engine ranges)
+  infra/apptheory-ssr-site/package-lock.json project engines.node ">=24" (111 dependency engine ranges)
+  infra/apptheory-ssg-isr-site/package-lock.json project engines.node ">=24" (111 dependency engine ranges)
+node-engines-floor: PASS (self-test 88 matcher and scope cases + 13 synthetic lockfiles; floor Node 22.x; lockfiles 3; dependency engine ranges 533; distinct ranges 72)
+  self-test scan scope: surfaces 3
+  self-test coverage scope: roots 2
+  self-test coverage walk: 3 surfaces
+  self-test synthetic supported-pinned-runtime: PASS
+  self-test synthetic supported-floor-runtime: PASS
+  self-test synthetic deprecated-runtime: FAIL deprecated
+  self-test synthetic deprecated-runtime-older-than-the-minimum: FAIL deprecated
+  self-test synthetic deprecated-runtime-in-a-scaffold-template-literal: FAIL deprecated
+  self-test synthetic unpinned-moving-alias: FAIL unpinned-alias
+  self-test synthetic unmodelled-enum: FAIL unmodelled-enum
+  self-test synthetic unmodelled-runtime-literal: FAIL unmodelled-runtime
+  self-test synthetic deprecated-runtime-literal: FAIL deprecated
+  self-test synthetic supported-runtime-literal: PASS
+  self-test synthetic provided-al2023-literal: FAIL unmodelled-runtime
+  self-test synthetic every-declaration-is-judged: FAIL deprecated; deprecated
+  self-test synthetic quoted-strings-that-are-not-runtimes: PASS
+  self-test synthetic deprecated-runtime-through-a-named-import: FAIL deprecated
+  self-test synthetic supported-runtime-through-a-named-import: PASS
+  self-test synthetic deprecated-runtime-through-an-aliased-namespace: FAIL deprecated
+  self-test synthetic supported-runtime-through-an-aliased-namespace: PASS
+  self-test synthetic deprecated-runtime-through-a-renamed-named-import: FAIL deprecated
+  self-test synthetic scaffold-template-switching-to-a-named-import: FAIL deprecated
+  self-test synthetic unmodelled-family-literal: FAIL unmodelled-literal
+  self-test synthetic runtime-literal-without-a-version: FAIL unmodelled-literal
+  self-test synthetic stray-runtime-literal-is-not-a-declaration: PASS
+  self-test synthetic deprecated-runtime-through-a-second-hop-alias: FAIL deprecated
+  self-test synthetic supported-runtime-through-a-second-hop-alias: PASS
+  self-test synthetic deprecated-runtime-through-a-quoted-index: FAIL deprecated
+  self-test synthetic supported-runtime-through-a-quoted-index: PASS
+  self-test synthetic deprecated-runtime-through-a-renamed-destructure: FAIL deprecated
+  self-test synthetic supported-runtime-through-a-renamed-destructure: PASS
+  self-test synthetic surface-without-a-declaration: FAIL CLOSED (declares no modelled Lambda runtime)
+  self-test synthetic surface-of-only-quoted-non-runtimes: FAIL CLOSED (declares no modelled Lambda runtime)
+  self-test synthetic named-import-with-an-unreadable-member: FAIL CLOSED (declares no modelled Lambda runtime)
+  self-test synthetic aliased-namespace-with-an-unreadable-member: FAIL CLOSED (declares no modelled Lambda runtime)
+  self-test synthetic dynamic-fromString-rescued-by-a-stray-runtime-literal: FAIL CLOSED (declares no modelled Lambda runtime)
+  self-test synthetic dynamic-fromString-with-no-literal-at-all: FAIL CLOSED (declares no modelled Lambda runtime)
+  self-test missing surface: FAIL CLOSED (could not read scanned surface)
+  self-test entry point without a coverage scan root: FAIL CLOSED (gate FAIL line, no stack frames)
+  infra/apptheory-ssr-site/src/stack.ts declares 1 Lambda runtime(s)
+  infra/apptheory-ssg-isr-site/src/stack.ts declares 1 Lambda runtime(s)
+  ts/src/create-templates/index.ts declares 1 Lambda runtime(s)
+lambda-runtime-deprecations: PASS (self-test 35 synthetic surfaces + 2 scope cases + 1 entry-point probe; surfaces 3; declarations 3; deprecated set 11; supported nodejs22.x, nodejs24.x)
 workflow-action-pins: PASS
