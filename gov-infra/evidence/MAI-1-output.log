@@ -2,7 +2,6 @@ Verifier: gov_check_maintainability
 Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
 Rubric ID: MAI-1
 
-npm warn deprecated constructs@10.8.0: This version has a bug that breaks downstream jsii consumers
 npm warn install-scripts 1 package had install scripts blocked because they are not covered by allowScripts:
 npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)
 npm warn install-scripts
