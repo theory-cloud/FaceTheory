@@ -10,7 +10,7 @@ Use this guide for recurring setup, build, and runtime failures that already hav
 
 | Symptom                                                               | Likely cause                                                                                  | Where to look                                                            |
 | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `npm ci` or scripts fail early                                        | Node.js is below the required baseline                                                        | `ts/package.json` (`engines.node: >=20`)                                 |
+| `npm ci` or scripts fail early                                        | Node.js is below the required baseline                                                        | `ts/package.json` (`engines.node: >=22`)                                 |
 | `npm run ssg` exits with usage errors                                 | Missing or invalid CLI flags                                                                  | `docs/api-reference.md` and `ts/src/ssg-cli.ts`                          |
 | SSG build fails during page generation                                | Network access was attempted without opting in                                                | `buildSsgSite()` and SSG fetch guard behavior                            |
 | SSG build fails with dot-segment output errors                        | `generateStaticParams()` returned `.` / `..` path segments                                    | `ts/src/ssg.ts` path validation and route params                         |
@@ -63,12 +63,12 @@ For AppTheory/TableTheory alignment, make the app's `package.json` use the same 
 ```json
 {
   "dependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v4.2.3/theory-cloud-apptheory-4.2.3.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.6/theory-cloud-tabletheory-ts-3.0.6.tgz"
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v4.3.0/theory-cloud-apptheory-4.3.0.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.1.0/theory-cloud-tabletheory-ts-3.1.0.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.0.6/theory-cloud-tabletheory-ts-3.0.6.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.1.0/theory-cloud-tabletheory-ts-3.1.0.tgz"
     }
   }
 }
@@ -88,7 +88,7 @@ Symptoms:
 
 Cause:
 
-- FaceTheory requires Node.js `>=20`.
+- FaceTheory requires Node.js `>=22`. The floor moved from 20 to 22 when Node 20 reached end of life in April 2026.
 
 Solution:
 

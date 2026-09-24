@@ -210,8 +210,8 @@ test('facetheory create emits a React starter that typechecks', async () => {
       packageJson.dependencies['@theory-cloud/facetheory'] ?? '',
       expectedFaceTheoryTarball,
     );
-    assert.equal(packageJson.dependencies.react, '^19.2.6');
-    assert.equal(packageJson.dependencies['react-dom'], '^19.2.6');
+    assert.equal(packageJson.dependencies.react, '^19.3.0');
+    assert.equal(packageJson.dependencies['react-dom'], '^19.3.0');
     assert.equal(
       packageJson.overrides['@theory-cloud/apptheory']?.[
         '@theory-cloud/tabletheory-ts'

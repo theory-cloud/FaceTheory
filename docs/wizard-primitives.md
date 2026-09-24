@@ -1,6 +1,6 @@
 # FaceTheory wizard primitives (Stitch admin)
 
-Status: stable 3.x. The framework-neutral contract is shared across all adapters and follows the FaceTheory deprecation policy.
+Status: stable. The framework-neutral contract is shared across all adapters and follows the FaceTheory deprecation policy.
 All wizard primitive families ship with full React + Vue + Svelte parity:
 `WizardProgress`, `WizardPackageSummaryPanel`, `WizardFindingListPanel`,
 `WizardReconcileSummaryPanel`, `WizardReconciliationPlanPanel`

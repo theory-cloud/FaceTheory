@@ -4,13 +4,13 @@ title: Getting Started
 
 # Getting Started with FaceTheory
 
-FaceTheory is a TypeScript runtime for SSR, SSG, and blocking ISR on Node.js `>=20`, with published adapters for React, Vue, and Svelte.
+FaceTheory is a TypeScript runtime for SSR, SSG, and blocking ISR on Node.js `>=22`, with published adapters for React, Vue, and Svelte.
 
 ## Prerequisites
 
 Required:
 
-- Node.js `>=20`
+- Node.js `>=22` (Node 20 reached end of life in April 2026; the floor moved from 20 to 22)
 - npm
 
 Optional:
@@ -23,7 +23,7 @@ Optional:
 Use the CLI from the pinned GitHub Release tarball to create an adapter-specific starter before hand-writing any hydration code:
 
 ```bash
-export FACETHEORY_VERSION=4.0.10-rc # x-release-please-version
+export FACETHEORY_VERSION=4.0.10 # x-release-please-version
 npx --package \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz" \
   facetheory create my-app --adapter react
@@ -49,7 +49,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=4.0.10-rc # x-release-please-version
+export FACETHEORY_VERSION=4.0.10 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -75,10 +75,10 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v4.2.3/theory-cloud-apptheory-4.2.3.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v4.3.0/theory-cloud-apptheory-4.3.0.tgz
 
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v3.0.6/theory-cloud-tabletheory-ts-3.0.6.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v3.1.0/theory-cloud-tabletheory-ts-3.1.0.tgz
 ```
 
 Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoint. Use TableTheory when you want the documented production ISR metadata store adapter.
@@ -193,7 +193,7 @@ const assetsBucket = new s3.Bucket(this, "AssetsBucket", {
 });
 
 const ssrFunction = new NodejsFunction(this, "SsrFunction", {
-  runtime: lambda.Runtime.NODEJS_20_X,
+  runtime: lambda.Runtime.NODEJS_24_X,
   entry: "src/handler.ts",
   handler: "handler",
   timeout: Duration.seconds(10),
@@ -632,7 +632,7 @@ Important ISR default:
 
 ## Reference Bundle
 
-The `v4.0.10-rc` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v4.0.10` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples

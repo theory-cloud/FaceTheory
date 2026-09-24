@@ -79,7 +79,7 @@ deploy/
 
 The FaceTheory reference stacks keep explicit `BucketDeployment` resources for immutable assets, the Vite manifest, and
 SSG HTML. This preserves cache-control differences while `AppTheorySsrSite` owns the CloudFront distribution. AppTheory
-v4.2.3 does not yet expose per-deployment `distributionPaths` invalidation controls for those uploads; invalidate changed
+v4.3.0 does not yet expose per-deployment `distributionPaths` invalidation controls for those uploads; invalidate changed
 HTML and hydration JSON paths in your deployment pipeline until that AppTheory gap is closed.
 
 Local reference validation before any deploy:
@@ -114,7 +114,7 @@ const assetsBucket = new s3.Bucket(this, "AssetsBucket", {
 });
 
 const ssrFunction = new NodejsFunction(this, "SsrFunction", {
-  runtime: lambda.Runtime.NODEJS_20_X,
+  runtime: lambda.Runtime.NODEJS_24_X,
   entry: "src/handler.ts",
   handler: "handler",
   timeout: Duration.seconds(10),
