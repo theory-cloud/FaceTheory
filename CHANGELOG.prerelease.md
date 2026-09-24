@@ -1,5 +1,41 @@
 # Changelog
 
+## [4.1.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.0.10...v4.1.0-rc) (2026-09-24)
+
+
+### Features
+
+* **create:** scaffold new apps on the nodejs24.x Lambda runtime ([68a0c87](https://github.com/theory-cloud/FaceTheory/commit/68a0c876ad00eb506d509ba3e2786632a0501166))
+* **infra:** move FaceTheory to the nodejs24.x Lambda runtime (U1-U5) ([18d4a85](https://github.com/theory-cloud/FaceTheory/commit/18d4a85bacaf9d60b6737579e4c926f72a54603e))
+* **infra:** move the reference stacks to the nodejs24.x Lambda runtime ([0d718c1](https://github.com/theory-cloud/FaceTheory/commit/0d718c1d7a4effec7ac84bf8ea0a5cc28bebaa06))
+* **lambda-checker:** read bracket, second-hop, and destructured runtime receivers ([172011f](https://github.com/theory-cloud/FaceTheory/commit/172011f044bda01e65b1804f65409ac8ff537e0a))
+* **platform:** raise the Node floor to Node 22 ([c97c1ca](https://github.com/theory-cloud/FaceTheory/commit/c97c1ca3c3ca1fe8b2bc83a71eea6f5f2159998c))
+* **scripts:** gate deprecated Lambda runtimes ([2a40875](https://github.com/theory-cloud/FaceTheory/commit/2a408758000a1237b2fab236a3b1b52a2c9fcef2))
+* **scripts:** gate npm dependency engines on the Node floor ([c222884](https://github.com/theory-cloud/FaceTheory/commit/c2228843141f8d3f2c75d9046bcd1db916ffb3e8))
+
+
+### Bug Fixes
+
+* **ci:** close the named-import bypass in the Lambda-runtime gate ([4296cda](https://github.com/theory-cloud/FaceTheory/commit/4296cda7b4a3fa2180bf83e0c4777d01e8b488e7))
+* **ci:** harden the engines-floor and Lambda-runtime gates ([ae77859](https://github.com/theory-cloud/FaceTheory/commit/ae77859957dab317200accc88e711b288e3524e6))
+* **ci:** quote-anchor the runtime-gate surface pins ([0cd60d2](https://github.com/theory-cloud/FaceTheory/commit/0cd60d2410a62c8fa1ca0cb0d6327c165407bb59))
+* **ci:** refuse concrete components after a wildcard in the engines-floor matcher ([2b66dd1](https://github.com/theory-cloud/FaceTheory/commit/2b66dd186f32dee408ebdfa1ee61c28619618137))
+* **create:** align scaffold TypeScript fallback with the modern line ([032f872](https://github.com/theory-cloud/FaceTheory/commit/032f8727c3da02022889689f19b0f64bc36c3231))
+* **deps:** bump docs json gem to 2.21.2 and resolve ts devalue advisory ([698a707](https://github.com/theory-cloud/FaceTheory/commit/698a7078a7b1802090500faa219a6b6bb4cc1788))
+* **deps:** bump json gem to 2.21.2 in docs ([2f4137a](https://github.com/theory-cloud/FaceTheory/commit/2f4137a2a0cc4ae056ecb558ba8eada7e4b08ee5))
+* **deps:** move upstream pins to AppTheory v4.3.0 and TableTheory v3.1.0 ([0533c86](https://github.com/theory-cloud/FaceTheory/commit/0533c869904eea48ed51de60dd039d3939ff8e42))
+* **deps:** move upstream pins to AppTheory v4.3.0 and TableTheory v3.1.0 ([b84d498](https://github.com/theory-cloud/FaceTheory/commit/b84d498464c097f6c5583ffc767f580360e762bf))
+* **deps:** pin TableTheory v3.0.7 across ts and infra ([a4a6705](https://github.com/theory-cloud/FaceTheory/commit/a4a6705d7325027552535370cc9a26c99c934d26))
+* **deps:** pin TableTheory v3.0.7 across ts and infra; add Dependabot config ([971a3d6](https://github.com/theory-cloud/FaceTheory/commit/971a3d69f9f5378af8bf7a97fc4f84bcec738df9))
+* **deps:** resolve devalue advisory in ts lockfile ([662c807](https://github.com/theory-cloud/FaceTheory/commit/662c807f8ded4784b992ea038861b4f1183523f7))
+* **gov-infra:** remove the stale brace-expansion audit exception ([7400d2a](https://github.com/theory-cloud/FaceTheory/commit/7400d2aa1f415406c683cba8789fe7174262042f))
+* **lambda-checker:** give the coverage walk an entry-point error boundary ([b87aab4](https://github.com/theory-cloud/FaceTheory/commit/b87aab45ebbe0cbc431574a3ffe5c760572dd2e8))
+* **lambda-checker:** harden the Lambda runtime deprecation gate (quoted literals, entry-point boundary, receiver idioms) ([7ba82e7](https://github.com/theory-cloud/FaceTheory/commit/7ba82e72484a8f20e303b0ad5d54db11ebd0831a))
+* **lambda-checker:** scope the runtime-literal rule to fromString receivers ([23209ff](https://github.com/theory-cloud/FaceTheory/commit/23209ff3bc1bac5e2dd98d1728c56b26f620b6d2))
+* **scripts:** close the prerelease false pass in the engines floor gate ([1b30932](https://github.com/theory-cloud/FaceTheory/commit/1b30932457d1b0d98c81e5768880373f8cf3078e))
+* **test:** deflake oac-form document replacement against async completion ([d2d00c5](https://github.com/theory-cloud/FaceTheory/commit/d2d00c5950c668e68b40cfdc1ee5135cb43296a7))
+* **test:** deflake the oac-form document-replacement test ([56ba145](https://github.com/theory-cloud/FaceTheory/commit/56ba145859bec367b0b7c5a1b4ac5fd4da931adb))
+
 ## [4.0.10-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.0.9...v4.0.10-rc) (2026-09-03)
 
 
