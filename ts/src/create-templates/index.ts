@@ -19,6 +19,12 @@ export interface CreateTemplateFile {
 
 const CLIENT_BOOTSTRAP_MODULE = '/assets/client.js';
 
+const NPMRC_POLICY = `# npm 12 defaults allow-remote=none, which refuses the pinned FaceTheory,
+# AppTheory, AppTheory CDK, and TableTheory GitHub Release tarballs with
+# EALLOWREMOTE. Keep the narrow root policy: npm may fetch only URL
+# dependencies declared by this package.json.
+allow-remote=root`;
+
 function withFinalNewline(content: string): string {
   return content.endsWith('\n') ? content : `${content}\n`;
 }
@@ -546,6 +552,10 @@ hydrate(App, {
   ];
 }
 
+function renderNpmrc(): string {
+  return withFinalNewline(NPMRC_POLICY);
+}
+
 export function renderCreateTemplate(ctx: CreateTemplateContext): CreateTemplateFile[] {
   const adapterFiles =
     ctx.adapter === 'react'
@@ -556,6 +566,7 @@ export function renderCreateTemplate(ctx: CreateTemplateContext): CreateTemplate
 
   return [
     { path: 'package.json', content: renderPackageJson(ctx) },
+    { path: '.npmrc', content: renderNpmrc() },
     { path: 'tsconfig.json', content: renderTsconfig(ctx) },
     { path: 'README.md', content: renderReadme(ctx) },
     { path: 'vite.config.ts', content: renderViteConfig(ctx) },

@@ -19,10 +19,10 @@ npm-audit: PASS (infra/apptheory-ssg-isr-site)
   self-test synthetic non-object-engines: FAIL CLOSED (non-object engines)
   self-test synthetic root-without-engines-node: FAIL CLOSED (does not declare engines.node for its root entry)
   self-test synthetic root-entry-absent: FAIL CLOSED (does not declare engines.node for its root entry)
-  ts/package-lock.json project engines.node ">=22" (311 dependency engine ranges)
-  infra/apptheory-ssr-site/package-lock.json project engines.node ">=24" (111 dependency engine ranges)
-  infra/apptheory-ssg-isr-site/package-lock.json project engines.node ">=24" (111 dependency engine ranges)
-node-engines-floor: PASS (self-test 88 matcher and scope cases + 13 synthetic lockfiles; floor Node 22.x; lockfiles 3; dependency engine ranges 533; distinct ranges 72)
+  ts/package-lock.json project engines.node ">=22" (312 dependency engine ranges)
+  infra/apptheory-ssr-site/package-lock.json project engines.node ">=24" (112 dependency engine ranges)
+  infra/apptheory-ssg-isr-site/package-lock.json project engines.node ">=24" (112 dependency engine ranges)
+node-engines-floor: PASS (self-test 88 matcher and scope cases + 13 synthetic lockfiles; floor Node 22.x; lockfiles 3; dependency engine ranges 536; distinct ranges 72)
   self-test scan scope: surfaces 3
   self-test coverage scope: roots 2
   self-test coverage walk: 3 surfaces
