@@ -8,6 +8,7 @@ import {
   rm,
   stat,
   symlink,
+  writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -305,6 +306,67 @@ test('facetheory create rejects non-empty target directories with a fix', async 
     assert.equal(exitCode, 1);
     assert.match(stderr.text, /target directory is not empty/);
     assert.match(stderr.text, /Fix: choose a new directory/);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('facetheory create emits a narrow allow-remote .npmrc for the pinned tarball dependencies', async () => {
+  const tempRoot = await mkdtemp(
+    path.join(tmpdir(), 'facetheory-create-npmrc-'),
+  );
+  const stderr = new CaptureStream();
+  try {
+    const exitCode = await runCreateCli(['my-app', '--adapter', 'react'], {
+      cwd: tempRoot,
+      stderr,
+      stdout: new CaptureStream(),
+    });
+    assert.equal(exitCode, 0, stderr.text);
+
+    const npmrc = await readFile(
+      path.resolve(tempRoot, 'my-app/.npmrc'),
+      'utf8',
+    );
+    assert.equal(
+      npmrc,
+      `# npm 12 defaults allow-remote=none, which refuses the pinned FaceTheory,
+# AppTheory, AppTheory CDK, and TableTheory GitHub Release tarballs with
+# EALLOWREMOTE. Keep the narrow root policy: npm may fetch only URL
+# dependencies declared by this package.json.
+allow-remote=root
+`,
+    );
+    assert.match(npmrc, /^allow-remote=root$/m);
+    assert.doesNotMatch(npmrc, /allow-remote=all/);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('facetheory create does not overwrite an existing .npmrc in the target directory', async () => {
+  const tempRoot = await mkdtemp(
+    path.join(tmpdir(), 'facetheory-create-npmrc-existing-'),
+  );
+  const stderr = new CaptureStream();
+  try {
+    const appDir = path.resolve(tempRoot, 'my-app');
+    await mkdir(appDir, { recursive: true });
+    const existing = '# operator policy\nallow-remote=none\n';
+    await writeFile(path.resolve(appDir, '.npmrc'), existing, 'utf8');
+
+    const exitCode = await runCreateCli(['my-app', '--adapter', 'react'], {
+      cwd: tempRoot,
+      stderr,
+      stdout: new CaptureStream(),
+    });
+
+    assert.equal(exitCode, 1);
+    assert.match(stderr.text, /target directory is not empty/);
+    assert.equal(
+      await readFile(path.resolve(appDir, '.npmrc'), 'utf8'),
+      existing,
+    );
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }

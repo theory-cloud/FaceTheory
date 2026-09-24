@@ -40,6 +40,12 @@ Use `--adapter vue` or `--adapter svelte` for the other first-class adapters. Th
 - a framework-specific client entry with a real hydrate call (`hydrateRoot`, `createSSRApp(...).mount(...)`, or `hydrate(...)`) wired through `loadFaceHydrationData()`;
 - an `AppTheorySsrSite` CDK stack that deploys the Vite client output to S3 and routes SSR through AppTheory's Lambda Function URL path.
 
+The generated starter also writes an `.npmrc` at the app root, because npm 12 defaults to `allow-remote=none` and refuses the pinned release-tarball dependencies with `EALLOWREMOTE`:
+
+```ini
+allow-remote=root
+```
+
 The scaffold is a local developer onboarding aid only: it writes files under the target directory and never deploys, mutates AWS, or reads credentials.
 
 ## Install The Published Package
