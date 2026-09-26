@@ -12,8 +12,8 @@
     "synth": "tsx scripts/synth.ts"
   },
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v4.4.0/theory-cloud-apptheory-4.4.0.tgz",
-    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v4.4.0/theory-cloud-apptheory-cdk-4.4.0.tgz",
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v4.4.2/theory-cloud-apptheory-4.4.2.tgz",
+    "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v4.4.2/theory-cloud-apptheory-cdk-4.4.2.tgz",
     "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v3.1.0/theory-cloud-tabletheory-ts-3.1.0.tgz",
     "@types/node": "^26.6.1",
     "aws-cdk-lib": "2.270.0",
