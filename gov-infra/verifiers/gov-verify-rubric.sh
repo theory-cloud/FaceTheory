@@ -429,6 +429,7 @@ gov_check_compliance() {
   scripts/test-verify-release-readiness.sh
   scripts/test-release-workflow-changelog-preservation.sh
   scripts/test-verify-npm-audit.sh
+  scripts/test-verify-ci-trigger-parity.sh
 }
 
 gov_check_maintainability() {

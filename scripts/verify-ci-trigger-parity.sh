@@ -5,19 +5,28 @@
 # equivalent job running on pull requests targeting staging -- the class of gap
 # that lets a pull request merge green and then fail promotion.
 #
-# Requirements enforced (R-F1):
-#   A. every job in ci.yml that can run on push must also run on pull_request;
-#   B. the rubric job runs on push and on pull_request for every promotion base;
-#   C. the deterministic-build job does the same;
+# Requirements enforced (R-F1, as amended by the operator ruling 2026-09-28 --
+# "rubric is only needed in staging; premain and main only ever come from staging
+# and do not need to repeat the full rubric"):
+#   A. the rubric job runs only for pull requests targeting staging, plus the
+#      opt-in manual dispatch -- never on a protected-branch push and never on a
+#      promotion pull request;
+#   B. the deterministic-build job has the same staging-PR-only shape;
+#   C. every other job in ci.yml that can run on push must also run on
+#      pull_request (the #623 push-parity class);
 #   D. the staging -> premain readiness gate still exists and stays premain-scoped;
 #   E. the PR -> main readiness gate still exists and stays main-scoped;
 #   F. a PR -> staging readiness counterpart exists and runs the readiness verifier;
-#   G. any job that can run on a promotion pull request must either also run on
-#      pull requests to staging or appear in the exemption table with a reason;
+#   G. any non-exempt job that can run on a promotion pull request must also run
+#      on pull requests to staging, or appear in the exemption table with a reason;
 #   H. every cross-workflow exemption still holds its stated mechanical reason.
 #
-# A job whose `if:` uses a predicate this checker does not model is a failure,
-# never a pass: unknown wiring must be made explicit here before it can ship.
+# A job whose `if:` uses a predicate this checker does not model -- an unknown or
+# absent event predicate, a negated event predicate, or a negated / unmodelled PR
+# base-ref predicate -- is a failure, never a pass: unknown wiring must be made
+# explicit here before it can ship. The `on:` block is modelled structurally too:
+# a pull_request branch filter fails closed, because it can silently remove the
+# rubric from the staging pull request that is the only place it runs.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -38,6 +47,8 @@ DETERMINISTIC_JOB = "deterministic-builds"
 PR_STAGING_READINESS = "Release readiness (PR -> staging)"
 PROMOTION_BASES = {"premain", "main"}
 STAGING = "staging"
+# The rubric and deterministic-build jobs are staging-PR-only under the ruling.
+STAGING_PR_ONLY_EVENTS = {"pull_request", "workflow_dispatch"}
 
 # Jobs that may run on a promotion pull request without also running on pull
 # requests to staging. Each entry must state why, and the reason must hold
@@ -70,21 +81,43 @@ def parse_ci():
 
     trigger_names = []
     push_branches = []
+    pr_branch_filters = []
     section = None
+    trigger = None
     for line in lines:
         if re.match(r"^on:\s*$", line):
             section = "on"
+            trigger = None
             continue
         if re.match(r"^[A-Za-z0-9_.-]+:\s*$", line) and not line.startswith((" ", "\t")):
             section = "jobs" if line.startswith("jobs:") else None
+            trigger = None
             continue
-        if section == "on":
-            match = re.match(r"^  ([A-Za-z0-9_-]+):", line)
-            if match:
-                trigger_names.append(match.group(1))
+        if section != "on":
+            continue
+        match = re.match(r"^  ([A-Za-z0-9_-]+):", line)
+        if match:
+            trigger = match.group(1)
+            trigger_names.append(trigger)
+            continue
+        if trigger is None or trigger == "push":
+            # The push branch list is validated directly below through
+            # push_branches; only non-push triggers can carry a filter that hides
+            # a job from the staging pull request.
             branch = re.match(r'^      -\s*"?([A-Za-z0-9_.-]+)"?\s*$', line)
-            if branch:
+            if branch and trigger == "push":
                 push_branches.append(branch.group(1))
+            continue
+        key = re.match(r"^    (branches|branches-ignore):\s*([^\s].*)?$", line)
+        if key and key.group(2):
+            pr_branch_filters.append((trigger, key.group(1), key.group(2).strip()))
+            continue
+        if key:
+            pr_branch_filters.append((trigger, key.group(1), None))
+            continue
+        branch = re.match(r'^      -\s*"?([A-Za-z0-9_.-]+)"?\s*$', line)
+        if branch:
+            pr_branch_filters.append((trigger, "branches", branch.group(1)))
 
     jobs = {}
     job_name = None
@@ -112,6 +145,20 @@ def parse_ci():
     for branch in (STAGING, "premain", "main"):
         if branch not in push_branches:
             fail(f"{CI_PATH}: push trigger must include {branch!r}")
+    for trigger_name, key, value in pr_branch_filters:
+        detail = f" ({key}: {value})" if value else f" ({key})"
+        if trigger_name == "pull_request":
+            fail(
+                f"{CI_PATH}: pull_request trigger carries a branch filter{detail} this "
+                "checker does not model; the staging pull request is the only place the "
+                "rubric runs, so spell the coverage out here before it can ship"
+            )
+        else:
+            fail(
+                f"{CI_PATH}: {trigger_name!r} trigger carries a {key!r} filter{detail} "
+                "this checker does not model; make the handled branches explicit before "
+                "shipping"
+            )
 
     return lines, jobs
 
@@ -127,10 +174,19 @@ def classify(job_id, body):
         return {"push", "pull_request", "workflow_dispatch"}, {"staging", "premain", "main"}
 
     text = if_lines[0].split("if:", 1)[1]
+    base_ref_expr = r"github\.event\.pull_request\.base\.ref"
     if re.search(r"github\.event_name\s*!=", text):
         fail(
             f"{CI_PATH}: job {job_id!r} uses a negated event predicate this checker does "
             "not model; make the handled events explicit before shipping"
+        )
+        return None
+    if re.search(base_ref_expr + r"\s*!=", text) or re.search(
+        r"!\s*\(?\s*" + base_ref_expr, text
+    ):
+        fail(
+            f"{CI_PATH}: job {job_id!r} uses a negated PR base-ref predicate this checker "
+            "does not model; make the targeted bases explicit before shipping"
         )
         return None
 
@@ -148,8 +204,21 @@ def classify(job_id, body):
 
     pr_bases = set()
     if "pull_request" in events:
-        base_match = re.search(r"github\.event\.pull_request\.base\.ref == '([a-z]+)'", text)
-        pr_bases = {base_match.group(1)} if base_match else {"staging", "premain", "main"}
+        base_matches = re.findall(base_ref_expr + r"\s*==\s*'([a-z]+)'", text)
+        base_ref_occurrences = len(re.findall(base_ref_expr, text))
+        if base_ref_occurrences != len(base_matches):
+            fail(
+                f"{CI_PATH}: job {job_id!r} references the PR base ref in a form this "
+                f"checker does not model: {text.strip()}"
+            )
+            return None
+        if len(base_matches) > 1:
+            fail(
+                f"{CI_PATH}: job {job_id!r} declares more than one PR base-ref predicate; "
+                "make the targeted bases explicit before shipping"
+            )
+            return None
+        pr_bases = {base_matches[0]} if base_matches else {"staging", "premain", "main"}
     return events, pr_bases
 
 
@@ -169,21 +238,23 @@ if parsed is not None:
                 "(R-F1 push parity)"
             )
 
+    # Ruling: the rubric and deterministic-build jobs are staging-PR-only; they
+    # must not run on a protected-branch push or on a promotion pull request, so
+    # a required promotion context can never depend on them.
     for required_job in (RUBRIC_JOB, DETERMINISTIC_JOB):
         if required_job not in wiring:
             fail(f"{CI_PATH}: missing job {required_job!r}")
             continue
         events, pr_bases = wiring[required_job]
-        missing_events = {"push", "pull_request"} - events
-        if missing_events:
+        if events != STAGING_PR_ONLY_EVENTS:
             fail(
-                f"{CI_PATH}: job {required_job!r} must run on {sorted(missing_events)} "
-                "so every protected-branch push and promotion path is gated"
+                f"{CI_PATH}: job {required_job!r} must run only for pull requests to "
+                f"staging plus opted-in manual dispatch; got events={sorted(events)}"
             )
-        missing_bases = {"staging", "premain", "main"} - pr_bases
-        if missing_bases:
+        if pr_bases != {STAGING}:
             fail(
-                f"{CI_PATH}: job {required_job!r} must run for PRs to {sorted(missing_bases)}"
+                f"{CI_PATH}: job {required_job!r} must be scoped to pull requests "
+                f"targeting {STAGING!r}; got bases={sorted(pr_bases)}"
             )
 
     names = {}

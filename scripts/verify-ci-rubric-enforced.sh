@@ -160,17 +160,20 @@ require_contains "${ci}" "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c
 require_contains "${ci}" "path: gov-infra/evidence/" "CI rubric job must upload gov-infra/evidence/"
 require_contains "${ci}" "run_full_rubric:" "manual CI dispatch must expose an explicit full-rubric toggle"
 require_contains "${ci}" "default: true" "manual CI dispatch must continue to run the full rubric by default"
+# Operator ruling 2026-09-28: the rubric is only needed in staging; premain and
+# main only ever come from staging, so the full rubric must not run on a
+# protected-branch push or on a promotion pull request.
 require_contains \
   "${ci}" \
-  "if: (github.event_name == 'workflow_dispatch' && (inputs.run_full_rubric == true || inputs.run_full_rubric == 'true')) || github.event_name == 'push' || github.event_name == 'pull_request'" \
-  "full rubric must run on every protected-branch push and every PR targeted at staging, premain, or main, plus opted-in manual dispatch"
+  "if: (github.event_name == 'workflow_dispatch' && (inputs.run_full_rubric == true || inputs.run_full_rubric == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')" \
+  "full rubric must run only for PRs targeting staging plus opted-in manual dispatch"
 require_contains "${ci}" "  deterministic-builds:" "CI must define the standalone deterministic-build job"
 require_contains "${ci}" "name: Verify deterministic builds" "CI must keep the deterministic-build job name stable for branch protection visibility"
 require_contains "${ci}" "run: scripts/verify-deterministic-builds.sh" "deterministic-build job must run the verifier script"
 require_contains \
   "${ci}" \
-  "if: (github.event_name == 'workflow_dispatch' && (inputs.run_deterministic_builds == true || inputs.run_deterministic_builds == 'true')) || github.event_name == 'push' || github.event_name == 'pull_request'" \
-  "deterministic builds must run on every protected-branch push and every PR targeted at staging, premain, or main, plus opted-in manual dispatch"
+  "if: (github.event_name == 'workflow_dispatch' && (inputs.run_deterministic_builds == true || inputs.run_deterministic_builds == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')" \
+  "deterministic builds must run only for PRs targeting staging plus opted-in manual dispatch"
 
 # R-F1 promotion-path parity: the PR -> staging readiness job must exist and must
 # check the pull request's own commits.
