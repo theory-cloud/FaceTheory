@@ -428,6 +428,7 @@ gov_check_compliance() {
   scripts/test-publish-draft-release-assets.sh
   scripts/test-verify-release-readiness.sh
   scripts/test-release-workflow-changelog-preservation.sh
+  scripts/test-verify-npm-audit.sh
 }
 
 gov_check_maintainability() {
