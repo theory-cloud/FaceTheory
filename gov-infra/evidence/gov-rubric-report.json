@@ -1,8 +1,8 @@
 {
   "$schema": "theorymcp://namespaces/theorycloud/governance-profiles/theorycloud_governance_profile.v0.1/schemas/gov_rubric_report.v1",
   "schemaVersion": "gov_rubric_report.v1",
-  "timestamp": "2026-09-28T14:54:55Z",
-  "git_head": "529768e4a1d176c73024cc0bcb8537c1897dff39",
+  "timestamp": "2026-09-28T14:56:56Z",
+  "git_head": "e12fe6231e60555b5900ec4f2b368c2d8d0a29ff",
   "pack": {"version": "bc41187efb6f", "digest": "780b5ac1b375223df4475fa67fcd7f26a669630f2fe3e90bea090c37770d00a8"},
   "project": {"name": "FaceTheory", "slug": "facetheory"},
   "summary": {"status": "PASS", "pass": 7, "fail": 0, "blocked": 0},
