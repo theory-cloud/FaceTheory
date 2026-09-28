@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.1.2](https://github.com/theory-cloud/FaceTheory/compare/v4.1.1...v4.1.2) (2026-09-26)
+
+
+### Bug Fixes
+
+* **deps:** move upstream pin to AppTheory v4.4.2 ([cc5e727](https://github.com/theory-cloud/FaceTheory/commit/cc5e7273a6581e4e582cc33231462ffb717330ad))
+* **deps:** move upstream pin to AppTheory v4.4.2 ([f920a18](https://github.com/theory-cloud/FaceTheory/commit/f920a18650b5cd60ce694ccb5ef33497151281bb))
+
 ## [4.1.1](https://github.com/theory-cloud/FaceTheory/compare/v4.1.0...v4.1.1) (2026-09-24)
 
 

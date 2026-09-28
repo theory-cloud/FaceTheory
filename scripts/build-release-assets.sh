@@ -31,7 +31,7 @@ rm -rf "$tmp_package_dir/dist"
 
 (
   cd "$tmp_package_dir"
-  npm ci >/dev/null
+  npm ci --ignore-scripts >/dev/null
   npm run build >/dev/null
 )
 

@@ -111,7 +111,7 @@ ensure_ts_deps_installed() {
   fi
 
   echo "Installing TypeScript dependencies from ts/package-lock.json"
-  (cd ts && npm ci --no-audit --no-fund)
+  (cd ts && npm ci --no-audit --no-fund --ignore-scripts)
   printf '%s\n' "${lock_hash}" > "${stamp}"
 }
 
@@ -413,18 +413,24 @@ gov_check_security() {
   scripts/verify-npm-audit.sh
   scripts/verify-node-engines-floor.sh
   scripts/verify-lambda-runtime-deprecations.sh
+  scripts/verify-ci-install-hardening.sh
   check_actions_pinned_to_sha
 }
 
 gov_check_compliance() {
   require_cmd_or_blocked bash || return $?
   scripts/verify-ci-rubric-enforced.sh
+  scripts/verify-ci-trigger-parity.sh
+  scripts/test-ensure-release-branches.sh
   scripts/test-verify-release-draft-target.sh
   scripts/test-check-release-baseline-ready.sh
   scripts/test-resolve-release-source-ref.sh
   scripts/test-publish-draft-release-assets.sh
   scripts/test-verify-release-readiness.sh
   scripts/test-release-workflow-changelog-preservation.sh
+  scripts/test-verify-npm-audit.sh
+  scripts/test-verify-ci-install-hardening.sh
+  scripts/test-verify-ci-trigger-parity.sh
 }
 
 gov_check_maintainability() {
