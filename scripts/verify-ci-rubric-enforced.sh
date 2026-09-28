@@ -162,15 +162,27 @@ require_contains "${ci}" "run_full_rubric:" "manual CI dispatch must expose an e
 require_contains "${ci}" "default: true" "manual CI dispatch must continue to run the full rubric by default"
 require_contains \
   "${ci}" \
-  "if: (github.event_name == 'workflow_dispatch' && (inputs.run_full_rubric == true || inputs.run_full_rubric == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')" \
-  "full rubric must run only for PRs targeting staging plus opted-in manual dispatch"
+  "if: (github.event_name == 'workflow_dispatch' && (inputs.run_full_rubric == true || inputs.run_full_rubric == 'true')) || github.event_name == 'push' || github.event_name == 'pull_request'" \
+  "full rubric must run on every protected-branch push and every PR targeted at staging, premain, or main, plus opted-in manual dispatch"
 require_contains "${ci}" "  deterministic-builds:" "CI must define the standalone deterministic-build job"
 require_contains "${ci}" "name: Verify deterministic builds" "CI must keep the deterministic-build job name stable for branch protection visibility"
 require_contains "${ci}" "run: scripts/verify-deterministic-builds.sh" "deterministic-build job must run the verifier script"
 require_contains \
   "${ci}" \
-  "if: (github.event_name == 'workflow_dispatch' && (inputs.run_deterministic_builds == true || inputs.run_deterministic_builds == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')" \
-  "deterministic builds must run only for PRs targeting staging plus opted-in manual dispatch"
+  "if: (github.event_name == 'workflow_dispatch' && (inputs.run_deterministic_builds == true || inputs.run_deterministic_builds == 'true')) || github.event_name == 'push' || github.event_name == 'pull_request'" \
+  "deterministic builds must run on every protected-branch push and every PR targeted at staging, premain, or main, plus opted-in manual dispatch"
+
+# R-F1 promotion-path parity: the PR -> staging readiness job must exist and must
+# check the pull request's own commits.
+require_contains "${ci}" "  staging-readiness:" "CI must define the PR -> staging release readiness job"
+require_contains \
+  "${ci}" \
+  "name: Release readiness (PR -> staging)" \
+  "PR -> staging readiness job name must stay stable for branch protection visibility"
+require_contains \
+  "${ci}" \
+  "scripts/verify-release-readiness.sh origin/staging HEAD staging" \
+  "PR -> staging readiness must check the pull request's own commits"
 
 for release_path in \
   ".github/workflows/prerelease.yml" \

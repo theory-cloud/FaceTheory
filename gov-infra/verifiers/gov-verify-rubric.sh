@@ -420,6 +420,8 @@ gov_check_security() {
 gov_check_compliance() {
   require_cmd_or_blocked bash || return $?
   scripts/verify-ci-rubric-enforced.sh
+  scripts/verify-ci-trigger-parity.sh
+  scripts/test-ensure-release-branches.sh
   scripts/test-verify-release-draft-target.sh
   scripts/test-check-release-baseline-ready.sh
   scripts/test-resolve-release-source-ref.sh
