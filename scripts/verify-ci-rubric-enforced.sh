@@ -160,6 +160,9 @@ require_contains "${ci}" "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c
 require_contains "${ci}" "path: gov-infra/evidence/" "CI rubric job must upload gov-infra/evidence/"
 require_contains "${ci}" "run_full_rubric:" "manual CI dispatch must expose an explicit full-rubric toggle"
 require_contains "${ci}" "default: true" "manual CI dispatch must continue to run the full rubric by default"
+# Operator ruling 2026-09-28: the rubric is only needed in staging; premain and
+# main only ever come from staging, so the full rubric must not run on a
+# protected-branch push or on a promotion pull request.
 require_contains \
   "${ci}" \
   "if: (github.event_name == 'workflow_dispatch' && (inputs.run_full_rubric == true || inputs.run_full_rubric == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')" \
@@ -171,6 +174,18 @@ require_contains \
   "${ci}" \
   "if: (github.event_name == 'workflow_dispatch' && (inputs.run_deterministic_builds == true || inputs.run_deterministic_builds == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')" \
   "deterministic builds must run only for PRs targeting staging plus opted-in manual dispatch"
+
+# R-F1 promotion-path parity: the PR -> staging readiness job must exist and must
+# check the pull request's own commits.
+require_contains "${ci}" "  staging-readiness:" "CI must define the PR -> staging release readiness job"
+require_contains \
+  "${ci}" \
+  "name: Release readiness (PR -> staging)" \
+  "PR -> staging readiness job name must stay stable for branch protection visibility"
+require_contains \
+  "${ci}" \
+  "scripts/verify-release-readiness.sh origin/staging HEAD staging" \
+  "PR -> staging readiness must check the pull request's own commits"
 
 for release_path in \
   ".github/workflows/prerelease.yml" \
@@ -225,5 +240,18 @@ require_release_pr_postcondition_checkout ".github/workflows/release-pr.yml" "ma
 if grep -R -Fq 'run: scripts/verify-deterministic-builds.sh' .github/workflows/prerelease.yml .github/workflows/release.yml; then
   fail "release workflows must not run deterministic builds"
 fi
+
+require_contains \
+  "${ci}" \
+  "run: cd ts && npm ci --ignore-scripts" \
+  "CI installs must disable npm install scripts"
+require_contains \
+  ".github/workflows/prerelease.yml" \
+  "cd ts && npm ci --ignore-scripts" \
+  "prerelease installs must disable npm install scripts"
+require_contains \
+  ".github/workflows/release.yml" \
+  "cd ts && npm ci --ignore-scripts" \
+  "release installs must disable npm install scripts"
 
 echo "ci-rubric: PASS"

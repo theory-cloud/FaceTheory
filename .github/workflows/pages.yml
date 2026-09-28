@@ -181,7 +181,7 @@ jobs:
         # install the Gemfile explicitly so the build step's bundle exec
         # finds jekyll on a cold runner.
         working-directory: docs
-        run: bundle install
+        run: bundle install --frozen
 
       - name: Configure Pages
         id: pages

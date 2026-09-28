@@ -10,6 +10,16 @@ projects=(
   "infra/apptheory-ssg-isr-site"
 )
 
+# Bounded registry-call retry. The overrides exist so the repo-local test can
+# keep the retry path fast; they can only ever shorten the wait, never turn a
+# failed audit into a pass.
+AUDIT_ATTEMPTS="${FACETHEORY_NPM_AUDIT_ATTEMPTS:-3}"
+AUDIT_BACKOFF_SECONDS="${FACETHEORY_NPM_AUDIT_BACKOFF_SECONDS:-5}"
+
+report_is_usable() {
+  node -e 'try { JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); } catch (error) { process.exit(1); }' "$1"
+}
+
 tmp_files=()
 cleanup() {
   if (( ${#tmp_files[@]} > 0 )); then
@@ -22,10 +32,32 @@ for project in "${projects[@]}"; do
   report="$(mktemp)"
   tmp_files+=("${report}")
 
-  set +e
-  (cd "${ROOT_DIR}/${project}" && npm audit --package-lock-only --json > "${report}")
-  audit_status=$?
-  set -e
+  audit_status=0
+  attempt=1
+  while true; do
+    set +e
+    (cd "${ROOT_DIR}/${project}" && npm audit --package-lock-only --json > "${report}")
+    audit_status=$?
+    set -e
+
+    # A registry or network failure leaves no usable report; retry those with a
+    # bounded linear backoff and still fail closed once the attempts run out. A
+    # report that parses is a real audit outcome and is never retried.
+    if report_is_usable "${report}"; then
+      break
+    fi
+    if (( attempt >= AUDIT_ATTEMPTS )); then
+      break
+    fi
+    echo "npm-audit: retry (${project}) unusable report on attempt ${attempt}/${AUDIT_ATTEMPTS} (exit ${audit_status})" >&2
+    sleep "$(( AUDIT_BACKOFF_SECONDS * attempt ))"
+    attempt=$(( attempt + 1 ))
+  done
+
+  if ! report_is_usable "${report}"; then
+    echo "npm-audit: FAIL (${project}) no usable audit report after ${attempt} attempt(s) (exit ${audit_status})" >&2
+    exit 1
+  fi
 
   ROOT_DIR="${ROOT_DIR}" ALLOWLIST_FILE="${ALLOWLIST_FILE}" PROJECT="${project}" AUDIT_STATUS="${audit_status}" REPORT="${report}" node <<'NODE'
 const fs = require('node:fs');
