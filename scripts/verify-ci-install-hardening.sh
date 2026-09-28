@@ -9,10 +9,17 @@
 # gov-infra/verifiers/*.sh.
 #
 # A lockfile install counts only in command position (start of line, after a
-# shell separator, or after a workflow `run:` key). `scripts/render-release-notes.sh`
-# embeds an `npm install` usage line inside rendered release-note prose; matching
-# on command position keeps that documentation text from tripping the gate
-# without weakening the rule for real invocations.
+# shell separator, after a workflow `run:` key, or behind an `npx` prefix).
+# `scripts/render-release-notes.sh` embeds an `npm install` usage line inside
+# rendered release-note prose; matching on command position keeps that
+# documentation text from tripping the gate without weakening the rule for real
+# invocations.
+#
+# Required flags are checked against the command span itself, not the whole
+# logical line: the `#`-comment tail is dropped first, and the span ends at the
+# next shell separator, so `npm ci # --ignore-scripts` (flag only in a comment)
+# and `npm ci --ignore-scripts && npm ci` (a second, unprotected install) both
+# fail closed.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -35,33 +42,61 @@ surface = (
     + sorted(glob.glob("gov-infra/verifiers/*.sh"))
 )
 
-PREFIX = r"(?:^|[;&|()]|&&|\|\||run:[ \t]+)[ \t]*"
+PREFIX = r"(?:^|[;&|()]|&&|\|\||run:[ \t]+|npx[ \t]+)[ \t]*"
 
-# (matcher, required flags on the invocation, human label)
+# (matcher with the command in capture group 1, required flags, human label)
 INSTALL_RULES = [
     (
-        re.compile(PREFIX + r"npm[ \t]+ci(?=[ \t]|$)"),
+        re.compile(PREFIX + r"(npm[ \t]+ci)(?=[ \t]|$)"),
         ("--ignore-scripts",),
         "npm ci",
     ),
     (
-        re.compile(PREFIX + r"npm[ \t]+(?:install|i)(?=[ \t]|$)"),
+        re.compile(PREFIX + r"(npm[ \t]+(?:install|i))(?=[ \t]|$)"),
         ("--ignore-scripts",),
         "npm install",
     ),
     (
-        re.compile(PREFIX + r"pnpm[ \t]+(?:install|i|add)(?=[ \t]|$)"),
+        re.compile(PREFIX + r"(pnpm[ \t]+(?:install|i|add))(?=[ \t]|$)"),
         ("--frozen-lockfile", "--ignore-scripts"),
         "pnpm install",
     ),
     (
-        re.compile(PREFIX + r"yarn(?:\.js)?[ \t]+(?:install|add)(?=[ \t]|$)"),
+        re.compile(PREFIX + r"(yarn(?:\.js)?[ \t]+(?:install|add))(?=[ \t]|$)"),
         ("--frozen-lockfile", "--ignore-scripts"),
         "yarn install",
     ),
 ]
 
-BUNDLE = re.compile(PREFIX + r"bundle[ \t]+install(?=[ \t]|$)")
+BUNDLE = re.compile(PREFIX + r"(bundle[ \t]+install)(?=[ \t]|$)")
+SEPARATOR = re.compile(r"&&|\|\||[;&|]")
+
+
+def strip_comment(text):
+    """Drop a trailing unquoted `#` shell comment from a logical line."""
+    out = []
+    quote = None
+    for index, char in enumerate(text):
+        if quote is not None:
+            out.append(char)
+            if char == quote:
+                quote = None
+            continue
+        if char in "\"'":
+            quote = char
+            out.append(char)
+            continue
+        if char == "#" and (index == 0 or text[index - 1] in " \t"):
+            break
+        out.append(char)
+    return "".join(out)
+
+
+def command_span(code, start):
+    """The invoked command text from `start` up to the next shell separator."""
+    separator = SEPARATOR.search(code, start)
+    return code[start:separator.start()] if separator else code[start:]
+
 
 failures = []
 
@@ -78,20 +113,25 @@ for path in surface:
         while logical.rstrip().endswith("\\") and index + 1 < len(lines):
             index += 1
             logical = logical.rstrip()[:-1] + " " + lines[index]
+        code = strip_comment(logical)
         for matcher, required, label in INSTALL_RULES:
-            if not matcher.search(logical):
-                continue
-            missing = [flag for flag in required if flag not in logical]
-            if missing:
+            for match in matcher.finditer(code):
+                span = command_span(code, match.start(1))
+                missing = [flag for flag in required if flag not in span]
+                if missing:
+                    failures.append(
+                        f"{path}:{start_line}: {label} must run with scripts disabled and the "
+                        f"lockfile enforced (missing {' '.join(missing)}): {code.strip()}"
+                    )
+                    break
+        for match in BUNDLE.finditer(code):
+            span = command_span(code, match.start(1))
+            if "--frozen" not in span and "--deployment" not in span:
                 failures.append(
-                    f"{path}:{start_line}: {label} must run with scripts disabled and the "
-                    f"lockfile enforced (missing {' '.join(missing)}): {logical.strip()}"
+                    f"{path}:{start_line}: bundle install must pin Gemfile.lock "
+                    f"(pass --frozen or --deployment): {code.strip()}"
                 )
-        if BUNDLE.search(logical) and "--frozen" not in logical and "--deployment" not in logical:
-            failures.append(
-                f"{path}:{start_line}: bundle install must pin Gemfile.lock "
-                f"(pass --frozen or --deployment): {logical.strip()}"
-            )
+                break
         index += 1
 
 pages = Path(".github/workflows/pages.yml")
