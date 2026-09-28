@@ -127,7 +127,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
-        run: cd ts && npm ci
+        run: cd ts && npm ci --ignore-scripts
       - name: Run TypeScript gates
         run: |
           make ts-typecheck
@@ -220,7 +220,7 @@ jobs:
           go-version-file: ".go-version"
           cache: false
       - name: Install dependencies
-        run: cd ts && npm ci
+        run: cd ts && npm ci --ignore-scripts
       - name: Run full rubric
         run: bash gov-infra/verifiers/gov-verify-rubric.sh
       - name: Upload governance evidence

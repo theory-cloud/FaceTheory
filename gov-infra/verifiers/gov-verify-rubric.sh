@@ -111,7 +111,7 @@ ensure_ts_deps_installed() {
   fi
 
   echo "Installing TypeScript dependencies from ts/package-lock.json"
-  (cd ts && npm ci --no-audit --no-fund)
+  (cd ts && npm ci --no-audit --no-fund --ignore-scripts)
   printf '%s\n' "${lock_hash}" > "${stamp}"
 }
 
@@ -413,6 +413,7 @@ gov_check_security() {
   scripts/verify-npm-audit.sh
   scripts/verify-node-engines-floor.sh
   scripts/verify-lambda-runtime-deprecations.sh
+  scripts/verify-ci-install-hardening.sh
   check_actions_pinned_to_sha
 }
 

@@ -226,4 +226,17 @@ if grep -R -Fq 'run: scripts/verify-deterministic-builds.sh' .github/workflows/p
   fail "release workflows must not run deterministic builds"
 fi
 
+require_contains \
+  "${ci}" \
+  "run: cd ts && npm ci --ignore-scripts" \
+  "CI installs must disable npm install scripts"
+require_contains \
+  ".github/workflows/prerelease.yml" \
+  "cd ts && npm ci --ignore-scripts" \
+  "prerelease installs must disable npm install scripts"
+require_contains \
+  ".github/workflows/release.yml" \
+  "cd ts && npm ci --ignore-scripts" \
+  "release installs must disable npm install scripts"
+
 echo "ci-rubric: PASS"

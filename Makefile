@@ -25,8 +25,8 @@ ts-examples-readmes:
 	cd ts && npm run verify:examples:readmes
 
 infra-snapshot-test: ts-build
-	cd infra/apptheory-ssr-site && npm ci && npm test
-	cd infra/apptheory-ssg-isr-site && npm ci && npm test
+	cd infra/apptheory-ssr-site && npm ci --ignore-scripts && npm test
+	cd infra/apptheory-ssg-isr-site && npm ci --ignore-scripts && npm test
 
 docs-export-map:
 	./scripts/verify-docs-export-map.sh
