@@ -66,5 +66,5 @@ node-engines-floor: PASS (self-test 88 matcher and scope cases + 13 synthetic lo
   infra/apptheory-ssg-isr-site/src/stack.ts declares 1 Lambda runtime(s)
   ts/src/create-templates/index.ts declares 1 Lambda runtime(s)
 lambda-runtime-deprecations: PASS (self-test 35 synthetic surfaces + 2 scope cases + 1 entry-point probe; surfaces 3; declarations 3; deprecated set 11; supported nodejs22.x, nodejs24.x)
-ci-install-hardening: PASS (52 surfaces)
+ci-install-hardening: PASS (54 surfaces)
 workflow-action-pins: PASS
