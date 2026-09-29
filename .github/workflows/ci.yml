@@ -115,9 +115,18 @@ jobs:
         with:
           fetch-depth: 0
       - name: Verify the pull request carries promotion-eligible commits
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
+          # On a PR, HEAD is the synthetic merge commit, so origin/staging..HEAD is
+          # the range that would exist after the merge. This is the only lane that
+          # opts in to the post-release main back-merge exemption: after a stable
+          # release the returned main branch carries no release-driving commit,
+          # correctly, so that one PR shape must not read as a missing driver.
           git fetch origin staging --force
-          scripts/verify-release-readiness.sh origin/staging HEAD staging
+          scripts/verify-release-readiness.sh origin/staging HEAD staging --allow-main-backmerge --head-ref "${PR_HEAD_REF}" --github-head-repository "${PR_HEAD_REPOSITORY}" --github-repository "${GITHUB_REPOSITORY}"
 
   version-alignment:
     name: Version alignment

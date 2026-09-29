@@ -280,6 +280,57 @@ if parsed is not None:
                 "scripts/verify-release-readiness.sh"
             )
 
+    # Post-release main back-merge exemption: the staging-lane readiness gate is
+    # the only lane that may opt in, and only with the pull-request head ref and
+    # head repository the predicate compares -- never a widened expression such
+    # as github.ref_name, which would exempt a pull request whose content has not
+    # been released. The promotion-edge readiness lanes must never opt in: they
+    # promote already-released content, so a range with no release-driving commit
+    # there means the promotion would ship nothing.
+    if PR_STAGING_READINESS in by_name:
+        readiness_body = jobs[by_name[PR_STAGING_READINESS]]
+        for needle, why in (
+            ("--allow-main-backmerge", "opt in to the post-release main back-merge exemption"),
+            (
+                "PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}",
+                "bind the exemption's head ref to the pull-request head ref",
+            ),
+            (
+                '--head-ref "${PR_HEAD_REF}"',
+                "feed the exemption the bound pull-request head ref",
+            ),
+            (
+                "PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}",
+                "bind the exemption's head repository to the pull-request head repository",
+            ),
+            (
+                '--github-head-repository "${PR_HEAD_REPOSITORY}"',
+                "feed the exemption the bound pull-request head repository, so a fork branch named main cannot take it",
+            ),
+            (
+                '--github-repository "${GITHUB_REPOSITORY}"',
+                "name this repository for the exemption's trusted-repository comparison",
+            ),
+        ):
+            if needle not in readiness_body:
+                fail(
+                    f"{CI_PATH}: {PR_STAGING_READINESS!r} must {why}; "
+                    f"missing {needle!r}"
+                )
+
+    for promotion_name in (
+        "Prerelease readiness (staging -> premain)",
+        "Release readiness (PR -> main)",
+    ):
+        if (
+            promotion_name in by_name
+            and "--allow-main-backmerge" in jobs[by_name[promotion_name]]
+        ):
+            fail(
+                f"{CI_PATH}: {promotion_name!r} must not take the post-release "
+                "main back-merge exemption; it promotes already-released content"
+            )
+
     for required_name, expected_base in (
         ("Prerelease readiness (staging -> premain)", "premain"),
         ("Release readiness (PR -> main)", "main"),

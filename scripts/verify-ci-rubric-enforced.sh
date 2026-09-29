@@ -175,8 +175,10 @@ require_contains \
   "if: (github.event_name == 'workflow_dispatch' && (inputs.run_deterministic_builds == true || inputs.run_deterministic_builds == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')" \
   "deterministic builds must run only for PRs targeting staging plus opted-in manual dispatch"
 
-# R-F1 promotion-path parity: the PR -> staging readiness job must exist and must
-# check the pull request's own commits.
+# R-F1 promotion-path parity: the PR -> staging readiness job must exist, must
+# check the pull request's own commits, and is the only job that may opt in to
+# the post-release main back-merge exemption. The lane-scoped side of that
+# invariant lives in scripts/verify-ci-trigger-parity.sh.
 require_contains "${ci}" "  staging-readiness:" "CI must define the PR -> staging release readiness job"
 require_contains \
   "${ci}" \
@@ -184,8 +186,12 @@ require_contains \
   "PR -> staging readiness job name must stay stable for branch protection visibility"
 require_contains \
   "${ci}" \
-  "scripts/verify-release-readiness.sh origin/staging HEAD staging" \
-  "PR -> staging readiness must check the pull request's own commits"
+  'scripts/verify-release-readiness.sh origin/staging HEAD staging --allow-main-backmerge --head-ref "${PR_HEAD_REF}" --github-head-repository "${PR_HEAD_REPOSITORY}" --github-repository "${GITHUB_REPOSITORY}"' \
+  "PR -> staging readiness must check the pull request's own commits and opt in to the post-release main back-merge exemption with the pull-request head ref and head repository"
+require_contains \
+  "scripts/verify-release-readiness.sh" \
+  "--allow-main-backmerge" \
+  "the release readiness verifier must implement the opt-in post-release main back-merge exemption"
 
 for release_path in \
   ".github/workflows/prerelease.yml" \
