@@ -1,5 +1,25 @@
 # Changelog
 
+## [4.2.0](https://github.com/theory-cloud/FaceTheory/compare/v4.1.2...v4.2.0) (2026-09-29)
+
+
+### Features
+
+* **ci:** enforce the rubric and release readiness on every promotion path ([de0fc22](https://github.com/theory-cloud/FaceTheory/commit/de0fc22d223d21db72a0cfbfe6e471e5dfe1240a))
+* **ci:** meet the software_repo_gov_infra profile on every promotion path ([cb7bcea](https://github.com/theory-cloud/FaceTheory/commit/cb7bcea87981843e4454ef8c03688b10f1c509c5))
+
+
+### Bug Fixes
+
+* **ci:** bound the npm-audit registry call and keep the gate fail-closed ([2f4f6ab](https://github.com/theory-cloud/FaceTheory/commit/2f4f6ab6347853d6acd184de3f53c0f72b039847))
+* **ci:** disable npm install scripts on every lockfile install ([6fdd79c](https://github.com/theory-cloud/FaceTheory/commit/6fdd79c769dbcc3b44e4fb22d8d9a0cdb5c6957f))
+* **ci:** scope the rubric and deterministic builds to staging pull requests ([f3fbd3d](https://github.com/theory-cloud/FaceTheory/commit/f3fbd3d95bbbfa5c90535e735c138ea714b6a173))
+* **deps:** adopt AppTheory v5.0.0 and TableTheory v4.0.0; fold Dependabot [#482](https://github.com/theory-cloud/FaceTheory/issues/482) ([4df528f](https://github.com/theory-cloud/FaceTheory/commit/4df528fb0427d5b2b14651c10c2af9ffce93df50))
+* **deps:** bump ruby/setup-ruby to v1.327.0 ([c3b8ed5](https://github.com/theory-cloud/FaceTheory/commit/c3b8ed5b542dea983edb0697c966d279fba08ff5))
+* **deps:** move upstream pins to AppTheory v5.0.0 and TableTheory v4.0.0 ([8bcca65](https://github.com/theory-cloud/FaceTheory/commit/8bcca65342a3d9a3eb15b8b2104e0f76476661bf))
+* **deps:** refresh infra synth snapshots for the AppTheory v5 runtime ([2ef7d05](https://github.com/theory-cloud/FaceTheory/commit/2ef7d057cdde5e0a63c6803155897c4b6b710050))
+* **gov:** fail closed on comment-masked npm install flags ([529768e](https://github.com/theory-cloud/FaceTheory/commit/529768e4a1d176c73024cc0bcb8537c1897dff39))
+
 ## [4.1.2](https://github.com/theory-cloud/FaceTheory/compare/v4.1.1...v4.1.2) (2026-09-26)
 
 
