@@ -106,6 +106,19 @@ jobs:
           git fetch origin "${{ github.event.pull_request.base.ref }}" --force
           scripts/verify-release-readiness.sh "origin/${{ github.event.pull_request.base.ref }}" HEAD release
 
+  staging-readiness:
+    name: Release readiness (PR -> staging)
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Verify the pull request carries promotion-eligible commits
+        run: |
+          git fetch origin staging --force
+          scripts/verify-release-readiness.sh origin/staging HEAD staging
+
   version-alignment:
     name: Version alignment
     runs-on: ubuntu-latest
@@ -127,7 +140,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
-        run: cd ts && npm ci
+        run: cd ts && npm ci --ignore-scripts
       - name: Run TypeScript gates
         run: |
           make ts-typecheck
@@ -220,7 +233,7 @@ jobs:
           go-version-file: ".go-version"
           cache: false
       - name: Install dependencies
-        run: cd ts && npm ci
+        run: cd ts && npm ci --ignore-scripts
       - name: Run full rubric
         run: bash gov-infra/verifiers/gov-verify-rubric.sh
       - name: Upload governance evidence
