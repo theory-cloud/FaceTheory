@@ -102,6 +102,38 @@ path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 PY
 }
 
+replace_ci_job_text() { # <job-id> <old-text> <new-text>
+  python3 - "${root}/.github/workflows/ci.yml" "$1" "$2" "$3" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+job, old, new = sys.argv[2], sys.argv[3], sys.argv[4]
+lines = path.read_text(encoding="utf-8").split("\n")
+
+start = None
+for index, line in enumerate(lines):
+    if line == f"  {job}:":
+        start = index
+        break
+if start is None:
+    raise SystemExit(f"job {job!r} not found")
+
+end = len(lines)
+for index in range(start + 1, len(lines)):
+    if re.match(r"^  [A-Za-z0-9_-]+:\s*$", lines[index]):
+        end = index
+        break
+
+block = "\n".join(lines[start:end])
+if old not in block:
+    raise SystemExit(f"fixture text not found in job {job!r}: {old!r}")
+lines[start:end] = block.replace(old, new, 1).split("\n")
+path.write_text("\n".join(lines), encoding="utf-8")
+PY
+}
+
 # Baseline: the shipped wiring (rubric/deterministic staging-PR-only) is clean.
 reset_ci
 expect_pass "baseline"
@@ -151,6 +183,31 @@ expect_fail "rubric scoped to promotion base premain"
 reset_ci
 add_pull_request_branch_filter
 expect_fail "pull_request trigger gained a branches filter"
+
+# The post-release main back-merge exemption must stay narrow: only the staging
+# readiness lane may opt in, and only against the pull-request head ref and head
+# repository. The promotion-edge readiness lanes must never opt in.
+reset_ci
+replace_ci_job_text staging-readiness '--allow-main-backmerge ' ''
+expect_fail "staging readiness lost the post-release main back-merge opt-in"
+
+reset_ci
+replace_ci_job_text staging-readiness \
+  'PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}' \
+  'PR_HEAD_REF: ${{ github.ref_name }}'
+expect_fail "the exemption head-ref binding was widened to a non-pull-request expression"
+
+reset_ci
+replace_ci_job_text staging-readiness \
+  'PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}' \
+  'PR_HEAD_REPOSITORY: ${{ github.repository }}'
+expect_fail "the exemption head-repository binding was widened to this repository"
+
+reset_ci
+replace_ci_job_text prerelease-readiness \
+  'scripts/verify-release-readiness.sh origin/premain origin/staging prerelease' \
+  'scripts/verify-release-readiness.sh origin/premain origin/staging prerelease --allow-main-backmerge'
+expect_fail "the promotion-edge readiness lane took the post-release main back-merge exemption"
 
 # Positive control: restore the shipped wiring and confirm the guard is green.
 reset_ci
