@@ -271,21 +271,21 @@
     "verify:format-gate": "node scripts/verify-format-gate.mjs"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1136.0",
+    "@aws-sdk/client-s3": "^3.1141.0",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/server": "^11.11.0",
     "@eslint/js": "^10.0.1",
-    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v5.0.0/theory-cloud-apptheory-5.0.0.tgz",
     "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v5.0.0/theory-cloud-apptheory-cdk-5.0.0.tgz",
     "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v4.0.0/theory-cloud-tabletheory-ts-4.0.0.tgz",
     "@types/jsdom": "^30.0.0",
-    "@types/node": "^26.6.2",
+    "@types/node": "^24.19.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@typescript-eslint/eslint-plugin": "^8.70.0",
-    "@typescript-eslint/parser": "^8.70.0",
+    "@typescript-eslint/eslint-plugin": "^8.70.1",
+    "@typescript-eslint/parser": "^8.70.1",
     "@vue/server-renderer": "^3.5.43",
     "antd": "^6.6.4",
     "aws-cdk-lib": "2.270.0",
@@ -295,20 +295,20 @@
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "jsdom": "^30.1.0",
-    "prettier": "^3.9.8",
+    "prettier": "^3.9.9",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "svelte": "^5.57.1",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",
-    "vite": "^8.3.0",
+    "vite": "^8.3.1",
     "vue": "^3.5.43"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
       "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v4.0.0/theory-cloud-tabletheory-ts-4.0.0.tgz"
     },
-    "brace-expansion": "5.0.9",
+    "brace-expansion": "5.0.12",
     "postcss": "8.5.25"
   },
   "sideEffects": false

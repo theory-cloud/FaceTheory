@@ -1,7 +1,5 @@
 Verifier: gov_check_maintainability
-Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
+Repository: /Users/theorycloud/AgentSpace/factory/products/frameworks/FaceTheory
 Rubric ID: MAI-1
 
-npm notice run @theory-cloud/facetheory@4.1.2 build
-npm notice run tsc -p tsconfig.build.json && node scripts/copy-svelte-sources.mjs
-ts-pack: PASS (theory-cloud-facetheory-4.1.2.tgz)
+ts-pack: PASS (theory-cloud-facetheory-4.2.0.tgz)
