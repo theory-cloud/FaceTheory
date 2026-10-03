@@ -69,9 +69,21 @@ a release-asset integrity stop condition).
 
 ## Known Audit Exceptions
 
-There are no active `npm audit` exceptions for the current upstream baseline. `scripts/verify-npm-audit.sh` requires a
-clean audit in `ts`, `infra/apptheory-ssr-site`, and `infra/apptheory-ssg-isr-site`; any reported vulnerability or nonzero
-audit exit fails the verifier.
+The gov-infra supply-chain allowlist (`gov-infra/planning/facetheory-supply-chain-allowlist.txt`) is the only place an
+`npm audit` finding may be allowed, and `scripts/verify-npm-audit.sh` requires a clean audit in `ts`,
+`infra/apptheory-ssr-site`, and `infra/apptheory-ssg-isr-site` otherwise. A scoped exception entry names an exact
+advisory set, package, installed version, node path, project list, and UTC expiry; the gate fails on anything outside
+those gates and ignores the entry once it expires.
+
+### Active exceptions
+
+- **bundled `brace-expansion` 5.0.9** — `aws-cdk-lib` bundles `brace-expansion@5.0.9` at
+  `node_modules/aws-cdk-lib/node_modules/brace-expansion` in all three projects. The three advisories below are fixed
+  only at 5.0.10 / 5.0.11 / 5.0.12, which no AppTheory-compatible `aws-cdk-lib` line bundles yet. FaceTheory does not
+  repackage AWS dependencies (operator ruling 2026-10-03: "if a vulnerable dependency is bundled in AWS we make an
+  exception until its updated there"), so a scoped allowlist exception covers this exact copy only:
+  `GHSA-q2hr-2g5m-vwhr`, `GHSA-qhr7-859c-m2p7`, `GHSA-6j4f-fj2g-mc7p`. The entry expires **2026-11-02** and must be
+  rechecked when `aws-cdk-lib` bundles a fixed `brace-expansion` (>= 5.0.10).
 
 ### Recently cleared
 

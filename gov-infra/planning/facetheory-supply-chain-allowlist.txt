@@ -1,3 +1,32 @@
 # FaceTheory gov-infra supply-chain allowlist
 #
-# Add exact finding IDs only, with a short justification comment above each entry.
+# Consumed by scripts/verify-npm-audit.sh. Two entry forms are supported:
+#
+# 1. Bare advisory ID (legacy, advisory-only): a line holding exactly one GHSA
+#    id. A finding is allowed in any audited project when every advisory in its
+#    `via` list is a listed id. Use only when the advisory has no package,
+#    version, node, or project scope.
+#
+# 2. Scoped, self-expiring exception (preferred): a single `allow` directive
+#    line, with a short justification comment above it. Every field must match
+#    the finding exactly or the finding still fails:
+#
+#      allow ids=<GHSA,...> package=<name> version=<version> nodes=<node-path,...> projects=<project-dir,...> expires=<YYYY-MM-DD>
+#
+#    - ids      every `via` advisory id must be listed here
+#    - package  exact npm package name (the finding name and every via[].name)
+#    - version  exact installed version, read from the project lockfile per node
+#    - nodes    every reported node path must be listed here (a copy on any
+#               other path, bundled or not, still fails)
+#    - projects every audited project dir this exception may apply to
+#    - expires  UTC date; the entry is ignored on or after this date, so the
+#               gate fails again and the exception must be revisited
+#
+# Operator ruling 2026-10-03: "if a vulnerable dependency is bundled in AWS we
+# make an exception until its updated there."
+#
+# brace-expansion 5.0.9 is bundled in aws-cdk-lib; AWS-published; exception
+# until aws-cdk-lib bundles a fixed version; operator ruling 2026-10-03.
+# The three advisories below are fixed only at 5.0.10/5.0.11/5.0.12, which no
+# AppTheory-compatible aws-cdk-lib line bundles yet. Recheck by 2026-11-02.
+allow ids=GHSA-q2hr-2g5m-vwhr,GHSA-qhr7-859c-m2p7,GHSA-6j4f-fj2g-mc7p package=brace-expansion version=5.0.9 nodes=node_modules/aws-cdk-lib/node_modules/brace-expansion projects=ts,infra/apptheory-ssr-site,infra/apptheory-ssg-isr-site expires=2026-11-02
