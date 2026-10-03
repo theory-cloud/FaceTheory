@@ -4,11 +4,11 @@ Rubric ID: CMP-1
 
 ci-rubric: PASS
 ci-trigger-parity: PASS
-To /var/folders/px/kdf8vn8x5297c4h8720rdzw80000gn/T/tmp.xZtPB3BgrC/publish-remote.git
+To /var/folders/px/kdf8vn8x5297c4h8720rdzw80000gn/T/tmp.shP6Xbm7u1/publish-remote.git
  * [new branch]      origin/main -> premain
-To /var/folders/px/kdf8vn8x5297c4h8720rdzw80000gn/T/tmp.xZtPB3BgrC/publish-remote.git
+To /var/folders/px/kdf8vn8x5297c4h8720rdzw80000gn/T/tmp.shP6Xbm7u1/publish-remote.git
  * [new branch]      origin/main -> staging
-To /var/folders/px/kdf8vn8x5297c4h8720rdzw80000gn/T/tmp.xZtPB3BgrC/preserve-remote.git
+To /var/folders/px/kdf8vn8x5297c4h8720rdzw80000gn/T/tmp.shP6Xbm7u1/preserve-remote.git
  * [new branch]      origin/main -> premain
 test-ensure-release-branches: PASS
 test-verify-release-draft-target: PASS
