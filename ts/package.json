@@ -271,7 +271,7 @@
     "verify:format-gate": "node scripts/verify-format-gate.mjs"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1141.0",
+    "@aws-sdk/client-s3": "^3.1144.0",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/server": "^11.11.0",
@@ -281,10 +281,10 @@
     "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v5.0.0/theory-cloud-apptheory-cdk-5.0.0.tgz",
     "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v4.0.0/theory-cloud-tabletheory-ts-4.0.0.tgz",
     "@types/jsdom": "^30.0.0",
-    "@types/node": "^24.19.0",
+    "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@typescript-eslint/eslint-plugin": "^8.70.1",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
     "@typescript-eslint/parser": "^8.70.1",
     "@vue/server-renderer": "^3.5.43",
     "antd": "^6.6.4",
