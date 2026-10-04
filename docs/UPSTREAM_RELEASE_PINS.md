@@ -77,13 +77,13 @@ those gates and ignores the entry once it expires.
 
 ### Active exceptions
 
-- **bundled `brace-expansion` 5.0.9** — `aws-cdk-lib` bundles `brace-expansion@5.0.9` at
+- **bundled `brace-expansion` 5.0.9** — `aws-cdk-lib@2.271.0` bundles `brace-expansion@5.0.9` at
   `node_modules/aws-cdk-lib/node_modules/brace-expansion` in all three projects. The three advisories below are fixed
   only at 5.0.10 / 5.0.11 / 5.0.12, which no AppTheory-compatible `aws-cdk-lib` line bundles yet. FaceTheory does not
   repackage AWS dependencies (operator ruling 2026-10-03: "if a vulnerable dependency is bundled in AWS we make an
   exception until its updated there"), so a scoped allowlist exception covers this exact copy only:
   `GHSA-q2hr-2g5m-vwhr`, `GHSA-qhr7-859c-m2p7`, `GHSA-6j4f-fj2g-mc7p`. The entry expires **2026-11-02** and must be
-  rechecked when `aws-cdk-lib` bundles a fixed `brace-expansion` (>= 5.0.10).
+  rechecked when `aws-cdk-lib` bundles a fixed `brace-expansion` (>= 5.0.12).
 
 ### Recently cleared
 

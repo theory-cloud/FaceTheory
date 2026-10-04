@@ -25,8 +25,9 @@
 # Operator ruling 2026-10-03: "if a vulnerable dependency is bundled in AWS we
 # make an exception until its updated there."
 #
-# brace-expansion 5.0.9 is bundled in aws-cdk-lib; AWS-published; exception
-# until aws-cdk-lib bundles a fixed version; operator ruling 2026-10-03.
-# The three advisories below are fixed only at 5.0.10/5.0.11/5.0.12, which no
-# AppTheory-compatible aws-cdk-lib line bundles yet. Recheck by 2026-11-02.
+# brace-expansion 5.0.9 is bundled in aws-cdk-lib 2.271.0 (the aws-cdk-lib peer
+# of apptheory-cdk 5.0.1); AWS-published; exception until aws-cdk-lib bundles a
+# fixed version; operator ruling 2026-10-03. The three advisories below are
+# fixed only at 5.0.10/5.0.11/5.0.12, which no AppTheory-compatible aws-cdk-lib
+# line bundles yet. Recheck by 2026-11-02.
 allow ids=GHSA-q2hr-2g5m-vwhr,GHSA-qhr7-859c-m2p7,GHSA-6j4f-fj2g-mc7p package=brace-expansion version=5.0.9 nodes=node_modules/aws-cdk-lib/node_modules/brace-expansion projects=ts,infra/apptheory-ssr-site,infra/apptheory-ssg-isr-site expires=2026-11-02
