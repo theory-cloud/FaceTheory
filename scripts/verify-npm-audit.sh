@@ -68,33 +68,102 @@ const reportPath = process.env.REPORT;
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const vulnerabilities = report.vulnerabilities || {};
 const entries = Object.entries(vulnerabilities);
-const allowlist = new Set(
-  fs
-    .readFileSync(process.env.ALLOWLIST_FILE, 'utf8')
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith('#')),
-);
+// The governed allowlist supports two entry forms: a bare advisory id, and a
+// scoped `allow` directive whose every field (advisory ids, package, version,
+// node paths, project dirs, expiry) must match the finding. Scoped entries are
+// self-expiring so a stale exception fails the gate and is forced back onto the
+// review path.
+const bareIds = new Set();
+const scoped = [];
+for (const raw of fs.readFileSync(process.env.ALLOWLIST_FILE, 'utf8').split(/\r?\n/)) {
+  const line = raw.trim();
+  if (!line || line.startsWith('#')) continue;
+  if (!line.startsWith('allow ')) {
+    bareIds.add(line);
+    continue;
+  }
+  const fields = {};
+  for (const token of line.slice('allow '.length).trim().split(/\s+/)) {
+    const eq = token.indexOf('=');
+    if (eq > 0) fields[token.slice(0, eq)] = token.slice(eq + 1);
+  }
+  scoped.push({
+    ids: (fields.ids || '').split(',').filter(Boolean),
+    package: fields.package,
+    version: fields.version,
+    nodes: (fields.nodes || '').split(',').filter(Boolean),
+    projects: (fields.projects || '').split(',').filter(Boolean),
+    expires: fields.expires || '',
+  });
+}
 
 function advisoryId(url) {
   const match = /^https:\/\/github\.com\/advisories\/(GHSA-[0-9a-z-]+)$/.exec(url || '');
   return match?.[1];
 }
 
-function isAllowlisted(vulnerability) {
-  const via = Array.isArray(vulnerability?.via) ? vulnerability.via : [];
-  return (
-    via.length > 0 &&
-    via.every((entry) => {
-      if (!entry || typeof entry !== 'object') return false;
-      const id = advisoryId(entry.url);
-      return id !== undefined && allowlist.has(id);
-    })
+function viaAdvisories(vulnerability) {
+  return Array.isArray(vulnerability?.via)
+    ? vulnerability.via.map((entry) =>
+        entry && typeof entry === 'object'
+          ? { name: entry.name, id: advisoryId(entry.url) }
+          : { name: undefined, id: undefined },
+      )
+    : [];
+}
+
+function isBareAllowlisted(vulnerability) {
+  const via = viaAdvisories(vulnerability);
+  return via.length > 0 && via.every((entry) => entry.id !== undefined && bareIds.has(entry.id));
+}
+
+const today = new Date().toISOString().slice(0, 10);
+
+const lockPackages = (() => {
+  try {
+    return (
+      JSON.parse(fs.readFileSync(`${process.env.ROOT_DIR}/${project}/package-lock.json`, 'utf8')).packages || {}
+    );
+  } catch (error) {
+    return {};
+  }
+})();
+
+function isScopedAllowlisted(exception, name, vulnerability) {
+  if (!exception.expires || today >= exception.expires) return false;
+  if (name !== exception.package || vulnerability?.name !== exception.package) return false;
+  if (!exception.projects.includes(project)) return false;
+
+  const nodes = Array.isArray(vulnerability.nodes) ? vulnerability.nodes : [];
+  if (nodes.length === 0 || !nodes.every((node) => exception.nodes.includes(node))) return false;
+  if (!nodes.every((node) => lockPackages[node]?.version === exception.version)) return false;
+
+  const via = viaAdvisories(vulnerability);
+  if (via.length === 0) return false;
+  return via.every(
+    (entry) => entry.name === exception.package && entry.id !== undefined && exception.ids.includes(entry.id),
   );
 }
 
-const unexpected = entries.filter(([, vulnerability]) => !isAllowlisted(vulnerability));
-const allowed = entries.filter(([, vulnerability]) => isAllowlisted(vulnerability));
+const allowed = [];
+const unexpected = [];
+for (const [name, vulnerability] of entries) {
+  const advisoryIds = viaAdvisories(vulnerability)
+    .map((entry) => entry.id)
+    .join(',');
+  if (isBareAllowlisted(vulnerability)) {
+    allowed.push(`npm-audit: ALLOW (${project}) ${name} via ${advisoryIds} [allowlist id]`);
+    continue;
+  }
+  const match = scoped.find((exception) => isScopedAllowlisted(exception, name, vulnerability));
+  if (match) {
+    allowed.push(
+      `npm-audit: ALLOW (${project}) ${name} via ${advisoryIds} [scoped exception, expires ${match.expires}]`,
+    );
+  } else {
+    unexpected.push([name, vulnerability]);
+  }
+}
 
 if (unexpected.length > 0) {
   console.error(`npm-audit: FAIL (${project})`);
@@ -104,9 +173,8 @@ if (unexpected.length > 0) {
   process.exit(1);
 }
 
-for (const [name, vulnerability] of allowed) {
-  const ids = vulnerability.via.map((entry) => advisoryId(entry.url)).join(',');
-  console.log(`npm-audit: ALLOW (${project}) ${name} via ${ids}`);
+for (const line of allowed) {
+  console.log(line);
 }
 
 if (auditStatus !== 0 && allowed.length === 0) {

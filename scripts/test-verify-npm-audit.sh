@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Purpose: prove the npm-audit security gate (a) retries only unusable registry
 # results, (b) stays bounded and fails closed when the registry never answers,
-# and (c) still fails on a real, non-allowlisted finding without retrying.
+# (c) still fails on a real, non-allowlisted finding without retrying, and
+# (d) honours a scoped, self-expiring allowlist exception ONLY for the exact
+# bundled package, version, node path, advisory set, and project it names.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -60,6 +62,22 @@ case "${FAKE_NPM_MODE}" in
     printf '%s\n' '{"vulnerabilities":{"evil-pkg":{"severity":"high","via":[{"url":"https://github.com/advisories/GHSA-9999-9999-9999"}]}}}'
     exit 1
     ;;
+  bundled-ok|bundled-version-drift|bundled-project-scope|bundled-expired)
+    printf '%s\n' '{"vulnerabilities":{"brace-expansion":{"name":"brace-expansion","severity":"high","via":[{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"},{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-qhr7-859c-m2p7"},{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-6j4f-fj2g-mc7p"}],"nodes":["node_modules/aws-cdk-lib/node_modules/brace-expansion"]}}}'
+    exit 1
+    ;;
+  bundled-nonbundled-node)
+    printf '%s\n' '{"vulnerabilities":{"brace-expansion":{"name":"brace-expansion","severity":"high","via":[{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"}],"nodes":["node_modules/brace-expansion"]}}}'
+    exit 1
+    ;;
+  bundled-advisory-drift)
+    printf '%s\n' '{"vulnerabilities":{"brace-expansion":{"name":"brace-expansion","severity":"high","via":[{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"},{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-9999-9999-9999"}],"nodes":["node_modules/aws-cdk-lib/node_modules/brace-expansion"]}}}'
+    exit 1
+    ;;
+  bundled-other-package)
+    printf '%s\n' '{"vulnerabilities":{"minimatch":{"name":"minimatch","severity":"high","via":[{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"}],"nodes":["node_modules/aws-cdk-lib/node_modules/brace-expansion"]}}}'
+    exit 1
+    ;;
   *)
     echo "unknown FAKE_NPM_MODE ${FAKE_NPM_MODE}" >&2
     exit 1
@@ -67,6 +85,20 @@ case "${FAKE_NPM_MODE}" in
 esac
 SH
 chmod +x "${bin_dir}/npm"
+
+# Overwrite the scratch allowlist and the three scratch lockfiles so a scoped
+# exception can be exercised against the exact bundled finding it targets.
+write_allowlist() {
+  printf '%s\n' "$1" > "${fake_root}/gov-infra/planning/facetheory-supply-chain-allowlist.txt"
+}
+
+write_bundled_locks() {
+  local version="$1" project
+  for project in ts infra/apptheory-ssr-site infra/apptheory-ssg-isr-site; do
+    printf '{"name":"scratch","lockfileVersion":3,"packages":{"node_modules/aws-cdk-lib/node_modules/brace-expansion":{"version":"%s","inBundle":true}}}\n' \
+      "${version}" > "${fake_root}/${project}/package-lock.json"
+  done
+}
 
 run_gate() {
   local mode="$1"
@@ -109,5 +141,56 @@ grep -Fq 'evil-pkg' "${tmpdir}/vulnerable.err" ||
   fail "non-allowlisted finding was not named in the failure"
 [[ "$(cat "${tmpdir}/vulnerable.count-ts")" == "1" ]] ||
   fail "a usable audit report must not be retried, got $(cat "${tmpdir}/vulnerable.count-ts") attempts"
+
+# (d) A scoped, self-expiring exception allows ONLY the exact bundled finding.
+scoped_prefix='allow ids=GHSA-q2hr-2g5m-vwhr,GHSA-qhr7-859c-m2p7,GHSA-6j4f-fj2g-mc7p package=brace-expansion version=5.0.9 nodes=node_modules/aws-cdk-lib/node_modules/brace-expansion'
+all_projects='ts,infra/apptheory-ssr-site,infra/apptheory-ssg-isr-site'
+
+write_allowlist "${scoped_prefix} projects=${all_projects} expires=2999-01-01"
+write_bundled_locks 5.0.9
+status="$(run_gate bundled-ok)"
+[[ "${status}" == "0" ]] || fail "scoped exception should allow the exact bundled finding, got status ${status}"
+grep -Fq 'npm-audit: ALLOW (ts) brace-expansion' "${tmpdir}/bundled-ok.out" ||
+  fail "scoped pass did not report the ts allowance"
+grep -Fq 'scoped exception, expires 2999-01-01' "${tmpdir}/bundled-ok.out" ||
+  fail "scoped pass did not identify the scoped exception"
+
+# (e) A bundled copy at a different installed version is NOT covered.
+write_bundled_locks 5.0.11
+status="$(run_gate bundled-version-drift)"
+[[ "${status}" != "0" ]] || fail "a different bundled version must fail the scoped exception"
+grep -Fq 'npm-audit: FAIL (ts)' "${tmpdir}/bundled-version-drift.err" ||
+  fail "version drift did not fail the gate"
+
+# (f) A non-bundled copy is NOT covered.
+write_bundled_locks 5.0.9
+status="$(run_gate bundled-nonbundled-node)"
+[[ "${status}" != "0" ]] || fail "a non-bundled node path must fail the scoped exception"
+
+# (g) An advisory id outside the exception's set is NOT covered.
+status="$(run_gate bundled-advisory-drift)"
+[[ "${status}" != "0" ]] || fail "an unlisted advisory id must fail the scoped exception"
+
+# (h) A different package is NOT covered.
+status="$(run_gate bundled-other-package)"
+[[ "${status}" != "0" ]] || fail "another package must fail the scoped exception"
+
+# (i) A project outside the exception's project list is NOT covered.
+write_allowlist "${scoped_prefix} projects=ts expires=2999-01-01"
+write_bundled_locks 5.0.9
+status="$(run_gate bundled-project-scope)"
+[[ "${status}" != "0" ]] || fail "a project outside the scoped projects must fail"
+grep -Fq 'npm-audit: ALLOW (ts) brace-expansion' "${tmpdir}/bundled-project-scope.out" ||
+  fail "the in-scope project should have been allowed"
+grep -Fq 'npm-audit: FAIL (infra/apptheory-ssr-site)' "${tmpdir}/bundled-project-scope.err" ||
+  fail "the out-of-scope project should have failed"
+
+# (j) An expired exception is ignored.
+write_allowlist "${scoped_prefix} projects=${all_projects} expires=2020-01-01"
+write_bundled_locks 5.0.9
+status="$(run_gate bundled-expired)"
+[[ "${status}" != "0" ]] || fail "an expired scoped exception must fail the gate"
+grep -Fq 'npm-audit: FAIL (ts)' "${tmpdir}/bundled-expired.err" ||
+  fail "expired exception did not fail the gate"
 
 echo "test-verify-npm-audit: PASS"
