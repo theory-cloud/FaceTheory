@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.2.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.2.0...v4.2.1-rc) (2026-10-05)
+
+
+### Bug Fixes
+
+* **deps:** adopt AppTheory 5.0.1 and TableTheory 4.0.1 ([b742a70](https://github.com/theory-cloud/FaceTheory/commit/b742a70058ff26e35d43a5bc015081a41171d49d))
+* **deps:** adopt AppTheory 5.0.1 and TableTheory 4.0.1 ([c0cfe7c](https://github.com/theory-cloud/FaceTheory/commit/c0cfe7c81a791b8c4fdb54a1d05f905f9bcecb9d))
+* **deps:** bump ts brace-expansion override to 5.0.12 ([66b39a4](https://github.com/theory-cloud/FaceTheory/commit/66b39a4c8e982e10146af0a13771ebd8d2f35385))
+* **deps:** clear fixable brace-expansion advisory + cooldown-gated routine updates (Wave 1) ([6e117f6](https://github.com/theory-cloud/FaceTheory/commit/6e117f61a943dbba6015113d16c6ccaa6830495d))
+
 ## [4.2.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.1.2...v4.2.0-rc) (2026-09-28)
 
 
