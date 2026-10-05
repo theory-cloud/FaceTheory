@@ -1,9 +1,15 @@
 Verifier: gov_check_security
-Repository: /home/aron/ai-workspace/codebases/theory.cloud/factory/products/frameworks/FaceTheory
+Repository: /Users/theorycloud/AgentSpace/factory/products/frameworks/FaceTheory
 Rubric ID: SEC-1
 
+npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
+npm-audit: ALLOW (ts) brace-expansion via GHSA-q2hr-2g5m-vwhr,GHSA-qhr7-859c-m2p7,GHSA-6j4f-fj2g-mc7p [scoped exception, expires 2026-11-02]
 npm-audit: PASS (ts)
+npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
+npm-audit: ALLOW (infra/apptheory-ssr-site) brace-expansion via GHSA-q2hr-2g5m-vwhr,GHSA-qhr7-859c-m2p7,GHSA-6j4f-fj2g-mc7p [scoped exception, expires 2026-11-02]
 npm-audit: PASS (infra/apptheory-ssr-site)
+npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
+npm-audit: ALLOW (infra/apptheory-ssg-isr-site) brace-expansion via GHSA-q2hr-2g5m-vwhr,GHSA-qhr7-859c-m2p7,GHSA-6j4f-fj2g-mc7p [scoped exception, expires 2026-11-02]
 npm-audit: PASS (infra/apptheory-ssg-isr-site)
   self-test scan scope: lockfiles 3
   self-test synthetic dependency-excludes-floor: FAIL dependency node_modules/floor-too-high >=24
