@@ -109,6 +109,49 @@ current_case="release sync-only"
 sync_out="$(cd "${sync_dir}" && bash "${sync_script}" base HEAD release)"
 assert_contains "${sync_out}" 'release-readiness: OK (release sync only change)' "release sync-only"
 
+# The post-release main -> staging back-merge carries release-please's
+# CHANGELOG.prerelease.md alongside the other sync files; that range has no
+# feat/fix/perf commit, so it must clear the allowlist just like CHANGELOG.md.
+prerelease_dir="${tmpdir}/sync-only-prerelease"
+current_case="setup release sync-only with prerelease changelog"
+setup_repo "${prerelease_dir}"
+prerelease_script="$(copy_script "${prerelease_dir}")"
+mkdir -p "${prerelease_dir}/docs" "${prerelease_dir}/ts"
+printf '%s\n' '4.2.1' > "${prerelease_dir}/VERSION"
+printf '%s\n' '# 4.2.1-rc prerelease notes' >> "${prerelease_dir}/CHANGELOG.prerelease.md"
+printf '%s\n' '# 4.2.1' >> "${prerelease_dir}/CHANGELOG.md"
+printf '%s\n' '# release sync test change' >> "${prerelease_dir}/README.md"
+printf '%s\n' '# docs release sync' >> "${prerelease_dir}/docs/README.md"
+printf '%s\n' '{"version":"4.2.1"}' > "${prerelease_dir}/ts/package.json"
+commit_file "${prerelease_dir}" "chore(release): sync release metadata files" \
+  VERSION CHANGELOG.prerelease.md CHANGELOG.md README.md docs/README.md ts/package.json
+current_case="release sync-only with prerelease changelog"
+prerelease_out="$(cd "${prerelease_dir}" && bash "${prerelease_script}" base HEAD release)"
+assert_contains "${prerelease_out}" 'release-readiness: OK (release sync only change)' "release sync-only with prerelease changelog"
+
+# The same sync range plus one non-allowlisted path must still fail: adding
+# CHANGELOG.prerelease.md must not open a hole in the gate.
+prerelease_drift_dir="${tmpdir}/sync-only-prerelease-drift"
+current_case="setup release sync-only with non-allowlisted drift"
+setup_repo "${prerelease_drift_dir}"
+prerelease_drift_script="$(copy_script "${prerelease_drift_dir}")"
+mkdir -p "${prerelease_drift_dir}/docs" "${prerelease_drift_dir}/ts/src"
+printf '%s\n' '4.2.1' > "${prerelease_drift_dir}/VERSION"
+printf '%s\n' '# 4.2.1-rc prerelease notes' >> "${prerelease_drift_dir}/CHANGELOG.prerelease.md"
+printf '%s\n' '# 4.2.1' >> "${prerelease_drift_dir}/CHANGELOG.md"
+printf '%s\n' '# release sync test change' >> "${prerelease_drift_dir}/README.md"
+printf '%s\n' '# docs release sync' >> "${prerelease_drift_dir}/docs/README.md"
+printf '%s\n' '{"version":"4.2.1"}' > "${prerelease_drift_dir}/ts/package.json"
+printf '%s\n' 'export const x = 1;' > "${prerelease_drift_dir}/ts/src/x.ts"
+commit_file "${prerelease_drift_dir}" "chore(release): sync release metadata with drift" \
+  VERSION CHANGELOG.prerelease.md CHANGELOG.md README.md docs/README.md ts/package.json ts/src/x.ts
+prerelease_drift_out="${tmpdir}/readiness-prerelease-drift.out"
+current_case="release sync-only with non-allowlisted drift fails"
+if (cd "${prerelease_drift_dir}" && bash "${prerelease_drift_script}" base HEAD release >"${prerelease_drift_out}" 2>&1); then
+  fail "sync range with a non-allowlisted path unexpectedly passed"
+fi
+assert_contains "$(cat "${prerelease_drift_out}")" 'release-readiness: FAIL' "release sync-only with non-allowlisted drift"
+
 # Non-release-sync changes without a conventional release commit still fail.
 fail_dir="${tmpdir}/no-release-signal"
 current_case="setup failing release signal"
