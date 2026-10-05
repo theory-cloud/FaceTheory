@@ -35,6 +35,7 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
       | release-please-config*.json \
       | VERSION \
       | CHANGELOG.md \
+      | CHANGELOG.prerelease.md \
       | README.md \
       | Makefile \
       | .gitignore \

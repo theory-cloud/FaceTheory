@@ -24,4 +24,4 @@ npm warn EBADENGINE   required: { node: '^22.22.2 || ^24.15.0 || >=26.0.0' },
 npm warn EBADENGINE   current: { node: 'v24.13.1', npm: '11.8.0' }
 npm warn EBADENGINE }
 npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
-ts-pack: PASS (theory-cloud-facetheory-4.2.0.tgz)
+ts-pack: PASS (theory-cloud-facetheory-4.2.1.tgz)
