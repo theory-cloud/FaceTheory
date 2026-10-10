@@ -471,26 +471,107 @@ test('head: strict CSP allows same-origin relative and absolute script src/link 
   assert.ok(absoluteHead.includes('href="https://app.example/assets/app.css"'));
 });
 
-test('head: strict CSP normalizes a dotted allowed origin for dotted and dotless URLs', () => {
-  for (const href of [
-    'https://real.example./articles/canonical',
-    'https://real.example/articles/canonical',
-  ]) {
-    const head = renderFaceHead(
-      {
-        html: '<div>ok</div>',
-        csp: {
-          inlineScripts: false,
-          inlineStyles: false,
-          rawHead: false,
+test('head: strict CSP rejects a URL carrying a trailing DNS root dot', () => {
+  // Deliberate behavior reversal of a526684: the dotted URL used to be accepted
+  // and rendered verbatim, so the validated string differed from the rendered
+  // string. The rendered byte sequence must now equal the validated one.
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          headTags: [
+            {
+              type: 'script',
+              attrs: { src: 'https://real.example./assets/entry.js' },
+            },
+          ],
         },
-        headTags: [{ type: 'link', attrs: { rel: 'canonical', href } }],
-      },
-      { allowedOrigin: 'https://real.example.' },
-    );
+        { allowedOrigin: 'https://real.example.' },
+      ),
+    /must not carry a trailing DNS root dot/,
+  );
 
-    assert.ok(head.includes(`href="${href}"`));
-  }
+  const head = renderFaceHead(
+    {
+      html: '<div>ok</div>',
+      csp: {
+        inlineScripts: false,
+        inlineStyles: false,
+        rawHead: false,
+      },
+      headTags: [
+        {
+          type: 'script',
+          attrs: { src: 'https://real.example/assets/entry.js' },
+        },
+      ],
+    },
+    { allowedOrigin: 'https://real.example.' },
+  );
+
+  assert.ok(head.includes('src="https://real.example/assets/entry.js"'));
+});
+
+test('head: strict CSP normalizes a dotted allowed origin for dotless URLs', () => {
+  const head = renderFaceHead(
+    {
+      html: '<div>ok</div>',
+      csp: {
+        inlineScripts: false,
+        inlineStyles: false,
+        rawHead: false,
+      },
+      headTags: [
+        {
+          type: 'link',
+          attrs: {
+            rel: 'canonical',
+            href: 'https://real.example/articles/canonical',
+          },
+        },
+      ],
+    },
+    { allowedOrigin: 'https://real.example.' },
+  );
+
+  assert.ok(
+    head.includes('href="https://real.example/articles/canonical"'),
+    head,
+  );
+
+  // Behavior reversal (was accepted and rendered verbatim before this change):
+  // a dotted URL is no longer accepted, so the validated URL always equals the
+  // rendered URL byte-for-byte.
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://real.example./articles/canonical',
+              },
+            },
+          ],
+        },
+        { allowedOrigin: 'https://real.example.' },
+      ),
+    /must not carry a trailing DNS root dot/,
+  );
 });
 
 test('head: strict CSP rejects a second trailing DNS root dot on both origins', () => {
