@@ -51,6 +51,38 @@ export function renderAttributes(attrs: FaceAttributes | undefined): string {
   return out;
 }
 
+const DOCUMENT_SHELL_ATTRIBUTE_NAME = /^[A-Za-z0-9_:.-]+$/;
+
+/**
+ * Rejects document-shell attribute names that could break out of the emitted
+ * start tag or install an inline event handler. Values are escaped by
+ * `renderAttributes`; names are rejected outright because the emitted byte
+ * sequence is not a valid single attribute name.
+ */
+function assertSafeDocumentShellAttributeName(name: string): void {
+  const trimmed = name.trim();
+  if (
+    /^on[a-z]/i.test(trimmed) ||
+    !DOCUMENT_SHELL_ATTRIBUTE_NAME.test(trimmed)
+  ) {
+    throw new Error(
+      `FaceTheory document shell attribute name is unsafe: ${JSON.stringify(name)}`,
+    );
+  }
+}
+
+function renderDocumentShellAttributes(
+  attrs: FaceAttributes | undefined,
+): string {
+  if (attrs) {
+    for (const [key, value] of Object.entries(attrs)) {
+      if (value === undefined || value === null || value === false) continue;
+      assertSafeDocumentShellAttributeName(key);
+    }
+  }
+  return renderAttributes(attrs);
+}
+
 function htmlAttributesForDocument(parts: {
   lang?: string;
   htmlAttrs?: FaceAttributes;
@@ -70,8 +102,10 @@ function htmlAttributesForDocument(parts: {
 
 export function renderHTMLDocument(parts: HTMLDocumentParts): string {
   const head = parts.head ?? '';
-  const htmlAttrs = renderAttributes(htmlAttributesForDocument(parts));
-  const bodyAttrs = renderAttributes(parts.bodyAttrs);
+  const htmlAttrs = renderDocumentShellAttributes(
+    htmlAttributesForDocument(parts),
+  );
+  const bodyAttrs = renderDocumentShellAttributes(parts.bodyAttrs);
   return `<!doctype html><html${htmlAttrs}><head>${head}</head><body${bodyAttrs}>${parts.body}</body></html>`;
 }
 
@@ -90,8 +124,10 @@ export async function* streamHTMLDocument(
   parts: HTMLDocumentStreamParts,
 ): AsyncIterable<Uint8Array> {
   const head = parts.head ?? '';
-  const htmlAttrs = renderAttributes(htmlAttributesForDocument(parts));
-  const bodyAttrs = renderAttributes(parts.bodyAttrs);
+  const htmlAttrs = renderDocumentShellAttributes(
+    htmlAttributesForDocument(parts),
+  );
+  const bodyAttrs = renderDocumentShellAttributes(parts.bodyAttrs);
 
   yield utf8(
     `<!doctype html><html${htmlAttrs}><head>${head}</head><body${bodyAttrs}>`,

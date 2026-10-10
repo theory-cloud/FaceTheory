@@ -231,3 +231,42 @@ test('security: strict CSP document validator rejects slash-separated unsafe att
     ),
   );
 });
+
+test('renderHTMLDocument rejects event-handler and delimiter-bearing shell attribute names', () => {
+  for (const htmlAttrs of [
+    { onload: 'alert(1)' },
+    { 'onmouseover=alert(1) x': 'y' },
+    { 'data-x onload=alert(1)': 'y' },
+    { 'data-x"y': 'y' },
+    { 'data-x>y': 'y' },
+    { 'data-x=y': 'y' },
+  ]) {
+    assert.throws(
+      () => renderHTMLDocument({ htmlAttrs, body: 'ok' }),
+      /document shell attribute name is unsafe/,
+    );
+  }
+
+  assert.throws(
+    () => renderHTMLDocument({ bodyAttrs: { onclick: 'alert(1)' }, body: 'ok' }),
+    /document shell attribute name is unsafe/,
+  );
+});
+
+test('renderHTMLDocument keeps ordinary shell attributes byte-identical', () => {
+  const html = renderHTMLDocument({
+    lang: 'fr',
+    htmlAttrs: { class: 'shell', 'data-theme': 'light' },
+    bodyAttrs: { class: 'page', hidden: true, 'data-label': '<unsafe>' },
+    body: 'ok',
+  });
+
+  assert.ok(
+    html.includes('<html class="shell" data-theme="light" lang="fr">'),
+    html,
+  );
+  assert.ok(
+    html.includes('<body class="page" data-label="&lt;unsafe&gt;" hidden>ok</body>'),
+    html,
+  );
+});
