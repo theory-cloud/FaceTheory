@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Purpose: prove the trigger-parity guard fails closed on the bypass forms
-# reproduced in review (SAN-FW503-F1: a negated PR base-ref predicate read as
-# compliant) and encodes the operator ruling of 2026-09-28 -- the rubric and
-# deterministic-build jobs are staging-PR-only, so regaining push or promotion
-# coverage must fail the guard.
+# Purpose: prove the ci.yml gate verifiers fail closed on the bypass forms
+# reproduced in review. For verify-ci-trigger-parity.sh: a negated PR base-ref
+# predicate read as compliant (SAN-FW503-F1), a false event conjunct, and the
+# operator ruling of 2026-09-28 -- the rubric and deterministic-build jobs are
+# staging-PR-only, so regaining push or promotion coverage must fail the guard.
+# For verify-ci-rubric-enforced.sh: a governance evidence upload action swapped
+# while the identical coverage pin remains, and a false conjunct on the trusted
+# release-train gate.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -170,6 +173,101 @@ append_job "$(cat <<'YAML'
 YAML
 )"
 expect_fail "push-only event with a disabled pull_request branch"
+
+# The rubric-enforced verifier shares the same ci.yml surface, so it is exercised
+# here too. Seed a temp root with the files it reads so its scoped checks run
+# without touching the checkout.
+seed_rubric_enforced_root() {
+  mkdir -p "${root}/gov-infra/verifiers"
+  for workflow in prerelease.yml release.yml prerelease-pr.yml release-pr.yml; do
+    cp "${repo_root}/.github/workflows/${workflow}" "${root}/.github/workflows/${workflow}"
+  done
+  cp "${repo_root}/Makefile" "${root}/Makefile"
+  cp "${repo_root}/gov-infra/verifiers/gov-verify-rubric.sh" "${root}/gov-infra/verifiers/gov-verify-rubric.sh"
+  for script in \
+    check-lambda-runtime-deprecations.mjs \
+    check-node-engines-floor.mjs \
+    verify-ci-rubric-enforced.sh \
+    build-release-assets.sh \
+    render-release-notes.sh; do
+    cp "${repo_root}/scripts/${script}" "${root}/scripts/${script}"
+  done
+}
+
+run_rubric_guard() {
+  set +e
+  bash "${root}/scripts/verify-ci-rubric-enforced.sh" > "${tmpdir}/rubric-out" 2>&1
+  local status=$?
+  set -e
+  printf '%s' "${status}"
+}
+
+expect_rubric_pass() {
+  local label="$1"
+  local status
+  status="$(run_rubric_guard)"
+  if [[ "${status}" != "0" ]]; then
+    cat "${tmpdir}/rubric-out" >&2
+    fail "${label}: ci-rubric guard must PASS on the canonical wiring"
+  fi
+}
+
+expect_rubric_fail() {
+  local label="$1"
+  local status
+  status="$(run_rubric_guard)"
+  if [[ "${status}" == "0" ]]; then
+    cat "${tmpdir}/rubric-out" >&2
+    fail "${label}: ci-rubric guard must FAIL on the injected wiring"
+  fi
+}
+
+# Replace the governance evidence upload step's action pin while leaving the
+# identical pin in the unrelated TypeScript coverage step intact.
+mutate_governance_upload_action() {
+  python3 - "${root}/.github/workflows/ci.yml" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines()
+step_starts = [index for index, line in enumerate(lines) if line.startswith("      - ")]
+swapped = False
+for position, start in enumerate(step_starts):
+    end = step_starts[position + 1] if position + 1 < len(step_starts) else len(lines)
+    step = lines[start:end]
+    if not any("name: Upload governance evidence" in line for line in step):
+        continue
+    for offset, line in enumerate(step):
+        if "uses: actions/upload-artifact@" in line:
+            lines[start + offset] = "        uses: attacker/evidence@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            swapped = True
+            break
+    break
+if not swapped:
+    raise SystemExit("governance evidence upload step not found")
+path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+}
+
+reset_ci
+seed_rubric_enforced_root
+expect_rubric_pass "ci-rubric canonical wiring"
+
+# Row 38: changing only the governance upload action must fail even though the
+# coverage step still carries the pinned action.
+reset_ci
+mutate_governance_upload_action
+expect_rubric_fail "governance upload action replaced while the coverage pin remains"
+
+# Row 22: a false conjunct on the trusted release-train gate must fail the scoped
+# condition check.
+reset_ci
+replace_job_if "github.event_name == 'pull_request'" "github.event_name == 'pull_request' && false"
+expect_rubric_fail "ci-rubric release-train gate predicate with a false conjunct"
+
+reset_ci
+expect_rubric_pass "ci-rubric restored canonical wiring"
 
 # Positive control: restore the shipped wiring and confirm the guard is green.
 reset_ci
