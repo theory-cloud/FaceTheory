@@ -3,4 +3,4 @@ Repository: /Users/theorycloud/AgentSpace/factory/products/frameworks/FaceTheory
 Rubric ID: CON-1
 
 version-alignment: PASS (4.2.1)
-go-version-pin: PASS (go1.26.5)
+go-version-pin: PASS (go1.27.2)
