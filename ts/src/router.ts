@@ -1,4 +1,8 @@
-import { normalizePath, type TrailingSlashPolicy } from './types.js';
+import {
+  collapseLeadingSlashes,
+  normalizePath,
+  type TrailingSlashPolicy,
+} from './types.js';
 
 export interface RouteMatch {
   pattern: string;
@@ -52,7 +56,8 @@ export function redirectPathForTrailingSlashPolicy(
   if (policy !== 'redirect') return null;
   const normalized = normalizePath(path);
   const canonical = stripNonRootTrailingSlashes(normalized);
-  return canonical === normalized ? null : canonical;
+  if (canonical === normalized) return null;
+  return collapseLeadingSlashes(canonical);
 }
 
 function splitPath(path: string): string[] {

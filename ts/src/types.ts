@@ -343,6 +343,15 @@ export function trimLeadingSlashes(value: string): string {
 }
 
 /**
+ * Collapses any leading slash run to exactly one slash so a path can only be
+ * interpreted as an origin-relative location, never as an authority-bearing
+ * (protocol-relative) URL.
+ */
+export function collapseLeadingSlashes(value: string): string {
+  return `/${trimLeadingSlashes(value)}`;
+}
+
+/**
  * Removes trailing slash characters without touching interior path separators.
  */
 export function trimTrailingSlashes(value: string): string {
