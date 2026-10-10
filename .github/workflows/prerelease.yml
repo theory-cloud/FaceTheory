@@ -465,6 +465,7 @@ jobs:
             --method PATCH \
             "repos/${repo}/releases/${release_id}" \
             -F draft=false \
+            -f "target_commitish=${expected_source_commit}" \
             -F prerelease=true \
             >/dev/null
           echo "release-assets: published ${TAG_NAME}${release_url:+ (${release_url})}"

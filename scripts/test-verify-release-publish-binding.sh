@@ -93,6 +93,28 @@ if run_guard "${tmpdir}/late-pin" >/dev/null 2>&1; then
   fail "target pinned after publish unexpectedly passed"
 fi
 
+# Negative: the final publish PATCH stops re-asserting the pinned target.
+seed "${tmpdir}/unpinned-publish"
+python3 - "${tmpdir}/unpinned-publish/.github/workflows/release.yml" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+needle = (
+    '            -F draft=false \\\n'
+    '            -f "target_commitish=${expected_source_commit}" \\\n'
+    '            -F prerelease=false \\\n'
+)
+path.write_text(
+    text.replace(needle, "            -F draft=false \\\n            -F prerelease=false \\\n", 1),
+    encoding="utf-8",
+)
+PY
+if run_guard "${tmpdir}/unpinned-publish" >/dev/null 2>&1; then
+  fail "final publish PATCH without the pinned target unexpectedly passed"
+fi
+
 # Runtime: execute the exact binding block from the workflow against a mocked gh.
 stub_dir="${tmpdir}/stub"
 mkdir -p "${stub_dir}"

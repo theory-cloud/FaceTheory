@@ -15,7 +15,9 @@
 #   B. a release-publish-target-binding block is present, identical across
 #      sites (parity), re-resolves the draft target and refuses drift;
 #   C. the block PATCHes `target_commitish` to the verified full SHA BEFORE the
-#      draft is published (`-F draft=false`).
+#      draft is published (`-F draft=false`);
+#   D. the final `draft=false` publish PATCH re-asserts the verified full SHA,
+#      so the asset-upload window cannot repoint the release tag.
 set -euo pipefail
 
 repo_root="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -104,6 +106,20 @@ for relative, job_id in sites:
         errors.append(
             f"{relative}:{job_id}: target must be pinned before the draft is published"
         )
+
+    patch_indexes = [i for i, line in enumerate(block) if "--method PATCH" in line]
+    if not patch_indexes:
+        errors.append(f"{relative}:{job_id}: missing a release publish PATCH")
+    else:
+        final_publish = "\n".join(block[patch_indexes[-1] :])
+        if "-F draft=false" not in final_publish:
+            errors.append(
+                f"{relative}:{job_id}: final PATCH must publish the draft (draft=false)"
+            )
+        if "target_commitish=${expected_source_commit}" not in final_publish:
+            errors.append(
+                f"{relative}:{job_id}: final publish PATCH must re-assert the pinned target_commitish"
+            )
 
 distinct = set(blocks.values())
 if len(blocks) == len(sites) and len(distinct) != 1:
