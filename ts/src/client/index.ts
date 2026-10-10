@@ -566,8 +566,10 @@ function createHydrationRequestInit(
 ): RequestInit {
   return {
     credentials: 'same-origin',
-    redirect: 'follow',
     ...(requestInit ?? {}),
+    // Redirects are rejected unconditionally so a cross-origin redirect response
+    // can never receive the hydration loader's request or its credentials.
+    redirect: 'error',
     headers: withHydrationAcceptHeader(requestInit?.headers),
   };
 }
