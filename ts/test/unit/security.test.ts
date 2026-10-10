@@ -74,4 +74,21 @@ test('security: strict CSP extensions reject injection-shaped directives and val
       }),
     /individual CSP tokens/,
   );
+
+  assert.throws(
+    () =>
+      buildStrictCspHeader({
+        directives: {
+          'frame-ancestors': "'none', script-src 'unsafe-inline'",
+        },
+      }),
+    /individual CSP tokens/,
+  );
+
+  assert.equal(
+    buildStrictCspHeader({
+      directives: { 'report-to': 'facetheory-csp', 'img-src': ["'self'", 'data:'] },
+    }).includes('report-to facetheory-csp'),
+    true,
+  );
 });

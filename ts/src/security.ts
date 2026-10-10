@@ -218,9 +218,9 @@ function normalizeStrictCspDirectiveValue(
       `FaceTheory strict CSP directive "${directiveName}" contains an empty value`,
     );
   }
-  if (/[\s;]/.test(normalized)) {
+  if (/[\s;,]/.test(normalized)) {
     throw new Error(
-      `FaceTheory strict CSP directive "${directiveName}" values must be individual CSP tokens without whitespace or semicolons`,
+      `FaceTheory strict CSP directive "${directiveName}" values must be individual CSP tokens without whitespace, commas, or semicolons`,
     );
   }
 
