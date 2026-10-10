@@ -46,7 +46,7 @@ def logical_lines(lines):
         index += 1
 
 
-install_re = re.compile(r"python3\s+-m\s+pip\s+install\b")
+install_re = re.compile(r"(?:python3\s+-m\s+)?pip3?\s+install\b")
 requirement_re = re.compile(r"(?:--requirement|(?:^|\s)-r)(?:[=\s]+)(\S+)")
 first_install_line = None
 referenced_requirements = []
@@ -69,7 +69,7 @@ for line_number, line in logical_lines(raw_lines):
         referenced_requirements.append((line_number, requirement_match.group(1)))
 
 for line_number, line in logical_lines(raw_lines):
-    if re.search(r"pip\s+install\b", line) and "--upgrade" in line:
+    if re.search(r"pip3?\s+install\b", line) and "--upgrade" in line:
         errors.append(
             f"{workflow_path}:{line_number}: floating pip upgrade must be removed: {line.strip()}"
         )

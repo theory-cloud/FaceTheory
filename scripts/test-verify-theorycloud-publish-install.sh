@@ -69,6 +69,35 @@ path.write_text(text.replace(needle, replacement, 1), encoding="utf-8")
 PY
 expect_fail "floating pip upgrade" "${tmpdir}/pip-upgrade"
 
+# Negative: a bare `pip install --upgrade` (no `python3 -m`) floating upgrade.
+seed "${tmpdir}/bare-pip-upgrade"
+python3 - "${tmpdir}/bare-pip-upgrade/${workflow_rel}" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+needle = "          python3 -m pip install --user --require-hashes --no-deps \\\n"
+replacement = "          pip install --upgrade pip\n" + needle
+path.write_text(text.replace(needle, replacement, 1), encoding="utf-8")
+PY
+expect_fail "bare floating pip upgrade" "${tmpdir}/bare-pip-upgrade"
+
+# Negative: a bare unpinned `pip install` that drops the hashed install.
+seed "${tmpdir}/bare-pip-install"
+python3 - "${tmpdir}/bare-pip-install/${workflow_rel}" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+path.write_text(
+    text.replace("python3 -m pip install --user --require-hashes --no-deps", "pip install --user", 1),
+    encoding="utf-8",
+)
+PY
+expect_fail "bare unpinned pip install" "${tmpdir}/bare-pip-install"
+
 # Negative: credentials acquired before the mutable install (the original defect
 # ordering). Swap the install and role-assumption steps.
 seed "${tmpdir}/creds-first"
