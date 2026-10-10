@@ -156,8 +156,88 @@ require_contains \
   "scripts/check-lambda-runtime-deprecations.mjs" \
   '"ts/src/create-templates/index.ts",' \
   "deprecated runtime gate must scan ts/src/create-templates/index.ts"
-require_contains "${ci}" "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1" "CI rubric job must upload governance evidence with the pinned upload-artifact action"
-require_contains "${ci}" "path: gov-infra/evidence/" "CI rubric job must upload gov-infra/evidence/"
+if ! python3 - "${ci}" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines()
+
+job_starts = []
+for index, line in enumerate(lines):
+    match = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
+    if match:
+        job_starts.append((index, match.group(1)))
+
+jobs = {}
+for position, (index, name) in enumerate(job_starts):
+    end = job_starts[position + 1][0] if position + 1 < len(job_starts) else len(lines)
+    jobs[name] = lines[index:end]
+
+
+def steps_of(job_lines):
+    starts = [index for index, line in enumerate(job_lines) if re.match(r"^      - ", line)]
+    steps = []
+    for position, start in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(job_lines)
+        steps.append("\n".join(job_lines[start:end]))
+    return steps
+
+
+# Row 22: bind the trusted release-train gate to the exact job it validates. The
+# job must still exist, must run on pull_request via the exact canonical
+# predicate (a `&& false` conjunct or any other drift must fail here, not only in
+# the parity checker), and must carry its trusted checkout and verifier
+# invocation inside that job rather than anywhere in the file.
+release_job = jobs.get("release-train-promotion")
+if release_job is None:
+    raise SystemExit("ci-rubric: FAIL (missing release-train-promotion job)")
+
+release_if = [line for line in release_job if re.match(r"^    if:", line)]
+if len(release_if) != 1:
+    raise SystemExit("ci-rubric: FAIL (release-train-promotion must declare exactly one job-level if:)")
+release_condition = release_if[0].split("if:", 1)[1].strip()
+if release_condition.startswith("${{") and release_condition.endswith("}}"):
+    release_condition = release_condition[3:-2].strip()
+if release_condition != "github.event_name == 'pull_request'":
+    raise SystemExit(
+        "ci-rubric: FAIL (release-train-promotion if: must be exactly "
+        "github.event_name == 'pull_request'; got " + repr(release_condition) + ")"
+    )
+
+release_steps = steps_of(release_job)
+if not any("ref: refs/heads/staging" in step for step in release_steps):
+    raise SystemExit("ci-rubric: FAIL (release-train-promotion must checkout trusted staging code)")
+if not any("scripts/verify-release-train-promotion.sh" in step for step in release_steps):
+    raise SystemExit("ci-rubric: FAIL (release-train-promotion must run the verifier script)")
+
+# Row 38: the governance-evidence upload must be the step carrying the pinned
+# upload-artifact action and the evidence path, so the identical pin in the
+# unrelated TypeScript coverage step cannot stand in for it.
+rubric_job = jobs.get("rubric")
+if rubric_job is None:
+    raise SystemExit("ci-rubric: FAIL (missing rubric job)")
+
+pinned_upload = "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1"
+governance_steps = [
+    step for step in steps_of(rubric_job) if "name: Upload governance evidence" in step
+]
+if len(governance_steps) != 1:
+    raise SystemExit("ci-rubric: FAIL (rubric job must have exactly one governance evidence upload step)")
+missing = [
+    needle
+    for needle in (pinned_upload, "path: gov-infra/evidence/", "name: gov-infra-evidence")
+    if needle not in governance_steps[0]
+]
+if missing:
+    raise SystemExit(
+        "ci-rubric: FAIL (governance evidence upload step is missing " + ", ".join(missing) + ")"
+    )
+PY
+then
+  fail "CI release-train gate and governance evidence upload must stay bound to their canonical jobs"
+fi
 require_contains "${ci}" "run_full_rubric:" "manual CI dispatch must expose an explicit full-rubric toggle"
 require_contains "${ci}" "default: true" "manual CI dispatch must continue to run the full rubric by default"
 # Operator ruling 2026-09-28: the rubric is only needed in staging; premain and

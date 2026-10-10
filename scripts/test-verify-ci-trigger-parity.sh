@@ -152,6 +152,25 @@ reset_ci
 add_pull_request_branch_filter
 expect_fail "pull_request trigger gained a branches filter"
 
+# Row 22: a false conjunct on the trusted release-train gate must not read as a
+# pull-request job, and an event disjunction that never selects pull_request is
+# not push/PR parity.
+reset_ci
+replace_job_if "github.event_name == 'pull_request'" "github.event_name == 'pull_request' && false"
+expect_fail "release-train gate predicate with a false conjunct"
+
+reset_ci
+append_job "$(cat <<'YAML'
+  sneaky:
+    name: Sneaky push or disabled-PR job
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && false)
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo sneaky
+YAML
+)"
+expect_fail "push-only event with a disabled pull_request branch"
+
 # Positive control: restore the shipped wiring and confirm the guard is green.
 reset_ci
 expect_pass "restored baseline"

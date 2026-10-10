@@ -163,8 +163,187 @@ def parse_ci():
     return lines, jobs
 
 
+# === job-condition evaluation ==============================================
+# A job-level if: is parsed and evaluated over the event/base combinations this
+# checker cares about instead of being substring-matched. Substring matching
+# read `github.event_name == 'pull_request' && false` as a pull-request job and
+# defaulted a base-less PR job to all three bases; evaluating the expression
+# closes both gaps. `&&`, `||`, parentheses, `always()`, the literals true/false,
+# and the event/base/head/input atoms below are modelled; `!`, `!=`, and every
+# other token or shape fail closed.
+
+KNOWN_EVENTS = ("push", "pull_request", "workflow_dispatch")
+KNOWN_BASES = ("staging", "premain", "main")
+
+
+class UnmodelledCondition(Exception):
+    pass
+
+
+CONDITION_TOKEN_RE = re.compile(
+    r"\s*(?:(?P<and>&&)|(?P<or>\|\|)|(?P<neq>!=)|(?P<not>!)"
+    r"|(?P<eq>==)|(?P<lparen>\()|(?P<rparen>\))|(?P<string>'[^']*')"
+    r"|(?P<ident>[A-Za-z_$][A-Za-z0-9_$.]*))"
+)
+
+
+def tokenize_condition(text):
+    tokens = []
+    position = 0
+    while position < len(text):
+        match = CONDITION_TOKEN_RE.match(text, position)
+        if match is None:
+            if text[position:].strip() == "":
+                break
+            raise UnmodelledCondition(f"unrecognised text {text[position:].strip()!r}")
+        position = match.end()
+        kind = match.lastgroup
+        tokens.append((kind, match.group(kind)))
+    return tokens
+
+
+class ConditionParser:
+    def __init__(self, tokens, text):
+        self.tokens = tokens
+        self.position = 0
+        self.text = text
+
+    def peek(self):
+        if self.position < len(self.tokens):
+            return self.tokens[self.position]
+        return (None, None)
+
+    def expect(self, kind):
+        token = self.peek()
+        if token[0] != kind:
+            raise UnmodelledCondition(f"expected {kind!r} in {self.text!r}")
+        self.position += 1
+        return token[1]
+
+    def parse(self):
+        node = self.parse_or()
+        if self.position != len(self.tokens):
+            raise UnmodelledCondition(f"trailing tokens in {self.text!r}")
+        return node
+
+    def parse_or(self):
+        node = self.parse_and()
+        while self.peek()[0] == "or":
+            self.position += 1
+            node = ("or", node, self.parse_and())
+        return node
+
+    def parse_and(self):
+        node = self.parse_unary()
+        while self.peek()[0] == "and":
+            self.position += 1
+            node = ("and", node, self.parse_unary())
+        return node
+
+    def parse_unary(self):
+        kind = self.peek()[0]
+        if kind in ("not", "neq"):
+            raise UnmodelledCondition("negated predicates are not modelled")
+        if kind == "lparen":
+            self.position += 1
+            node = self.parse_or()
+            self.expect("rparen")
+            return node
+        return self.parse_atom()
+
+    def parse_atom(self):
+        kind, value = self.peek()
+        if kind != "ident":
+            raise UnmodelledCondition(f"unexpected token {value!r}")
+        if value == "always":
+            self.position += 1
+            self.expect("lparen")
+            self.expect("rparen")
+            return ("const", True)
+        if value in ("true", "false"):
+            self.position += 1
+            return ("const", value == "true")
+        self.position += 1
+        self.expect("eq")
+        right_kind, right_value = self.peek()
+        if right_kind == "string":
+            self.position += 1
+            return self.comparison(value, right_value[1:-1])
+        if right_kind == "ident" and right_value in ("true", "false"):
+            self.position += 1
+            return self.comparison(value, right_value)
+        raise UnmodelledCondition(f"unsupported comparison in {self.text!r}")
+
+    @staticmethod
+    def comparison(left, right):
+        if left == "github.event_name":
+            if right not in KNOWN_EVENTS:
+                raise UnmodelledCondition(f"event {right!r} is not modelled")
+            return ("atom", ("event", right))
+        if left == "github.event.pull_request.base.ref":
+            if right not in KNOWN_BASES:
+                raise UnmodelledCondition(f"PR base {right!r} is not modelled")
+            return ("atom", ("base", right))
+        if left == "github.event.pull_request.head.ref":
+            return ("atom", ("head", right))
+        if left.startswith("inputs."):
+            if right not in ("true", "false"):
+                raise UnmodelledCondition(f"input predicate {left} == {right!r} is not modelled")
+            return ("atom", ("input", left, right))
+        raise UnmodelledCondition(f"unsupported predicate {left} == {right!r}")
+
+
+def condition_atoms(node):
+    kind = node[0]
+    if kind == "atom":
+        return {node[1]}
+    if kind in ("and", "or"):
+        return condition_atoms(node[1]) | condition_atoms(node[2])
+    return set()
+
+
+def evaluate_condition(node, assignment):
+    kind = node[0]
+    if kind == "const":
+        return node[1]
+    if kind == "atom":
+        return assignment[node[1]]
+    if kind == "and":
+        return evaluate_condition(node[1], assignment) and evaluate_condition(node[2], assignment)
+    if kind == "or":
+        return evaluate_condition(node[1], assignment) or evaluate_condition(node[2], assignment)
+    raise UnmodelledCondition(f"unknown node {kind!r}")
+
+
+def condition_holds(node, event, base=None):
+    """True when some input assignment fixes the given event/base and satisfies node."""
+    fixed = {}
+    free = []
+    for atom in condition_atoms(node):
+        if atom[0] == "event":
+            fixed[atom] = atom[1] == event
+        elif atom[0] == "base":
+            if event == "pull_request" and base is not None:
+                fixed[atom] = atom[1] == base
+            elif event == "pull_request":
+                free.append(atom)
+            else:
+                fixed[atom] = False
+        else:
+            free.append(atom)
+    if len(free) > 12:
+        raise UnmodelledCondition(f"too many free predicates in {node!r}")
+    for mask in range(1 << len(free)):
+        assignment = dict(fixed)
+        for index, atom in enumerate(free):
+            assignment[atom] = bool(mask & (1 << index))
+        if evaluate_condition(node, assignment):
+            return True
+    return False
+
+
 def classify(job_id, body):
-    """Return (events, pr_bases) for a job, or None when the wiring is unmodelled."""
+    """Return (events, pr_bases) for a job, or None when its if: is unmodelled."""
     lines = [line for line in body.splitlines() if line.strip()]
     if_lines = [line for line in lines if re.match(r"^    if:", line)]
     if len(if_lines) > 1:
@@ -173,52 +352,20 @@ def classify(job_id, body):
     if not if_lines:
         return {"push", "pull_request", "workflow_dispatch"}, {"staging", "premain", "main"}
 
-    text = if_lines[0].split("if:", 1)[1]
-    base_ref_expr = r"github\.event\.pull_request\.base\.ref"
-    if re.search(r"github\.event_name\s*!=", text):
-        fail(
-            f"{CI_PATH}: job {job_id!r} uses a negated event predicate this checker does "
-            "not model; make the handled events explicit before shipping"
-        )
-        return None
-    if re.search(base_ref_expr + r"\s*!=", text) or re.search(
-        r"!\s*\(?\s*" + base_ref_expr, text
-    ):
-        fail(
-            f"{CI_PATH}: job {job_id!r} uses a negated PR base-ref predicate this checker "
-            "does not model; make the targeted bases explicit before shipping"
-        )
+    text = if_lines[0].split("if:", 1)[1].strip()
+    if text.startswith("${{") and text.endswith("}}"):
+        text = text[3:-2].strip()
+    try:
+        node = ConditionParser(tokenize_condition(text), text).parse()
+    except UnmodelledCondition as error:
+        fail(f"{CI_PATH}: job {job_id!r} uses a condition this checker does not model ({error}): {text}")
         return None
 
-    events = set()
-    for event in ("push", "pull_request", "workflow_dispatch"):
-        if f"github.event_name == '{event}'" in text:
-            events.add(event)
-    if not events and "always()" in text:
-        # Aggregator jobs gated only on needs-results run on every event that
-        # triggers the workflow, so they carry no event restriction of their own.
-        events = {"push", "pull_request", "workflow_dispatch"}
+    events = {event for event in KNOWN_EVENTS if condition_holds(node, event)}
     if not events:
-        fail(f"{CI_PATH}: job {job_id!r} if: names no handled event: {text.strip()}")
+        fail(f"{CI_PATH}: job {job_id!r} if: names no handled event: {text}")
         return None
-
-    pr_bases = set()
-    if "pull_request" in events:
-        base_matches = re.findall(base_ref_expr + r"\s*==\s*'([a-z]+)'", text)
-        base_ref_occurrences = len(re.findall(base_ref_expr, text))
-        if base_ref_occurrences != len(base_matches):
-            fail(
-                f"{CI_PATH}: job {job_id!r} references the PR base ref in a form this "
-                f"checker does not model: {text.strip()}"
-            )
-            return None
-        if len(base_matches) > 1:
-            fail(
-                f"{CI_PATH}: job {job_id!r} declares more than one PR base-ref predicate; "
-                "make the targeted bases explicit before shipping"
-            )
-            return None
-        pr_bases = {base_matches[0]} if base_matches else {"staging", "premain", "main"}
+    pr_bases = {base for base in KNOWN_BASES if condition_holds(node, "pull_request", base)}
     return events, pr_bases
 
 
