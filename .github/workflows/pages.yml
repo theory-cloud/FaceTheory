@@ -61,12 +61,15 @@
 # and never touches the release manifests.
 #
 # Security invariants: the workflow token stays read-only except the
-# pages write + id-token granted to the deploy job; the build checks out
-# the run's own ref only, and the dispatch tag is validated to match the
-# run ref and to name a published stable release (never a draft or
-# prerelease); the override is generated only from that validated tag or
-# the resolved release tag; no secrets are introduced; checkout
-# credentials are not persisted and the build writes no caches.
+# pages write + id-token granted to the deploy job; the provenance
+# verifier is sourced from the protected `main` lane — never from the tag
+# being deployed, whose commit is unverified until the check passes — and
+# the build tree is then the run's own ref only; the dispatch tag is
+# validated to match the run ref, to name a published stable release
+# (never a draft or prerelease), and to be an approved `main` release
+# commit; the override is generated only from that validated tag or the
+# resolved release tag; no secrets are introduced; checkout credentials
+# are not persisted and the build writes no caches.
 # =============================================================
 name: pages
 
@@ -154,6 +157,20 @@ jobs:
           fi
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
 
+      - name: Checkout trusted verifier source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Run the provenance verifier from the protected main lane, never
+          # from the tag being deployed. A dispatch tag can point the run
+          # tree (github.sha) at unreviewed code, and an unverified tree
+          # must not be trusted to police its own deploy. This checkout
+          # lands in a subdirectory so the build checkout below can still
+          # be the immutable run ref exactly.
+          ref: refs/heads/main
+          path: .trusted-pages-verifier
+          persist-credentials: false
+          fetch-depth: 1
+
       - name: Verify deploy tag provenance
         env:
           GH_TOKEN: ${{ github.token }}
@@ -163,7 +180,7 @@ jobs:
           RUN_REF_TYPE: ${{ github.ref_type }}
         run: |
           set -euo pipefail
-          scripts/verify-pages-deploy-tag.sh "${DEPLOY_TAG}" "${RUN_SHA}" "${RUN_REF_TYPE}"
+          .trusted-pages-verifier/scripts/verify-pages-deploy-tag.sh "${DEPLOY_TAG}" "${RUN_SHA}" "${RUN_REF_TYPE}"
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

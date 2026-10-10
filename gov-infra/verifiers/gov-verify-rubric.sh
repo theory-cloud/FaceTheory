@@ -436,6 +436,8 @@ gov_check_compliance() {
   scripts/verify-release-python-isolation.sh
   scripts/test-verify-release-python-isolation.sh
   scripts/test-verify-pages-deploy-tag.sh
+  scripts/verify-pages-workflow-order.sh
+  scripts/test-verify-pages-workflow-order.sh
   scripts/verify-release-publish-binding.sh
   scripts/test-verify-release-publish-binding.sh
 }
