@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      source_commit: ${{ steps.source.outputs.release_source_commit }}
     steps:
       - name: Checkout release workflow scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,7 +65,7 @@ jobs:
             page_file="$(mktemp)"
             gh api "repos/${repo}/releases?per_page=100&page=${page}" > "${page_file}"
             match="$(
-              TAG_NAME="${TAG_NAME}" python3 - "${page_file}" <<'PY'
+              TAG_NAME="${TAG_NAME}" python3 -I - "${page_file}" <<'PY'
           import json
           import os
           import sys
@@ -78,7 +80,7 @@ jobs:
               break
           PY
             )"
-            count="$(python3 - "${page_file}" <<'PY'
+            count="$(python3 -I - "${page_file}" <<'PY'
           import json
           import sys
 
@@ -201,7 +203,7 @@ jobs:
             printf '%s # x-release-please-version\n' "${TAG_NAME#v}" > VERSION
           fi
 
-          RELEASE_VERSION="${TAG_NAME#v}" python3 - <<'PY'
+          RELEASE_VERSION="${TAG_NAME#v}" python3 -I - <<'PY'
           import json
           import os
           from pathlib import Path
@@ -266,6 +268,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
+          EXPECTED_SOURCE_COMMIT: ${{ needs.build-existing-tag-assets.outputs.source_commit }}
         run: |
           set -euo pipefail
 
@@ -285,7 +288,7 @@ jobs:
             page_file="$(mktemp)"
             gh api "repos/${repo}/releases?per_page=100&page=${page}" > "${page_file}"
             match="$(
-              TAG_NAME="${TAG_NAME}" python3 - "${page_file}" <<'PY'
+              TAG_NAME="${TAG_NAME}" python3 -I - "${page_file}" <<'PY'
           import json
           import os
           import sys
@@ -298,7 +301,7 @@ jobs:
                   break
           PY
             )"
-            count="$(python3 - "${page_file}" <<'PY'
+            count="$(python3 -I - "${page_file}" <<'PY'
           import json
           import sys
 
@@ -321,7 +324,7 @@ jobs:
           fi
 
           mapfile -t release_fields < <(
-            RELEASE_JSON="${release_json}" python3 - <<'PY'
+            RELEASE_JSON="${release_json}" python3 -I - <<'PY'
           import json
           import os
 
@@ -330,6 +333,7 @@ jobs:
           print("true" if data.get("prerelease") is True else "false")
           print(data.get("upload_url") or "")
           print(data.get("html_url") or "")
+          print(data.get("target_commitish") or "")
           PY
           )
           release_id="${release_fields[0]:-}"
@@ -349,6 +353,32 @@ jobs:
             echo "release-assets: FAIL (${TAG_NAME} stable draft must not be marked prerelease)"
             exit 1
           fi
+
+          # --- release-publish-target-binding:start ---
+          # Bind the draft's publish target to the verified, immutable source
+          # commit BEFORE assets are uploaded and the draft is published. A
+          # mutable branch target (main/premain) could otherwise move after the
+          # build-time verification and make the release tag point at a
+          # different revision than the published assets.
+          expected_source_commit="${EXPECTED_SOURCE_COMMIT:-}"
+          if [[ ! "${expected_source_commit}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "release-assets: FAIL (missing expected source commit)" >&2
+            exit 1
+          fi
+          target_commitish="${release_fields[4]:-}"
+          if [[ "${target_commitish}" =~ ^[0-9a-f]{40}$ ]]; then
+            resolved_target_commit="${target_commitish}"
+          else
+            resolved_target_commit="$(
+              gh api "repos/${repo}/branches/${target_commitish#refs/heads/}" --jq .commit.sha 2>/dev/null || true
+            )"
+          fi
+          if [[ "${resolved_target_commit}" != "${expected_source_commit}" ]]; then
+            echo "release-assets: FAIL (${TAG_NAME} publish target ${target_commitish:-<empty>} resolves to ${resolved_target_commit:-<unresolved>}, expected ${expected_source_commit})" >&2
+            exit 1
+          fi
+          gh api --method PATCH "repos/${repo}/releases/${release_id}" -f "target_commitish=${expected_source_commit}" >/dev/null
+          # --- release-publish-target-binding:end ---
 
           mapfile -t existing_assets < <(gh api "repos/${repo}/releases/${release_id}/assets" --jq '.[].name' 2>/dev/null || true)
           upload_base="${upload_url%%\{*}"
@@ -374,7 +404,7 @@ jobs:
               echo "release-assets: skip existing ${asset_name}"
               continue
             fi
-            encoded_name="$(ASSET_NAME="${asset_name}" python3 - <<'PY'
+            encoded_name="$(ASSET_NAME="${asset_name}" python3 -I - <<'PY'
           import os
           import urllib.parse
 
@@ -397,6 +427,7 @@ jobs:
             --method PATCH \
             "repos/${repo}/releases/${release_id}" \
             -F draft=false \
+            -f "target_commitish=${expected_source_commit}" \
             -F prerelease="${prerelease_field}" \
             >/dev/null
           echo "release-assets: published ${TAG_NAME}${release_url:+ (${release_url})}"
@@ -450,7 +481,7 @@ jobs:
           set -euo pipefail
 
           version="$(
-            python3 - <<'PY'
+            python3 -I - <<'PY'
           import json
           from pathlib import Path
 
@@ -556,7 +587,7 @@ jobs:
               page_file="$(mktemp)"
               gh api "repos/${repo}/releases?per_page=100&page=${page}" > "${page_file}"
               match="$(
-                TAG_NAME="${TAG_NAME}" python3 - "${page_file}" <<'PY'
+                TAG_NAME="${TAG_NAME}" python3 -I - "${page_file}" <<'PY'
           import json
           import os
           import sys
@@ -573,7 +604,7 @@ jobs:
               break
           PY
               )"
-              count="$(python3 - "${page_file}" <<'PY'
+              count="$(python3 -I - "${page_file}" <<'PY'
           import json
           import sys
 
@@ -706,6 +737,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          EXPECTED_SOURCE_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -721,7 +753,7 @@ jobs:
             page_file="$(mktemp)"
             gh api "repos/${repo}/releases?per_page=100&page=${page}" > "${page_file}"
             match="$(
-              TAG_NAME="${TAG_NAME}" python3 - "${page_file}" <<'PY'
+              TAG_NAME="${TAG_NAME}" python3 -I - "${page_file}" <<'PY'
           import json
           import os
           import sys
@@ -734,7 +766,7 @@ jobs:
                   break
           PY
             )"
-            count="$(python3 - "${page_file}" <<'PY'
+            count="$(python3 -I - "${page_file}" <<'PY'
           import json
           import sys
 
@@ -757,7 +789,7 @@ jobs:
           fi
 
           mapfile -t release_fields < <(
-            RELEASE_JSON="${release_json}" python3 - <<'PY'
+            RELEASE_JSON="${release_json}" python3 -I - <<'PY'
           import json
           import os
 
@@ -766,6 +798,7 @@ jobs:
           print("true" if data.get("prerelease") is True else "false")
           print(data.get("upload_url") or "")
           print(data.get("html_url") or "")
+          print(data.get("target_commitish") or "")
           PY
           )
           release_id="${release_fields[0]:-}"
@@ -785,6 +818,32 @@ jobs:
             echo "release-assets: FAIL (${TAG_NAME} stable draft must not be marked prerelease)"
             exit 1
           fi
+
+          # --- release-publish-target-binding:start ---
+          # Bind the draft's publish target to the verified, immutable source
+          # commit BEFORE assets are uploaded and the draft is published. A
+          # mutable branch target (main/premain) could otherwise move after the
+          # build-time verification and make the release tag point at a
+          # different revision than the published assets.
+          expected_source_commit="${EXPECTED_SOURCE_COMMIT:-}"
+          if [[ ! "${expected_source_commit}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "release-assets: FAIL (missing expected source commit)" >&2
+            exit 1
+          fi
+          target_commitish="${release_fields[4]:-}"
+          if [[ "${target_commitish}" =~ ^[0-9a-f]{40}$ ]]; then
+            resolved_target_commit="${target_commitish}"
+          else
+            resolved_target_commit="$(
+              gh api "repos/${repo}/branches/${target_commitish#refs/heads/}" --jq .commit.sha 2>/dev/null || true
+            )"
+          fi
+          if [[ "${resolved_target_commit}" != "${expected_source_commit}" ]]; then
+            echo "release-assets: FAIL (${TAG_NAME} publish target ${target_commitish:-<empty>} resolves to ${resolved_target_commit:-<unresolved>}, expected ${expected_source_commit})" >&2
+            exit 1
+          fi
+          gh api --method PATCH "repos/${repo}/releases/${release_id}" -f "target_commitish=${expected_source_commit}" >/dev/null
+          # --- release-publish-target-binding:end ---
 
           mapfile -t existing_assets < <(gh api "repos/${repo}/releases/${release_id}/assets" --jq '.[].name' 2>/dev/null || true)
           upload_base="${upload_url%%\{*}"
@@ -810,7 +869,7 @@ jobs:
               echo "release-assets: skip existing ${asset_name}"
               continue
             fi
-            encoded_name="$(ASSET_NAME="${asset_name}" python3 - <<'PY'
+            encoded_name="$(ASSET_NAME="${asset_name}" python3 -I - <<'PY'
           import os
           import urllib.parse
 
@@ -829,6 +888,7 @@ jobs:
             --method PATCH \
             "repos/${repo}/releases/${release_id}" \
             -F draft=false \
+            -f "target_commitish=${expected_source_commit}" \
             -F prerelease=false \
             >/dev/null
           echo "release-assets: published ${TAG_NAME}${release_url:+ (${release_url})}"

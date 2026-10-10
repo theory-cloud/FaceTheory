@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test ts-coverage ts-examples-readmes infra-snapshot-test docs-export-map verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin verify-ci-rubric-enforced verify-ci-install-hardening verify-ci-trigger-parity verify-deterministic-builds build-release-assets ensure-release-branches test-ensure-release-branches test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation test-verify-ci-install-hardening test-verify-ci-trigger-parity stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test ts-coverage ts-examples-readmes infra-snapshot-test docs-export-map verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin verify-ci-rubric-enforced verify-ci-install-hardening verify-ci-trigger-parity verify-deterministic-builds build-release-assets ensure-release-branches test-ensure-release-branches test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation test-verify-ci-install-hardening test-verify-ci-trigger-parity stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl verify-theorycloud-publish-install test-verify-theorycloud-publish-install verify-release-python-isolation test-verify-release-python-isolation test-verify-pages-deploy-tag verify-pages-workflow-order test-verify-pages-workflow-order verify-release-publish-binding test-verify-release-publish-binding rubric
 
 ts-build:
 	cd ts && npm run build
@@ -108,6 +108,33 @@ test-verify-ci-install-hardening:
 
 test-verify-ci-trigger-parity:
 	./scripts/test-verify-ci-trigger-parity.sh
+
+verify-theorycloud-publish-install:
+	./scripts/verify-theorycloud-publish-install.sh
+
+test-verify-theorycloud-publish-install:
+	./scripts/test-verify-theorycloud-publish-install.sh
+
+verify-release-python-isolation:
+	./scripts/verify-release-python-isolation.sh
+
+test-verify-release-python-isolation:
+	./scripts/test-verify-release-python-isolation.sh
+
+test-verify-pages-deploy-tag:
+	./scripts/test-verify-pages-deploy-tag.sh
+
+verify-pages-workflow-order:
+	./scripts/verify-pages-workflow-order.sh
+
+test-verify-pages-workflow-order:
+	./scripts/test-verify-pages-workflow-order.sh
+
+verify-release-publish-binding:
+	./scripts/verify-release-publish-binding.sh
+
+test-verify-release-publish-binding:
+	./scripts/test-verify-release-publish-binding.sh
 
 rubric:
 	bash gov-infra/verifiers/gov-verify-rubric.sh

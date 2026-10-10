@@ -414,6 +414,7 @@ gov_check_security() {
   scripts/verify-node-engines-floor.sh
   scripts/verify-lambda-runtime-deprecations.sh
   scripts/verify-ci-install-hardening.sh
+  scripts/verify-theorycloud-publish-install.sh
   check_actions_pinned_to_sha
 }
 
@@ -431,6 +432,14 @@ gov_check_compliance() {
   scripts/test-verify-npm-audit.sh
   scripts/test-verify-ci-install-hardening.sh
   scripts/test-verify-ci-trigger-parity.sh
+  scripts/test-verify-theorycloud-publish-install.sh
+  scripts/verify-release-python-isolation.sh
+  scripts/test-verify-release-python-isolation.sh
+  scripts/test-verify-pages-deploy-tag.sh
+  scripts/verify-pages-workflow-order.sh
+  scripts/test-verify-pages-workflow-order.sh
+  scripts/verify-release-publish-binding.sh
+  scripts/test-verify-release-publish-binding.sh
 }
 
 gov_check_maintainability() {
