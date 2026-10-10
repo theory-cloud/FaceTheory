@@ -1341,6 +1341,11 @@ function withQueryString(
 }
 
 function redirectResponse(location: string): FaceResponse {
+  if (!/^\/(?!\/)/.test(location) || location.includes('\\')) {
+    throw new Error(
+      `FaceTheory redirect Location must be a single-leading-slash origin-relative path: ${JSON.stringify(location)}`,
+    );
+  }
   return textResponse(308, 'Permanent Redirect', {
     location: [location],
     'content-type': ['text/plain; charset=utf-8'],

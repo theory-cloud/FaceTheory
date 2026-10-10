@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### ⚠ BREAKING CHANGES
+
+* **head:** Strict-CSP head-script URLs whose hostname carries a trailing DNS root dot (for example `https://real.example./assets/entry.js`) are now rejected instead of being accepted and rendered verbatim while only the comparison URL was normalized. Use the dotless host form (`https://real.example/assets/entry.js`). This is a deliberate reversal of the behavior codified by `a526684` and is release-major material, not a patch or minor; no version bump, tag, or release is performed by this change.
+
 ## [4.2.1](https://github.com/theory-cloud/FaceTheory/compare/v4.2.0...v4.2.1) (2026-10-05)
 
 
