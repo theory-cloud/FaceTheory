@@ -154,6 +154,17 @@ jobs:
           fi
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
 
+      - name: Verify deploy tag provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          DEPLOY_TAG: ${{ steps.tag.outputs.tag }}
+          RUN_SHA: ${{ github.sha }}
+          RUN_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          scripts/verify-pages-deploy-tag.sh "${DEPLOY_TAG}" "${RUN_SHA}" "${RUN_REF_TYPE}"
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

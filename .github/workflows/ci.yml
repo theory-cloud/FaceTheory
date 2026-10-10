@@ -257,6 +257,14 @@ jobs:
           bash -n scripts/trigger_theorycloud_publish.sh
           bash -n scripts/test-theorycloud-targets.sh
           bash -n scripts/test-trigger-theorycloud-publish-awscurl.sh
+          bash -n scripts/verify-theorycloud-publish-install.sh
+          bash -n scripts/test-verify-theorycloud-publish-install.sh
+          bash -n scripts/verify-release-python-isolation.sh
+          bash -n scripts/test-verify-release-python-isolation.sh
+          bash -n scripts/verify-pages-deploy-tag.sh
+          bash -n scripts/test-verify-pages-deploy-tag.sh
+          bash -n scripts/verify-release-publish-binding.sh
+          bash -n scripts/test-verify-release-publish-binding.sh
       - name: Verify no-vars publisher workflow contract
         run: |
           set -euo pipefail
@@ -283,3 +291,12 @@ jobs:
         run: |
           bash scripts/test-theorycloud-targets.sh
           bash scripts/test-trigger-theorycloud-publish-awscurl.sh
+      - name: Verify release-trust guards
+        run: |
+          bash scripts/verify-theorycloud-publish-install.sh
+          bash scripts/test-verify-theorycloud-publish-install.sh
+          bash scripts/verify-release-python-isolation.sh
+          bash scripts/test-verify-release-python-isolation.sh
+          bash scripts/test-verify-pages-deploy-tag.sh
+          bash scripts/verify-release-publish-binding.sh
+          bash scripts/test-verify-release-publish-binding.sh

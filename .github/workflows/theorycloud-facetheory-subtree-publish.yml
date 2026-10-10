@@ -25,6 +25,7 @@ on:
       - "scripts/sync_theorycloud_facetheory_subtree.sh"
       - "scripts/trigger_theorycloud_publish.sh"
       - "scripts/test-theorycloud-targets.sh"
+      - ".github/requirements/theorycloud-publish-awscurl.txt"
       - ".github/workflows/theorycloud-facetheory-subtree-publish.yml"
 
 permissions:
@@ -96,20 +97,23 @@ jobs:
               ;;
           esac
 
+      - name: Install hash-locked awscurl publisher toolchain
+        run: |
+          set -euo pipefail
+
+          # Resolve the publisher toolchain BEFORE the stage-scoped AWS role is
+          # assumed, from an exact hash-locked closure. Mutable PyPI code must
+          # never execute inside the credential-bearing publish environment.
+          python3 -m pip install --user --require-hashes --no-deps \
+            --requirement .github/requirements/theorycloud-publish-awscurl.txt
+          printf '%s\n' "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
       - name: Assume stage-scoped theorycloud publish role
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           role-session-name: facetheory-${{ github.ref_name }}-${{ github.run_id }}
-
-      - name: Install awscurl
-        run: |
-          set -euo pipefail
-
-          python3 -m pip install --user --upgrade pip
-          python3 -m pip install --user awscurl
-          printf '%s\n' "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 
       - name: Sync FaceTheory subtree into shared theorycloud source state
         run: |
