@@ -5,8 +5,11 @@
 # operator ruling of 2026-09-28 -- the rubric and deterministic-build jobs are
 # staging-PR-only, so regaining push or promotion coverage must fail the guard.
 # For verify-ci-rubric-enforced.sh: a governance evidence upload action swapped
-# while the identical coverage pin remains, and a false conjunct on the trusted
-# release-train gate.
+# while the identical coverage pin remains, a governance upload replaced by a
+# `run:` step that merely echoes the pinned action/path/name, and a false
+# conjunct on the trusted release-train gate. The same-symbol controls prove the
+# trigger-parity evaluator correlates predicates on one workflow symbol, so a
+# self-contradictory head-ref or input conjunction cannot read as satisfiable.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -174,6 +177,49 @@ YAML
 )"
 expect_fail "push-only event with a disabled pull_request branch"
 
+# Row 22 R1: predicates on the same workflow symbol are correlated. A head ref
+# holds one value and each input is one boolean, so a self-contradictory
+# conjunction can never hold and must fail closed rather than read as a
+# satisfiable pull-request condition.
+reset_ci
+append_job "$(cat <<'YAML'
+  sneakyhead:
+    name: Sneaky head contradiction
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'staging' && github.event.pull_request.head.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo sneaky
+YAML
+)"
+expect_fail "contradictory head.ref == 'staging' && head.ref == 'main'"
+
+reset_ci
+append_job "$(cat <<'YAML'
+  sneakyinput:
+    name: Sneaky input contradiction
+    if: github.event_name == 'workflow_dispatch' && inputs.run_full_rubric == 'true' && inputs.run_full_rubric == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo sneaky
+YAML
+)"
+expect_fail "contradictory inputs.x == 'true' && inputs.x == 'false'"
+
+# Canonical positive: a single-valued head predicate on a staging pull request is
+# satisfiable, so symbol correlation must not over-reject the ordinary wiring.
+reset_ci
+append_job "$(cat <<'YAML'
+
+  canonical-head:
+    name: Canonical head-scoped staging job
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'staging'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo canonical
+YAML
+)"
+expect_pass "canonical single-valued head predicate on a staging PR"
+
 # The rubric-enforced verifier shares the same ci.yml surface, so it is exercised
 # here too. Seed a temp root with the files it reads so its scoped checks run
 # without touching the checkout.
@@ -250,6 +296,40 @@ path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 PY
 }
 
+# Replace the whole governance upload step body with a `run:` block that echoes
+# the pinned action/path/name strings, leaving the step name intact.
+mutate_governance_upload_to_echo() {
+  python3 - "${root}/.github/workflows/ci.yml" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines()
+step_starts = [index for index, line in enumerate(lines) if line.startswith("      - ")]
+mutated = False
+for position, start in enumerate(step_starts):
+    end = step_starts[position + 1] if position + 1 < len(step_starts) else len(lines)
+    step = lines[start:end]
+    name_index = next(
+        (index for index, line in enumerate(step) if "name: Upload governance evidence" in line),
+        None,
+    )
+    if name_index is None:
+        continue
+    lines[start + name_index + 1:end] = [
+        "        run: |",
+        '          echo "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1"',
+        '          echo "path: gov-infra/evidence/"',
+        '          echo "name: gov-infra-evidence"',
+    ]
+    mutated = True
+    break
+if not mutated:
+    raise SystemExit("governance evidence upload step not found")
+path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+}
+
 reset_ci
 seed_rubric_enforced_root
 expect_rubric_pass "ci-rubric canonical wiring"
@@ -259,6 +339,19 @@ expect_rubric_pass "ci-rubric canonical wiring"
 reset_ci
 mutate_governance_upload_action
 expect_rubric_fail "governance upload action replaced while the coverage pin remains"
+
+# Row 38 R1: the pinned action/path/name must be real step properties, not text a
+# `run:` step prints; an echoing step fails even though every string is present.
+reset_ci
+mutate_governance_upload_to_echo
+expect_rubric_fail "governance upload replaced by a run step echoing the pinned strings"
+
+# Canonical positive: the shipped governance upload step, with the pinned action
+# and with.path/with.name at their property positions, still passes.
+reset_ci
+seed_rubric_enforced_root
+expect_rubric_pass "ci-rubric canonical real governance upload"
+
 
 # Row 22: a false conjunct on the trusted release-train gate must fail the scoped
 # condition check.

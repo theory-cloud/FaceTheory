@@ -37,6 +37,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 python3 <<'PY'
+import itertools
 import re
 import sys
 from pathlib import Path
@@ -170,7 +171,10 @@ def parse_ci():
 # defaulted a base-less PR job to all three bases; evaluating the expression
 # closes both gaps. `&&`, `||`, parentheses, `always()`, the literals true/false,
 # and the event/base/head/input atoms below are modelled; `!`, `!=`, and every
-# other token or shape fail closed.
+# other token or shape fail closed. Predicates on the same workflow symbol are
+# correlated -- `head.ref` holds one value and each `inputs.<name>` one boolean --
+# so a self-contradictory condition like `head.ref == 'staging' && head.ref ==
+# 'main'` is unsatisfiable rather than read as two settable predicates.
 
 KNOWN_EVENTS = ("push", "pull_request", "workflow_dispatch")
 KNOWN_BASES = ("staging", "premain", "main")
@@ -315,28 +319,68 @@ def evaluate_condition(node, assignment):
     raise UnmodelledCondition(f"unknown node {kind!r}")
 
 
+def condition_symbol(atom):
+    """The single workflow symbol whose value an atom's truth tracks."""
+    if atom[0] == "event":
+        return "github.event_name"
+    if atom[0] == "base":
+        return "github.event.pull_request.base.ref"
+    if atom[0] == "head":
+        return "github.event.pull_request.head.ref"
+    return atom[1]  # ("input", "inputs.<name>", value)
+
+
+def condition_value(atom):
+    if atom[0] == "input":
+        return atom[2]
+    return atom[1]
+
+
 def condition_holds(node, event, base=None):
-    """True when some input assignment fixes the given event/base and satisfies node."""
+    """True when some real input assignment fixes the given event/base and satisfies node.
+
+    Atoms are correlated by the one workflow symbol each reads instead of being
+    enumerated independently. `github.event.pull_request.head.ref` holds a single
+    value and every `inputs.<name>` is one boolean, so `head.ref == 'staging' &&
+    head.ref == 'main'` -- and likewise `inputs.x == 'true' && inputs.x ==
+    'false'` -- is unsatisfiable, not two independently settable predicates.
+    Each remaining free symbol takes one of the values it is compared against,
+    or some other value that leaves all of its atoms false.
+    """
+    symbols = {}
+    for atom in condition_atoms(node):
+        symbols.setdefault(condition_symbol(atom), []).append(atom)
+
     fixed = {}
     free = []
-    for atom in condition_atoms(node):
-        if atom[0] == "event":
-            fixed[atom] = atom[1] == event
-        elif atom[0] == "base":
-            if event == "pull_request" and base is not None:
-                fixed[atom] = atom[1] == base
-            elif event == "pull_request":
-                free.append(atom)
+    for symbol, group in symbols.items():
+        values = sorted({condition_value(atom) for atom in group})
+        if symbol == "github.event_name":
+            for atom in group:
+                fixed[atom] = condition_value(atom) == event
+        elif symbol == "github.event.pull_request.base.ref":
+            if event != "pull_request":
+                for atom in group:
+                    fixed[atom] = False
+            elif base is not None:
+                for atom in group:
+                    fixed[atom] = condition_value(atom) == base
             else:
-                fixed[atom] = False
+                free.append((group, values + [None]))
         else:
-            free.append(atom)
-    if len(free) > 12:
-        raise UnmodelledCondition(f"too many free predicates in {node!r}")
-    for mask in range(1 << len(free)):
+            free.append((group, values + [None]))
+
+    combinations = 1
+    for _, states in free:
+        combinations *= len(states)
+    if combinations > 4096:
+        raise UnmodelledCondition(f"too many input combinations in {node!r}")
+
+    for chosen in itertools.product(*[states for _, states in free]):
         assignment = dict(fixed)
-        for index, atom in enumerate(free):
-            assignment[atom] = bool(mask & (1 << index))
+        for (group, _), state in zip(free, chosen):
+            for atom in group:
+                assignment[atom] = condition_value(atom) == state
         if evaluate_condition(node, assignment):
             return True
     return False
