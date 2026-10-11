@@ -9,7 +9,7 @@
   "scripts": {
     "test": "tsx test/run.ts",
     "test:update": "UPDATE_SNAPSHOTS=1 tsx test/run.ts",
-    "synth": "tsx scripts/synth.ts"
+    "synth": "npm --prefix ../../ts run build && tsx scripts/synth.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1146.0",

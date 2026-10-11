@@ -9,7 +9,7 @@
   "scripts": {
     "test": "tsx test/run.ts",
     "test:update": "UPDATE_SNAPSHOTS=1 tsx test/run.ts",
-    "synth": "tsx scripts/synth.ts"
+    "synth": "npm --prefix ../../ts run build && tsx scripts/synth.ts"
   },
   "devDependencies": {
     "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v5.0.1/theory-cloud-apptheory-5.0.1.tgz",
