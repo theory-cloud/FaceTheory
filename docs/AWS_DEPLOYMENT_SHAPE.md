@@ -227,8 +227,10 @@ Notes:
 
 ### ISR (blocking)
 
-- FaceTheory runtime default helper (`blockingIsrCacheControl`) emits:
+- FaceTheory runtime default helper (`blockingIsrCacheControl`) emits, for an ordinary anonymous default-key request:
   - `cache-control: public, max-age=0, s-maxage=0, stale-if-error=<revalidateSeconds>, must-revalidate`
+- Authenticated requests (any default auth-vary header or any cookie) and every request on a deployment with an explicit custom `cacheKey` fail closed:
+  - `cache-control: private, no-store`
 - Runtime ISR state marker header:
   - `x-facetheory-isr: miss | hit | wait-hit | stale`
 - CloudFront should not treat ISR HTML as long-lived immutable content; freshness is runtime-controlled via metadata.

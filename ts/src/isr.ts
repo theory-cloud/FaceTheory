@@ -45,6 +45,7 @@ const DEFAULT_TENANT_BOUNDARY_HEADERS = [
 const ISR_HYDRATION_QUERY_PARAM = '__facetheory_isr_hydration';
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 const HYDRATION_SIDECAR_CACHE_CONTROL = 'no-store';
+const ISR_PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store';
 const ISR_HTML_METADATA_CONTENT_SECURITY_POLICY =
   'facetheory-content-security-policy';
 const ISR_HTML_METADATA_STATUS = 'facetheory-status';
@@ -633,6 +634,12 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         );
       }
 
+      const guarded = isGuardedIsrRequest(
+        runtimeOptions,
+        input.ctx.request.headers,
+        input.ctx.request.cookies,
+      );
+
       const currentNow = runtimeOptions.now();
       let existing: IsrMetaRecord | null;
       try {
@@ -644,6 +651,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           input,
           lastKnownRecord(cacheKey),
           err,
+          guarded,
         );
         if (stale) return stale;
         throw err;
@@ -656,6 +664,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           'hit',
           currentNow,
           false,
+          guarded,
         );
         if (cachedFresh) {
           rememberRecord(existing);
@@ -680,6 +689,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           input,
           existing ?? lastKnownRecord(cacheKey),
           err,
+          guarded,
         );
         if (stale) return stale;
         throw err;
@@ -699,6 +709,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           revalidateSeconds,
           existing ?? acquire.record,
           rememberRecord,
+          guarded,
         );
       }
 
@@ -721,6 +732,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
             input,
             staleRecord,
             err,
+            guarded,
           );
           if (stale) return stale;
           throw err;
@@ -732,6 +744,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
             'wait-hit',
             runtimeOptions.now(),
             true,
+            guarded,
           );
           if (cached) return cached;
         }
@@ -753,6 +766,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           input,
           staleRecord,
           err,
+          guarded,
         );
         if (stale) return stale;
         throw err;
@@ -767,6 +781,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           revalidateSeconds,
           staleRecord,
           rememberRecord,
+          guarded,
         );
       }
 
@@ -780,6 +795,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           'stale',
           runtimeOptions.now(),
           true,
+          guarded,
         );
         if (stale) return stale;
       }
@@ -924,6 +940,7 @@ async function regenerateAndCommit(
   revalidateSeconds: number,
   staleRecord: IsrMetaRecord,
   rememberRecord: (record: IsrMetaRecord | null) => void,
+  guarded: boolean,
 ): Promise<FaceResponse> {
   const regenerationMetricStartedAt = metricNow();
   let regenerationOutcome = 'error';
@@ -972,7 +989,9 @@ async function regenerateAndCommit(
       key: htmlPointer,
       body: prepared.body,
       contentType: prepared.contentType,
-      cacheControl: blockingIsrCacheControl(revalidateSeconds),
+      cacheControl: guarded
+        ? ISR_PRIVATE_NO_STORE_CACHE_CONTROL
+        : blockingIsrCacheControl(revalidateSeconds),
       ...(htmlMetadata ? { metadata: htmlMetadata } : {}),
     });
     const etag = prepared.etag ?? write.etag ?? null;
@@ -1015,6 +1034,7 @@ async function regenerateAndCommit(
       prepared.body,
       'miss',
       runtimeOptions.now(),
+      guarded,
     );
   } catch (err) {
     if (runtimeOptions.failurePolicy === 'serve-stale') {
@@ -1024,6 +1044,7 @@ async function regenerateAndCommit(
         'stale',
         runtimeOptions.now(),
         true,
+        guarded,
       );
       if (stale) {
         regenerationOutcome = 'stale_after_error';
@@ -1107,6 +1128,7 @@ async function staleResponseForMetadataFailure(
   input: HandleIsrFaceInput,
   record: IsrMetaRecord | null,
   err: unknown,
+  guarded: boolean,
 ): Promise<FaceResponse | null> {
   if (runtimeOptions.failurePolicy !== 'serve-stale') return null;
 
@@ -1116,6 +1138,7 @@ async function staleResponseForMetadataFailure(
     ISR_STATE_STALE_METADATA_ERROR,
     runtimeOptions.now(),
     true,
+    guarded,
   );
   if (!response) return null;
 
@@ -1188,6 +1211,7 @@ async function cachedResponseFromRecord(
   state: IsrCacheState,
   nowMs: number,
   allowStale: boolean,
+  guarded: boolean,
 ): Promise<FaceResponse | null> {
   if (!record?.htmlPointer) return null;
   if (!allowStale && !isFresh(record, nowMs)) return null;
@@ -1202,6 +1226,7 @@ async function cachedResponseFromRecord(
     body,
     state,
     nowMs,
+    guarded,
     html.metadata,
   );
 }
@@ -1212,6 +1237,7 @@ function responseFromStoredHtml(
   body: Uint8Array,
   state: IsrCacheState,
   nowMs: number,
+  guarded: boolean,
   htmlMetadata?: Record<string, string> | undefined,
 ): FaceResponse {
   const contentType = normalizeContentType(
@@ -1238,11 +1264,13 @@ function responseFromStoredHtml(
   const isRecordFresh = isFresh(record, nowMs);
   const headers: FaceHeaders = {
     'cache-control': [
-      runtimeOptions.cacheControl({
-        revalidateSeconds: record.revalidateSeconds,
-        state,
-        isFresh: isRecordFresh,
-      }),
+      guarded
+        ? ISR_PRIVATE_NO_STORE_CACHE_CONTROL
+        : runtimeOptions.cacheControl({
+            revalidateSeconds: record.revalidateSeconds,
+            state,
+            isFresh: isRecordFresh,
+          }),
     ],
     'content-type': [contentType],
     'x-facetheory-isr': [state],
@@ -1459,6 +1487,28 @@ function hasNonEmptyHeader(
     if (values.some((value) => String(value).trim().length > 0)) return true;
   }
   return false;
+}
+
+/**
+ * Returns whether an ISR request must fail closed with a private `no-store`
+ * cache-control value instead of a shared-cacheable one.
+ *
+ * A request is guarded when the deployment configured an explicit, opaque
+ * custom `cacheKey` (a consumer-owned identity the framework cannot attribute to
+ * a shared viewer) or when the request itself carries an auth-variant signal: any
+ * `DEFAULT_AUTH_VARY_HEADERS` value or any request cookie. Every cookie counts,
+ * independent of `varyCookies` (which only scopes the default key digest), so an
+ * unlisted cookie can never re-share a request-private response. The ordinary
+ * anonymous default-key request stays shared-cacheable.
+ */
+function isGuardedIsrRequest(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  headers: FaceHeaders | undefined,
+  cookies: CookieMap | undefined,
+): boolean {
+  if (runtimeOptions.hasExplicitCacheKey) return true;
+  if (hasNonEmptyHeader(headers, DEFAULT_AUTH_VARY_HEADERS)) return true;
+  return cookies !== undefined && Object.keys(cookies).length > 0;
 }
 
 function resolveTenant(
