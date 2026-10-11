@@ -24,6 +24,10 @@
             "Value": "true"
           },
           {
+            "Key": "aws-cdk:cr-owned:_facetheory/data:172ca18e",
+            "Value": "true"
+          },
+          {
             "Key": "aws-cdk:cr-owned:1ee9696c",
             "Value": "true"
           },
@@ -1011,12 +1015,55 @@
           }
         ],
         "SourceObjectKeys": [
-          "c20b5617209083c0fa7240bb7553b538c56d203565e53328ba7dcfc751d0ecd9.zip"
+          "d50e801fbc938af9c5abca424efd7626df60b8f45b727f3ba1230a8924152327.zip"
         ],
         "DestinationBucketName": {
           "Ref": "IsrBucketCAA25890"
         },
         "DestinationBucketKeyPrefix": "isr",
+        "WaitForDistributionInvalidation": true,
+        "Prune": false,
+        "SystemMetadata": {
+          "cache-control": "public,max-age=0,s-maxage=600"
+        },
+        "OutputObjectKeys": true
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "AssetsDeploymentSsgSidecarsAwsCliLayer501BE1F7": {
+      "Type": "AWS::Lambda::LayerVersion",
+      "Properties": {
+        "Content": {
+          "S3Bucket": {
+            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+          },
+          "S3Key": "98f62bef9320f8c0a0a7be21d7c746f069131f196f51ffe3008a6bb730b368ec.zip"
+        },
+        "Description": "/opt/awscli/aws"
+      }
+    },
+    "AssetsDeploymentSsgSidecarsCustomResource05F07803": {
+      "Type": "Custom::CDKBucketDeployment",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536",
+            "Arn"
+          ]
+        },
+        "SourceBucketNames": [
+          {
+            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+          }
+        ],
+        "SourceObjectKeys": [
+          "a5b2e1cf8d5c476e1c982926db0cabd7e418d35dab40f3b098049130cedaf6b9.zip"
+        ],
+        "DestinationBucketName": {
+          "Ref": "AssetsBucket5CB76180"
+        },
+        "DestinationBucketKeyPrefix": "_facetheory/data",
         "WaitForDistributionInvalidation": true,
         "Prune": false,
         "SystemMetadata": {
