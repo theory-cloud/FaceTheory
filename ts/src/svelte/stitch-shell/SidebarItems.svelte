@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { NavItem } from './nav-types.js';
+  import { safeNavHref } from '../../stitch-shell/safe-nav-href.js';
 
   let {
     items = [],
@@ -26,14 +27,15 @@
 </script>
 
 {#each items.filter((item) => !item.hidden) as item (item.key)}
+  {@const safePath = safeNavHref(item.path)}
   <li style="list-style:none;">
-    {#if item.path}
+    {#if safePath}
       <a
-        href={item.path}
+        href={safePath}
         onclick={(event) => {
           if (!onNavigate) return;
           event.preventDefault();
-          onNavigate(item.path!, item.key);
+          onNavigate(safePath, item.key);
         }}
         style={`display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--stitch-radius-lg, 12px);text-decoration:none;background:${
           item.key === activeKey

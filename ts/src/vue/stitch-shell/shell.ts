@@ -2,6 +2,7 @@ import { defineComponent, Fragment, h } from 'vue';
 import type { PropType, VNode } from 'vue';
 
 import type { NavItem } from './nav-types.js';
+import { safeNavHref } from '../../stitch-shell/safe-nav-href.js';
 import {
   renderDefaultSlot,
   renderPropContent,
@@ -65,17 +66,18 @@ function renderNavItems(
     .filter((item) => !item.hidden)
     .map((item) => {
       const active = item.key === activeKey;
+      const safePath = safeNavHref(item.path);
 
       return h('li', { key: item.key, style: { listStyle: 'none' } }, [
-        item.path !== undefined
+        safePath !== undefined
           ? h(
               'a',
               {
-                href: item.path,
+                href: safePath,
                 onClick: (event: MouseEvent) => {
                   if (!onNavigate) return;
                   event.preventDefault();
-                  onNavigate(item.path!, item.key);
+                  onNavigate(safePath, item.key);
                 },
                 style: {
                   display: 'flex',

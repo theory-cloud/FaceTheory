@@ -3,6 +3,7 @@ import { Layout, Menu } from 'antd';
 import type { MenuProps } from 'antd';
 
 import type { NavItem } from './nav-types.js';
+import { safeNavHref } from '../../stitch-shell/safe-nav-href.js';
 
 const h = React.createElement;
 
@@ -57,7 +58,7 @@ function renderNavLabel(
   item: NavItem,
   onNavigate: ((path: string, key: string) => void) | undefined,
 ): React.ReactNode {
-  const path = item.path;
+  const path = safeNavHref(item.path);
   if (path === undefined) return item.label;
 
   const anchorProps: React.AnchorHTMLAttributes<HTMLAnchorElement> = {
