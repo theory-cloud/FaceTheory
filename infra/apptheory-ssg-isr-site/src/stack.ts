@@ -96,9 +96,13 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
     const ssgDir = requireDir('ssg output', '../deploy/ssg');
     new s3deploy.BucketDeployment(this, 'AssetsDeploymentSsg', {
       sources: [s3deploy.Source.asset(ssgDir)],
-      destinationBucket: assetsBucket,
-      destinationKeyPrefix: '',
-      prune: true,
+      // Pre-rendered SSG HTML must land at the primary CloudFront HTML origin:
+      // the ISR html store bucket under the `isr` prefix. That prefix is shared
+      // with runtime ISR writes, so pruning must stay off to preserve objects
+      // this deployment did not place.
+      destinationBucket: isrBucket,
+      destinationKeyPrefix: 'isr',
+      prune: false,
       // Reasonable default for build output; tune per environment.
       cacheControl: [s3deploy.CacheControl.fromString('public,max-age=0,s-maxage=600')],
     });

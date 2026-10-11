@@ -28,10 +28,6 @@
             "Value": "true"
           },
           {
-            "Key": "aws-cdk:cr-owned:a74ab5a1",
-            "Value": "true"
-          },
-          {
             "Key": "aws-cdk:cr-owned:assets:f9aff29a",
             "Value": "true"
           }
@@ -268,6 +264,10 @@
         "Tags": [
           {
             "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true"
+          },
+          {
+            "Key": "aws-cdk:cr-owned:isr:a74ab5a1",
             "Value": "true"
           }
         ]
@@ -854,6 +854,43 @@
                   ]
                 }
               ]
+            },
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging",
+                "s3:Abort*"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "IsrBucketCAA25890",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "IsrBucketCAA25890",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
             }
           ],
           "Version": "2012-10-17"
@@ -977,11 +1014,11 @@
           "c20b5617209083c0fa7240bb7553b538c56d203565e53328ba7dcfc751d0ecd9.zip"
         ],
         "DestinationBucketName": {
-          "Ref": "AssetsBucket5CB76180"
+          "Ref": "IsrBucketCAA25890"
         },
-        "DestinationBucketKeyPrefix": "",
+        "DestinationBucketKeyPrefix": "isr",
         "WaitForDistributionInvalidation": true,
-        "Prune": true,
+        "Prune": false,
         "SystemMetadata": {
           "cache-control": "public,max-age=0,s-maxage=600"
         },

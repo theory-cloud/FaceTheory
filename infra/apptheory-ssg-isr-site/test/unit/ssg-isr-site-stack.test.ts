@@ -21,6 +21,7 @@ interface OriginTemplate {
   readonly Id?: string;
   readonly CustomOriginConfig?: unknown;
   readonly S3OriginConfig?: unknown;
+  readonly OriginPath?: string;
 }
 
 interface OriginGroupTemplate {
@@ -108,6 +109,36 @@ function assertOldInlineFunctionsDeleted(template: Record<string, unknown>): voi
   );
 }
 
+function findBucketLogicalId(template: Record<string, unknown>, logicalIdPrefix: string): string {
+  const resources = template.Resources as Record<string, { Type?: string }> | undefined;
+  assert.ok(resources, 'template should include resources');
+
+  const entry = Object.entries(resources).find(
+    ([logicalId, resource]) =>
+      logicalId.startsWith(logicalIdPrefix) && resource.Type === 'AWS::S3::Bucket',
+  );
+  assert.ok(entry, `missing S3 bucket with logical id prefix ${logicalIdPrefix}`);
+  return entry[0];
+}
+
+function findBucketDeployment(
+  template: Record<string, unknown>,
+  logicalIdIncludes: string,
+): Record<string, unknown> {
+  const resources = template.Resources as
+    | Record<string, { Type?: string; Properties?: Record<string, unknown> }>
+    | undefined;
+  assert.ok(resources, 'template should include resources');
+
+  const entry = Object.entries(resources).find(
+    ([logicalId, resource]) =>
+      logicalId.includes(logicalIdIncludes) &&
+      resource.Type === 'Custom::CDKBucketDeployment',
+  );
+  assert.ok(entry, `missing BucketDeployment resource containing ${logicalIdIncludes}`);
+  return entry[1].Properties ?? {};
+}
+
 function buildFaceTheoryDist(): void {
   const repoRoot = path.resolve(__dirname, '../../../..');
   execFileSync('npm', ['--prefix', path.resolve(repoRoot, 'ts'), 'run', 'build'], {
@@ -125,6 +156,27 @@ test('H3: SSG+ISR stack synth is snapshotted', async () => {
 
   const template = Template.fromStack(stack).toJSON();
   assertOldInlineFunctionsDeleted(template);
+
+  // The pre-rendered SSG HTML must land where the primary CloudFront HTML origin
+  // points (the ISR html store bucket + prefix), otherwise S3-first SSG misses
+  // fall through to the Lambda failover. The shared prefix must not be pruned.
+  const isrBucketLogicalId = findBucketLogicalId(template, 'IsrBucket');
+  const ssgDeployment = findBucketDeployment(template, 'AssetsDeploymentSsg');
+  assert.deepEqual(
+    ssgDeployment.DestinationBucketName,
+    { Ref: isrBucketLogicalId },
+    'SSG HTML must deploy into the ISR html store bucket that backs the primary S3 origin',
+  );
+  assert.equal(
+    ssgDeployment.DestinationBucketKeyPrefix,
+    'isr',
+    'SSG HTML must deploy under the ISR html store prefix so the origin path resolves it',
+  );
+  assert.equal(
+    ssgDeployment.Prune,
+    false,
+    'the SSG deployment must not prune the shared ISR prefix, preserving runtime ISR objects',
+  );
 
   const distribution = findDistribution(template);
   const defaultBehavior = distribution.DefaultCacheBehavior;
@@ -148,6 +200,14 @@ test('H3: SSG+ISR stack synth is snapshotted', async () => {
   assert.ok(
     originGroupOrigins.some((origin) => origin?.CustomOriginConfig),
     'SSG_ISR origin group must keep Lambda Function URL as the failover origin',
+  );
+
+  const primaryS3Origin = originGroupOrigins.find((origin) => origin?.S3OriginConfig);
+  assert.ok(primaryS3Origin, 'SSG_ISR origin group must keep an S3 member');
+  assert.equal(
+    primaryS3Origin.OriginPath,
+    '/isr',
+    'primary S3 HTML origin must keep the ISR html store origin path that SSG HTML deploys behind',
   );
 
   const viteManifestOrigin = findOrigin(distribution, findBehavior(distribution, '.vite/*'));
