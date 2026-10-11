@@ -357,3 +357,70 @@ test('AuditTrail / DisclosurePanel fixtures do not leak production-like secrets 
     );
   }
 });
+
+const EMPTY_MARKER_TRAIL: AuditTrail = {
+  groupId: 'trail-empty-marker',
+  label: 'Empty marker',
+  variant: 'detailed',
+  safetyPolicy: 'no-secret-or-production-like-data',
+  groups: [
+    {
+      id: 'g',
+      label: 'G',
+      expanded: true,
+      events: [
+        {
+          id: 'empty-marker',
+          timestamp: '2026-05-21T17:00:05.000Z',
+          redactedMarker: '',
+          title: 'AKIA-EMPTY-TITLE-SECRET',
+          body: 'AKIA-EMPTY-BODY-SECRET',
+          metadata: [{ key: 'k', label: 'K', value: 'AKIA-EMPTY-META-SECRET' }],
+          externalLink: {
+            href: 'https://example.com/x',
+            label: 'AKIA-EMPTY-LINK-SECRET',
+          },
+        },
+        {
+          id: 'ordinary',
+          timestamp: '2026-05-21T17:00:06.000Z',
+          title: 'Ordinary visible title',
+          body: 'Ordinary visible body',
+        },
+        {
+          id: 'nonempty',
+          timestamp: '2026-05-21T17:00:07.000Z',
+          redactedMarker: '[redacted by policy]',
+          title: 'AKIA-NONEMPTY-TITLE-SECRET',
+        },
+      ],
+    },
+  ],
+};
+
+function assertEmptyMarkerSafe(body: string): void {
+  for (const needle of [
+    'AKIA-EMPTY-TITLE-SECRET',
+    'AKIA-EMPTY-BODY-SECRET',
+    'AKIA-EMPTY-META-SECRET',
+    'AKIA-EMPTY-LINK-SECRET',
+    'AKIA-NONEMPTY-TITLE-SECRET',
+  ]) {
+    assert.equal(body.includes(needle), false, `leaked ${needle}`);
+  }
+  assert.ok(body.includes('Ordinary visible title'));
+  assert.ok(body.includes('Ordinary visible body'));
+  assert.ok(body.includes('[redacted by policy]'));
+  assert.equal(countRedactedMarkers(body), 2);
+}
+
+function countRedactedMarkers(body: string): number {
+  return body.split('data-event-redacted-marker="true"').length - 1;
+}
+
+test('AuditTrailPanel redacts when redactedMarker is the empty string', async () => {
+  const body = await renderSSR(
+    h(AuditTrailPanel, { trail: EMPTY_MARKER_TRAIL }),
+  );
+  assertEmptyMarkerSafe(body);
+});

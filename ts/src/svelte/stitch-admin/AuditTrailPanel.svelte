@@ -34,7 +34,7 @@
   };
 
   function isRedacted(event: AuditTrailEvent): boolean {
-    return event.redactedMarker !== undefined && event.redactedMarker !== '';
+    return event.redactedMarker !== undefined;
   }
   function eventRole(event: AuditTrailEvent): 'alert' | 'listitem' {
     return event.status === 'error' ? 'alert' : 'listitem';

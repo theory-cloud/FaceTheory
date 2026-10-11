@@ -81,7 +81,7 @@ function isErrorEvent(event: AuditTrailEvent): boolean {
 }
 
 function isRedactedEvent(event: AuditTrailEvent): boolean {
-  return event.redactedMarker !== undefined && event.redactedMarker !== '';
+  return event.redactedMarker !== undefined;
 }
 
 function renderSafetyFootnote(policy: WizardSafetyPolicy): React.ReactElement {
