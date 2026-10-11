@@ -989,3 +989,140 @@ test('FaceApp: streaming body error emits marker and closes document', async () 
     console.error = originalConsoleError;
   }
 });
+
+async function observeReactReadinessScenario(options: {
+  styleStrategy?: 'shell' | 'all-ready';
+  abortDelayMs?: number;
+  render: () => React.ReactNode;
+}): Promise<{ status: number; html: string; unhandled: unknown[] }> {
+  const app = createFaceApp({
+    faces: [
+      createReactStreamFace({
+        route: '/',
+        mode: 'ssr',
+        render: options.render,
+        renderOptions: {
+          ...(options.styleStrategy ? { styleStrategy: options.styleStrategy } : {}),
+          ...(options.abortDelayMs !== undefined
+            ? { abortDelayMs: options.abortDelayMs }
+            : {}),
+        },
+      }),
+    ],
+  });
+
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => {
+    unhandled.push(reason);
+  };
+  const originalConsoleError = console.error;
+  process.on('unhandledRejection', onUnhandled);
+  console.error = () => undefined;
+
+  try {
+    const response = await app.handle({ method: 'GET', path: '/' });
+    let html = '';
+    try {
+      html = new TextDecoder().decode(await collectBody(response.body));
+    } catch {
+      // Body errors after headers are an ordinary streaming outcome here; the
+      // assertion of interest is the absence of unhandled readiness rejections.
+    }
+    await delay(80);
+    return { status: response.status, html, unhandled };
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+    console.error = originalConsoleError;
+  }
+}
+
+function ThrowsDuringRender(): React.ReactElement {
+  throw new Error('pre-shell render failure');
+}
+
+function lazyFailingChild(ms: number): React.ReactElement {
+  const LazyFailure = React.lazy(async () => {
+    await delay(ms);
+    throw new Error('post-shell render failure');
+  });
+  return React.createElement(
+    React.Suspense,
+    { fallback: React.createElement('p', null, 'Loading') },
+    React.createElement(LazyFailure),
+  );
+}
+
+function lazyPendingChild(ms: number): React.ReactElement {
+  const LazyPending = React.lazy(async () => {
+    await delay(ms);
+    return { default: () => React.createElement('p', null, 'late') };
+  });
+  return React.createElement(
+    React.Suspense,
+    { fallback: React.createElement('p', null, 'Pending') },
+    React.createElement(LazyPending),
+  );
+}
+
+for (const styleStrategy of ['all-ready', 'shell'] as const) {
+  test(`react adapter: ${styleStrategy} pre-shell errors observe both readiness promises`, async () => {
+    const result = await observeReactReadinessScenario({
+      styleStrategy,
+      render: () => React.createElement(ThrowsDuringRender),
+    });
+
+    assert.equal(result.status, 500);
+    assert.deepEqual(result.unhandled, []);
+  });
+
+  test(`react adapter: ${styleStrategy} post-shell errors observe both readiness promises`, async () => {
+    const result = await observeReactReadinessScenario({
+      styleStrategy,
+      render: () =>
+        React.createElement('main', null, lazyFailingChild(10)),
+    });
+
+    assert.deepEqual(result.unhandled, []);
+    if (styleStrategy === 'all-ready') {
+      assert.equal(result.status, 500);
+    } else {
+      assert.equal(result.status, 200);
+      assert.ok(result.html.startsWith('<!doctype html>'));
+    }
+  });
+
+  test(`react adapter: ${styleStrategy} aborts observe both readiness promises`, async () => {
+    const result = await observeReactReadinessScenario({
+      styleStrategy,
+      abortDelayMs: 10,
+      render: () =>
+        React.createElement('main', null, lazyPendingChild(200)),
+    });
+
+    assert.deepEqual(result.unhandled, []);
+    if (styleStrategy === 'all-ready') {
+      assert.equal(result.status, 500);
+    } else {
+      assert.equal(result.status, 200);
+    }
+  });
+
+  test(`react adapter: ${styleStrategy} ordinary streamed render completes`, async () => {
+    const result = await observeReactReadinessScenario({
+      styleStrategy,
+      render: () =>
+        React.createElement(
+          'main',
+          null,
+          React.createElement('h1', null, 'Ready'),
+          lazyPendingChild(5),
+        ),
+    });
+
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.unhandled, []);
+    assert.ok(result.html.includes('Ready'));
+    assert.ok(result.html.includes('late'));
+    assert.ok(result.html.trimEnd().endsWith('</html>'));
+  });
+}

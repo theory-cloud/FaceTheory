@@ -250,3 +250,140 @@ test('vue adapter: streaming body error emits marker and closes document', async
   assert.ok(html.includes('data-facetheory-stream-error="true"'));
   assert.ok(html.endsWith('</body></html>'));
 });
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function paragraphs(count: number, size: number) {
+  return h(
+    'main',
+    null,
+    Array.from({ length: count }, (_, index) =>
+      h('p', null, `${index}:${'v'.repeat(size)}`),
+    ),
+  );
+}
+
+test('vue adapter: slow streaming consumer receives complete output in bounded coalesced chunks', async () => {
+  const out = await renderVueStream(baseCtx, paragraphs(2000, 100));
+  const decoder = new TextDecoder();
+  const chunks: Uint8Array[] = [];
+  let html = '';
+  for await (const chunk of out.html as AsyncIterable<Uint8Array>) {
+    chunks.push(chunk);
+    html += decoder.decode(chunk, { stream: true });
+    await delay(1);
+  }
+  html += decoder.decode();
+
+  const totalBytes = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  assert.ok(html.startsWith('<main>'));
+  assert.ok(html.endsWith('</main>'));
+  assert.equal(html.match(/<p>/g)?.length, 2000);
+  assert.ok(html.includes(`<p>1999:${'v'.repeat(100)}</p>`));
+  assert.ok(
+    chunks.length <= Math.ceil(totalBytes / (16 * 1024)) + 4,
+    `expected coalesced chunks, received ${chunks.length} for ${totalBytes} bytes`,
+  );
+});
+
+test('vue adapter: unread streamed output beyond the buffer bound fails closed without retaining bytes', async () => {
+  const out = await renderVueStream(baseCtx, paragraphs(6000, 1024));
+  // Let Vue finish producing while nothing consumes the body.
+  await delay(50);
+
+  let receivedBytes = 0;
+  await assert.rejects(async () => {
+    for await (const chunk of out.html as AsyncIterable<Uint8Array>) {
+      receivedBytes += chunk.byteLength;
+    }
+  }, /exceeded 5242880 buffered bytes/);
+  assert.equal(receivedBytes, 0);
+});
+
+test('vue adapter: all-ready integrations complete ordinary output and fail closed beyond the bound', async () => {
+  const createApp = (count: number) =>
+    createFaceApp({
+      faces: [
+        createVueStreamFace({
+          route: '/',
+          mode: 'ssr',
+          render: () => paragraphs(count, 1024),
+          renderOptions: {
+            integrations: [
+              {
+                name: 'vue-all-ready-test',
+                contribute: () => ({
+                  headTags: [{ type: 'title', text: 'All Ready' }],
+                }),
+              },
+            ],
+          },
+        }),
+      ],
+    });
+
+  const ordinary = await createApp(400).handle({ method: 'GET', path: '/' });
+  assert.equal(ordinary.status, 200);
+  const html = await collect(ordinary.body);
+  assert.ok(html.includes('<title>All Ready</title>'));
+  assert.equal(html.match(/<p>/g)?.length, 400);
+  assert.ok(html.endsWith('</html>'));
+
+  const originalConsoleError = console.error;
+  console.error = () => undefined;
+  try {
+    const oversized = await createApp(6000).handle({ method: 'GET', path: '/' });
+    assert.equal(oversized.status, 500);
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
+test('vue adapter: consumer cancellation stops stream production and drops queued output', async () => {
+  const slowItem = (index: number) => ({
+    async setup() {
+      await delay(5 * (index + 1));
+      return () => h('p', null, `slow-${index}`);
+    },
+  });
+  const out = await renderVueStream(
+    baseCtx,
+    h(
+      'main',
+      null,
+      Array.from({ length: 20 }, (_, index) => h(slowItem(index))),
+    ),
+  );
+
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => {
+    unhandled.push(reason);
+  };
+  process.on('unhandledRejection', onUnhandled);
+  const originalEncode = TextEncoder.prototype.encode;
+  let encodesAfterCancel = 0;
+  let cancelled = false;
+  TextEncoder.prototype.encode = function (this: TextEncoder, input?: string) {
+    if (cancelled) encodesAfterCancel += 1;
+    return originalEncode.call(this, input);
+  };
+
+  try {
+    const iterator = (out.html as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
+    const first = await iterator.next();
+    assert.equal(first.done, false);
+    cancelled = true;
+    const returned = await iterator.return?.();
+    assert.equal(returned?.done, true);
+
+    await delay(150);
+    assert.equal(encodesAfterCancel, 0);
+    assert.deepEqual(await iterator.next(), { done: true, value: undefined });
+    assert.deepEqual(unhandled, []);
+  } finally {
+    TextEncoder.prototype.encode = originalEncode;
+    process.off('unhandledRejection', onUnhandled);
+  }
+});

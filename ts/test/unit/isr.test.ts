@@ -1812,3 +1812,40 @@ test('isr: invalid strict sidecar tokens fail closed without rendering', async (
   assert.equal(response.status, 404);
   assert.equal(renderCount, 0);
 });
+
+test('isr: cache metrics label parameterized routes by template, not request path', async () => {
+  const metrics: Array<{ name: string; tags?: Record<string, string> }> = [];
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/isr-posts/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: (ctx) => ({ html: `<main>${String(ctx.params.slug)}</main>` }),
+      },
+    ],
+    observability: {
+      metric: (record) =>
+        metrics.push(record as unknown as { name: string; tags?: Record<string, string> }),
+    },
+  });
+
+  await app.handle({ method: 'GET', path: '/isr-posts/a' });
+  await app.handle({ method: 'GET', path: '/isr-posts/b' });
+  await app.handle({ method: 'GET', path: '/isr-posts/a' });
+  const missing = await app.handle({ method: 'GET', path: '/isr-missing/zzz' });
+  assert.equal(missing.status, 404);
+
+  const cacheLabels = metrics
+    .filter((metric) => metric.name === 'facetheory.isr.cache')
+    .map((metric) => metric.tags?.route_pattern);
+  assert.equal(cacheLabels.length, 3);
+  assert.ok(cacheLabels.every((label) => label === '/isr-posts/{slug}'));
+
+  const requestLabels = new Set(
+    metrics
+      .filter((metric) => metric.name === 'facetheory.request')
+      .map((metric) => metric.tags?.route_pattern),
+  );
+  assert.deepEqual([...requestLabels].sort(), ['/isr-posts/{slug}', 'unmatched']);
+});
