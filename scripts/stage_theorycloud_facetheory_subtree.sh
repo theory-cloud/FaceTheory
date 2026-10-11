@@ -68,7 +68,11 @@ def git_blob_bytes(repo_root: Path, object_id: str) -> bytes:
 
 
 def validate_output_root(output_root: Path) -> None:
-    """Fail closed unless the output root is (or becomes) a private real dir."""
+    """Fail closed unless the output root is (or becomes) a private real dir.
+
+    Call this on the raw, unresolved path so a precreated symlink at the
+    destination is detected before the path is dereferenced.
+    """
     if output_root.is_symlink():
         fail(f"output root is a symlink: {output_root}")
     if output_root.exists():
@@ -228,7 +232,9 @@ def main() -> None:
 
     repo_root = Path(args.repo_root).resolve()
     contract_path = (repo_root / args.contract).resolve()
-    output_root = Path(args.output).resolve()
+    # Keep the raw, unresolved path so validate_output_root can reject a
+    # precreated symlink destination before the path is dereferenced.
+    output_root = Path(args.output)
 
     if not (repo_root / ".git").exists():
         fail(f"repo root {repo_root} is not a git repository")
@@ -281,6 +287,7 @@ def main() -> None:
         fail(f"unable to read tree at source_revision {source_revision}: {exc.stderr.decode('utf-8', 'replace').strip()}")
 
     validate_output_root(output_root)
+    output_root = output_root.resolve()
 
     subtree_root = output_root / SUBTREE_NAME
     if subtree_root.is_symlink():

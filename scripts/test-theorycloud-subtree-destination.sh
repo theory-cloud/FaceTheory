@@ -39,6 +39,27 @@ fi
 grep -Fq "symlink" "${scratch}/link.log" || fail "symlink rejection did not name the reason"
 [[ -z "$(ls -A "${victim}")" ]] || fail "symlinked staging destination received an arbitrary write"
 
+# Negative: the direct stage helper (also reached through the Makefile target)
+# must validate the RAW --output path before resolving it, so a precreated
+# symlink destination is refused with no write through to the arbitrary target.
+stage_victim="${scratch}/stage-victim"
+mkdir -p "${stage_victim}"
+ln -s "${stage_victim}" "${scratch}/stage-link-out"
+if bash "${stage_script}" --output "${scratch}/stage-link-out" --repo-root "${repo_root}" >"${scratch}/stage-link.log" 2>&1; then
+  fail "direct staging accepted a symlinked output destination"
+fi
+grep -Fq "symlink" "${scratch}/stage-link.log" || fail "direct stage symlink rejection did not name the reason"
+[[ -z "$(ls -A "${stage_victim}")" ]] || fail "direct staging wrote through a symlinked destination"
+
+# Ordinary: the direct stage helper still stages into a clean private
+# destination.
+stage_ok="${scratch}/stage-ok"
+if ! bash "${stage_script}" --output "${stage_ok}" --repo-root "${repo_root}" >"${scratch}/stage-ok.log" 2>&1; then
+  cat "${scratch}/stage-ok.log" >&2
+  fail "direct staging into a clean private destination failed"
+fi
+[[ -f "${stage_ok}/facetheory/source-manifest.json" ]] || fail "direct staging did not produce a manifest"
+
 # Negative: a group/world-writable destination must be refused.
 open_dir="${scratch}/open-out"
 mkdir -p "${open_dir}"
