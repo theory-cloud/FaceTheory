@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { Component as SvelteComponent } from 'svelte';
+import type { Component as SvelteComponent, Snippet } from 'svelte';
 
 import type {
   BrandHeaderProps as SvelteBrandHeaderProps,
@@ -10,8 +10,11 @@ import type {
 } from '@theory-cloud/facetheory/svelte/stitch-shell';
 import type {
   AuthCardProps as SvelteAuthCardProps,
+  AuthFlowSectionProps as SvelteAuthFlowSectionProps,
   AuthPageLayoutProps as SvelteAuthPageLayoutProps,
+  AuthStateCardProps as SvelteAuthStateCardProps,
   ConsentItemProps as SvelteConsentItemProps,
+  PasskeyCTAProps as SvelteHostedAuthPasskeyCTAProps,
 } from '@theory-cloud/facetheory/svelte/stitch-hosted-auth';
 import type {
   DataTableProps as SvelteDataTableProps,
@@ -140,4 +143,67 @@ const publicSubpathExportsResolve = true satisfies
 
 test('public package subpaths expose Vue and Svelte stitch modules to TypeScript consumers', () => {
   assert.equal(publicSubpathExportsResolve, true);
+});
+
+/* Svelte 5 hosted-auth snippet-prop declarations (package `types` condition). */
+const zeroAritySnippet = (() => undefined) as unknown as Snippet;
+const oneArgSnippet = (() => undefined) as unknown as Snippet<[string]>;
+
+const svelteHostedAuthSnippetProps = {
+  authPageLayout: {
+    brand: zeroAritySnippet,
+    footer: zeroAritySnippet,
+    children: zeroAritySnippet,
+  } satisfies SvelteAuthPageLayoutProps,
+  authCard: {
+    title: 'Sign in',
+    headerAction: zeroAritySnippet,
+    footer: zeroAritySnippet,
+    children: zeroAritySnippet,
+  } satisfies SvelteAuthCardProps,
+  authFlowSection: {
+    children: zeroAritySnippet,
+  } satisfies SvelteAuthFlowSectionProps,
+  authStateCard: {
+    title: 'State',
+    icon: zeroAritySnippet,
+    actions: zeroAritySnippet,
+  } satisfies SvelteAuthStateCardProps,
+  consentItem: {
+    label: 'Email',
+    icon: zeroAritySnippet,
+  } satisfies SvelteConsentItemProps,
+  passkeyCta: {
+    icon: zeroAritySnippet,
+    children: zeroAritySnippet,
+  } satisfies SvelteHostedAuthPasskeyCTAProps,
+  // All six snippet props stay optional.
+  optionalOnly: [
+    {} satisfies SvelteAuthPageLayoutProps,
+    { title: 'T' } satisfies SvelteAuthCardProps,
+    { title: 'T' } satisfies SvelteAuthStateCardProps,
+    {} satisfies SvelteHostedAuthPasskeyCTAProps,
+  ],
+};
+
+const svelteHostedAuthInvalidAuthoring = [
+  // @ts-expect-error snippet props must be Snippets, not strings
+  { headerAction: 'not a snippet' } satisfies SvelteAuthCardProps,
+  // @ts-expect-error snippets declared by hosted-auth are zero-arity
+  { children: oneArgSnippet } satisfies SvelteAuthCardProps,
+  // @ts-expect-error AuthPageLayout has no `icon` snippet
+  { icon: zeroAritySnippet } satisfies SvelteAuthPageLayoutProps,
+  // @ts-expect-error AuthFlowSection exposes only `children`
+  { footer: zeroAritySnippet } satisfies SvelteAuthFlowSectionProps,
+  // @ts-expect-error AuthStateCard has no `children` snippet
+  { children: zeroAritySnippet } satisfies SvelteAuthStateCardProps,
+  // @ts-expect-error ConsentItem exposes only `icon`
+  { actions: zeroAritySnippet } satisfies SvelteConsentItemProps,
+  // @ts-expect-error PasskeyCTA has no `footer` snippet
+  { footer: zeroAritySnippet } satisfies SvelteHostedAuthPasskeyCTAProps,
+];
+
+test('svelte hosted-auth declarations admit the six optional zero-arity snippet props and reject invalid authoring', () => {
+  assert.ok(svelteHostedAuthSnippetProps);
+  assert.ok(svelteHostedAuthInvalidAuthoring);
 });

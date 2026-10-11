@@ -425,3 +425,28 @@ test('vue stitch-shell: BrandHeader composes with Topbar via the logo slot', asy
   assert.ok(body.includes('[Auth]'));
   assert.ok(body.includes('--stitch-color-tertiary-container'));
 });
+
+test('vue stitch-shell: Shell renders unsafe NavItem paths inert and keeps safe paths navigable', async () => {
+  const unsafeNav: NavItem[] = [
+    { key: 'js', label: 'JsLink', path: 'javascript:alert(1)' },
+    { key: 'data', label: 'DataLink', path: 'data:text/html,<b>x</b>' },
+    { key: 'tab', label: 'TabLink', path: 'java\tscript:alert(1)' },
+    { key: 'rel', label: 'RelLink', path: '/ok/relative' },
+    { key: 'https', label: 'HttpsLink', path: 'https://example.com/a' },
+  ];
+  for (const onNavigate of [undefined, () => undefined]) {
+    const body = await renderSSR(
+      h(
+        Shell,
+        { nav: unsafeNav, activeKey: 'rel', onNavigate },
+        { default: () => h('div', null, 'content') },
+      ),
+    );
+    assert.ok(!body.includes('javascript:'));
+    assert.ok(!body.includes('data:text'));
+    assert.ok(!/java\s*script/i.test(body));
+    assert.ok(body.includes('JsLink'));
+    assert.ok(body.includes('href="/ok/relative"'));
+    assert.ok(body.includes('href="https://example.com/a"'));
+  }
+});

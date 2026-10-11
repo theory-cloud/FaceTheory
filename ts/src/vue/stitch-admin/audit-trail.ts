@@ -78,7 +78,7 @@ function renderSafetyFootnote(policy: WizardSafetyPolicy): VNodeChild {
 }
 
 function isRedactedEvent(event: AuditTrailEvent): boolean {
-  return event.redactedMarker !== undefined && event.redactedMarker !== '';
+  return event.redactedMarker !== undefined;
 }
 
 function renderTonePill(event: AuditTrailEvent): VNodeChild {

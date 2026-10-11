@@ -1,6 +1,8 @@
 import { hydrate } from 'svelte';
 
 import App from './App.svelte';
+import AppBrand from './AppBrand.svelte';
+import { selectHydrationRoot } from './select-hydration-root.js';
 import logoUrl from './logo.svg';
 import './styles.css';
 
@@ -19,7 +21,7 @@ function readHydrationData(): HydrationPayload {
 const data = readHydrationData();
 document.body.setAttribute('data-logo', logoUrl);
 
-hydrate(App, {
+hydrate(selectHydrationRoot(window.location.pathname, App, AppBrand), {
   target: document.body,
   props: { message: data?.message ?? 'from client' },
 });
