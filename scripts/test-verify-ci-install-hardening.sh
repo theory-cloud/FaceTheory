@@ -89,4 +89,13 @@ expect_fail "npx-prefixed unprotected npm ci"
 write_probe "cd ts && npm ci --ignore-scripts"
 expect_pass "restored hardened npm ci"
 
+# Row 25: an escaped quote leaves the double-quoted string open, so the `#`
+# after it stays inside the string and the trailing install must still be read.
+write_probe 'echo "literal \" # quoted" && cd ts && npm ci'
+expect_fail "escaped quote masks an unprotected npm ci"
+
+# Ordinary control: the same escaped-quote line with a hardened install passes.
+write_probe 'echo "literal \" # quoted" && cd ts && npm ci --ignore-scripts'
+expect_pass "escaped quote with hardened npm ci"
+
 echo "test-verify-ci-install-hardening: PASS"

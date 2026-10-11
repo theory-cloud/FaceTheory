@@ -73,22 +73,40 @@ SEPARATOR = re.compile(r"&&|\|\||[;&|]")
 
 
 def strip_comment(text):
-    """Drop a trailing unquoted `#` shell comment from a logical line."""
+    """Drop a trailing unquoted `#` shell comment from a logical line.
+
+    Quote tracking is escape-aware: a backslash escapes the next character
+    wherever the shell gives it that meaning, outside quotes and inside double
+    quotes, so an escaped double quote does not close the string and the `#`
+    that follows it stays inside the string instead of truncating the line. A
+    backslash inside single quotes is ordinary, as the shell treats it.
+    """
     out = []
     quote = None
-    for index, char in enumerate(text):
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if char == "\\" and quote != "'" and index + 1 < length:
+            out.append(char)
+            out.append(text[index + 1])
+            index += 2
+            continue
         if quote is not None:
             out.append(char)
             if char == quote:
                 quote = None
+            index += 1
             continue
         if char in "\"'":
             quote = char
             out.append(char)
+            index += 1
             continue
         if char == "#" and (index == 0 or text[index - 1] in " \t"):
             break
         out.append(char)
+        index += 1
     return "".join(out)
 
 

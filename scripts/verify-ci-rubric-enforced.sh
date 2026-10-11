@@ -156,8 +156,159 @@ require_contains \
   "scripts/check-lambda-runtime-deprecations.mjs" \
   '"ts/src/create-templates/index.ts",' \
   "deprecated runtime gate must scan ts/src/create-templates/index.ts"
-require_contains "${ci}" "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1" "CI rubric job must upload governance evidence with the pinned upload-artifact action"
-require_contains "${ci}" "path: gov-infra/evidence/" "CI rubric job must upload gov-infra/evidence/"
+if ! python3 - "${ci}" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines()
+
+job_starts = []
+for index, line in enumerate(lines):
+    match = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
+    if match:
+        job_starts.append((index, match.group(1)))
+
+jobs = {}
+for position, (index, name) in enumerate(job_starts):
+    end = job_starts[position + 1][0] if position + 1 < len(job_starts) else len(lines)
+    jobs[name] = lines[index:end]
+
+
+def steps_of(job_lines):
+    starts = [index for index, line in enumerate(job_lines) if re.match(r"^      - ", line)]
+    steps = []
+    for position, start in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(job_lines)
+        steps.append("\n".join(job_lines[start:end]))
+    return steps
+
+
+# Row 22: bind the trusted release-train gate to the exact job it validates. The
+# job must still exist, must run on pull_request via the exact canonical
+# predicate (a `&& false` conjunct or any other drift must fail here, not only in
+# the parity checker), and must carry its trusted checkout and verifier
+# invocation inside that job rather than anywhere in the file.
+release_job = jobs.get("release-train-promotion")
+if release_job is None:
+    raise SystemExit("ci-rubric: FAIL (missing release-train-promotion job)")
+
+release_if = [line for line in release_job if re.match(r"^    if:", line)]
+if len(release_if) != 1:
+    raise SystemExit("ci-rubric: FAIL (release-train-promotion must declare exactly one job-level if:)")
+release_condition = release_if[0].split("if:", 1)[1].strip()
+if release_condition.startswith("${{") and release_condition.endswith("}}"):
+    release_condition = release_condition[3:-2].strip()
+if release_condition != "github.event_name == 'pull_request'":
+    raise SystemExit(
+        "ci-rubric: FAIL (release-train-promotion if: must be exactly "
+        "github.event_name == 'pull_request'; got " + repr(release_condition) + ")"
+    )
+
+release_steps = steps_of(release_job)
+if not any("ref: refs/heads/staging" in step for step in release_steps):
+    raise SystemExit("ci-rubric: FAIL (release-train-promotion must checkout trusted staging code)")
+if not any("scripts/verify-release-train-promotion.sh" in step for step in release_steps):
+    raise SystemExit("ci-rubric: FAIL (release-train-promotion must run the verifier script)")
+
+# Row 38: the governance-evidence upload must be a real step in the rubric job
+# whose own `uses:` carries the pinned upload-artifact action and whose `with:`
+# carries the evidence path and artifact name. Those keys are read at their
+# property positions rather than as substrings, so the identical pin in the
+# unrelated TypeScript coverage step -- or a `run:` block echoing the strings --
+# can no longer stand in for the upload.
+rubric_job = jobs.get("rubric")
+if rubric_job is None:
+    raise SystemExit("ci-rubric: FAIL (missing rubric job)")
+
+PINNED_UPLOAD = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+PINNED_USES_RE = re.compile(r"^" + re.escape(PINNED_UPLOAD) + r"(\s+#.*)?$")
+
+
+def split_step_entries(step_text):
+    """Return (indent, key, value) for each mapping entry in a step block.
+
+    The list marker is normalised to spaces so the step's own keys share one
+    indent and nested keys (`with:` children) sit deeper. Block-scalar (`|`/`>`)
+    bodies and comment lines are skipped so their literal text is never read as
+    structure.
+    """
+    entries = []
+    block_indent = None
+    for raw in step_text.splitlines():
+        indent = len(raw) - len(raw.lstrip(" "))
+        if block_indent is not None:
+            if raw.strip() == "" or indent > block_indent:
+                continue
+            block_indent = None
+        if raw.strip() == "" or raw.lstrip().startswith("#"):
+            continue
+        without_marker = re.sub(r"^(\s*)- ", r"\1  ", raw, count=1)
+        content = without_marker.strip()
+        match = re.match(r"([A-Za-z0-9_.-]+):\s*(.*)$", content)
+        if match is None:
+            continue
+        key, value = match.group(1), match.group(2).strip()
+        entry_indent = len(without_marker) - len(without_marker.lstrip(" "))
+        entries.append((entry_indent, key, value))
+        if re.match(r"^[|>][+-]?\s*$", value):
+            block_indent = entry_indent
+    return entries
+
+
+def step_property(step_text, key):
+    entries = split_step_entries(step_text)
+    if not entries:
+        return None
+    base = min(indent for indent, _, _ in entries)
+    for indent, entry_key, value in entries:
+        if indent == base and entry_key == key:
+            return value
+    return None
+
+
+def step_with_children(step_text):
+    entries = split_step_entries(step_text)
+    if not entries:
+        return {}
+    base = min(indent for indent, _, _ in entries)
+    children = {}
+    in_with = False
+    for indent, key, value in entries:
+        if indent == base:
+            in_with = key == "with"
+            continue
+        if in_with and indent > base:
+            children[key] = value
+    return children
+
+
+governance_steps = [
+    step
+    for step in steps_of(rubric_job)
+    if step_property(step, "name") == "Upload governance evidence"
+]
+if len(governance_steps) != 1:
+    raise SystemExit("ci-rubric: FAIL (rubric job must have exactly one governance evidence upload step)")
+
+governance_uses = step_property(governance_steps[0], "uses")
+governance_with = step_with_children(governance_steps[0])
+missing = []
+if governance_uses is None or not PINNED_USES_RE.match(governance_uses):
+    missing.append("uses: " + PINNED_UPLOAD)
+if governance_with.get("path") != "gov-infra/evidence/":
+    missing.append("path: gov-infra/evidence/")
+if governance_with.get("name") != "gov-infra-evidence":
+    missing.append("name: gov-infra-evidence")
+if missing:
+    raise SystemExit(
+        "ci-rubric: FAIL (governance evidence upload step is missing " + ", ".join(missing) + ")"
+    )
+PY
+then
+  fail "CI release-train gate and governance evidence upload must stay bound to their canonical jobs"
+fi
 require_contains "${ci}" "run_full_rubric:" "manual CI dispatch must expose an explicit full-rubric toggle"
 require_contains "${ci}" "default: true" "manual CI dispatch must continue to run the full rubric by default"
 # Operator ruling 2026-09-28: the rubric is only needed in staging; premain and

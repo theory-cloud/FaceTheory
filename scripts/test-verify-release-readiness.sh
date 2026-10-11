@@ -166,5 +166,98 @@ if (cd "${fail_dir}" && bash "${fail_script}" base HEAD release >"${fail_out}" 2
 fi
 assert_contains "$(cat "${fail_out}")" 'release-readiness: FAIL' "non-release signal failure output"
 
+# Row 29: the changed-file query must account for deletions and both endpoints
+# of a rename, not only the allowlisted destination.
+
+commit_staged() {
+  local work_dir="$1"
+  local message="$2"
+  git -C "${work_dir}" \
+    -c commit.gpgSign=false \
+    -c tag.gpgSign=false \
+    -c core.hooksPath=/dev/null \
+    commit -m "${message}" >/dev/null
+}
+
+seed_release_repo() {
+  local work_dir="$1"
+  git init -b main "${work_dir}" >/dev/null
+  git -C "${work_dir}" config user.name "FaceTheory Test"
+  git -C "${work_dir}" config user.email "facetheory-test@example.com"
+  printf '%s\n' seed > "${work_dir}/README.md"
+  mkdir -p "${work_dir}/ts/src"
+  printf '%s\n' 'export const x = 1;' > "${work_dir}/ts/src/user.ts"
+  commit_file "${work_dir}" "chore: seed" README.md ts/src/user.ts
+  git -C "${work_dir}" branch base
+}
+
+# Deleting a non-allowlisted path alongside an allowlisted change: the range is
+# release-sync shaped, but the deleted user-facing path must fail it.
+delete_dir="${tmpdir}/deletion-drift"
+current_case="setup deletion of a non-allowlisted path"
+seed_release_repo "${delete_dir}"
+delete_script="$(copy_script "${delete_dir}")"
+printf '%s\n' '# release sync change' >> "${delete_dir}/scripts/verify-release-readiness.sh"
+git -C "${delete_dir}" rm -q ts/src/user.ts
+git -C "${delete_dir}" add scripts/verify-release-readiness.sh
+commit_staged "${delete_dir}" "chore(release): sync and delete user source"
+delete_out="${tmpdir}/readiness-deletion.out"
+current_case="deletion of a non-allowlisted path fails"
+if (cd "${delete_dir}" && bash "${delete_script}" base HEAD release >"${delete_out}" 2>&1); then
+  fail "a deleted non-allowlisted path unexpectedly passed release readiness"
+fi
+assert_contains "$(cat "${delete_out}")" 'release-readiness: FAIL' "deletion of non-allowlisted path"
+
+# Renaming a non-allowlisted path into an allowlisted location must fail on the
+# source endpoint even though the destination is allowlisted.
+rename_dir="${tmpdir}/rename-drift"
+current_case="setup rename out of a non-allowlisted path"
+seed_release_repo "${rename_dir}"
+rename_script="$(copy_script "${rename_dir}")"
+git -C "${rename_dir}" mv ts/src/user.ts scripts/read-version.sh
+commit_staged "${rename_dir}" "chore(release): rename user source into release helper"
+rename_out="${tmpdir}/readiness-rename.out"
+current_case="rename out of a non-allowlisted path fails"
+if (cd "${rename_dir}" && bash "${rename_script}" base HEAD release >"${rename_out}" 2>&1); then
+  fail "a rename out of a non-allowlisted path unexpectedly passed release readiness"
+fi
+assert_contains "$(cat "${rename_out}")" 'release-readiness: FAIL' "rename out of non-allowlisted path"
+
+# Ordinary controls: a rename wholly inside the allowlist and a deletion of an
+# allowlisted path are release-sync changes.
+allow_rename_dir="${tmpdir}/rename-allowed"
+current_case="setup rename wholly inside the allowlist"
+git init -b main "${allow_rename_dir}" >/dev/null
+git -C "${allow_rename_dir}" config user.name "FaceTheory Test"
+git -C "${allow_rename_dir}" config user.email "facetheory-test@example.com"
+printf '%s\n' seed > "${allow_rename_dir}/README.md"
+mkdir -p "${allow_rename_dir}/scripts"
+printf '%s\n' placeholder > "${allow_rename_dir}/scripts/read-version.sh"
+commit_file "${allow_rename_dir}" "chore: seed" README.md scripts/read-version.sh
+git -C "${allow_rename_dir}" branch base
+allow_rename_script="$(copy_script "${allow_rename_dir}")"
+git -C "${allow_rename_dir}" mv scripts/read-version.sh scripts/render-release-notes.sh
+commit_staged "${allow_rename_dir}" "chore(release): rename release helper"
+current_case="rename wholly inside the allowlist passes"
+allow_rename_text="$(cd "${allow_rename_dir}" && bash "${allow_rename_script}" base HEAD release)"
+assert_contains "${allow_rename_text}" 'release-readiness: OK (release sync only change)' "rename inside allowlist"
+
+delete_allowed_dir="${tmpdir}/deletion-allowed"
+current_case="setup deletion of an allowlisted path"
+git init -b main "${delete_allowed_dir}" >/dev/null
+git -C "${delete_allowed_dir}" config user.name "FaceTheory Test"
+git -C "${delete_allowed_dir}" config user.email "facetheory-test@example.com"
+printf '%s\n' seed > "${delete_allowed_dir}/README.md"
+mkdir -p "${delete_allowed_dir}/docs"
+printf '%s\n' '# docs' > "${delete_allowed_dir}/docs/README.md"
+commit_file "${delete_allowed_dir}" "chore: seed" README.md docs/README.md
+git -C "${delete_allowed_dir}" branch base
+delete_allowed_script="$(copy_script "${delete_allowed_dir}")"
+git -C "${delete_allowed_dir}" rm -q docs/README.md
+commit_staged "${delete_allowed_dir}" "chore(release): drop docs readme"
+current_case="deletion of an allowlisted path passes"
+delete_allowed_text="$(cd "${delete_allowed_dir}" && bash "${delete_allowed_script}" base HEAD release)"
+assert_contains "${delete_allowed_text}" 'release-readiness: OK (release sync only change)' "deletion of allowlisted path"
+
 trap - ERR
 echo "test-verify-release-readiness: PASS"
