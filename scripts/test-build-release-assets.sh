@@ -58,10 +58,16 @@ make_fixture() {
   printf 'committed deploy snapshot\n' > "${dir}/infra/apptheory-ssr-site/deploy/keep.txt"
   git -C "${dir}" init -q
   git -C "${dir}" add -A
-  # Throwaway fixture repo (not a FaceTheory commit): pin identity and skip
-  # signing so the test is hermetic regardless of the host git configuration.
-  git -C "${dir}" -c user.email=fixture@example.invalid -c user.name=fixture \
-    -c commit.gpgsign=false commit -q -m "fixture"
+  # Hermetic COMMIT-FREE fixture: write the index to a tree object and point the
+  # fixture HEAD straight at it. `git archive HEAD` accepts any tree-ish, so the
+  # real build script's tracked-source assembly is exercised without ever
+  # creating a commit object or touching git signing configuration.
+  local tree
+  tree="$(git -C "${dir}" write-tree)"
+  printf '%s\n' "${tree}" > "${dir}/.git/HEAD"
+  if git -C "${dir}" rev-parse --verify --quiet 'HEAD^{commit}' >/dev/null 2>&1; then
+    fail "fixture unexpectedly created a commit object"
+  fi
 }
 
 run_build() {
