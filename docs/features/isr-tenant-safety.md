@@ -70,7 +70,7 @@ If the cached HTML varies per tenant, choose one of:
   },
   ```
 
-  A custom `cacheKey` without an explicit `tenantKey` fails closed on any request that carries a tenant-boundary signal, and a trusted `tenantKey` that resolves to `null`, `undefined`, or a blank string on a tenant-scoped custom-key route fails closed rather than falling back to the implicit `default` tenant. The composed effective key embeds only a digest of the trusted tenant, so raw tenant values never appear in stored keys, and the composed custom-key representation stays distinct from the default key's raw-tenant representation.
+  A custom `cacheKey` without an explicit `tenantKey` fails closed on any request that carries a tenant-boundary signal, and a trusted `tenantKey` that resolves to `null`, `undefined`, or a blank string on a tenant-scoped custom-key route fails closed rather than falling back to the implicit `default` tenant. The framework-owned partition prefix of the composed key embeds only a digest of the trusted tenant, never the raw tenant value; the consumer-owned logical key is independent of that partition and may itself contain the raw tenant (the recommended `defaultIsrCacheKey` does). The composed custom-key representation therefore stays distinct from the default key's raw-tenant representation. That representation separation is not a global collision-freedom or confidentiality guarantee: consumer logical-key correctness remains the existing trust boundary.
 
 ## Cookie request variants
 

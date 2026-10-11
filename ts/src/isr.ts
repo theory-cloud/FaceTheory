@@ -1429,11 +1429,14 @@ const CUSTOM_CACHE_KEY_TENANT_PARTITION_PREFIX = 'isr-tenant:v1:';
 
 /**
  * Composes the framework-owned effective cache identity for a custom cache key.
- * The trusted tenant is folded in as a short digest so distinct tenants never
- * share a stored key even when their logical custom keys coincide, while the
- * logical key remains consumer-owned. The raw tenant is never embedded, which
- * keeps the composed custom-key representation distinct from the unchanged
- * default key's raw-tenant representation.
+ * The framework-owned partition prefix folds the trusted tenant in as a short
+ * digest so distinct tenants never share a stored key even when their logical
+ * custom keys coincide, while the logical key remains consumer-owned. The
+ * partition prefix never embeds the raw tenant, but the consumer-owned logical
+ * key may (the recommended `defaultIsrCacheKey` does), which keeps the composed
+ * custom-key representation distinct from the unchanged default key's raw-tenant
+ * representation. That representation separation is not a global collision-freedom
+ * or confidentiality guarantee.
  */
 function composeTenantPartitionedCacheKey(
   tenant: string,
