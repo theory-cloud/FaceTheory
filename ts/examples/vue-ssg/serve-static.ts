@@ -26,6 +26,7 @@ async function fileExists(filePath: string): Promise<boolean> {
 
 async function resolveStaticPage(urlPath: string): Promise<string | null> {
   const cleanPath = (urlPath.split('?')[0] ?? '/').replaceAll('\\', '/');
+  if (cleanPath.includes('..')) return null;
   const normalized = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
 
   const candidates = new Set<string>();
@@ -40,9 +41,10 @@ async function resolveStaticPage(urlPath: string): Promise<string | null> {
     candidates.add(`${normalized}/index.html`);
   }
 
+  const rootPrefix = staticRoot.endsWith(path.sep) ? staticRoot : `${staticRoot}${path.sep}`;
   for (const candidate of candidates) {
     const absolute = path.resolve(staticRoot, `.${candidate}`);
-    if (!absolute.startsWith(staticRoot)) continue;
+    if (!absolute.startsWith(rootPrefix)) continue;
     if (await fileExists(absolute)) return absolute;
   }
   return null;
