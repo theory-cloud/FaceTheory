@@ -88,11 +88,19 @@ isr: {
 
 Requests that differ only in non-listed cookies share the same cache entry; requests that differ in a listed cookie partition. Keep the list complete for every cookie that can affect the rendered HTML. The allowlist must be non-empty: omit `varyCookies` to keep the all-cookies fail-safe, and do not pass `varyCookies: []`.
 
+## Cache-control privacy (fail-closed)
+
+ISR responses fail closed at the cache-control boundary. A request carrying an auth-variant signal — any default auth-vary header or any request cookie — or any request on a deployment with an explicit custom `cacheKey` is emitted and stored with `cache-control: private, no-store`. An anonymous request on the default cache key keeps the shared `public` value. `varyCookies` does not exempt a cookie-bearing request from the guard.
+
+A custom `cacheKey` is an opaque identity the framework cannot attribute to a shared viewer, so it fails closed for every request, including anonymous ones; the previous public shared-cache hint is lost by design. Bespoke auth headers that are not part of the default auth-vary set require an explicit `cacheKey` to be protected. See [Blocking ISR → Cache-Control and request privacy](../modes/isr.md#cache-control-and-request-privacy-fail-closed).
+
 ## Migration
 
 A custom `cacheKey` without an explicit, trusted `tenantKey` no longer counts as an ISR tenant partition, and tenant-scoped custom-key cache identities are now composed with a tenant digest. Existing tenant-scoped custom-key entries therefore miss and repopulate after upgrade; there is no fallback to the old unpartitioned keys.
 
 The fail-closed behavior is a defensive default introduced in FaceTheory 3.x. Existing consumers that previously rendered tenant-invariant pages without filtering tenant-like headers may see new errors after upgrade — see [Migration Guide → Adopt ISR tenant fail-closed defaults](../migration-guide.md#migration-4-adopt-isr-tenant-fail-closed-defaults) for the upgrade path.
+
+Cache-control now fails closed alongside the key: authenticated requests (a default auth-vary header or any cookie) and every request on a deployment with an explicit custom `cacheKey` emit and store `cache-control: private, no-store` rather than a shared value. Response headers change for those requests only; anonymous default-key responses keep the previous `public` value.
 
 ## Related docs
 
