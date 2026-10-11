@@ -1,11 +1,40 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type { AddressInfo } from 'node:net';
+
 import { createFaceApp } from '../../src/app.js';
 import {
   createViteMiddlewareDevServer,
   type ViteMiddlewareDevServerLike,
 } from '../../src/dev.js';
+
+function fakeViteServer(): ViteMiddlewareDevServerLike {
+  return {
+    middlewares: (_req, _res, next) => {
+      next();
+    },
+    ssrLoadModule: async () => ({}),
+    close: async () => {},
+  };
+}
+
+function createDevServer() {
+  return createViteMiddlewareDevServer({
+    entry: 'src/entry-server.tsx',
+    createServer: async () => fakeViteServer(),
+    createApp: () =>
+      createFaceApp({
+        faces: [
+          {
+            route: '/',
+            mode: 'ssr',
+            render: () => ({ html: '<main>dev</main>' }),
+          },
+        ],
+      }),
+  });
+}
 
 async function fetchText(url: string): Promise<{ status: number; body: string }> {
   const response = await fetch(url);
@@ -154,4 +183,42 @@ test('vite dev server: sanitizes error responses without exposing stacks', async
   }
 
   assert.equal(fixedStacktrace, true);
+});
+
+test('vite dev server: binds loopback by default and reports the real address', async () => {
+  const devServer = await createDevServer();
+  const { address, url } = await devServer.listen({ port: 0 });
+  try {
+    const info = address as AddressInfo;
+    assert.equal(info.address, '127.0.0.1');
+    assert.equal(url, `http://127.0.0.1:${info.port}/`);
+
+    const response = await fetchText(url);
+    assert.equal(response.status, 200);
+  } finally {
+    await devServer.close();
+  }
+});
+
+test('vite dev server: an explicit host opt-in is honored and shown without masking', async () => {
+  const wildcard = await createDevServer();
+  const wildcardResult = await wildcard.listen({ port: 0, host: '0.0.0.0' });
+  try {
+    assert.equal((wildcardResult.address as AddressInfo).address, '0.0.0.0');
+    assert.match(wildcardResult.url, /^http:\/\/0\.0\.0\.0:\d+\/$/);
+  } finally {
+    await wildcard.close();
+  }
+
+  const ipv6 = await createDevServer();
+  const ipv6Result = await ipv6.listen({ port: 0, host: '::1' });
+  try {
+    assert.equal((ipv6Result.address as AddressInfo).address, '::1');
+    assert.match(ipv6Result.url, /^http:\/\/\[::1\]:\d+\/$/);
+
+    const response = await fetchText(ipv6Result.url);
+    assert.equal(response.status, 200);
+  } finally {
+    await ipv6.close();
+  }
 });

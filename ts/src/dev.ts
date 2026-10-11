@@ -207,17 +207,16 @@ function sendDevError(
   res.end(body);
 }
 
-function listenUrl(address: AddressInfo | string | null, host?: string): string {
+// Secure default: the public dev server binds loopback only. Callers must opt
+// in explicitly (for example `--host 0.0.0.0`) to expose other interfaces.
+const DEFAULT_DEV_SERVER_HOST = '127.0.0.1';
+
+function listenUrl(address: AddressInfo | string | null, host: string): string {
   if (typeof address === 'string') return address;
   if (!address) return '';
 
-  const rawHost = host ?? address.address;
-  const hostname =
-    rawHost === '' || rawHost === '::' || rawHost === '0.0.0.0'
-      ? 'localhost'
-      : rawHost.includes(':')
-        ? `[${rawHost}]`
-        : rawHost;
+  const boundHost = address.address || host;
+  const hostname = boundHost.includes(':') ? `[${boundHost}]` : boundHost;
 
   return `http://${hostname}:${address.port}/`;
 }
@@ -284,7 +283,7 @@ export async function createViteMiddlewareDevServer<TModule = unknown>(
       listenOptions: ViteMiddlewareDevListenOptions = {},
     ): Promise<ViteMiddlewareDevListenResult> {
       const port = listenOptions.port ?? 5173;
-      const host = listenOptions.host;
+      const host = listenOptions.host?.trim() ? listenOptions.host : DEFAULT_DEV_SERVER_HOST;
       await new Promise<void>((resolve, reject) => {
         const onError = (err: Error) => {
           server.off('listening', onListening);
@@ -298,11 +297,7 @@ export async function createViteMiddlewareDevServer<TModule = unknown>(
 
         server.once('error', onError);
         server.once('listening', onListening);
-        if (host !== undefined) {
-          server.listen(port, host);
-        } else {
-          server.listen(port);
-        }
+        server.listen(port, host);
       });
 
       const address = server.address();

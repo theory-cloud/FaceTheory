@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +21,8 @@ interface OriginTemplate {
   readonly Id?: string;
   readonly CustomOriginConfig?: unknown;
   readonly S3OriginConfig?: unknown;
+  readonly OriginPath?: string;
+  readonly DomainName?: { readonly 'Fn::GetAtt'?: readonly string[] };
 }
 
 interface OriginGroupTemplate {
@@ -108,6 +110,36 @@ function assertOldInlineFunctionsDeleted(template: Record<string, unknown>): voi
   );
 }
 
+function findBucketLogicalId(template: Record<string, unknown>, logicalIdPrefix: string): string {
+  const resources = template.Resources as Record<string, { Type?: string }> | undefined;
+  assert.ok(resources, 'template should include resources');
+
+  const entry = Object.entries(resources).find(
+    ([logicalId, resource]) =>
+      logicalId.startsWith(logicalIdPrefix) && resource.Type === 'AWS::S3::Bucket',
+  );
+  assert.ok(entry, `missing S3 bucket with logical id prefix ${logicalIdPrefix}`);
+  return entry[0];
+}
+
+function findBucketDeployment(
+  template: Record<string, unknown>,
+  logicalIdPrefix: string,
+): Record<string, unknown> {
+  const resources = template.Resources as
+    | Record<string, { Type?: string; Properties?: Record<string, unknown> }>
+    | undefined;
+  assert.ok(resources, 'template should include resources');
+
+  const entry = Object.entries(resources).find(
+    ([logicalId, resource]) =>
+      logicalId.startsWith(logicalIdPrefix) &&
+      resource.Type === 'Custom::CDKBucketDeployment',
+  );
+  assert.ok(entry, `missing BucketDeployment resource with logical id prefix ${logicalIdPrefix}`);
+  return entry[1].Properties ?? {};
+}
+
 function buildFaceTheoryDist(): void {
   const repoRoot = path.resolve(__dirname, '../../../..');
   execFileSync('npm', ['--prefix', path.resolve(repoRoot, 'ts'), 'run', 'build'], {
@@ -125,6 +157,65 @@ test('H3: SSG+ISR stack synth is snapshotted', async () => {
 
   const template = Template.fromStack(stack).toJSON();
   assertOldInlineFunctionsDeleted(template);
+
+  // The pre-rendered SSG HTML must land where the primary CloudFront HTML origin
+  // points (the ISR html store bucket + prefix), otherwise S3-first SSG misses
+  // fall through to the Lambda failover. The shared prefix must not be pruned.
+  const isrBucketLogicalId = findBucketLogicalId(template, 'IsrBucket');
+  const assetsBucketLogicalId = findBucketLogicalId(template, 'AssetsBucket');
+  const ssgDeployment = findBucketDeployment(template, 'AssetsDeploymentSsgCustomResource');
+  assert.deepEqual(
+    ssgDeployment.DestinationBucketName,
+    { Ref: isrBucketLogicalId },
+    'SSG HTML must deploy into the ISR html store bucket that backs the primary S3 origin',
+  );
+  assert.equal(
+    ssgDeployment.DestinationBucketKeyPrefix,
+    'isr',
+    'SSG HTML must deploy under the ISR html store prefix so the origin path resolves it',
+  );
+  assert.equal(
+    ssgDeployment.Prune,
+    false,
+    'the SSG deployment must not prune the shared ISR prefix, preserving runtime ISR objects',
+  );
+
+  // Hydration sidecars are served from the `/_facetheory/data/*` origin, which is
+  // the assets bucket, not the ISR html store. They must deploy there; folding them
+  // into the SSG HTML deployment strands them at the wrong origin on a fresh deploy.
+  const ssgSidecarDeployment = findBucketDeployment(
+    template,
+    'AssetsDeploymentSsgSidecarsCustomResource',
+  );
+  assert.deepEqual(
+    ssgSidecarDeployment.DestinationBucketName,
+    { Ref: assetsBucketLogicalId },
+    'SSG hydration sidecars must deploy into the assets bucket that backs the _facetheory/data origin',
+  );
+  assert.equal(
+    ssgSidecarDeployment.DestinationBucketKeyPrefix,
+    '_facetheory/data',
+    'SSG sidecars must deploy under the exact _facetheory/data prefix the edge routes to the assets origin',
+  );
+  assert.equal(
+    ssgSidecarDeployment.Prune,
+    false,
+    'the sidecar deployment shares the assets bucket with other deployments and must not prune',
+  );
+
+  // The sidecar deployment must be fed by the real hydration source files, not a
+  // detached fixture: the actual keys the edge requests must exist on disk at the
+  // source path the stack stages from.
+  const sidecarSourceDir = path.resolve(__dirname, '../../deploy/ssg/_facetheory/data');
+  const sidecarFiles = (await readdir(sidecarSourceDir)).sort();
+  assert.deepEqual(
+    sidecarFiles,
+    ['index.json', 'ssg-demo.json'],
+    'the reference SSG hydration source must contain the actual sidecar files the edge requests',
+  );
+  for (const name of sidecarFiles) {
+    JSON.parse(await readFile(path.join(sidecarSourceDir, name), 'utf8'));
+  }
 
   const distribution = findDistribution(template);
   const defaultBehavior = distribution.DefaultCacheBehavior;
@@ -150,12 +241,36 @@ test('H3: SSG+ISR stack synth is snapshotted', async () => {
     'SSG_ISR origin group must keep Lambda Function URL as the failover origin',
   );
 
+  const primaryS3Origin = originGroupOrigins.find((origin) => origin?.S3OriginConfig);
+  assert.ok(primaryS3Origin, 'SSG_ISR origin group must keep an S3 member');
+  assert.equal(
+    primaryS3Origin.OriginPath,
+    '/isr',
+    'primary S3 HTML origin must keep the ISR html store origin path that SSG HTML deploys behind',
+  );
+  assert.equal(
+    primaryS3Origin.DomainName?.['Fn::GetAtt']?.[0],
+    isrBucketLogicalId,
+    'the primary SSG HTML origin must resolve to the ISR html store bucket the HTML deploys into',
+  );
+
   const viteManifestOrigin = findOrigin(distribution, findBehavior(distribution, '.vite/*'));
   const ssgSidecarOrigin = findOrigin(distribution, findBehavior(distribution, '_facetheory/data/*'));
+  const ssgSidecarDataOrigin = findOrigin(distribution, findBehavior(distribution, '_facetheory/data'));
   const ssrSidecarOrigin = findOrigin(distribution, findBehavior(distribution, '_facetheory/ssr-data/*'));
 
   assert.ok(viteManifestOrigin.S3OriginConfig, 'Vite manifest paths must stay on the S3/static origin');
   assert.ok(ssgSidecarOrigin.S3OriginConfig, 'SSG sidecars must stay on the S3/static origin');
+  assert.equal(
+    ssgSidecarOrigin.DomainName?.['Fn::GetAtt']?.[0],
+    assetsBucketLogicalId,
+    'the _facetheory/data/* origin must resolve to the same assets bucket the sidecars deploy into',
+  );
+  assert.equal(
+    ssgSidecarDataOrigin.DomainName?.['Fn::GetAtt']?.[0],
+    assetsBucketLogicalId,
+    'the exact _facetheory/data origin must resolve to the same assets bucket the sidecars deploy into',
+  );
   assert.ok(
     ssrSidecarOrigin.CustomOriginConfig,
     'SSR hydration sidecars must route directly to the Lambda Function URL origin',
