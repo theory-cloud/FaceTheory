@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
 import {
+  blockingIsrCacheControl,
   type CommitIsrGenerationInput,
   createIsrRuntime,
   defaultIsrCacheKey,
@@ -20,6 +21,7 @@ import {
   type TryAcquireIsrLeaseInput,
   type TryAcquireIsrLeaseResult,
 } from '../../src/isr.js';
+import type { FaceContext, FaceModule, FaceResponse } from '../../src/types.js';
 
 function decodeBody(body: Uint8Array): string {
   return new TextDecoder().decode(body);
@@ -2328,4 +2330,478 @@ test('isr: cache metrics label parameterized routes by template, not request pat
       .map((metric) => metric.tags?.route_pattern),
   );
   assert.deepEqual([...requestLabels].sort(), ['/isr-posts/{slug}', 'unmatched']);
+});
+
+// --- FACE-063E M9: ISR authenticated cache-control fail-closed guard --------------
+//
+// Root criterion: authenticated requests fail closed with `private, no-store`
+// unless an explicit safe variation policy is configured. The guard also covers
+// any deployment that configures an explicit, opaque custom `cacheKey`, because
+// the framework cannot attribute that identity to a shared viewer. These tests
+// drive the real `createIsrRuntime` (through `createFaceApp`, plus one direct
+// runtime probe) across all six emission branches and assert both the emitted
+// response header and the committed `HtmlStore` cache-control value.
+
+const ISR_MATRIX_REVALIDATE_SECONDS = 60;
+const ISR_MATRIX_PUBLIC_CACHE_CONTROL = blockingIsrCacheControl(
+  ISR_MATRIX_REVALIDATE_SECONDS,
+);
+const ISR_MATRIX_PRIVATE_CACHE_CONTROL = 'private, no-store';
+
+type IsrMatrixBranch =
+  | 'miss'
+  | 'hit'
+  | 'wait-hit'
+  | 'stale'
+  | 'stale-after-error'
+  | 'stale-metadata-error';
+
+const ISR_MATRIX_BRANCHES: readonly IsrMatrixBranch[] = [
+  'miss',
+  'hit',
+  'wait-hit',
+  'stale',
+  'stale-after-error',
+  'stale-metadata-error',
+];
+
+const ISR_MATRIX_EXPECTED_STATE: Record<IsrMatrixBranch, string> = {
+  miss: 'miss',
+  hit: 'hit',
+  'wait-hit': 'wait-hit',
+  stale: 'stale',
+  'stale-after-error': 'stale',
+  'stale-metadata-error': 'stale-metadata-error',
+};
+
+const ISR_MATRIX_AUTH_HEADERS = { authorization: ['Bearer SECRET_TOKEN_A'] };
+const ISR_MATRIX_COOKIE_HEADERS = {
+  cookie: ['session=COOKIE_SECRET_A; theme=light'],
+};
+
+class RecordingHtmlStore extends InMemoryHtmlStore {
+  readonly writes: HtmlStoreWriteInput[] = [];
+
+  override async write(
+    input: HtmlStoreWriteInput,
+  ): Promise<HtmlStoreWriteResult> {
+    this.writes.push({
+      ...input,
+      ...(input.metadata ? { metadata: { ...input.metadata } } : {}),
+    });
+    return await super.write(input);
+  }
+}
+
+class ToggleContentionMetaStore extends InMemoryIsrMetaStore {
+  contend = false;
+
+  override async tryAcquireLease(
+    input: TryAcquireIsrLeaseInput,
+  ): Promise<TryAcquireIsrLeaseResult> {
+    if (!this.contend) return await super.tryAcquireLease(input);
+    const record = await this.get(input.cacheKey);
+    if (!record) throw new Error('contention store requires a warm record');
+    return { acquired: false, record, leaseToken: null };
+  }
+}
+
+class FailingGetMetaStore extends InMemoryIsrMetaStore {
+  failGet = false;
+
+  override async get(cacheKey: string): Promise<IsrMetaRecord | null> {
+    if (this.failGet) throw new Error('metadata store unavailable');
+    return await super.get(cacheKey);
+  }
+}
+
+interface IsrMatrixProbe {
+  headers?: Record<string, string[]>;
+}
+
+interface IsrMatrixResult {
+  response: FaceResponse;
+  writes: HtmlStoreWriteInput[];
+}
+
+async function driveIsrMatrixBranch(
+  branch: IsrMatrixBranch,
+  probe: IsrMatrixProbe,
+  isrOptions: FaceIsrOptions = {},
+): Promise<IsrMatrixResult> {
+  const htmlStore = new RecordingHtmlStore();
+  const plainMetaStore = new InMemoryIsrMetaStore();
+  const contentionMetaStore = new ToggleContentionMetaStore();
+  const failingGetMetaStore = new FailingGetMetaStore();
+  const metaStore: InMemoryIsrMetaStore =
+    branch === 'stale'
+      ? contentionMetaStore
+      : branch === 'stale-metadata-error'
+        ? failingGetMetaStore
+        : plainMetaStore;
+
+  let nowMs = 1_000;
+  let renderMode: 'ok' | 'throw' = 'ok';
+  let renderDelayMs = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/matrix',
+        mode: 'isr',
+        revalidateSeconds: ISR_MATRIX_REVALIDATE_SECONDS,
+        render: async () => {
+          if (renderDelayMs > 0) await delay(renderDelayMs);
+          if (renderMode === 'throw') {
+            throw new Error('matrix regeneration failure');
+          }
+          return { html: '<main>matrix</main>' };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+      ...(branch === 'stale'
+        ? { lockContentionPolicy: 'serve-stale' as const }
+        : {}),
+      ...isrOptions,
+    },
+  });
+
+  const request = (): Promise<FaceResponse> =>
+    app.handle({
+      method: 'GET',
+      path: '/matrix',
+      ...(probe.headers ? { headers: probe.headers } : {}),
+    });
+
+  let response: FaceResponse;
+  switch (branch) {
+    case 'miss':
+      response = await request();
+      break;
+    case 'hit': {
+      await request();
+      response = await request();
+      break;
+    }
+    case 'wait-hit': {
+      renderDelayMs = 40;
+      const first = request();
+      await delay(5);
+      const second = request();
+      const [, secondResponse] = await Promise.all([first, second]);
+      response = secondResponse;
+      break;
+    }
+    case 'stale': {
+      await request();
+      nowMs += (ISR_MATRIX_REVALIDATE_SECONDS + 1) * 1_000;
+      contentionMetaStore.contend = true;
+      response = await request();
+      break;
+    }
+    case 'stale-after-error': {
+      await request();
+      nowMs += (ISR_MATRIX_REVALIDATE_SECONDS + 1) * 1_000;
+      renderMode = 'throw';
+      response = await request();
+      break;
+    }
+    case 'stale-metadata-error': {
+      await request();
+      failingGetMetaStore.failGet = true;
+      response = await request();
+      break;
+    }
+    default:
+      throw new Error(`unknown ISR matrix branch: ${String(branch)}`);
+  }
+
+  return { response, writes: htmlStore.writes };
+}
+
+function isrCacheControl(response: FaceResponse): string | undefined {
+  return response.headers['cache-control']?.[0];
+}
+
+function isrState(response: FaceResponse): string | undefined {
+  return response.headers['x-facetheory-isr']?.[0];
+}
+
+function assertHtmlWritesCacheControl(
+  writes: readonly HtmlStoreWriteInput[],
+  expected: string,
+): void {
+  const htmlWrites = writes.filter(
+    (write) => write.contentType !== 'application/json; charset=utf-8',
+  );
+  assert.ok(htmlWrites.length > 0, 'expected at least one HTML store write');
+  for (const write of htmlWrites) {
+    assert.equal(write.cacheControl, expected);
+  }
+}
+
+for (const branch of ISR_MATRIX_BRANCHES) {
+  test(`isr: ordinary anonymous default-key request stays public on the ${branch} branch`, async () => {
+    const { response, writes } = await driveIsrMatrixBranch(branch, {});
+    assert.equal(isrState(response), ISR_MATRIX_EXPECTED_STATE[branch]);
+    assert.equal(isrCacheControl(response), ISR_MATRIX_PUBLIC_CACHE_CONTROL);
+    assertHtmlWritesCacheControl(writes, ISR_MATRIX_PUBLIC_CACHE_CONTROL);
+  });
+}
+
+for (const branch of ISR_MATRIX_BRANCHES) {
+  test(`isr: authorization request fails closed on the ${branch} branch`, async () => {
+    const { response, writes } = await driveIsrMatrixBranch(branch, {
+      headers: ISR_MATRIX_AUTH_HEADERS,
+    });
+    assert.equal(isrState(response), ISR_MATRIX_EXPECTED_STATE[branch]);
+    assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+    assertHtmlWritesCacheControl(writes, ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  });
+}
+
+for (const branch of ISR_MATRIX_BRANCHES) {
+  test(`isr: cookie-bearing request fails closed on the ${branch} branch`, async () => {
+    const { response, writes } = await driveIsrMatrixBranch(branch, {
+      headers: ISR_MATRIX_COOKIE_HEADERS,
+    });
+    assert.equal(isrState(response), ISR_MATRIX_EXPECTED_STATE[branch]);
+    assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+    assertHtmlWritesCacheControl(writes, ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  });
+}
+
+test('isr: every default auth-vary header fails closed on the miss branch', async () => {
+  for (const headerName of [
+    'authorization',
+    'proxy-authorization',
+    'x-api-key',
+    'x-amz-security-token',
+  ]) {
+    const { response } = await driveIsrMatrixBranch('miss', {
+      headers: { [headerName]: ['SECRET_VALUE'] },
+    });
+    assert.equal(
+      isrCacheControl(response),
+      ISR_MATRIX_PRIVATE_CACHE_CONTROL,
+      `expected ${headerName} to fail closed`,
+    );
+  }
+});
+
+test('isr: varyCookies keeps the key shared but still fails closed for an unlisted cookie', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renders = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/matrix',
+        mode: 'isr',
+        revalidateSeconds: ISR_MATRIX_REVALIDATE_SECONDS,
+        render: () => {
+          renders += 1;
+          return { html: `<main>matrix-${renders}</main>` };
+        },
+      },
+    ],
+    isr: { htmlStore, metaStore, varyCookies: ['pref'] },
+  });
+
+  const first = await app.handle({
+    method: 'GET',
+    path: '/matrix',
+    headers: { cookie: ['session=COOKIE_SECRET_A'] },
+  });
+  const second = await app.handle({
+    method: 'GET',
+    path: '/matrix',
+    headers: { cookie: ['session=COOKIE_SECRET_A'] },
+  });
+
+  assert.equal(metaStore.debugSnapshot().length, 1);
+  assert.equal(renders, 1);
+  assert.equal(isrState(second), 'hit');
+  assert.equal(isrCacheControl(first), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  assert.equal(isrCacheControl(second), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+});
+
+test('isr: explicit custom cacheKey fails closed for anonymous and bespoke-auth requests', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/matrix',
+        mode: 'isr',
+        revalidateSeconds: ISR_MATRIX_REVALIDATE_SECONDS,
+        render: () => ({ html: '<main>matrix</main>' }),
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      cacheKey: ({ headers }) =>
+        `custom::${headers?.['x-session-token']?.[0] ?? 'anonymous'}`,
+    },
+  });
+
+  const anonymous = await app.handle({ method: 'GET', path: '/matrix' });
+  const bespoke = await app.handle({
+    method: 'GET',
+    path: '/matrix',
+    headers: { 'x-session-token': ['SESSION_SECRET_VALUE'] },
+  });
+
+  assert.equal(isrCacheControl(anonymous), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  assert.equal(isrCacheControl(bespoke), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  assertHtmlWritesCacheControl(htmlStore.writes, ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+});
+
+test('isr: trusted tenantKey with a custom cacheKey stays guarded under the composed key', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/matrix',
+        mode: 'isr',
+        revalidateSeconds: ISR_MATRIX_REVALIDATE_SECONDS,
+        render: () => ({ html: '<main>matrix</main>' }),
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+      cacheKey: ({ routePattern }) => `custom::${routePattern}`,
+    },
+  });
+
+  const response = await app.handle({
+    method: 'GET',
+    path: '/matrix',
+    headers: {
+      'x-tenant-id': ['tenant-a'],
+      ...ISR_MATRIX_AUTH_HEADERS,
+    },
+  });
+
+  assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  const keys = metaStore.debugSnapshot().map((record) => record.cacheKey);
+  assert.equal(keys.length, 1);
+  assert.ok(keys[0]?.startsWith('isr-tenant:v1:'));
+});
+
+test('isr: explicit cacheControl callback is honored verbatim for anonymous default-key requests', async () => {
+  const { response, writes } = await driveIsrMatrixBranch('miss', {}, {
+    cacheControl: () => 'public, max-age=300',
+  });
+
+  assert.equal(isrCacheControl(response), 'public, max-age=300');
+  // The origin-store write keeps the unchanged framework default; the explicit
+  // callback only shapes the emitted response for unguarded requests.
+  assertHtmlWritesCacheControl(writes, ISR_MATRIX_PUBLIC_CACHE_CONTROL);
+});
+
+test('isr: explicit cacheControl callback cannot override the fail-closed guard', async () => {
+  const { response, writes } = await driveIsrMatrixBranch(
+    'miss',
+    { headers: ISR_MATRIX_AUTH_HEADERS },
+    { cacheControl: () => 'public, max-age=300' },
+  );
+
+  assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  assertHtmlWritesCacheControl(writes, ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+});
+
+test('isr: explicit cacheControl callback is clamped under a custom key even for anonymous requests', async () => {
+  const { response } = await driveIsrMatrixBranch('miss', {}, {
+    cacheKey: ({ routePattern }) => `custom::${routePattern}`,
+    cacheControl: () => 'public, max-age=300',
+  });
+
+  assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+});
+
+test('isr: a private-returning cacheControl callback is preserved verbatim when unguarded', async () => {
+  const { response } = await driveIsrMatrixBranch('miss', {}, {
+    cacheControl: () => 'private, max-age=5',
+  });
+
+  assert.equal(isrCacheControl(response), 'private, max-age=5');
+});
+
+test('isr: createIsrRuntime fails closed for auth-variant requests without app wiring', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  const runtime = createIsrRuntime({ htmlStore, metaStore, now: () => 1_000 });
+
+  const face: FaceModule = {
+    route: '/direct',
+    mode: 'isr',
+    revalidateSeconds: ISR_MATRIX_REVALIDATE_SECONDS,
+    render: () => ({ html: '<main>direct</main>' }),
+  };
+  const renderFresh = async (): Promise<FaceResponse> => ({
+    status: 200,
+    headers: {},
+    cookies: [],
+    body: encodeBody('<main>direct</main>'),
+    isBase64: false,
+  });
+  const contextFor = (
+    headers: Record<string, string[]>,
+    cookies: Record<string, string>,
+  ): FaceContext => ({
+    request: {
+      method: 'GET',
+      path: '/direct',
+      query: {},
+      headers,
+      cookies,
+      body: new Uint8Array(),
+      isBase64: false,
+      cspNonce: null,
+    },
+    params: {},
+    proxy: null,
+  });
+
+  const anonymous = await runtime.handleFace({
+    face,
+    ctx: contextFor({}, {}),
+    routePattern: '/direct',
+    renderFresh,
+  });
+  const authenticated = await runtime.handleFace({
+    face,
+    ctx: contextFor({ authorization: ['Bearer SECRET_TOKEN_D'] }, {}),
+    routePattern: '/direct',
+    renderFresh,
+  });
+
+  assert.equal(isrCacheControl(anonymous), ISR_MATRIX_PUBLIC_CACHE_CONTROL);
+  assert.equal(isrCacheControl(authenticated), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+});
+
+test('isr: guarded responses and stored metadata never carry the raw secret', async () => {
+  const secret = 'RAW_SECRET_VALUE_063E';
+  const { response, writes } = await driveIsrMatrixBranch('miss', {
+    headers: {
+      authorization: [`Bearer ${secret}`],
+      cookie: [`session=${secret}`],
+    },
+  });
+
+  const serialized = `${JSON.stringify(response.headers)}\n${JSON.stringify(writes)}`;
+  assert.equal(serialized.includes(secret), false);
+  assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
 });
