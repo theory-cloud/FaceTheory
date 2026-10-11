@@ -29,12 +29,19 @@ function contentTypeForPath(filePath: string): string {
   }
 }
 
-async function readStaticFile(root: string, urlPath: string): Promise<{ body: Uint8Array; type: string } | null> {
-  const decoded = decodeURIComponent(urlPath);
-  if (!decoded.startsWith('/')) return null;
-  if (decoded.includes('\0')) return null;
+function decodeUrlPath(urlPath: string): string | null {
+  try {
+    return decodeURIComponent(urlPath);
+  } catch {
+    return null;
+  }
+}
 
-  const safePath = decoded.replaceAll('\\', '/');
+async function readStaticFile(root: string, decodedPath: string): Promise<{ body: Uint8Array; type: string } | null> {
+  if (!decodedPath.startsWith('/')) return null;
+  if (decodedPath.includes('\0')) return null;
+
+  const safePath = decodedPath.replaceAll('\\', '/');
   if (safePath.includes('..')) return null;
 
   const filePath = path.resolve(root, `.${safePath}`);
@@ -61,40 +68,55 @@ async function main() {
   const app = serverMod.createViteVueSSRExampleApp(manifest);
 
   const server = http.createServer(async (req, res) => {
-    if (!req.url) {
-      res.writeHead(400);
-      res.end('Bad Request');
-      return;
-    }
-
-    const clientRoot = path.resolve('examples/vite-ssr-vue/dist/client');
-    if (req.url.startsWith('/assets/') || req.url.startsWith('/.vite/')) {
-      const staticFile = await readStaticFile(clientRoot, req.url);
-      if (!staticFile) {
-        res.writeHead(404);
-        res.end('Not Found');
+    try {
+      if (!req.url) {
+        res.writeHead(400);
+        res.end('Bad Request');
         return;
       }
-      res.writeHead(200, { 'content-type': staticFile.type });
-      res.end(staticFile.body);
-      return;
-    }
 
-    const resp = await app.handle({ method: 'GET', path: req.url });
-    res.writeHead(
-      resp.status,
-      Object.fromEntries(Object.entries(resp.headers).map(([k, v]) => [k, v.join(', ')])),
-    );
+      const clientRoot = path.resolve('examples/vite-ssr-vue/dist/client');
+      if (req.url.startsWith('/assets/') || req.url.startsWith('/.vite/')) {
+        const decodedPath = decodeUrlPath(req.url);
+        if (decodedPath === null) {
+          res.writeHead(400);
+          res.end('Bad Request');
+          return;
+        }
+        const staticFile = await readStaticFile(clientRoot, decodedPath);
+        if (!staticFile) {
+          res.writeHead(404);
+          res.end('Not Found');
+          return;
+        }
+        res.writeHead(200, { 'content-type': staticFile.type });
+        res.end(staticFile.body);
+        return;
+      }
 
-    if (resp.body instanceof Uint8Array) {
-      res.end(resp.body);
-      return;
-    }
+      const resp = await app.handle({ method: 'GET', path: req.url });
+      res.writeHead(
+        resp.status,
+        Object.fromEntries(Object.entries(resp.headers).map(([k, v]) => [k, v.join(', ')])),
+      );
 
-    for await (const chunk of resp.body) {
-      res.write(chunk);
+      if (resp.body instanceof Uint8Array) {
+        res.end(resp.body);
+        return;
+      }
+
+      for await (const chunk of resp.body) {
+        res.write(chunk);
+      }
+      res.end();
+    } catch {
+      if (res.headersSent) {
+        res.end();
+        return;
+      }
+      res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('Internal Server Error');
     }
-    res.end();
   });
 
   const port = Number(process.env.PORT ?? 4175);
