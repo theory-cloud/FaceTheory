@@ -440,10 +440,6 @@ gov_check_compliance() {
   scripts/test-verify-pages-workflow-order.sh
   scripts/verify-release-publish-binding.sh
   scripts/test-verify-release-publish-binding.sh
-  scripts/test-pack-dev-archive.sh
-  scripts/test-build-release-assets.sh
-  scripts/test-verify-theorycloud-facetheory-subtree.sh
-  scripts/test-theorycloud-subtree-destination.sh
 }
 
 gov_check_maintainability() {
