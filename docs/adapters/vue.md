@@ -47,7 +47,7 @@ export const handler = createLambdaUrlStreamingHandler({ app });
 
 ## Streaming SSR
 
-Use `createVueStreamFace` (or `renderVueStream` for lower-level adapter calls) when a Vue Face should return a streamed body. The Vue adapter uses `@vue/server-renderer`'s streaming renderer and returns the same `AsyncIterable<Uint8Array>` body contract as React streaming. FaceTheory still owns the document wrapper: `<head>` and structured style tags are emitted before the first body chunk, and mid-stream body errors are converted to FaceTheory's safe stream-error marker before the document closes.
+Use `createVueStreamFace` (or `renderVueStream` for lower-level adapter calls) when a Vue Face should return a streamed body. The Vue adapter uses `@vue/server-renderer`'s streaming renderer and returns the same `AsyncIterable<Uint8Array>` body contract as React streaming. FaceTheory still owns the document wrapper: `<head>` and structured style tags are emitted before the first body chunk, and mid-stream body errors are converted to FaceTheory's safe stream-error marker before the document closes. Because Vue's server renderer pushes output without a pause hook, the adapter coalesces pushed output into chunks and bounds what it holds for a slow or not-yet-reading consumer (including integrations that wait for the whole render before emitting `<head>`) to 5 MiB; exceeding the bound fails the render closed and stops further production, and a consumer that stops iterating cancels the stream and drops queued output.
 
 ```typescript
 import { createFaceApp } from "@theory-cloud/facetheory";
