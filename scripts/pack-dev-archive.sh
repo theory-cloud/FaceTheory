@@ -18,7 +18,7 @@
 #   <output-dir>/theory-cloud-facetheory-<version>-dev-<short-sha>.tgz.sha256
 #
 # Defaults:
-#   --output-dir defaults to /tmp/theorycloud-facetheory-dev-archives/
+#   --output-dir defaults to a private per-run temporary directory (mode 0700)
 #
 # Usage:
 #   scripts/pack-dev-archive.sh [--output-dir <path>] [--skip-build]
@@ -28,8 +28,57 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 REPO_ROOT="$(pwd)"
-OUTPUT_DIR="/tmp/theorycloud-facetheory-dev-archives"
+OUTPUT_DIR=""
 SKIP_BUILD=0
+
+fail() {
+  echo "pack-dev-archive: FAIL ($*)" >&2
+  exit 1
+}
+
+file_owner() {
+  local owner
+  if owner="$(stat -c '%u' "$1" 2>/dev/null)"; then
+    printf '%s\n' "${owner}"
+  else
+    stat -f '%u' "$1"
+  fi
+}
+
+file_mode() {
+  local mode
+  if mode="$(stat -c '%a' "$1" 2>/dev/null)"; then
+    printf '%s\n' "${mode}"
+  else
+    stat -f '%Lp' "$1"
+  fi
+}
+
+# Fail closed unless an existing output directory is a real directory owned by
+# the current user with no group/other write bit. A precreated symlink, a
+# foreign owner, or a shared-writable directory must be rejected before any
+# archive or checksum byte is written.
+validate_output_dir() {
+  local dir="$1"
+  if [[ -L "${dir}" ]]; then
+    fail "output directory is a symlink: ${dir}"
+  fi
+  if [[ ! -e "${dir}" ]]; then
+    return 0
+  fi
+  if [[ ! -d "${dir}" ]]; then
+    fail "output path exists and is not a directory: ${dir}"
+  fi
+  local owner mode
+  owner="$(file_owner "${dir}")"
+  mode="$(file_mode "${dir}")"
+  if [[ "${owner}" != "$(id -u)" ]]; then
+    fail "output directory is not owned by the current user: ${dir} (uid ${owner})"
+  fi
+  if (( 8#${mode} & 8#022 )); then
+    fail "output directory is group/world writable: ${dir} (mode ${mode})"
+  fi
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -56,20 +105,21 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -z "${OUTPUT_DIR}" ]]; then
+  OUTPUT_DIR="$(mktemp -d -t facetheory-dev-archives-XXXXXX)"
+fi
+
 if [[ ! -d "ts" ]]; then
-  echo "pack-dev-archive: FAIL (expected ts/ directory in repo root)" >&2
-  exit 1
+  fail "expected ts/ directory in repo root"
 fi
 
 if [[ ! -f "ts/package.json" ]]; then
-  echo "pack-dev-archive: FAIL (missing ts/package.json)" >&2
-  exit 1
+  fail "missing ts/package.json"
 fi
 
 PKG_VERSION="$(node -e "console.log(require('./ts/package.json').version)")"
 if [[ -z "${PKG_VERSION}" ]]; then
-  echo "pack-dev-archive: FAIL (could not read ts/package.json version)" >&2
-  exit 1
+  fail "could not read ts/package.json version"
 fi
 
 if command -v git >/dev/null 2>&1 && [[ -d ".git" ]]; then
@@ -82,10 +132,18 @@ else
 fi
 
 ARCHIVE_BASENAME="theory-cloud-facetheory-${PKG_VERSION}-dev-${SHORT_SHA}.tgz"
+
+validate_output_dir "${OUTPUT_DIR}"
+mkdir -m 700 -p "${OUTPUT_DIR}"
+validate_output_dir "${OUTPUT_DIR}"
+OUTPUT_DIR="$(cd "${OUTPUT_DIR}" && pwd)"
+
 ARCHIVE_PATH="${OUTPUT_DIR}/${ARCHIVE_BASENAME}"
 SHA_PATH="${ARCHIVE_PATH}.sha256"
 
-mkdir -p "${OUTPUT_DIR}"
+if [[ -L "${ARCHIVE_PATH}" || -L "${SHA_PATH}" ]]; then
+  fail "refusing to write through a symlinked archive or checksum path in ${OUTPUT_DIR}"
+fi
 
 if [[ "${SKIP_BUILD}" -eq 0 ]]; then
   echo "pack-dev-archive: running ts build"
@@ -102,18 +160,25 @@ echo "pack-dev-archive: running npm pack into ${TMP_PACK_DIR}"
 
 PACK_OUTPUT="${TMP_PACK_DIR}/theory-cloud-facetheory-${PKG_VERSION}.tgz"
 if [[ ! -f "${PACK_OUTPUT}" ]]; then
-  echo "pack-dev-archive: FAIL (npm pack did not produce ${PACK_OUTPUT})" >&2
-  ls -la "${TMP_PACK_DIR}" >&2 || true
-  exit 1
+  fail "npm pack did not produce ${PACK_OUTPUT}"
 fi
 
 mv -f "${PACK_OUTPUT}" "${ARCHIVE_PATH}"
 
-# Compute sha256sum next to the archive.
+# Write the sha256 sidecar through a fresh private temp file and rename it into
+# place, so a symlink precreated at the checksum path cannot redirect the write.
 if command -v sha256sum >/dev/null 2>&1; then
-  ( cd "${OUTPUT_DIR}" && sha256sum "${ARCHIVE_BASENAME}" > "${ARCHIVE_BASENAME}.sha256" )
+  SHA_TOOL=(sha256sum)
 elif command -v shasum >/dev/null 2>&1; then
-  ( cd "${OUTPUT_DIR}" && shasum -a 256 "${ARCHIVE_BASENAME}" > "${ARCHIVE_BASENAME}.sha256" )
+  SHA_TOOL=(shasum -a 256)
+else
+  SHA_TOOL=()
+fi
+
+if [[ ${#SHA_TOOL[@]} -gt 0 ]]; then
+  CHECKSUM_TMP="$(mktemp "${OUTPUT_DIR}/.${ARCHIVE_BASENAME}.sha256.XXXXXX")"
+  ( cd "${OUTPUT_DIR}" && "${SHA_TOOL[@]}" "${ARCHIVE_BASENAME}" > "${CHECKSUM_TMP}" )
+  mv -f "${CHECKSUM_TMP}" "${SHA_PATH}"
 else
   echo "pack-dev-archive: WARN (no sha256sum or shasum available; skipping checksum)" >&2
 fi
