@@ -2,7 +2,7 @@
 title: ISR tenant safety
 ---
 
-Blocking ISR is **fail-closed** when known tenant-boundary headers reach FaceTheory without an explicit `tenantKey` or custom `cacheKey`. This prevents a tenant from seeing another tenant's cached HTML simply because the cache key didn't account for the tenant dimension.
+Blocking ISR is **fail-closed** when known tenant-boundary headers reach FaceTheory without an explicit, trusted `tenantKey`. A custom `cacheKey` alone no longer exempts a tenant-scoped route: FaceTheory composes the trusted tenant into the effective cache identity. This prevents a tenant from seeing another tenant's cached HTML simply because the cache key didn't account for the tenant dimension.
 
 ## The hazard
 
@@ -10,7 +10,9 @@ ISR computes a cache key from the path, query, and (optionally) headers / cookie
 
 ## The fail-closed behavior
 
-When FaceTheory's ISR runtime sees a known tenant-boundary header — by default `x-tenant-id` or `x-facetheory-tenant` — and the Face has not configured a `tenantKey` or custom `cacheKey` that explicitly accounts for it, the runtime refuses to serve cached HTML and emits an error response instead.
+When FaceTheory's ISR runtime sees a known tenant-boundary header — by default `x-tenant-id` or `x-facetheory-tenant` — that signal only proves the route is tenant-scoped; it never supplies tenant authority. The runtime refuses to serve cached HTML unless the Face has configured an explicit, trusted `tenantKey`.
+
+A tenant-scoped custom `cacheKey` no longer exempts the route from this requirement. When both an explicit `tenantKey` and a custom `cacheKey` are configured, FaceTheory composes a framework-owned, privacy-preserving tenant partition (a digest of the trusted tenant) with the consumer's logical key, so distinct tenants never share a stored entry even when their logical keys coincide. When a custom `cacheKey` is configured without an explicit `tenantKey` and a tenant-boundary signal is present, the runtime fails closed before cache lookup, lease acquisition, or HTML writes.
 
 This is intentional. The framework cannot tell whether the rendered HTML is tenant-invariant or tenant-varying, so the safe default is to fail and force the consumer to declare intent.
 
@@ -24,7 +26,7 @@ isr: {
 },
 ```
 
-Custom tenant headers must be registered here, stripped before ISR, or included in an explicit `tenantKey` / custom `cacheKey` partition.
+Custom tenant headers must be registered here, stripped before ISR, or covered by an explicit `tenantKey` partition.
 
 ## Tenant-invariant deployments
 
@@ -35,32 +37,40 @@ If the cached HTML is the same for every tenant, strip the viewer-supplied tenan
 If the cached HTML varies per tenant, choose one of:
 
 - **Use SSR instead of ISR.** Per-request rendering does not share state across tenants.
-- **Configure `tenantKey`.** Provide a function that derives a stable tenant identifier from the request:
+- **Configure `tenantKey`.** Provide a function that derives a stable, trusted tenant identifier from the request. Never read a raw viewer-supplied header directly; resolve the tenant only after a trusted boundary (CloudFront / AppTheory middleware) has stripped client copies and injected trusted context:
 
   ```typescript
   isr: {
     htmlStore,
     metaStore,
-    tenantKey: (ctx) => ctx.request.headers['x-tenant-id']?.[0] ?? null,
+    tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
   },
   ```
 
-  The tenant key becomes part of the cache key; cache entries are partitioned per tenant.
+  The trusted tenant becomes part of the cache key; cache entries are partitioned per tenant.
 
-- **Configure a custom `cacheKey`.** When the partition is more complex than a single header, supply the full key derivation:
+- **Pair `tenantKey` with a custom `cacheKey` when the logical partition is more complex.** The custom function supplies the logical key; FaceTheory composes the trusted tenant partition on top. Delegate to `defaultIsrCacheKey` so query, cookie, and auth request variants are retained:
 
   ```typescript
   isr: {
     htmlStore,
     metaStore,
-    cacheKey: ({ tenant, routePattern, params, query, headers }) => {
-      const locale = headers?.['accept-language']?.[0]?.split(',')[0] ?? 'en';
-      return `${tenant ?? 'public'}|${routePattern}|${JSON.stringify(params)}|${locale}`;
-    },
+    // Trusted tenant identity — never a raw client-supplied header.
+    tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+    // Reuse the built-in key instead of hand-rolling one that drops request variants.
+    cacheKey: ({ tenant, routePattern, params, query, headers, cookies }) =>
+      defaultIsrCacheKey({
+        tenant,
+        routePattern,
+        params,
+        query,
+        headers,
+        cookies,
+      }),
   },
   ```
 
-  The cache key must include every request-varying dimension that affects the cached HTML.
+  A custom `cacheKey` without an explicit `tenantKey` fails closed on any request that carries a tenant-boundary signal, and a trusted `tenantKey` that resolves to `null`, `undefined`, or a blank string on a tenant-scoped custom-key route fails closed rather than falling back to the implicit `default` tenant. The composed effective key embeds only a digest of the trusted tenant, so raw tenant values never appear in stored keys, and the composed custom-key representation stays distinct from the default key's raw-tenant representation.
 
 ## Cookie request variants
 
@@ -79,6 +89,8 @@ isr: {
 Requests that differ only in non-listed cookies share the same cache entry; requests that differ in a listed cookie partition. Keep the list complete for every cookie that can affect the rendered HTML. The allowlist must be non-empty: omit `varyCookies` to keep the all-cookies fail-safe, and do not pass `varyCookies: []`.
 
 ## Migration
+
+A custom `cacheKey` without an explicit, trusted `tenantKey` no longer counts as an ISR tenant partition, and tenant-scoped custom-key cache identities are now composed with a tenant digest. Existing tenant-scoped custom-key entries therefore miss and repopulate after upgrade; there is no fallback to the old unpartitioned keys.
 
 The fail-closed behavior is a defensive default introduced in FaceTheory 3.x. Existing consumers that previously rendered tenant-invariant pages without filtering tenant-like headers may see new errors after upgrade — see [Migration Guide → Adopt ISR tenant fail-closed defaults](../migration-guide.md#migration-4-adopt-isr-tenant-fail-closed-defaults) for the upgrade path.
 

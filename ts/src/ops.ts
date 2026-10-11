@@ -74,7 +74,9 @@ export interface FaceObservabilityHooks {
   log?: (record: FaceObservabilityLogRecord) => void;
 
   /**
-   * Minimal metrics sink (counters / histograms depending on backend).
+   * Minimal metrics sink (counters / histograms depending on backend). The ISR
+   * runtime contains exceptions thrown by this sink: a throwing metric callback
+   * can never bypass ISR lease release or fail the ISR request journey.
    */
   metric?: (record: FaceMetricRecord) => void;
 

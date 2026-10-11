@@ -2,6 +2,8 @@
 
 Input scope: `docs/planning/SCOPED_NEED_ISR_TENANT_PARTITION_SAFETY.md`
 
+> **Amendment (operator-ratified, 2026-10-11) — supersedes the custom-`cacheKey` trust-only criterion:** for tenant-scoped ISR, FaceTheory now requires an explicit, trusted `tenantKey`. A custom `cacheKey` alone no longer counts as an explicit partition contract: without `tenantKey` it fails closed on a tenant-boundary signal, and with `tenantKey` the runtime composes a framework-owned, privacy-preserving tenant partition with the consumer's logical key. The item-1 acceptance criterion and regression-test bullets below are updated accordingly.
+
 Decision locked for this enumeration: **fail closed by default**. If a request carries a known tenant boundary signal and the ISR runtime has no explicit tenant/cache partition configured, FaceTheory must refuse to serve/cache the ISR response rather than silently using the shared `default` tenant.
 
 ### 1. Fail closed on unpartitioned ISR tenant boundary signals
@@ -10,7 +12,7 @@ Decision locked for this enumeration: **fail closed by default**. If a request c
 - **Layer**: core / tests / docs
 - **Render mode impact**: isr
 - **Determinism-sensitive**: no — this changes deterministic ISR cache identity and failure behavior, not server/client DOM or hydration equivalence.
-- **Acceptance**: ISR requests containing known tenant boundary headers, initially `x-tenant-id` and `x-facetheory-tenant`, fail closed before cache lookup/write when neither `tenantKey` nor a custom `cacheKey` is explicitly configured; tenant-invariant ISR without those headers still works; explicit `tenantKey` and explicit `cacheKey` paths continue to work; thrown/configuration errors do not include raw tenant/header secret values.
+- **Acceptance**: ISR requests containing known tenant boundary headers, initially `x-tenant-id` and `x-facetheory-tenant`, fail closed before cache lookup/write when no explicit, trusted `tenantKey` is configured; a custom `cacheKey` alone does not exempt a tenant-scoped route; tenant-invariant ISR without those headers still works; explicit `tenantKey` paths continue to work, and a tenant-scoped custom `cacheKey` requires `tenantKey` and composes a framework-owned tenant partition; thrown/configuration errors do not include raw tenant/header secret values.
 - **Validation**: `make rubric`; targeted ISR validation such as `cd ts && npx tsx --test test/unit/isr.test.ts`; verify docs mention the breaking fail-closed default and the explicit `tenantKey` / `cacheKey` escape path.
 - **Conventional Commit subject**: `fix!(isr): fail closed on unpartitioned tenant headers`
 
@@ -27,7 +29,7 @@ Implementation notes for this change:
   - the reproduced leak: tenant A warms, tenant B follows, and tenant B does **not** receive tenant A HTML when no partition is configured;
   - no metadata/cache entry is written on the fail-closed path;
   - `tenantKeyFromTrustedHeader('x-tenant-id')` still partitions tenant A and tenant B correctly;
-  - custom `cacheKey` remains accepted as an explicit partition contract;
+  - a tenant-scoped custom `cacheKey` alone no longer counts as an explicit partition: without a trusted `tenantKey` it fails closed, and with `tenantKey` the framework composes a tenant-partitioned effective key;
   - raw tenant/header values are absent from cache keys and error text.
 
 ### 2. Make ISR examples explicitly tenant-invariant or explicitly partitioned

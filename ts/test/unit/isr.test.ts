@@ -7,6 +7,8 @@ import {
   createIsrRuntime,
   defaultIsrCacheKey,
   type FaceIsrOptions,
+  type HtmlStore,
+  type HtmlStoreReadResult,
   type HtmlStoreWriteInput,
   type HtmlStoreWriteResult,
   InMemoryHtmlStore,
@@ -59,6 +61,62 @@ async function withTimeout<T>(
       },
     );
   });
+}
+
+class CountingHtmlStore implements HtmlStore {
+  readonly inner = new InMemoryHtmlStore();
+  readCalls = 0;
+  writeCalls = 0;
+
+  async read(key: string): Promise<HtmlStoreReadResult | null> {
+    this.readCalls += 1;
+    return await this.inner.read(key);
+  }
+
+  async write(input: HtmlStoreWriteInput): Promise<HtmlStoreWriteResult> {
+    this.writeCalls += 1;
+    return await this.inner.write(input);
+  }
+}
+
+class CountingMetaStore implements IsrMetaStore {
+  readonly inner = new InMemoryIsrMetaStore();
+  getCalls = 0;
+  invalidateCalls = 0;
+  leaseCalls = 0;
+  commitCalls = 0;
+  releaseCalls = 0;
+
+  async get(cacheKey: string): Promise<IsrMetaRecord | null> {
+    this.getCalls += 1;
+    return await this.inner.get(cacheKey);
+  }
+
+  async invalidate(cacheKey: string): Promise<void> {
+    this.invalidateCalls += 1;
+    await this.inner.invalidate(cacheKey);
+  }
+
+  async tryAcquireLease(
+    input: TryAcquireIsrLeaseInput,
+  ): Promise<TryAcquireIsrLeaseResult> {
+    this.leaseCalls += 1;
+    return await this.inner.tryAcquireLease(input);
+  }
+
+  async commitGeneration(input: CommitIsrGenerationInput): Promise<void> {
+    this.commitCalls += 1;
+    await this.inner.commitGeneration(input);
+  }
+
+  async releaseLease(input: ReleaseIsrLeaseInput): Promise<void> {
+    this.releaseCalls += 1;
+    await this.inner.releaseLease(input);
+  }
+
+  debugSnapshot(): IsrMetaRecord[] {
+    return this.inner.debugSnapshot();
+  }
 }
 
 test('isr: stale burst triggers one regeneration and waiters share result', async () => {
@@ -643,7 +701,63 @@ test('isr: tenantKey option partitions by a trusted header boundary', async () =
   assert.equal(cacheKeys.length, 2);
 });
 
-test('isr: custom cacheKey is an explicit tenant boundary partition contract', async () => {
+test('isr: custom cacheKey without an explicit tenantKey fails closed on tenant boundary signals', async () => {
+  const htmlStore = new CountingHtmlStore();
+  const metaStore = new CountingMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/tenant/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>tenant-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      cacheKey: ({ routePattern }) => `custom::${routePattern}`,
+    },
+  });
+
+  const tenantA = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['TENANT_SECRET_A'] },
+  });
+  const tenantB = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-facetheory-tenant': ['TENANT_SECRET_B'] },
+  });
+
+  assert.equal(tenantA.status, 500);
+  assert.equal(tenantB.status, 500);
+  assert.equal(renderCount, 0);
+  assert.equal(
+    decodeBody(tenantA.body as Uint8Array).includes('TENANT_SECRET_A'),
+    false,
+  );
+  assert.equal(
+    decodeBody(tenantB.body as Uint8Array).includes('TENANT_SECRET_B'),
+    false,
+  );
+  // Fail closed before any metadata lookup, lease acquisition, or HTML store access.
+  assert.equal(metaStore.getCalls, 0);
+  assert.equal(metaStore.leaseCalls, 0);
+  assert.equal(metaStore.commitCalls, 0);
+  assert.equal(metaStore.releaseCalls, 0);
+  assert.equal(htmlStore.readCalls, 0);
+  assert.equal(htmlStore.writeCalls, 0);
+  assert.deepEqual(metaStore.debugSnapshot(), []);
+});
+
+test('isr: explicit tenantKey partitions custom cache keys so tenants sharing one logical key stay isolated', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new InMemoryIsrMetaStore();
   let renderCount = 0;
@@ -664,52 +778,270 @@ test('isr: custom cacheKey is an explicit tenant boundary partition contract', a
     isr: {
       htmlStore,
       metaStore,
-      cacheKey: (input) => {
-        const tenant = input.headers?.['x-tenant-id']?.[0];
-        const tenantPartition = tenant === 'TENANT_SECRET_A' ? 'a' : 'b';
-        return `custom::${input.routePattern}#tenant=${tenantPartition}`;
-      },
+      tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+      // Identical logical key for every tenant: the framework-owned tenant
+      // partition must still keep the stored identities distinct.
+      cacheKey: ({ routePattern }) => `shared::${routePattern}`,
     },
   });
 
   const tenantAFirst = await app.handle({
     method: 'GET',
     path: '/tenant/home',
-    headers: { 'x-tenant-id': ['TENANT_SECRET_A'] },
+    headers: { 'x-tenant-id': ['tenant-a'] },
   });
   const tenantBFirst = await app.handle({
     method: 'GET',
     path: '/tenant/home',
-    headers: { 'x-tenant-id': ['TENANT_SECRET_B'] },
+    headers: { 'x-tenant-id': ['tenant-b'] },
   });
   const tenantASecond = await app.handle({
     method: 'GET',
     path: '/tenant/home',
-    headers: { 'x-tenant-id': ['TENANT_SECRET_A'] },
+    headers: { 'x-tenant-id': ['tenant-a'] },
   });
 
-  assert.equal(tenantAFirst.status, 200);
-  assert.equal(tenantBFirst.status, 200);
-  assert.equal(tenantASecond.status, 200);
-  assert.ok(
-    decodeBody(tenantAFirst.body as Uint8Array).includes('TENANT_SECRET_A-1'),
+  assert.ok(decodeBody(tenantAFirst.body as Uint8Array).includes('tenant-a-1'));
+  assert.ok(decodeBody(tenantBFirst.body as Uint8Array).includes('tenant-b-2'));
+  // Tenant B never receives tenant A's cached HTML even though the logical key matched.
+  assert.equal(
+    decodeBody(tenantBFirst.body as Uint8Array).includes('tenant-a'),
+    false,
   );
+  // Same-tenant repeats hit that tenant's own partitioned entry.
   assert.ok(
-    decodeBody(tenantBFirst.body as Uint8Array).includes('TENANT_SECRET_B-2'),
-  );
-  assert.ok(
-    decodeBody(tenantASecond.body as Uint8Array).includes('TENANT_SECRET_A-1'),
+    decodeBody(tenantASecond.body as Uint8Array).includes('tenant-a-1'),
   );
   assert.equal(renderCount, 2);
 
-  const serializedKeys = metaStore
-    .debugSnapshot()
-    .map((record) => record.cacheKey)
-    .join('\n');
-  assert.equal(serializedKeys.includes('TENANT_SECRET_A'), false);
-  assert.equal(serializedKeys.includes('TENANT_SECRET_B'), false);
+  const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
+  assert.equal(cacheKeys.length, 2);
+  assert.equal(new Set(cacheKeys).size, 2);
+  const serialized = cacheKeys.join('\n');
+  // The tenant is folded in as a digest: raw trusted tenant values never persist.
+  assert.equal(serialized.includes('tenant-a'), false);
+  assert.equal(serialized.includes('tenant-b'), false);
+});
+
+test('isr: explicit tenantKey distinguishes the literal "default" identifier from another tenant', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/tenant/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async (ctx) => {
+          const seq = ++renderCount;
+          const tenant = ctx.request.headers['x-tenant-id']?.[0] ?? 'missing';
+          return { html: `<main>${tenant}-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+      cacheKey: ({ routePattern }) => `shared::${routePattern}`,
+    },
+  });
+
+  const defaultFirst = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['default'] },
+  });
+  const defaultSecond = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['default'] },
+  });
+  const otherTenant = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['tenant-a'] },
+  });
+
+  assert.ok(decodeBody(defaultFirst.body as Uint8Array).includes('default-1'));
+  assert.ok(decodeBody(defaultSecond.body as Uint8Array).includes('default-1'));
+  assert.ok(decodeBody(otherTenant.body as Uint8Array).includes('tenant-a-2'));
+  assert.equal(renderCount, 2);
   assert.equal(metaStore.debugSnapshot().length, 2);
 });
+
+test('isr: tenant-invariant custom cacheKey without signals keeps its logical key unchanged', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/public/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>public-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      cacheKey: ({ routePattern }) => `public::${routePattern}`,
+    },
+  });
+
+  const first = await app.handle({ method: 'GET', path: '/public/home' });
+  const second = await app.handle({ method: 'GET', path: '/public/home' });
+
+  assert.ok(decodeBody(first.body as Uint8Array).includes('public-1'));
+  assert.ok(decodeBody(second.body as Uint8Array).includes('public-1'));
+  assert.equal(renderCount, 1);
+
+  const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
+  // No tenant scope and no signal: the consumer's logical key is used verbatim.
+  assert.deepEqual(cacheKeys, ['public::/public/{slug}']);
+});
+
+test('isr: documented tenant-safe example derives distinct keys across tenant, query, and auth variants', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/accounts/{id}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async (ctx) => {
+          const seq = ++renderCount;
+          const tenant = ctx.request.headers['x-tenant-id']?.[0] ?? 'missing';
+          const view = ctx.request.query.view?.[0] ?? 'missing';
+          return { html: `<main>${tenant}-${view}-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      // Trusted tenant identity — never a raw client-supplied header.
+      tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+      // Delegate to defaultIsrCacheKey so query, cookie, and auth request variants
+      // are retained instead of being dropped by a hand-rolled key.
+      cacheKey: (input) => defaultIsrCacheKey(input),
+    },
+  });
+
+  const tenantASummary = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=summary',
+    headers: { 'x-tenant-id': ['tenant-a'] },
+  });
+  const tenantASummaryRepeat = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=summary',
+    headers: { 'x-tenant-id': ['tenant-a'] },
+  });
+  const tenantBSummary = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=summary',
+    headers: { 'x-tenant-id': ['tenant-b'] },
+  });
+  const tenantADetail = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=detail',
+    headers: { 'x-tenant-id': ['tenant-a'] },
+  });
+  const tenantAAuth = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=summary',
+    headers: {
+      'x-tenant-id': ['tenant-a'],
+      authorization: ['Bearer SECRET_TOKEN_A'],
+    },
+  });
+
+  assert.ok(
+    decodeBody(tenantASummary.body as Uint8Array).includes(
+      'tenant-a-summary-1',
+    ),
+  );
+  assert.ok(
+    decodeBody(tenantASummaryRepeat.body as Uint8Array).includes(
+      'tenant-a-summary-1',
+    ),
+  );
+  assert.ok(
+    decodeBody(tenantBSummary.body as Uint8Array).includes(
+      'tenant-b-summary-2',
+    ),
+  );
+  assert.ok(
+    decodeBody(tenantADetail.body as Uint8Array).includes('tenant-a-detail-3'),
+  );
+  assert.ok(
+    decodeBody(tenantAAuth.body as Uint8Array).includes('tenant-a-summary-4'),
+  );
+  assert.equal(renderCount, 4);
+
+  const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
+  assert.equal(cacheKeys.length, 4);
+  assert.equal(new Set(cacheKeys).size, 4);
+  assert.ok(
+    cacheKeys.every((key) => key.startsWith('isr-tenant:v1:')),
+    'custom cache keys must be composed with a framework-owned tenant partition',
+  );
+});
+
+for (const emptyTenant of [null, undefined, '', '   '] as const) {
+  test(`isr: explicit tenantKey resolving to ${JSON.stringify(emptyTenant)} fails closed for custom cache keys`, async () => {
+    const htmlStore = new CountingHtmlStore();
+    const metaStore = new CountingMetaStore();
+    let renderCount = 0;
+
+    const app = createFaceApp({
+      faces: [
+        {
+          route: '/tenant/{slug}',
+          mode: 'isr',
+          revalidateSeconds: 60,
+          render: async () => {
+            const seq = ++renderCount;
+            return { html: `<main>tenant-${seq}</main>` };
+          },
+        },
+      ],
+      isr: {
+        htmlStore,
+        metaStore,
+        tenantKey: () => emptyTenant,
+        cacheKey: ({ routePattern }) => `custom::${routePattern}`,
+      },
+    });
+
+    const response = await app.handle({
+      method: 'GET',
+      path: '/tenant/home',
+      headers: { 'x-tenant-id': ['tenant-a'] },
+    });
+
+    assert.equal(response.status, 500);
+    assert.equal(renderCount, 0);
+    assert.equal(metaStore.getCalls, 0);
+    assert.equal(metaStore.leaseCalls, 0);
+    assert.equal(metaStore.commitCalls, 0);
+    assert.equal(metaStore.releaseCalls, 0);
+    assert.equal(htmlStore.readCalls, 0);
+    assert.equal(htmlStore.writeCalls, 0);
+    assert.deepEqual(metaStore.debugSnapshot(), []);
+  });
+}
 
 test('isr: default cache key partitions by auth headers and cookies without raw secrets', async () => {
   const htmlStore = new InMemoryHtmlStore();
@@ -1811,6 +2143,154 @@ test('isr: invalid strict sidecar tokens fail closed without rendering', async (
 
   assert.equal(response.status, 404);
   assert.equal(renderCount, 0);
+});
+
+test('isr: a throwing regeneration metric cannot strand the lease or mask the render outcome', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new CountingMetaStore();
+  let metricCalls = 0;
+
+  let nowMs = 1_000;
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/metric-regen',
+        mode: 'isr',
+        revalidateSeconds: 1,
+        render: () => {
+          throw new Error('regeneration blew up');
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+      failurePolicy: 'error',
+    },
+    observability: {
+      metric: (record) => {
+        metricCalls += 1;
+        if (record.name === 'facetheory.isr.regeneration_ms') {
+          throw new Error('metric sink unavailable');
+        }
+      },
+    },
+  });
+
+  const failed = await app.handle({ method: 'GET', path: '/metric-regen' });
+  assert.equal(failed.status, 500);
+  assert.ok(metricCalls >= 1);
+  // The lease acquired for the failed regeneration is released even though the
+  // regeneration metric threw before releaseLease ran.
+  assert.equal(metaStore.releaseCalls, 1);
+  const records = metaStore.debugSnapshot();
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.leaseOwner, null);
+  assert.equal(records[0]?.leaseToken, null);
+
+  // No stranded lease: a second request acquires a fresh lease and is contained again.
+  nowMs = 2_000;
+  const retry = await app.handle({ method: 'GET', path: '/metric-regen' });
+  assert.equal(retry.status, 500);
+  assert.equal(metaStore.releaseCalls, 2);
+});
+
+test('isr: ordinary regeneration still emits the success metric and releases the lease', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new CountingMetaStore();
+  const metrics: Array<{ name: string; tags?: Record<string, string> }> = [];
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/metric-ok',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: () => ({ html: '<main>ok</main>' }),
+      },
+    ],
+    isr: { htmlStore, metaStore },
+    observability: {
+      metric: (record) =>
+        metrics.push(
+          record as { name: string; tags?: Record<string, string> },
+        ),
+    },
+  });
+
+  const response = await app.handle({ method: 'GET', path: '/metric-ok' });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers['x-facetheory-isr']?.[0], 'miss');
+  const regeneration = metrics.filter(
+    (metric) => metric.name === 'facetheory.isr.regeneration_ms',
+  );
+  assert.equal(regeneration.length, 1);
+  assert.equal(regeneration[0]?.tags?.outcome, 'success');
+  assert.equal(metaStore.commitCalls, 1);
+  assert.equal(metaStore.releaseCalls, 1);
+});
+
+test('isr: a throwing contention metric does not fail the ordinary contention journey', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+
+  let nowMs = 1_000;
+  let renderCount = 0;
+  let contentionMetricCalls = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/posts/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 1,
+        render: async () => {
+          const seq = ++renderCount;
+          await delay(25);
+          return { html: `<main>render-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+      leaseDurationMs: 2_000,
+      regenerationWaitTimeoutMs: 1_000,
+      regenerationPollIntervalMs: 5,
+    },
+    observability: {
+      metric: (record) => {
+        if (record.name === 'facetheory.isr.lease_contention') {
+          contentionMetricCalls += 1;
+          throw new Error('contention metric sink unavailable');
+        }
+      },
+    },
+  });
+
+  const warm = await app.handle({ method: 'GET', path: '/posts/a' });
+  assert.equal(warm.status, 200);
+
+  nowMs = 2_000;
+  const responses = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      app.handle({ method: 'GET', path: '/posts/a' }),
+    ),
+  );
+
+  assert.ok(contentionMetricCalls >= 1);
+  assert.equal(renderCount, 2);
+  for (const response of responses) {
+    assert.equal(response.status, 200);
+    assert.ok(decodeBody(response.body as Uint8Array).includes('render-2'));
+  }
+  // Every held lease was released; nothing is stranded.
+  for (const record of metaStore.debugSnapshot()) {
+    assert.equal(record.leaseOwner, null);
+    assert.equal(record.leaseToken, null);
+  }
 });
 
 test('isr: cache metrics label parameterized routes by template, not request path', async () => {

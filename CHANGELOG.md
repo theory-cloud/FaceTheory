@@ -4,6 +4,7 @@
 
 ### ⚠ BREAKING CHANGES
 
+* **isr:** Tenant-scoped ISR custom `cacheKey` routes now require an explicit, trusted `tenantKey`. A custom `cacheKey` alone no longer counts as an explicit tenant partition: it fails closed when a tenant-boundary header is present without a trusted `tenantKey`, and when `tenantKey` is configured FaceTheory composes a framework-owned, privacy-preserving tenant digest with the consumer's logical key. Existing tenant-scoped custom-key cache identities change, so those entries miss and repopulate after upgrade; there is no fallback to the old unpartitioned keys. This is release-major material, not a patch or minor; no version bump, tag, or release is performed by this change.
 * **head:** Strict-CSP head-script URLs whose hostname carries a trailing DNS root dot (for example `https://real.example./assets/entry.js`) are now rejected instead of being accepted and rendered verbatim while only the comparison URL was normalized. Use the dotless host form (`https://real.example/assets/entry.js`). This is a deliberate reversal of the behavior codified by `a526684` and is release-major material, not a patch or minor; no version bump, tag, or release is performed by this change.
 
 ## [4.2.1](https://github.com/theory-cloud/FaceTheory/compare/v4.2.0...v4.2.1) (2026-10-05)

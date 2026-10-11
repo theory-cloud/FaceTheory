@@ -16,7 +16,7 @@ This document describes production hardening guidance for FaceTheory apps and th
   - SSR responses should be explicitly non-cacheable (example: `cache-control: private, no-store`).
   - SSG HTML and hydration JSON should be served from S3 with explicit `cache-control`.
   - ISR responses must include an `x-facetheory-isr` state header (`hit` | `miss` | `stale` | `wait-hit`) and deterministic cache headers.
-  - Query-dependent ISR output now partitions by query string by default; request-personalized output still needs an explicit `cacheKey` / `tenantKey` or SSR. Requests with known tenant boundary headers (`x-tenant-id`, `x-facetheory-tenant`) fail closed unless that explicit partition is configured.
+  - Query-dependent ISR output now partitions by query string by default; request-personalized output still needs an explicit `tenantKey` (with a custom `cacheKey` when a richer logical partition is needed) or SSR. Requests with known tenant boundary headers (`x-tenant-id`, `x-facetheory-tenant`) fail closed unless an explicit, trusted `tenantKey` is configured; a custom `cacheKey` alone does not exempt a tenant-scoped route.
 - Security headers:
   - Set baseline security headers at the CDN layer (HSTS, nosniff, frame-options, referrer-policy, permissions-policy).
   - Do not attempt to set a nonce-based CSP at CloudFront (nonces are per-request).
@@ -177,7 +177,7 @@ The SSG/ISR example stack provisions these via `cloudfront.ResponseHeadersPolicy
 - FaceTheory’s default ISR tenant resolver ignores request tenant headers and uses the `default` tenant.
 - Treat request headers as untrusted until AppTheory middleware, CloudFront, or another authenticated boundary strips client-supplied copies and writes trusted values.
 - If tenant identity is derived from a session, auth token, host mapping, or trusted header, override `tenantKey` so cached HTML keys follow that trusted source instead of raw client input.
-- If `x-tenant-id` or `x-facetheory-tenant` reaches an ISR route without an explicit `tenantKey` or custom `cacheKey`, FaceTheory refuses the ISR request before metadata lookup or HTML writes. Remove tenant-like headers for tenant-invariant ISR, or keep the route on SSR until partitioning is explicit.
+- If `x-tenant-id` or `x-facetheory-tenant` reaches an ISR route without an explicit, trusted `tenantKey`, FaceTheory refuses the ISR request before metadata lookup or HTML writes. A custom `cacheKey` alone does not exempt a tenant-scoped route; pair it with `tenantKey`. Remove tenant-like headers for tenant-invariant ISR, or keep the route on SSR until partitioning is explicit.
 
 ## Limits and Timeouts
 

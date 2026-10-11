@@ -72,7 +72,7 @@ See [TableTheory integration](../integrations/tabletheory.md) for the import bou
 
 ## Tenant safety (fail-closed)
 
-Blocking ISR is **fail-closed** when known tenant-boundary headers (e.g. `x-tenant-id`, `x-facetheory-tenant`) reach FaceTheory without an explicit `tenantKey` or custom `cacheKey`. Tenant-invariant ISR must strip viewer-supplied tenant-like headers at the CloudFront / AppTheory boundary; tenant-varying pages must use SSR or an explicit trusted partition that includes every request-varying dimension affecting the cached HTML.
+Blocking ISR is **fail-closed** when known tenant-boundary headers (e.g. `x-tenant-id`, `x-facetheory-tenant`) reach FaceTheory without an explicit, trusted `tenantKey`. A custom `cacheKey` alone does not exempt a tenant-scoped route: FaceTheory composes a framework-owned tenant partition with the consumer's logical key, and refuses before cache/lease/write when the trusted `tenantKey` is missing on a tenant-scoped custom-key route. Tenant-invariant ISR must strip viewer-supplied tenant-like headers at the CloudFront / AppTheory boundary; tenant-varying pages must use SSR or an explicit trusted partition that includes every request-varying dimension affecting the cached HTML.
 
 See [ISR tenant safety](../features/isr-tenant-safety.md) and [Migration Guide → Adopt ISR tenant fail-closed defaults](../migration-guide.md).
 

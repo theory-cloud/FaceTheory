@@ -2,7 +2,11 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { utf8 } from './bytes.js';
 import { safeJson } from './html.js';
-import { reportFaceError, type FaceObservabilityHooks } from './ops.js';
+import {
+  reportFaceError,
+  type FaceMetricRecord,
+  type FaceObservabilityHooks,
+} from './ops.js';
 import {
   requiresStrictCspDocumentValidation,
   validateStrictCspDocument,
@@ -578,14 +582,17 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
       const revalidateSeconds = normalizeRevalidateSeconds(
         input.face.revalidateSeconds,
       );
-      assertPartitionedTenantBoundary(runtimeOptions, input.ctx);
+      const tenantPartition = resolveTenantPartition(runtimeOptions, input.ctx);
 
       const hydrationSidecarPointer = hydrationSidecarPointerFromRequest(
         input.ctx.request.query,
         runtimeOptions.htmlPointerPrefix,
       );
 
-      const tenant = resolveTenant(runtimeOptions, input.ctx);
+      const tenant =
+        tenantPartition.mode === 'partitioned'
+          ? tenantPartition.tenant
+          : resolveTenant(runtimeOptions, input.ctx);
       const query = hydrationSidecarPointer.present
         ? queryWithoutHydrationSidecar(input.ctx.request.query)
         : input.ctx.request.query;
@@ -600,7 +607,14 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
       if (runtimeOptions.varyCookies !== null) {
         cacheKeyInput.varyCookies = runtimeOptions.varyCookies;
       }
-      const cacheKey = runtimeOptions.cacheKey(cacheKeyInput);
+      const logicalCacheKey = runtimeOptions.cacheKey(cacheKeyInput);
+      const cacheKey =
+        tenantPartition.mode === 'partitioned'
+          ? composeTenantPartitionedCacheKey(
+              tenantPartition.tenant,
+              logicalCacheKey,
+            )
+          : logicalCacheKey;
 
       if (hydrationSidecarPointer.present) {
         if (
@@ -1036,7 +1050,7 @@ function emitIsrLeaseContentionMetric(
   runtimeOptions: CreateIsrRuntimeOptions,
   input: HandleIsrFaceInput,
 ): void {
-  runtimeOptions.observability?.metric?.({
+  emitIsrMetric(runtimeOptions, {
     name: 'facetheory.isr.lease_contention',
     value: 1,
     tags: {
@@ -1053,7 +1067,7 @@ function emitIsrRegenerationMetric(
   durationMs: number,
   outcome: string,
 ): void {
-  runtimeOptions.observability?.metric?.({
+  emitIsrMetric(runtimeOptions, {
     name: 'facetheory.isr.regeneration_ms',
     value: durationMs,
     tags: {
@@ -1062,6 +1076,26 @@ function emitIsrRegenerationMetric(
       outcome,
     },
   });
+}
+
+/**
+ * Emits an ISR metric through the host sink while containing any exception it
+ * throws. Telemetry must never bypass lease release (the regeneration metric is
+ * emitted before `releaseLease` in the same `finally`) or fail an otherwise
+ * ordinary ISR regeneration/contention journey. Ordinary emissions pass through
+ * unchanged.
+ */
+function emitIsrMetric(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  record: FaceMetricRecord,
+): void {
+  const sink = runtimeOptions.observability?.metric;
+  if (!sink) return;
+  try {
+    sink(record);
+  } catch {
+    // Contained: a throwing metric callback cannot strand a lease or fail the request.
+  }
 }
 
 function metricNow(): number {
@@ -1343,23 +1377,73 @@ function normalizeStringListOption(
   });
 }
 
-function assertPartitionedTenantBoundary(
+type IsrTenantPartition =
+  | { readonly mode: 'plain' }
+  | { readonly mode: 'partitioned'; readonly tenant: string };
+
+/**
+ * Resolves whether a request must compose a framework-owned tenant partition and
+ * enforces the fail-closed rules before any cache interaction. A tenant-boundary
+ * signal proves only that the route is tenant-scoped; it never supplies tenant
+ * authority. Authoritative tenant identity comes from the explicit trusted
+ * `tenantKey` callback alone.
+ */
+function resolveTenantPartition(
   runtimeOptions: CreateIsrRuntimeOptions,
   ctx: FaceContext,
-): void {
-  if (runtimeOptions.hasExplicitTenantKey || runtimeOptions.hasExplicitCacheKey)
-    return;
-  if (
-    !hasNonEmptyHeader(
-      ctx.request.headers,
-      runtimeOptions.tenantBoundaryHeaders,
-    )
-  )
-    return;
-
-  throw new Error(
-    'ISR tenant boundary header requires explicit tenantKey or cacheKey configuration',
+): IsrTenantPartition {
+  const hasTenantBoundarySignal = hasNonEmptyHeader(
+    ctx.request.headers,
+    runtimeOptions.tenantBoundaryHeaders,
   );
+
+  if (runtimeOptions.hasExplicitCacheKey) {
+    if (!runtimeOptions.hasExplicitTenantKey) {
+      if (hasTenantBoundarySignal) {
+        throw new Error(
+          'ISR custom cacheKey requires an explicit tenantKey when a tenant boundary signal is present',
+        );
+      }
+      return { mode: 'plain' };
+    }
+
+    const tenant = String(runtimeOptions.tenantKey(ctx) ?? '').trim();
+    if (tenant.length === 0) {
+      throw new Error(
+        'ISR custom cacheKey requires a non-empty trusted tenantKey for tenant partitioning',
+      );
+    }
+    return { mode: 'partitioned', tenant };
+  }
+
+  if (!runtimeOptions.hasExplicitTenantKey && hasTenantBoundarySignal) {
+    throw new Error(
+      'ISR tenant boundary header requires explicit tenantKey or cacheKey configuration',
+    );
+  }
+
+  return { mode: 'plain' };
+}
+
+const CUSTOM_CACHE_KEY_TENANT_PARTITION_PREFIX = 'isr-tenant:v1:';
+
+/**
+ * Composes the framework-owned effective cache identity for a custom cache key.
+ * The trusted tenant is folded in as a short digest so distinct tenants never
+ * share a stored key even when their logical custom keys coincide, while the
+ * logical key remains consumer-owned. The raw tenant is never embedded, which
+ * keeps the composed custom-key representation distinct from the unchanged
+ * default key's raw-tenant representation.
+ */
+function composeTenantPartitionedCacheKey(
+  tenant: string,
+  logicalCacheKey: string,
+): string {
+  const tenantDigest = createHash('sha256')
+    .update(utf8(tenant))
+    .digest('hex')
+    .slice(0, 24);
+  return `${CUSTOM_CACHE_KEY_TENANT_PARTITION_PREFIX}${tenantDigest}::${logicalCacheKey}`;
 }
 
 function hasNonEmptyHeader(

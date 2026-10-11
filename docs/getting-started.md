@@ -633,8 +633,8 @@ Important ISR default:
 
 - FaceTheory’s default ISR cache key partitions by route params, query string, and hashed request-identity inputs for cookies and common auth headers without storing raw secrets.
 - FaceTheory’s default ISR tenant is `default`; configure `tenantKey` explicitly for authenticated tenant boundaries.
-- If a request carries `x-tenant-id` or `x-facetheory-tenant` and no explicit `tenantKey` or custom `cacheKey` is configured, ISR fails closed before cache lookup/write.
-- If cached HTML varies by other headers or host-derived tenant, configure an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
+- If a request carries `x-tenant-id` or `x-facetheory-tenant`, ISR fails closed unless an explicit, trusted `tenantKey` is configured. A custom `cacheKey` does not exempt a tenant-scoped route; the trusted tenant is composed into the effective custom-key identity.
+- If cached HTML varies by other headers or host-derived tenant, configure an explicit `tenantKey` (with a custom `cacheKey` when you need a richer logical partition) or keep that route on SSR.
 
 ## Reference Bundle
 
