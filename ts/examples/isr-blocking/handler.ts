@@ -5,8 +5,9 @@
 //
 // This example is intentionally tenant-invariant: it does not read tenant headers,
 // auth headers, or cookies while rendering cached HTML. Tenant-varying ISR must
-// configure an explicit `tenantKey` or custom `cacheKey`; otherwise FaceTheory
-// fails closed when known tenant boundary headers reach the ISR runtime.
+// configure an explicit, trusted `tenantKey`; a custom `cacheKey` alone no longer
+// exempts a tenant-scoped route, and FaceTheory fails closed when known tenant
+// boundary headers reach the ISR runtime without a trusted `tenantKey`.
 
 import {
   createFaceApp,

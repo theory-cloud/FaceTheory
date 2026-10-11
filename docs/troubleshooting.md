@@ -255,9 +255,10 @@ Symptoms:
 
 Cause:
 
-- FaceTheory detected a tenant boundary signal on an ISR route that has neither an explicit `tenantKey` nor a custom
-  `cacheKey`. The runtime fails closed before cache lookup, regeneration lease acquisition, metadata writes, or HTML
-  writes so tenant-specific HTML cannot fall into the shared default cache partition.
+- FaceTheory detected a tenant boundary signal on an ISR route that has no explicit, trusted `tenantKey`. A custom
+  `cacheKey` alone no longer exempts a tenant-scoped route. The runtime fails closed before cache lookup, regeneration
+  lease acquisition, metadata writes, or HTML writes so tenant-specific HTML cannot fall into the shared default cache
+  partition.
 
 Solution:
 
@@ -266,8 +267,9 @@ Solution:
 - If the route renders tenant-varying or personalized HTML, keep it as `mode: 'ssr'` unless the HTML is safe to cache
   independently for each partition.
 - If tenant-varying ISR is intentional, configure `tenantKey: tenantKeyFromTrustedHeader('x-tenant-id')` only after a
-  trusted boundary strips viewer-supplied values and injects trusted tenant context, or provide a custom `cacheKey`
-  that includes every request-varying dimension that changes the rendered HTML.
+  trusted boundary strips viewer-supplied values and injects trusted tenant context. Pair it with a custom `cacheKey`
+  (for example one that delegates to `defaultIsrCacheKey`) when you need a richer logical partition; FaceTheory composes
+  the trusted tenant partition on top, and a custom `cacheKey` without an explicit `tenantKey` still fails closed.
 
 Verification:
 
