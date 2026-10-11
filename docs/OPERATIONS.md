@@ -69,6 +69,7 @@ FaceTheory `createFaceApp({ observability: ... })` supports:
   - `facetheory.isr.regeneration_ms` timing for ISR regeneration attempts, distinct from Face render timing and tagged with `outcome`
   - `facetheory.isr.lease_contention` counter when an ISR request observes another active regeneration lease
   - `facetheory.stream_error` counter when a non-strict streaming body fails after bytes have started
+  - `route_pattern` is always the matched route template (for example `/items/{id}`, including trailing-slash redirects to a matched route). Unmatched requests (404s) share the fixed label `unmatched` so arbitrary request paths cannot create metric cardinality; the full request path is reported only in the `path` field of the structured log records.
 - `observability.log(record)` also receives `event: "facetheory.stream_error"` when a non-strict streaming response emits the bounded `<template data-facetheory-stream-error="true">` marker after a body failure. This log is emitted in addition to the historical `console.error` and the response bytes remain unchanged by telemetry hooks.
 - `observability.onError(err, ctx)`:
   - Receives the original thrown value when FaceTheory converts an internal failure into a deterministic response, fallback fragment, sidecar miss, or degraded ISR state.
