@@ -294,7 +294,7 @@ export function assertStrictCspDom(
         DEFAULT_TEST_URL,
     ),
   ).origin;
-  assertNoInlineHeadOrBodyTags(doc, allowedOrigin);
+  assertNoInlineHeadOrBodyTags(doc, allowedOrigin, options.cspNonce ?? null);
   assertNoRawHeadNodes(doc);
   assertNoUnsafeAttributes(doc, options.scopeSelector ?? 'html');
 }
@@ -698,8 +698,11 @@ function assertNoRawHeadNodes(doc: Document): void {
 function assertNoInlineHeadOrBodyTags(
   doc: Document,
   allowedOrigin: string,
+  cspNonce: string | null,
 ): void {
   for (const script of Array.from(doc.querySelectorAll('script'))) {
+    if (isNonceCarriedHeadJsonLdScript(doc, script, cspNonce)) continue;
+
     const src = script.getAttribute('src');
     assert.ok(src, `strict CSP inline script tag: ${script.outerHTML}`);
     assert.equal(
@@ -722,6 +725,36 @@ function assertNoInlineHeadOrBodyTags(
     if (href)
       assertSameOriginUrl(href, allowedOrigin, doc.URL, 'strict CSP link href');
   }
+}
+
+// Mirrors the strict-CSP core exemption: an inline script is accepted only as
+// non-executable `application/ld+json` data placed directly in <head>, carrying
+// a nonce (the expected one when provided) and a body that parses as JSON.
+function isNonceCarriedHeadJsonLdScript(
+  doc: Document,
+  script: HTMLScriptElement,
+  cspNonce: string | null,
+): boolean {
+  if (script.parentElement !== doc.head) return false;
+  if (script.hasAttribute('src')) return false;
+
+  const mediaType = String(script.getAttribute('type') ?? '')
+    .split(';', 1)[0]
+    ?.trim()
+    .toLowerCase();
+  if (mediaType !== 'application/ld+json') return false;
+
+  const nonce = script.nonce || script.getAttribute('nonce') || '';
+  if (!nonce) return false;
+  const expectedNonce = String(cspNonce ?? '').trim();
+  if (expectedNonce && nonce !== expectedNonce) return false;
+
+  try {
+    JSON.parse(script.textContent ?? '');
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 function assertNoUnsafeAttributes(doc: Document, scopeSelector: string): void {
