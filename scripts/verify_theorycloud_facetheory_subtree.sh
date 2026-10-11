@@ -46,6 +46,35 @@ def run_git(repo_root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def git_tree_entries(repo_root: Path, revision: str) -> dict[str, tuple[str, str]]:
+    """Return {repo-relative path: (mode, blob-sha)} for the tree at revision."""
+    raw = subprocess.run(
+        ["git", "ls-tree", "-r", "-z", revision],
+        cwd=repo_root,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout
+    entries: dict[str, tuple[str, str]] = {}
+    for record in raw.split(b"\0"):
+        if not record:
+            continue
+        meta, _, path = record.partition(b"\t")
+        mode, _otype, sha = meta.split(b" ", 2)
+        entries[path.decode("utf-8")] = (mode.decode("ascii"), sha.decode("ascii"))
+    return entries
+
+
+def git_blob_bytes(repo_root: Path, object_id: str) -> bytes:
+    return subprocess.run(
+        ["git", "cat-file", "blob", object_id],
+        cwd=repo_root,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout
+
+
 def normalize_remote_url(value: str | None) -> str:
     if not value:
         return DEFAULT_SOURCE_REPO
@@ -241,6 +270,36 @@ def main() -> None:
         fail(
             f"manifest source_revision={manifest['source_revision']!r} want {expected_source_revision!r}"
         )
+
+    # Bind every staged byte to the committed blob at source_revision, so a
+    # staged file that was tampered with (or produced from a mutable worktree)
+    # is rejected even though its path name is unchanged.
+    try:
+        source_tree = git_tree_entries(repo_root, manifest["source_revision"])
+    except subprocess.CalledProcessError as exc:
+        fail(
+            f"unable to read tree at source_revision {manifest['source_revision']!r}: "
+            f"{exc.stderr.decode('utf-8', 'replace').strip()}"
+        )
+
+    for repo_path, rel_path in zip(expected_repo_paths, expected_rel_paths, strict=True):
+        staged_path = subtree_root / rel_path
+        if staged_path.is_symlink():
+            fail(f"staged path is a symlink: {rel_path}")
+        if not staged_path.is_file():
+            fail(f"staged path is not a regular file: {rel_path}")
+        entry = source_tree.get(repo_path)
+        if entry is None:
+            fail(
+                f"staged file is not tracked at source_revision {manifest['source_revision']!r}: {repo_path}"
+            )
+        _mode, blob_sha = entry
+        try:
+            expected_bytes = git_blob_bytes(repo_root, blob_sha)
+        except subprocess.CalledProcessError as exc:
+            fail(f"unable to read blob {blob_sha} for {repo_path}: {exc.stderr.decode('utf-8', 'replace').strip()}")
+        if staged_path.read_bytes() != expected_bytes:
+            fail(f"staged content does not match source_revision blob: {repo_path}")
 
     try:
         datetime.fromisoformat(manifest["generated_at"].replace("Z", "+00:00"))
