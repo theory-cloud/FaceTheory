@@ -11,7 +11,7 @@ Usage:
 
 Environment:
   THEORYCLOUD_STAGE                          Stage name. Default: lab
-  THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR  Staging root directory. Default: /tmp/facetheory-theorycloud
+  THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR  Staging root. Default: a private per-user temp dir (mode 0700)
   THEORYCLOUD_FACETHEORY_SOURCE_S3_URI       Optional override for the subtree destination S3 URI
   KT_SOURCE_S3_URI                           Alternate override for the subtree destination S3 URI
   THEORYCLOUD_S3_SYNC_DELETE                 Default: true. When true, prune objects under theorycloud/facetheory/
@@ -22,6 +22,35 @@ EOF_USAGE
 fail() {
   echo "sync-theorycloud-facetheory-subtree: FAIL ($*)" >&2
   exit 1
+}
+
+private_default_output_dir() {
+  local base="${TMPDIR:-/tmp}"
+  base="${base%/}"
+  printf '%s/facetheory-theorycloud-%s' "${base}" "$(id -u)"
+}
+
+# The staging destination holds a source of truth that is synced with --delete,
+# so it must be a private directory owned by the current user. A precreated
+# symlink, a foreign owner, or a shared-writable directory must fail closed.
+require_private_dir() {
+  local dir="${1%/}"
+  if [[ -L "${dir}" ]]; then
+    fail "output directory is a symlink: ${dir}"
+  fi
+  if [[ ! -d "${dir}" ]]; then
+    fail "output directory does not exist: ${dir}"
+  fi
+  if [[ ! -O "${dir}" ]]; then
+    fail "output directory is not owned by the current user: ${dir}"
+  fi
+  local mode
+  if ! mode="$(stat -c '%a' "${dir}" 2>/dev/null)"; then
+    mode="$(stat -f '%Lp' "${dir}")"
+  fi
+  if (( 8#${mode} & 8#022 )); then
+    fail "output directory is group/world writable: ${dir} (mode ${mode})"
+  fi
 }
 
 default_source_s3_uri_for_stage() {
@@ -45,7 +74,7 @@ require_s3_uri() {
 }
 
 STAGE="${THEORYCLOUD_STAGE:-lab}"
-OUTPUT_DIR="${THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR:-/tmp/facetheory-theorycloud}"
+OUTPUT_DIR="${THEORYCLOUD_FACETHEORY_SUBTREE_OUTPUT_DIR:-$(private_default_output_dir)}"
 SOURCE_S3_URI="${THEORYCLOUD_FACETHEORY_SOURCE_S3_URI:-${KT_SOURCE_S3_URI:-}}"
 SYNC_DELETE="${THEORYCLOUD_S3_SYNC_DELETE:-true}"
 SYNC_DRY_RUN="${THEORYCLOUD_S3_SYNC_DRY_RUN:-false}"
@@ -83,14 +112,20 @@ fi
 require_s3_uri "${SOURCE_S3_URI}" "THEORYCLOUD_FACETHEORY_SOURCE_S3_URI"
 SOURCE_S3_URI="${SOURCE_S3_URI%/}/"
 
+if [[ -e "${OUTPUT_DIR}" || -L "${OUTPUT_DIR}" ]]; then
+  require_private_dir "${OUTPUT_DIR}"
+fi
+
 bash "${SCRIPT_DIR}/stage_theorycloud_facetheory_subtree.sh" --output "${OUTPUT_DIR}"
 
+require_private_dir "${OUTPUT_DIR}"
+
 SUBTREE_DIR="${OUTPUT_DIR%/}/facetheory"
-if [[ ! -d "${SUBTREE_DIR}" ]]; then
-  fail "missing staged subtree at ${SUBTREE_DIR}; staging helper did not produce facetheory/"
+if [[ ! -d "${SUBTREE_DIR}" || -L "${SUBTREE_DIR}" ]]; then
+  fail "missing a real staged subtree at ${SUBTREE_DIR}; staging helper did not produce facetheory/"
 fi
-if [[ ! -f "${SUBTREE_DIR}/source-manifest.json" ]]; then
-  fail "missing staged provenance manifest at ${SUBTREE_DIR}/source-manifest.json"
+if [[ ! -f "${SUBTREE_DIR}/source-manifest.json" || -L "${SUBTREE_DIR}/source-manifest.json" ]]; then
+  fail "missing a regular staged provenance manifest at ${SUBTREE_DIR}/source-manifest.json"
 fi
 
 sync_flags=()
