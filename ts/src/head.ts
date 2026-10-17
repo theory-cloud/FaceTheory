@@ -196,8 +196,15 @@ function assertStrictSameOriginUrl(
     );
   }
 
+  const hostnameBeforeNormalization = parsed.hostname;
   if (!normalizeTrailingDnsRootDotHostname(parsed)) {
     throw new Error(`FaceTheory strict CSP ${label} URL is invalid: ${trimmed}`);
+  }
+
+  if (parsed.hostname !== hostnameBeforeNormalization) {
+    throw new Error(
+      `FaceTheory strict CSP ${label} URL must not carry a trailing DNS root dot: ${trimmed}`,
+    );
   }
 
   if (!allowedOrigin) {

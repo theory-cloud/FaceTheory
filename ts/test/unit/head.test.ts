@@ -471,26 +471,107 @@ test('head: strict CSP allows same-origin relative and absolute script src/link 
   assert.ok(absoluteHead.includes('href="https://app.example/assets/app.css"'));
 });
 
-test('head: strict CSP normalizes a dotted allowed origin for dotted and dotless URLs', () => {
-  for (const href of [
-    'https://real.example./articles/canonical',
-    'https://real.example/articles/canonical',
-  ]) {
-    const head = renderFaceHead(
-      {
-        html: '<div>ok</div>',
-        csp: {
-          inlineScripts: false,
-          inlineStyles: false,
-          rawHead: false,
+test('head: strict CSP rejects a URL carrying a trailing DNS root dot', () => {
+  // Deliberate behavior reversal of a526684: the dotted URL used to be accepted
+  // and rendered verbatim, so the validated string differed from the rendered
+  // string. The rendered byte sequence must now equal the validated one.
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          headTags: [
+            {
+              type: 'script',
+              attrs: { src: 'https://real.example./assets/entry.js' },
+            },
+          ],
         },
-        headTags: [{ type: 'link', attrs: { rel: 'canonical', href } }],
-      },
-      { allowedOrigin: 'https://real.example.' },
-    );
+        { allowedOrigin: 'https://real.example.' },
+      ),
+    /must not carry a trailing DNS root dot/,
+  );
 
-    assert.ok(head.includes(`href="${href}"`));
-  }
+  const head = renderFaceHead(
+    {
+      html: '<div>ok</div>',
+      csp: {
+        inlineScripts: false,
+        inlineStyles: false,
+        rawHead: false,
+      },
+      headTags: [
+        {
+          type: 'script',
+          attrs: { src: 'https://real.example/assets/entry.js' },
+        },
+      ],
+    },
+    { allowedOrigin: 'https://real.example.' },
+  );
+
+  assert.ok(head.includes('src="https://real.example/assets/entry.js"'));
+});
+
+test('head: strict CSP normalizes a dotted allowed origin for dotless URLs', () => {
+  const head = renderFaceHead(
+    {
+      html: '<div>ok</div>',
+      csp: {
+        inlineScripts: false,
+        inlineStyles: false,
+        rawHead: false,
+      },
+      headTags: [
+        {
+          type: 'link',
+          attrs: {
+            rel: 'canonical',
+            href: 'https://real.example/articles/canonical',
+          },
+        },
+      ],
+    },
+    { allowedOrigin: 'https://real.example.' },
+  );
+
+  assert.ok(
+    head.includes('href="https://real.example/articles/canonical"'),
+    head,
+  );
+
+  // Behavior reversal (was accepted and rendered verbatim before this change):
+  // a dotted URL is no longer accepted, so the validated URL always equals the
+  // rendered URL byte-for-byte.
+  assert.throws(
+    () =>
+      renderFaceHead(
+        {
+          html: '<div>ok</div>',
+          csp: {
+            inlineScripts: false,
+            inlineStyles: false,
+            rawHead: false,
+          },
+          headTags: [
+            {
+              type: 'link',
+              attrs: {
+                rel: 'canonical',
+                href: 'https://real.example./articles/canonical',
+              },
+            },
+          ],
+        },
+        { allowedOrigin: 'https://real.example.' },
+      ),
+    /must not carry a trailing DNS root dot/,
+  );
 });
 
 test('head: strict CSP rejects a second trailing DNS root dot on both origins', () => {
@@ -716,4 +797,186 @@ test('head: escapes title and blocks unsafe hydration module URLs', () => {
   assert.equal(head.includes('legacy'), false);
   assert.equal(head.includes('<script>alert("title")</script>'), false);
   assert.equal(head.includes('javascript:alert(1)'), false);
+});
+
+const strictValidationPolicy = {
+  inlineScripts: false,
+  inlineStyles: false,
+  rawHead: false,
+} as const;
+
+// Counts the String primitives the strict-CSP scanner is built on so the
+// validator's work can be compared across input sizes without relying on
+// wall-clock timing alone.
+function countStringScanCalls(run: () => void): number {
+  const proto = String.prototype;
+  const originalIndexOf = proto.indexOf;
+  const originalCharCodeAt = proto.charCodeAt;
+  let calls = 0;
+  proto.indexOf = function (this: string, ...args: Parameters<string['indexOf']>) {
+    calls += 1;
+    return originalIndexOf.apply(this, args);
+  };
+  proto.charCodeAt = function (this: string, index: number) {
+    calls += 1;
+    return originalCharCodeAt.call(this, index);
+  };
+  try {
+    run();
+  } finally {
+    proto.indexOf = originalIndexOf;
+    proto.charCodeAt = originalCharCodeAt;
+  }
+  return calls;
+}
+
+function manyHeadScriptsDocument(count: number): string {
+  const scripts = Array.from(
+    { length: count },
+    (_, index) => `<script src="/assets/s${index}.js"></script>`,
+  ).join('');
+  return (
+    '<!doctype html><html><head>' +
+    '<script nonce="nonce-many" type="application/ld+json">{"@type":"WebPage"}</script>' +
+    scripts +
+    '</head><body><main>ok</main></body></html>'
+  );
+}
+
+test('security: strict CSP head-script validation work grows linearly with script count', () => {
+  const validate = (html: string) =>
+    validateStrictCspDocument(html, {
+      policy: strictValidationPolicy,
+      cspNonce: 'nonce-many',
+    });
+
+  const small = manyHeadScriptsDocument(1000);
+  const large = manyHeadScriptsDocument(4000);
+  assert.doesNotThrow(() => validate(small));
+  assert.doesNotThrow(() => validate(large));
+
+  const smallCalls = countStringScanCalls(() => validate(small));
+  const largeCalls = countStringScanCalls(() => validate(large));
+  assert.ok(
+    largeCalls <= smallCalls * 6,
+    `expected linear scan work, 4x scripts cost ${largeCalls / smallCalls}x`,
+  );
+
+  const startedAt = performance.now();
+  validate(manyHeadScriptsDocument(16000));
+  assert.ok(performance.now() - startedAt < 2000);
+});
+
+test('security: strict CSP head boundary still limits nonce JSON-LD to the document head', () => {
+  const bodyJsonLd =
+    '<!doctype html><html><head><title>x</title></head><body>' +
+    '<script nonce="nonce-a" type="application/ld+json">{"@type":"WebPage"}</script>' +
+    '</body></html>';
+  assert.throws(
+    () =>
+      validateStrictCspDocument(bodyJsonLd, {
+        policy: strictValidationPolicy,
+        cspNonce: 'nonce-a',
+      }),
+    /inline script tags/,
+  );
+
+  const headJsonLd =
+    '<!doctype html><html><head>' +
+    '<script nonce="nonce-a" type="application/ld+json">{"@type":"WebPage"}</script>' +
+    '</head><body><main>ok</main></body></html>';
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(headJsonLd, {
+      policy: strictValidationPolicy,
+      cspNonce: 'nonce-a',
+    }),
+  );
+  assert.throws(
+    () =>
+      validateStrictCspDocument(headJsonLd, {
+        policy: strictValidationPolicy,
+        cspNonce: 'nonce-b',
+      }),
+    /inline script tags/,
+  );
+});
+
+function incompleteClosingCandidatesDocument(count: number): string {
+  return (
+    '<!doctype html><html><head></head><body><script src="/ok.js">x' +
+    '</script '.repeat(count)
+  );
+}
+
+test('security: incomplete script closing candidates are scanned in linear time and still fail closed', () => {
+  const validate = (html: string) =>
+    validateStrictCspDocument(html, { policy: strictValidationPolicy });
+
+  assert.throws(
+    () => validate(incompleteClosingCandidatesDocument(1000)),
+    /inline script tags/,
+  );
+
+  let smallCalls = 0;
+  let largeCalls = 0;
+  smallCalls = countStringScanCalls(() => {
+    assert.throws(() => validate(incompleteClosingCandidatesDocument(2000)));
+  });
+  largeCalls = countStringScanCalls(() => {
+    assert.throws(() => validate(incompleteClosingCandidatesDocument(8000)));
+  });
+  assert.ok(
+    largeCalls <= smallCalls * 6,
+    `expected linear scan work, 4x candidates cost ${largeCalls / smallCalls}x`,
+  );
+
+  const startedAt = performance.now();
+  assert.throws(
+    () => validate(incompleteClosingCandidatesDocument(40000)),
+    /inline script tags/,
+  );
+  assert.ok(
+    performance.now() - startedAt < 2000,
+    'incomplete closing candidates must not trigger quadratic suffix rescans',
+  );
+});
+
+test('security: parser-valid script closing tags remain recognized after incomplete candidates', () => {
+  const validate = (html: string) =>
+    validateStrictCspDocument(html, { policy: strictValidationPolicy });
+
+  assert.doesNotThrow(() =>
+    validate(
+      '<!doctype html><html><head><script src="/a.js"></script data-x="a>b" ></head>' +
+        '<body><script src="/b.js"></SCRIPT\t></body></html>',
+    ),
+  );
+  // An unterminated quote swallows the first candidate; the later
+  // parser-valid end tag closes the body, which then carries inline content.
+  assert.throws(
+    () =>
+      validate(
+        "<!doctype html><html><head></head><body><script src=\"/a.js\"></script a='" +
+          '</script>alert(1)</script></body></html>',
+      ),
+    /inline script tags/,
+  );
+  // Incomplete candidates followed by a `>` form one parser-valid end tag, so
+  // the script body is empty and the trailing text is inert body text.
+  assert.doesNotThrow(() =>
+    validate(
+      '<!doctype html><html><head></head><body><script src="/a.js">' +
+        '</script '.repeat(50) +
+        '>after</body></html>',
+    ),
+  );
+  assert.throws(
+    () =>
+      validate(
+        '<!doctype html><html><head></head><body><script src="/a.js">alert(1)' +
+          '</script '.repeat(50) +
+          '></body></html>',
+      ),
+    /inline script tags/,
+  );
 });

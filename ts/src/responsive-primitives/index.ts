@@ -548,23 +548,30 @@ export function isExternalLinkHref(
   href: string,
   sameOriginBaseHref?: string | URL,
 ): boolean {
-  if (!isHttpUrlLike(href)) return false;
+  const value = String(href ?? '').trim();
+  if (!isHttpUrlLike(value)) return false;
+
+  let base: URL | undefined;
+  if (sameOriginBaseHref !== undefined) {
+    try {
+      base = new URL(String(sameOriginBaseHref));
+    } catch {
+      return true;
+    }
+  }
 
   let url: URL;
   try {
-    url = new URL(href);
-  } catch {
-    return false;
-  }
-
-  if (sameOriginBaseHref === undefined) return true;
-
-  try {
-    const base = new URL(String(sameOriginBaseHref));
-    return url.origin !== base.origin;
+    // Protocol-relative targets must be resolved against the base origin (or a
+    // neutral origin) so `//host` is classified as external rather than treated
+    // as a same-origin relative path.
+    url = base ? new URL(value, base) : new URL(value);
   } catch {
     return true;
   }
+
+  if (base === undefined) return true;
+  return url.origin !== base.origin;
 }
 
 export function classifyResponsiveLinkClick(
@@ -599,7 +606,7 @@ export function handleResponsiveLinkClick(
 }
 
 function isHttpUrlLike(href: string): boolean {
-  return /^https?:\/\//i.test(href.trim());
+  return /^(?:https?:)?\/\//i.test(href.trim());
 }
 
 function unsafeNormalizedHrefScheme(href: string): string | null {

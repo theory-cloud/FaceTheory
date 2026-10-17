@@ -72,7 +72,7 @@ See [TableTheory integration](../integrations/tabletheory.md) for the import bou
 
 ## Tenant safety (fail-closed)
 
-Blocking ISR is **fail-closed** when known tenant-boundary headers (e.g. `x-tenant-id`, `x-facetheory-tenant`) reach FaceTheory without an explicit `tenantKey` or custom `cacheKey`. Tenant-invariant ISR must strip viewer-supplied tenant-like headers at the CloudFront / AppTheory boundary; tenant-varying pages must use SSR or an explicit trusted partition that includes every request-varying dimension affecting the cached HTML.
+Blocking ISR is **fail-closed** when known tenant-boundary headers (e.g. `x-tenant-id`, `x-facetheory-tenant`) reach FaceTheory without an explicit, trusted `tenantKey`. A custom `cacheKey` alone does not exempt a tenant-scoped route: FaceTheory composes a framework-owned tenant partition with the consumer's logical key, and refuses before cache/lease/write when the trusted `tenantKey` is missing on a tenant-scoped custom-key route. Tenant-invariant ISR must strip viewer-supplied tenant-like headers at the CloudFront / AppTheory boundary; tenant-varying pages must use SSR or an explicit trusted partition that includes every request-varying dimension affecting the cached HTML.
 
 See [ISR tenant safety](../features/isr-tenant-safety.md) and [Migration Guide → Adopt ISR tenant fail-closed defaults](../migration-guide.md).
 
@@ -92,6 +92,33 @@ export const app = createFaceApp({
 ```
 
 With `varyCookies`, only listed cookies partition the default cache key; absent `varyCookies` keeps the all-cookies default. The allowlist must contain at least one cookie name. `varyCookies: []` is rejected at app construction because it would remove cookie partitioning entirely.
+
+## Cache-Control and request privacy (fail-closed)
+
+ISR responses fail closed at the cache-control boundary. A request is treated as request-private when either:
+
+- the deployment configured an explicit custom `cacheKey` (an opaque, consumer-owned identity the framework cannot attribute to a shared viewer), or
+- the request carries an auth-variant signal: any default auth-vary header (`Authorization`, `Proxy-Authorization`, `X-API-Key`, `X-Amz-Security-Token`) or **any** request cookie.
+
+A request-private response is emitted — and its rendered HTML stored — with `cache-control: private, no-store`. Every cookie counts here, independent of `varyCookies`: `varyCookies` only scopes the default cache-key digest, so an unlisted cookie can contribute nothing to the key yet still never re-share a request-private response.
+
+An ordinary anonymous request on the default cache key keeps the shared value `blockingIsrCacheControl(revalidateSeconds)`:
+
+```
+public, max-age=0, s-maxage=0, stale-if-error=<revalidateSeconds>, must-revalidate
+```
+
+The guard applies on every emission path — fresh hit, miss, wait-hit, serve-stale, stale-after-error, and stale-metadata-error — and to the `HtmlStore` write, so a guarded render's stored object metadata never remains public.
+
+### Explicit `cacheControl` callbacks
+
+`FaceIsrOptions.cacheControl` still shapes the emitted cache-control value for **unguarded** requests, and a callback that returns `private, no-store` is preserved verbatim. It cannot widen a guarded request: when the guard applies, the callback result is not emitted. The origin-store write is always the framework default (or `private, no-store` when guarded); the callback only affects the response header, exactly as before.
+
+### Supported auth boundary
+
+The framework's supported auth surface is exactly the default key's fail-safe variant set: the default auth-vary headers plus all cookies. A deployment that authenticates with a bespoke identity header **not** in that set (for example `x-session-token`) and no cookies is not detectable as authenticated on the default key. If you authenticate that way, configure an explicit `cacheKey` that partitions on the identity input; a custom `cacheKey` now fails closed deployment-wide, including for anonymous requests. Origin key partition is not shared-cache safety on its own: the cache-control guard, not the key, is what stops a shared cache from storing a request-private response.
+
+Treat `cacheControl` like `tenantKeyFromTrustedHeader`: it is emitted per request and cannot see whether an upstream boundary already stripped client-supplied identity, so rely only on values a trusted boundary wrote after authentication.
 
 ## On-demand invalidation
 

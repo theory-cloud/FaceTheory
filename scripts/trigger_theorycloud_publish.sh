@@ -114,7 +114,7 @@ PAYLOAD="$(
   IDEMPOTENCY_KEY="${IDEMPOTENCY_KEY}" \
   REASON="${REASON}" \
   FORCE="${FORCE}" \
-  python3 - <<'PY'
+  python3 -I - <<'PY'
 import json
 import os
 

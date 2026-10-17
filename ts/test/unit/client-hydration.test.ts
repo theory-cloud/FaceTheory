@@ -122,6 +122,7 @@ test('client hydration loader: fetches same-origin external hydration data', asy
       document: dom.window.document,
       requestInit: {
         headers: { 'x-synthetic-test': 'yes' },
+        redirect: 'follow',
       },
       fetcher: async (input, init) => {
         fetched.push({ input: String(input), init });
@@ -136,6 +137,9 @@ test('client hydration loader: fetches same-origin external hydration data', asy
     });
 
     assert.deepEqual(data, { route: 'home' });
+    assert.equal(fetched[0]?.init?.redirect, 'error');
+
+    assert.deepEqual(data, { route: 'home' });
     assert.equal(
       readFaceExternalHydrationDataUrl(dom.window.document),
       '/_facetheory/ssr-data/home.json',
@@ -145,7 +149,7 @@ test('client hydration loader: fetches same-origin external hydration data', asy
       ['https://app.test/_facetheory/ssr-data/home.json'],
     );
     assert.equal(fetched[0]?.init?.credentials, 'same-origin');
-    assert.equal(fetched[0]?.init?.redirect, 'follow');
+    assert.equal(fetched[0]?.init?.redirect, 'error');
     assert.equal(
       (fetched[0]?.init?.headers as Record<string, string> | undefined)?.accept,
       'application/json',

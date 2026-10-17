@@ -2,14 +2,8 @@ Verifier: gov_check_security
 Repository: /Users/theorycloud/AgentSpace/factory/products/frameworks/FaceTheory
 Rubric ID: SEC-1
 
-npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
-npm-audit: ALLOW (ts) brace-expansion via GHSA-q2hr-2g5m-vwhr,GHSA-qhr7-859c-m2p7,GHSA-6j4f-fj2g-mc7p [scoped exception, expires 2026-11-02]
 npm-audit: PASS (ts)
-npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
-npm-audit: ALLOW (infra/apptheory-ssr-site) brace-expansion via GHSA-q2hr-2g5m-vwhr,GHSA-qhr7-859c-m2p7,GHSA-6j4f-fj2g-mc7p [scoped exception, expires 2026-11-02]
 npm-audit: PASS (infra/apptheory-ssr-site)
-npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
-npm-audit: ALLOW (infra/apptheory-ssg-isr-site) brace-expansion via GHSA-q2hr-2g5m-vwhr,GHSA-qhr7-859c-m2p7,GHSA-6j4f-fj2g-mc7p [scoped exception, expires 2026-11-02]
 npm-audit: PASS (infra/apptheory-ssg-isr-site)
   self-test scan scope: lockfiles 3
   self-test synthetic dependency-excludes-floor: FAIL dependency node_modules/floor-too-high >=24
@@ -25,10 +19,10 @@ npm-audit: PASS (infra/apptheory-ssg-isr-site)
   self-test synthetic non-object-engines: FAIL CLOSED (non-object engines)
   self-test synthetic root-without-engines-node: FAIL CLOSED (does not declare engines.node for its root entry)
   self-test synthetic root-entry-absent: FAIL CLOSED (does not declare engines.node for its root entry)
-  ts/package-lock.json project engines.node ">=22" (312 dependency engine ranges)
+  ts/package-lock.json project engines.node ">=22" (311 dependency engine ranges)
   infra/apptheory-ssr-site/package-lock.json project engines.node ">=24" (112 dependency engine ranges)
   infra/apptheory-ssg-isr-site/package-lock.json project engines.node ">=24" (112 dependency engine ranges)
-node-engines-floor: PASS (self-test 88 matcher and scope cases + 13 synthetic lockfiles; floor Node 22.x; lockfiles 3; dependency engine ranges 536; distinct ranges 72)
+node-engines-floor: PASS (self-test 88 matcher and scope cases + 13 synthetic lockfiles; floor Node 22.x; lockfiles 3; dependency engine ranges 535; distinct ranges 72)
   self-test scan scope: surfaces 3
   self-test coverage scope: roots 2
   self-test coverage walk: 3 surfaces
@@ -60,17 +54,25 @@ node-engines-floor: PASS (self-test 88 matcher and scope cases + 13 synthetic lo
   self-test synthetic supported-runtime-through-a-quoted-index: PASS
   self-test synthetic deprecated-runtime-through-a-renamed-destructure: FAIL deprecated
   self-test synthetic supported-runtime-through-a-renamed-destructure: PASS
+  self-test synthetic deprecated-runtime-through-a-quoted-enum-index: FAIL deprecated
+  self-test synthetic supported-runtime-through-a-quoted-enum-index: PASS
+  self-test synthetic unmodelled-runtime-through-a-quoted-enum-index: FAIL unmodelled-enum
+  self-test synthetic deprecated-runtime-through-an-aliased-quoted-enum-index: FAIL deprecated
+  self-test synthetic supported-declaration-does-not-mask-a-quoted-enum-index: FAIL deprecated
+  self-test synthetic dynamic-fromString-declares-an-unresolved-runtime: FAIL unresolved-dynamic-runtime
+  self-test synthetic supported-declaration-does-not-mask-a-dynamic-fromString: FAIL unresolved-dynamic-runtime
+  self-test synthetic dynamic-fromString-with-a-stray-runtime-literal-still-fails: FAIL unresolved-dynamic-runtime
+  self-test synthetic non-receiver-fromString-is-not-a-declaration: PASS
   self-test synthetic surface-without-a-declaration: FAIL CLOSED (declares no modelled Lambda runtime)
   self-test synthetic surface-of-only-quoted-non-runtimes: FAIL CLOSED (declares no modelled Lambda runtime)
   self-test synthetic named-import-with-an-unreadable-member: FAIL CLOSED (declares no modelled Lambda runtime)
   self-test synthetic aliased-namespace-with-an-unreadable-member: FAIL CLOSED (declares no modelled Lambda runtime)
-  self-test synthetic dynamic-fromString-rescued-by-a-stray-runtime-literal: FAIL CLOSED (declares no modelled Lambda runtime)
-  self-test synthetic dynamic-fromString-with-no-literal-at-all: FAIL CLOSED (declares no modelled Lambda runtime)
   self-test missing surface: FAIL CLOSED (could not read scanned surface)
   self-test entry point without a coverage scan root: FAIL CLOSED (gate FAIL line, no stack frames)
   infra/apptheory-ssr-site/src/stack.ts declares 1 Lambda runtime(s)
   infra/apptheory-ssg-isr-site/src/stack.ts declares 1 Lambda runtime(s)
   ts/src/create-templates/index.ts declares 1 Lambda runtime(s)
-lambda-runtime-deprecations: PASS (self-test 35 synthetic surfaces + 2 scope cases + 1 entry-point probe; surfaces 3; declarations 3; deprecated set 11; supported nodejs22.x, nodejs24.x)
-ci-install-hardening: PASS (54 surfaces)
+lambda-runtime-deprecations: PASS (self-test 42 synthetic surfaces + 2 scope cases + 1 entry-point probe; surfaces 3; declarations 3; deprecated set 11; supported nodejs22.x, nodejs24.x)
+ci-install-hardening: PASS (68 surfaces)
+theorycloud-publish-install: PASS
 workflow-action-pins: PASS

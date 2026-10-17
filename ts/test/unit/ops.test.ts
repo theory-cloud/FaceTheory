@@ -143,3 +143,116 @@ test('FaceApp: request metrics tag deterministic render errors by class', async 
     'TypeError',
   );
 });
+
+test('FaceApp: unmatched request metrics use one fixed route label while logs keep the path', async () => {
+  const logs: Array<Record<string, unknown>> = [];
+  const metrics: Array<{ name: string; tags?: Record<string, string> }> = [];
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/items/{id}',
+        mode: 'ssr',
+        render: (ctx) => ({ html: `<main>${String(ctx.params.id)}</main>` }),
+      },
+    ],
+    trailingSlash: 'redirect',
+    observability: {
+      log: (record) => logs.push(record as unknown as Record<string, unknown>),
+      metric: (record) =>
+        metrics.push(record as unknown as { name: string; tags?: Record<string, string> }),
+    },
+  });
+
+  const unmatchedPaths = Array.from(
+    { length: 50 },
+    (_, index) => `/missing/${index}-${Math.random().toString(36).slice(2)}`,
+  );
+  for (const path of unmatchedPaths) {
+    const response = await app.handle({ method: 'GET', path });
+    assert.equal(response.status, 404);
+  }
+
+  const unmatchedLabels = new Set(
+    metrics
+      .filter((metric) => metric.name === 'facetheory.request')
+      .map((metric) => metric.tags?.route_pattern),
+  );
+  assert.deepEqual([...unmatchedLabels], ['unmatched']);
+  assert.deepEqual(
+    logs.map((record) => record.path),
+    unmatchedPaths,
+  );
+  for (const metric of metrics) {
+    for (const value of Object.values(metric.tags ?? {})) {
+      assert.ok(!value.startsWith('/missing/'), `metric tag leaked path ${value}`);
+    }
+  }
+
+  metrics.length = 0;
+  logs.length = 0;
+  await app.handle({ method: 'GET', path: '/items/a' });
+  await app.handle({ method: 'GET', path: '/items/b' });
+  const redirect = await app.handle({ method: 'GET', path: '/items/c/' });
+  assert.equal(redirect.status >= 300 && redirect.status < 400, true);
+
+  const requestLabels = metrics
+    .filter((metric) => metric.name === 'facetheory.request')
+    .map((metric) => metric.tags?.route_pattern);
+  assert.deepEqual(requestLabels, ['/items/{id}', '/items/{id}', '/items/{id}']);
+  const renderLabels = metrics
+    .filter((metric) => metric.name === 'facetheory.render_ms')
+    .map((metric) => metric.tags?.route_pattern);
+  assert.deepEqual(renderLabels, ['/items/{id}', '/items/{id}']);
+  assert.deepEqual(
+    logs.map((record) => [record.path, record.routePattern]),
+    [
+      ['/items/a', '/items/{id}'],
+      ['/items/b', '/items/{id}'],
+      ['/items/c/', '/items/{id}'],
+    ],
+  );
+});
+
+test('FaceApp: stream error metrics keep the matched route template', async () => {
+  const metrics: Array<{ name: string; tags?: Record<string, string> }> = [];
+  const logs: Array<Record<string, unknown>> = [];
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/streams/{id}',
+        mode: 'ssr',
+        render: () => ({
+          html: (async function* () {
+            yield new TextEncoder().encode('<main>ok</main>');
+            throw new Error('stream boom');
+          })(),
+        }),
+      },
+    ],
+    observability: {
+      log: (record) => logs.push(record as unknown as Record<string, unknown>),
+      metric: (record) =>
+        metrics.push(record as unknown as { name: string; tags?: Record<string, string> }),
+    },
+  });
+
+  const originalConsoleError = console.error;
+  console.error = () => undefined;
+  try {
+    const response = await app.handle({ method: 'GET', path: '/streams/x1' });
+    assert.ok(!(response.body instanceof Uint8Array));
+    for await (const chunk of response.body) void chunk;
+  } finally {
+    console.error = originalConsoleError;
+  }
+
+  const streamErrorMetric = metrics.find(
+    (metric) => metric.name === 'facetheory.stream_error',
+  );
+  assert.equal(streamErrorMetric?.tags?.route_pattern, '/streams/{id}');
+  const streamErrorLog = logs.find(
+    (record) => record.event === 'facetheory.stream_error',
+  );
+  assert.equal(streamErrorLog?.path, '/streams/x1');
+});

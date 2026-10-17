@@ -23,7 +23,7 @@ Optional:
 Use the CLI from the pinned GitHub Release tarball to create an adapter-specific starter before hand-writing any hydration code:
 
 ```bash
-export FACETHEORY_VERSION=4.2.1 # x-release-please-version
+export FACETHEORY_VERSION=5.0.0-rc # x-release-please-version
 npx --package \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz" \
   facetheory create my-app --adapter react
@@ -55,7 +55,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=4.2.1 # x-release-please-version
+export FACETHEORY_VERSION=5.0.0-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -81,10 +81,10 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v5.0.1/theory-cloud-apptheory-5.0.1.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v6.2.0/theory-cloud-apptheory-6.2.0.tgz
 
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v4.0.1/theory-cloud-tabletheory-ts-4.0.1.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v6.0.0/theory-cloud-tabletheory-ts-6.0.0.tgz
 ```
 
 Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoint. Use TableTheory when you want the documented production ISR metadata store adapter.
@@ -633,12 +633,12 @@ Important ISR default:
 
 - FaceTheory’s default ISR cache key partitions by route params, query string, and hashed request-identity inputs for cookies and common auth headers without storing raw secrets.
 - FaceTheory’s default ISR tenant is `default`; configure `tenantKey` explicitly for authenticated tenant boundaries.
-- If a request carries `x-tenant-id` or `x-facetheory-tenant` and no explicit `tenantKey` or custom `cacheKey` is configured, ISR fails closed before cache lookup/write.
-- If cached HTML varies by other headers or host-derived tenant, configure an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
+- If a request carries `x-tenant-id` or `x-facetheory-tenant`, ISR fails closed unless an explicit, trusted `tenantKey` is configured. A custom `cacheKey` does not exempt a tenant-scoped route; the trusted tenant is composed into the effective custom-key identity.
+- If cached HTML varies by other headers or host-derived tenant, configure an explicit `tenantKey` (with a custom `cacheKey` when you need a richer logical partition) or keep that route on SSR.
 
 ## Reference Bundle
 
-The `v4.2.1` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v5.0.0-rc` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples

@@ -354,7 +354,10 @@ export class FaceApp {
           withQueryString(trailingSlashRedirectPath, normalizedReq.query),
         ),
         {
-          routePattern: trailingSlashRedirectPath,
+          // Label the redirect with the matched route template, never the
+          // request-derived concrete path.
+          routePattern:
+            this.router.match(trailingSlashRedirectPath)?.pattern ?? '',
           mode,
           renderMs,
           coldStart,
@@ -937,7 +940,7 @@ function finishResponse(
     value: 1,
     tags: {
       method: req.method,
-      route_pattern: context.routePattern || req.path,
+      route_pattern: routePatternMetricLabel(context.routePattern),
       mode: String(context.mode),
       status: String(out.status),
       isr_state: isrState ?? '',
@@ -953,7 +956,7 @@ function finishResponse(
       value: 1,
       tags: {
         method: req.method,
-        route_pattern: context.routePattern || req.path,
+        route_pattern: routePatternMetricLabel(context.routePattern),
         state: isrState,
         status: String(out.status),
       },
@@ -966,13 +969,21 @@ function finishResponse(
       value: context.renderMs,
       tags: {
         method: req.method,
-        route_pattern: context.routePattern || req.path,
+        route_pattern: routePatternMetricLabel(context.routePattern),
         mode: String(context.mode),
       },
     });
   }
 
   return out;
+}
+
+// Metric tags must stay low-cardinality: unmatched requests share one fixed
+// route label, and the request path is reported only in structured logs.
+const UNMATCHED_ROUTE_METRIC_LABEL = 'unmatched';
+
+function routePatternMetricLabel(routePattern: string): string {
+  return routePattern || UNMATCHED_ROUTE_METRIC_LABEL;
 }
 
 function withObservedError(
@@ -1247,7 +1258,7 @@ function reportStreamError(
     value: 1,
     tags: {
       method: context.method,
-      route_pattern: context.routePattern || context.path,
+      route_pattern: routePatternMetricLabel(context.routePattern),
       mode: String(context.mode),
       error_class: errorClass,
     },
@@ -1341,6 +1352,11 @@ function withQueryString(
 }
 
 function redirectResponse(location: string): FaceResponse {
+  if (!/^\/(?!\/)/.test(location) || location.includes('\\')) {
+    throw new Error(
+      `FaceTheory redirect Location must be a single-leading-slash origin-relative path: ${JSON.stringify(location)}`,
+    );
+  }
   return textResponse(308, 'Permanent Redirect', {
     location: [location],
     'content-type': ['text/plain; charset=utf-8'],

@@ -3,10 +3,13 @@ import test from 'node:test';
 
 import { createFaceApp } from '../../src/app.js';
 import {
+  blockingIsrCacheControl,
   type CommitIsrGenerationInput,
   createIsrRuntime,
   defaultIsrCacheKey,
   type FaceIsrOptions,
+  type HtmlStore,
+  type HtmlStoreReadResult,
   type HtmlStoreWriteInput,
   type HtmlStoreWriteResult,
   InMemoryHtmlStore,
@@ -18,6 +21,7 @@ import {
   type TryAcquireIsrLeaseInput,
   type TryAcquireIsrLeaseResult,
 } from '../../src/isr.js';
+import type { FaceContext, FaceModule, FaceResponse } from '../../src/types.js';
 
 function decodeBody(body: Uint8Array): string {
   return new TextDecoder().decode(body);
@@ -59,6 +63,62 @@ async function withTimeout<T>(
       },
     );
   });
+}
+
+class CountingHtmlStore implements HtmlStore {
+  readonly inner = new InMemoryHtmlStore();
+  readCalls = 0;
+  writeCalls = 0;
+
+  async read(key: string): Promise<HtmlStoreReadResult | null> {
+    this.readCalls += 1;
+    return await this.inner.read(key);
+  }
+
+  async write(input: HtmlStoreWriteInput): Promise<HtmlStoreWriteResult> {
+    this.writeCalls += 1;
+    return await this.inner.write(input);
+  }
+}
+
+class CountingMetaStore implements IsrMetaStore {
+  readonly inner = new InMemoryIsrMetaStore();
+  getCalls = 0;
+  invalidateCalls = 0;
+  leaseCalls = 0;
+  commitCalls = 0;
+  releaseCalls = 0;
+
+  async get(cacheKey: string): Promise<IsrMetaRecord | null> {
+    this.getCalls += 1;
+    return await this.inner.get(cacheKey);
+  }
+
+  async invalidate(cacheKey: string): Promise<void> {
+    this.invalidateCalls += 1;
+    await this.inner.invalidate(cacheKey);
+  }
+
+  async tryAcquireLease(
+    input: TryAcquireIsrLeaseInput,
+  ): Promise<TryAcquireIsrLeaseResult> {
+    this.leaseCalls += 1;
+    return await this.inner.tryAcquireLease(input);
+  }
+
+  async commitGeneration(input: CommitIsrGenerationInput): Promise<void> {
+    this.commitCalls += 1;
+    await this.inner.commitGeneration(input);
+  }
+
+  async releaseLease(input: ReleaseIsrLeaseInput): Promise<void> {
+    this.releaseCalls += 1;
+    await this.inner.releaseLease(input);
+  }
+
+  debugSnapshot(): IsrMetaRecord[] {
+    return this.inner.debugSnapshot();
+  }
 }
 
 test('isr: stale burst triggers one regeneration and waiters share result', async () => {
@@ -643,7 +703,63 @@ test('isr: tenantKey option partitions by a trusted header boundary', async () =
   assert.equal(cacheKeys.length, 2);
 });
 
-test('isr: custom cacheKey is an explicit tenant boundary partition contract', async () => {
+test('isr: custom cacheKey without an explicit tenantKey fails closed on tenant boundary signals', async () => {
+  const htmlStore = new CountingHtmlStore();
+  const metaStore = new CountingMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/tenant/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>tenant-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      cacheKey: ({ routePattern }) => `custom::${routePattern}`,
+    },
+  });
+
+  const tenantA = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['TENANT_SECRET_A'] },
+  });
+  const tenantB = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-facetheory-tenant': ['TENANT_SECRET_B'] },
+  });
+
+  assert.equal(tenantA.status, 500);
+  assert.equal(tenantB.status, 500);
+  assert.equal(renderCount, 0);
+  assert.equal(
+    decodeBody(tenantA.body as Uint8Array).includes('TENANT_SECRET_A'),
+    false,
+  );
+  assert.equal(
+    decodeBody(tenantB.body as Uint8Array).includes('TENANT_SECRET_B'),
+    false,
+  );
+  // Fail closed before any metadata lookup, lease acquisition, or HTML store access.
+  assert.equal(metaStore.getCalls, 0);
+  assert.equal(metaStore.leaseCalls, 0);
+  assert.equal(metaStore.commitCalls, 0);
+  assert.equal(metaStore.releaseCalls, 0);
+  assert.equal(htmlStore.readCalls, 0);
+  assert.equal(htmlStore.writeCalls, 0);
+  assert.deepEqual(metaStore.debugSnapshot(), []);
+});
+
+test('isr: explicit tenantKey partitions custom cache keys so tenants sharing one logical key stay isolated', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new InMemoryIsrMetaStore();
   let renderCount = 0;
@@ -664,52 +780,270 @@ test('isr: custom cacheKey is an explicit tenant boundary partition contract', a
     isr: {
       htmlStore,
       metaStore,
-      cacheKey: (input) => {
-        const tenant = input.headers?.['x-tenant-id']?.[0];
-        const tenantPartition = tenant === 'TENANT_SECRET_A' ? 'a' : 'b';
-        return `custom::${input.routePattern}#tenant=${tenantPartition}`;
-      },
+      tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+      // Identical logical key for every tenant: the framework-owned tenant
+      // partition must still keep the stored identities distinct.
+      cacheKey: ({ routePattern }) => `shared::${routePattern}`,
     },
   });
 
   const tenantAFirst = await app.handle({
     method: 'GET',
     path: '/tenant/home',
-    headers: { 'x-tenant-id': ['TENANT_SECRET_A'] },
+    headers: { 'x-tenant-id': ['tenant-a'] },
   });
   const tenantBFirst = await app.handle({
     method: 'GET',
     path: '/tenant/home',
-    headers: { 'x-tenant-id': ['TENANT_SECRET_B'] },
+    headers: { 'x-tenant-id': ['tenant-b'] },
   });
   const tenantASecond = await app.handle({
     method: 'GET',
     path: '/tenant/home',
-    headers: { 'x-tenant-id': ['TENANT_SECRET_A'] },
+    headers: { 'x-tenant-id': ['tenant-a'] },
   });
 
-  assert.equal(tenantAFirst.status, 200);
-  assert.equal(tenantBFirst.status, 200);
-  assert.equal(tenantASecond.status, 200);
-  assert.ok(
-    decodeBody(tenantAFirst.body as Uint8Array).includes('TENANT_SECRET_A-1'),
+  assert.ok(decodeBody(tenantAFirst.body as Uint8Array).includes('tenant-a-1'));
+  assert.ok(decodeBody(tenantBFirst.body as Uint8Array).includes('tenant-b-2'));
+  // Tenant B never receives tenant A's cached HTML even though the logical key matched.
+  assert.equal(
+    decodeBody(tenantBFirst.body as Uint8Array).includes('tenant-a'),
+    false,
   );
+  // Same-tenant repeats hit that tenant's own partitioned entry.
   assert.ok(
-    decodeBody(tenantBFirst.body as Uint8Array).includes('TENANT_SECRET_B-2'),
-  );
-  assert.ok(
-    decodeBody(tenantASecond.body as Uint8Array).includes('TENANT_SECRET_A-1'),
+    decodeBody(tenantASecond.body as Uint8Array).includes('tenant-a-1'),
   );
   assert.equal(renderCount, 2);
 
-  const serializedKeys = metaStore
-    .debugSnapshot()
-    .map((record) => record.cacheKey)
-    .join('\n');
-  assert.equal(serializedKeys.includes('TENANT_SECRET_A'), false);
-  assert.equal(serializedKeys.includes('TENANT_SECRET_B'), false);
+  const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
+  assert.equal(cacheKeys.length, 2);
+  assert.equal(new Set(cacheKeys).size, 2);
+  const serialized = cacheKeys.join('\n');
+  // The tenant is folded in as a digest: raw trusted tenant values never persist.
+  assert.equal(serialized.includes('tenant-a'), false);
+  assert.equal(serialized.includes('tenant-b'), false);
+});
+
+test('isr: explicit tenantKey distinguishes the literal "default" identifier from another tenant', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/tenant/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async (ctx) => {
+          const seq = ++renderCount;
+          const tenant = ctx.request.headers['x-tenant-id']?.[0] ?? 'missing';
+          return { html: `<main>${tenant}-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+      cacheKey: ({ routePattern }) => `shared::${routePattern}`,
+    },
+  });
+
+  const defaultFirst = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['default'] },
+  });
+  const defaultSecond = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['default'] },
+  });
+  const otherTenant = await app.handle({
+    method: 'GET',
+    path: '/tenant/home',
+    headers: { 'x-tenant-id': ['tenant-a'] },
+  });
+
+  assert.ok(decodeBody(defaultFirst.body as Uint8Array).includes('default-1'));
+  assert.ok(decodeBody(defaultSecond.body as Uint8Array).includes('default-1'));
+  assert.ok(decodeBody(otherTenant.body as Uint8Array).includes('tenant-a-2'));
+  assert.equal(renderCount, 2);
   assert.equal(metaStore.debugSnapshot().length, 2);
 });
+
+test('isr: tenant-invariant custom cacheKey without signals keeps its logical key unchanged', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/public/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>public-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      cacheKey: ({ routePattern }) => `public::${routePattern}`,
+    },
+  });
+
+  const first = await app.handle({ method: 'GET', path: '/public/home' });
+  const second = await app.handle({ method: 'GET', path: '/public/home' });
+
+  assert.ok(decodeBody(first.body as Uint8Array).includes('public-1'));
+  assert.ok(decodeBody(second.body as Uint8Array).includes('public-1'));
+  assert.equal(renderCount, 1);
+
+  const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
+  // No tenant scope and no signal: the consumer's logical key is used verbatim.
+  assert.deepEqual(cacheKeys, ['public::/public/{slug}']);
+});
+
+test('isr: documented tenant-safe example derives distinct keys across tenant, query, and auth variants', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/accounts/{id}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async (ctx) => {
+          const seq = ++renderCount;
+          const tenant = ctx.request.headers['x-tenant-id']?.[0] ?? 'missing';
+          const view = ctx.request.query.view?.[0] ?? 'missing';
+          return { html: `<main>${tenant}-${view}-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      // Trusted tenant identity — never a raw client-supplied header.
+      tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+      // Delegate to defaultIsrCacheKey so query, cookie, and auth request variants
+      // are retained instead of being dropped by a hand-rolled key.
+      cacheKey: (input) => defaultIsrCacheKey(input),
+    },
+  });
+
+  const tenantASummary = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=summary',
+    headers: { 'x-tenant-id': ['tenant-a'] },
+  });
+  const tenantASummaryRepeat = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=summary',
+    headers: { 'x-tenant-id': ['tenant-a'] },
+  });
+  const tenantBSummary = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=summary',
+    headers: { 'x-tenant-id': ['tenant-b'] },
+  });
+  const tenantADetail = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=detail',
+    headers: { 'x-tenant-id': ['tenant-a'] },
+  });
+  const tenantAAuth = await app.handle({
+    method: 'GET',
+    path: '/accounts/42?view=summary',
+    headers: {
+      'x-tenant-id': ['tenant-a'],
+      authorization: ['Bearer SECRET_TOKEN_A'],
+    },
+  });
+
+  assert.ok(
+    decodeBody(tenantASummary.body as Uint8Array).includes(
+      'tenant-a-summary-1',
+    ),
+  );
+  assert.ok(
+    decodeBody(tenantASummaryRepeat.body as Uint8Array).includes(
+      'tenant-a-summary-1',
+    ),
+  );
+  assert.ok(
+    decodeBody(tenantBSummary.body as Uint8Array).includes(
+      'tenant-b-summary-2',
+    ),
+  );
+  assert.ok(
+    decodeBody(tenantADetail.body as Uint8Array).includes('tenant-a-detail-3'),
+  );
+  assert.ok(
+    decodeBody(tenantAAuth.body as Uint8Array).includes('tenant-a-summary-4'),
+  );
+  assert.equal(renderCount, 4);
+
+  const cacheKeys = metaStore.debugSnapshot().map((record) => record.cacheKey);
+  assert.equal(cacheKeys.length, 4);
+  assert.equal(new Set(cacheKeys).size, 4);
+  assert.ok(
+    cacheKeys.every((key) => key.startsWith('isr-tenant:v1:')),
+    'custom cache keys must be composed with a framework-owned tenant partition',
+  );
+});
+
+for (const emptyTenant of [null, undefined, '', '   '] as const) {
+  test(`isr: explicit tenantKey resolving to ${JSON.stringify(emptyTenant)} fails closed for custom cache keys`, async () => {
+    const htmlStore = new CountingHtmlStore();
+    const metaStore = new CountingMetaStore();
+    let renderCount = 0;
+
+    const app = createFaceApp({
+      faces: [
+        {
+          route: '/tenant/{slug}',
+          mode: 'isr',
+          revalidateSeconds: 60,
+          render: async () => {
+            const seq = ++renderCount;
+            return { html: `<main>tenant-${seq}</main>` };
+          },
+        },
+      ],
+      isr: {
+        htmlStore,
+        metaStore,
+        tenantKey: () => emptyTenant,
+        cacheKey: ({ routePattern }) => `custom::${routePattern}`,
+      },
+    });
+
+    const response = await app.handle({
+      method: 'GET',
+      path: '/tenant/home',
+      headers: { 'x-tenant-id': ['tenant-a'] },
+    });
+
+    assert.equal(response.status, 500);
+    assert.equal(renderCount, 0);
+    assert.equal(metaStore.getCalls, 0);
+    assert.equal(metaStore.leaseCalls, 0);
+    assert.equal(metaStore.commitCalls, 0);
+    assert.equal(metaStore.releaseCalls, 0);
+    assert.equal(htmlStore.readCalls, 0);
+    assert.equal(htmlStore.writeCalls, 0);
+    assert.deepEqual(metaStore.debugSnapshot(), []);
+  });
+}
 
 test('isr: default cache key partitions by auth headers and cookies without raw secrets', async () => {
   const htmlStore = new InMemoryHtmlStore();
@@ -1811,4 +2145,663 @@ test('isr: invalid strict sidecar tokens fail closed without rendering', async (
 
   assert.equal(response.status, 404);
   assert.equal(renderCount, 0);
+});
+
+test('isr: a throwing regeneration metric cannot strand the lease or mask the render outcome', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new CountingMetaStore();
+  let metricCalls = 0;
+
+  let nowMs = 1_000;
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/metric-regen',
+        mode: 'isr',
+        revalidateSeconds: 1,
+        render: () => {
+          throw new Error('regeneration blew up');
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+      failurePolicy: 'error',
+    },
+    observability: {
+      metric: (record) => {
+        metricCalls += 1;
+        if (record.name === 'facetheory.isr.regeneration_ms') {
+          throw new Error('metric sink unavailable');
+        }
+      },
+    },
+  });
+
+  const failed = await app.handle({ method: 'GET', path: '/metric-regen' });
+  assert.equal(failed.status, 500);
+  assert.ok(metricCalls >= 1);
+  // The lease acquired for the failed regeneration is released even though the
+  // regeneration metric threw before releaseLease ran.
+  assert.equal(metaStore.releaseCalls, 1);
+  const records = metaStore.debugSnapshot();
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.leaseOwner, null);
+  assert.equal(records[0]?.leaseToken, null);
+
+  // No stranded lease: a second request acquires a fresh lease and is contained again.
+  nowMs = 2_000;
+  const retry = await app.handle({ method: 'GET', path: '/metric-regen' });
+  assert.equal(retry.status, 500);
+  assert.equal(metaStore.releaseCalls, 2);
+});
+
+test('isr: ordinary regeneration still emits the success metric and releases the lease', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new CountingMetaStore();
+  const metrics: Array<{ name: string; tags?: Record<string, string> }> = [];
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/metric-ok',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: () => ({ html: '<main>ok</main>' }),
+      },
+    ],
+    isr: { htmlStore, metaStore },
+    observability: {
+      metric: (record) =>
+        metrics.push(
+          record as { name: string; tags?: Record<string, string> },
+        ),
+    },
+  });
+
+  const response = await app.handle({ method: 'GET', path: '/metric-ok' });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers['x-facetheory-isr']?.[0], 'miss');
+  const regeneration = metrics.filter(
+    (metric) => metric.name === 'facetheory.isr.regeneration_ms',
+  );
+  assert.equal(regeneration.length, 1);
+  assert.equal(regeneration[0]?.tags?.outcome, 'success');
+  assert.equal(metaStore.commitCalls, 1);
+  assert.equal(metaStore.releaseCalls, 1);
+});
+
+test('isr: a throwing contention metric does not fail the ordinary contention journey', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+
+  let nowMs = 1_000;
+  let renderCount = 0;
+  let contentionMetricCalls = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/posts/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 1,
+        render: async () => {
+          const seq = ++renderCount;
+          await delay(25);
+          return { html: `<main>render-${seq}</main>` };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+      leaseDurationMs: 2_000,
+      regenerationWaitTimeoutMs: 1_000,
+      regenerationPollIntervalMs: 5,
+    },
+    observability: {
+      metric: (record) => {
+        if (record.name === 'facetheory.isr.lease_contention') {
+          contentionMetricCalls += 1;
+          throw new Error('contention metric sink unavailable');
+        }
+      },
+    },
+  });
+
+  const warm = await app.handle({ method: 'GET', path: '/posts/a' });
+  assert.equal(warm.status, 200);
+
+  nowMs = 2_000;
+  const responses = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      app.handle({ method: 'GET', path: '/posts/a' }),
+    ),
+  );
+
+  assert.ok(contentionMetricCalls >= 1);
+  assert.equal(renderCount, 2);
+  for (const response of responses) {
+    assert.equal(response.status, 200);
+    assert.ok(decodeBody(response.body as Uint8Array).includes('render-2'));
+  }
+  // Every held lease was released; nothing is stranded.
+  for (const record of metaStore.debugSnapshot()) {
+    assert.equal(record.leaseOwner, null);
+    assert.equal(record.leaseToken, null);
+  }
+});
+
+test('isr: cache metrics label parameterized routes by template, not request path', async () => {
+  const metrics: Array<{ name: string; tags?: Record<string, string> }> = [];
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/isr-posts/{slug}',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: (ctx) => ({ html: `<main>${String(ctx.params.slug)}</main>` }),
+      },
+    ],
+    observability: {
+      metric: (record) =>
+        metrics.push(record as unknown as { name: string; tags?: Record<string, string> }),
+    },
+  });
+
+  await app.handle({ method: 'GET', path: '/isr-posts/a' });
+  await app.handle({ method: 'GET', path: '/isr-posts/b' });
+  await app.handle({ method: 'GET', path: '/isr-posts/a' });
+  const missing = await app.handle({ method: 'GET', path: '/isr-missing/zzz' });
+  assert.equal(missing.status, 404);
+
+  const cacheLabels = metrics
+    .filter((metric) => metric.name === 'facetheory.isr.cache')
+    .map((metric) => metric.tags?.route_pattern);
+  assert.equal(cacheLabels.length, 3);
+  assert.ok(cacheLabels.every((label) => label === '/isr-posts/{slug}'));
+
+  const requestLabels = new Set(
+    metrics
+      .filter((metric) => metric.name === 'facetheory.request')
+      .map((metric) => metric.tags?.route_pattern),
+  );
+  assert.deepEqual([...requestLabels].sort(), ['/isr-posts/{slug}', 'unmatched']);
+});
+
+// --- FACE-063E M9: ISR authenticated cache-control fail-closed guard --------------
+//
+// Root criterion: authenticated requests fail closed with `private, no-store`
+// unless an explicit safe variation policy is configured. The guard also covers
+// any deployment that configures an explicit, opaque custom `cacheKey`, because
+// the framework cannot attribute that identity to a shared viewer. These tests
+// drive the real `createIsrRuntime` (through `createFaceApp`, plus one direct
+// runtime probe) across all six emission branches and assert both the emitted
+// response header and the committed `HtmlStore` cache-control value.
+
+const ISR_MATRIX_REVALIDATE_SECONDS = 60;
+const ISR_MATRIX_PUBLIC_CACHE_CONTROL = blockingIsrCacheControl(
+  ISR_MATRIX_REVALIDATE_SECONDS,
+);
+const ISR_MATRIX_PRIVATE_CACHE_CONTROL = 'private, no-store';
+
+type IsrMatrixBranch =
+  | 'miss'
+  | 'hit'
+  | 'wait-hit'
+  | 'stale'
+  | 'stale-after-error'
+  | 'stale-metadata-error';
+
+const ISR_MATRIX_BRANCHES: readonly IsrMatrixBranch[] = [
+  'miss',
+  'hit',
+  'wait-hit',
+  'stale',
+  'stale-after-error',
+  'stale-metadata-error',
+];
+
+const ISR_MATRIX_EXPECTED_STATE: Record<IsrMatrixBranch, string> = {
+  miss: 'miss',
+  hit: 'hit',
+  'wait-hit': 'wait-hit',
+  stale: 'stale',
+  'stale-after-error': 'stale',
+  'stale-metadata-error': 'stale-metadata-error',
+};
+
+const ISR_MATRIX_AUTH_HEADERS = { authorization: ['Bearer SECRET_TOKEN_A'] };
+const ISR_MATRIX_COOKIE_HEADERS = {
+  cookie: ['session=COOKIE_SECRET_A; theme=light'],
+};
+
+class RecordingHtmlStore extends InMemoryHtmlStore {
+  readonly writes: HtmlStoreWriteInput[] = [];
+
+  override async write(
+    input: HtmlStoreWriteInput,
+  ): Promise<HtmlStoreWriteResult> {
+    this.writes.push({
+      ...input,
+      ...(input.metadata ? { metadata: { ...input.metadata } } : {}),
+    });
+    return await super.write(input);
+  }
+}
+
+class ToggleContentionMetaStore extends InMemoryIsrMetaStore {
+  contend = false;
+
+  override async tryAcquireLease(
+    input: TryAcquireIsrLeaseInput,
+  ): Promise<TryAcquireIsrLeaseResult> {
+    if (!this.contend) return await super.tryAcquireLease(input);
+    const record = await this.get(input.cacheKey);
+    if (!record) throw new Error('contention store requires a warm record');
+    return { acquired: false, record, leaseToken: null };
+  }
+}
+
+class FailingGetMetaStore extends InMemoryIsrMetaStore {
+  failGet = false;
+
+  override async get(cacheKey: string): Promise<IsrMetaRecord | null> {
+    if (this.failGet) throw new Error('metadata store unavailable');
+    return await super.get(cacheKey);
+  }
+}
+
+interface IsrMatrixProbe {
+  headers?: Record<string, string[]>;
+}
+
+interface IsrMatrixResult {
+  response: FaceResponse;
+  writes: HtmlStoreWriteInput[];
+}
+
+async function driveIsrMatrixBranch(
+  branch: IsrMatrixBranch,
+  probe: IsrMatrixProbe,
+  isrOptions: FaceIsrOptions = {},
+): Promise<IsrMatrixResult> {
+  const htmlStore = new RecordingHtmlStore();
+  const plainMetaStore = new InMemoryIsrMetaStore();
+  const contentionMetaStore = new ToggleContentionMetaStore();
+  const failingGetMetaStore = new FailingGetMetaStore();
+  const metaStore: InMemoryIsrMetaStore =
+    branch === 'stale'
+      ? contentionMetaStore
+      : branch === 'stale-metadata-error'
+        ? failingGetMetaStore
+        : plainMetaStore;
+
+  let nowMs = 1_000;
+  let renderMode: 'ok' | 'throw' = 'ok';
+  let renderDelayMs = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/matrix',
+        mode: 'isr',
+        revalidateSeconds: ISR_MATRIX_REVALIDATE_SECONDS,
+        render: async () => {
+          if (renderDelayMs > 0) await delay(renderDelayMs);
+          if (renderMode === 'throw') {
+            throw new Error('matrix regeneration failure');
+          }
+          return { html: '<main>matrix</main>' };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+      ...(branch === 'stale'
+        ? { lockContentionPolicy: 'serve-stale' as const }
+        : {}),
+      ...isrOptions,
+    },
+  });
+
+  const request = (): Promise<FaceResponse> =>
+    app.handle({
+      method: 'GET',
+      path: '/matrix',
+      ...(probe.headers ? { headers: probe.headers } : {}),
+    });
+
+  let response: FaceResponse;
+  switch (branch) {
+    case 'miss':
+      response = await request();
+      break;
+    case 'hit': {
+      await request();
+      response = await request();
+      break;
+    }
+    case 'wait-hit': {
+      renderDelayMs = 40;
+      const first = request();
+      await delay(5);
+      const second = request();
+      const [, secondResponse] = await Promise.all([first, second]);
+      response = secondResponse;
+      break;
+    }
+    case 'stale': {
+      await request();
+      nowMs += (ISR_MATRIX_REVALIDATE_SECONDS + 1) * 1_000;
+      contentionMetaStore.contend = true;
+      response = await request();
+      break;
+    }
+    case 'stale-after-error': {
+      await request();
+      nowMs += (ISR_MATRIX_REVALIDATE_SECONDS + 1) * 1_000;
+      renderMode = 'throw';
+      response = await request();
+      break;
+    }
+    case 'stale-metadata-error': {
+      await request();
+      failingGetMetaStore.failGet = true;
+      response = await request();
+      break;
+    }
+    default:
+      throw new Error(`unknown ISR matrix branch: ${String(branch)}`);
+  }
+
+  return { response, writes: htmlStore.writes };
+}
+
+function isrCacheControl(response: FaceResponse): string | undefined {
+  return response.headers['cache-control']?.[0];
+}
+
+function isrState(response: FaceResponse): string | undefined {
+  return response.headers['x-facetheory-isr']?.[0];
+}
+
+function assertHtmlWritesCacheControl(
+  writes: readonly HtmlStoreWriteInput[],
+  expected: string,
+): void {
+  const htmlWrites = writes.filter(
+    (write) => write.contentType !== 'application/json; charset=utf-8',
+  );
+  assert.ok(htmlWrites.length > 0, 'expected at least one HTML store write');
+  for (const write of htmlWrites) {
+    assert.equal(write.cacheControl, expected);
+  }
+}
+
+for (const branch of ISR_MATRIX_BRANCHES) {
+  test(`isr: ordinary anonymous default-key request stays public on the ${branch} branch`, async () => {
+    const { response, writes } = await driveIsrMatrixBranch(branch, {});
+    assert.equal(isrState(response), ISR_MATRIX_EXPECTED_STATE[branch]);
+    assert.equal(isrCacheControl(response), ISR_MATRIX_PUBLIC_CACHE_CONTROL);
+    assertHtmlWritesCacheControl(writes, ISR_MATRIX_PUBLIC_CACHE_CONTROL);
+  });
+}
+
+for (const branch of ISR_MATRIX_BRANCHES) {
+  test(`isr: authorization request fails closed on the ${branch} branch`, async () => {
+    const { response, writes } = await driveIsrMatrixBranch(branch, {
+      headers: ISR_MATRIX_AUTH_HEADERS,
+    });
+    assert.equal(isrState(response), ISR_MATRIX_EXPECTED_STATE[branch]);
+    assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+    assertHtmlWritesCacheControl(writes, ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  });
+}
+
+for (const branch of ISR_MATRIX_BRANCHES) {
+  test(`isr: cookie-bearing request fails closed on the ${branch} branch`, async () => {
+    const { response, writes } = await driveIsrMatrixBranch(branch, {
+      headers: ISR_MATRIX_COOKIE_HEADERS,
+    });
+    assert.equal(isrState(response), ISR_MATRIX_EXPECTED_STATE[branch]);
+    assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+    assertHtmlWritesCacheControl(writes, ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  });
+}
+
+test('isr: every default auth-vary header fails closed on the miss branch', async () => {
+  for (const headerName of [
+    'authorization',
+    'proxy-authorization',
+    'x-api-key',
+    'x-amz-security-token',
+  ]) {
+    const { response } = await driveIsrMatrixBranch('miss', {
+      headers: { [headerName]: ['SECRET_VALUE'] },
+    });
+    assert.equal(
+      isrCacheControl(response),
+      ISR_MATRIX_PRIVATE_CACHE_CONTROL,
+      `expected ${headerName} to fail closed`,
+    );
+  }
+});
+
+test('isr: varyCookies keeps the key shared but still fails closed for an unlisted cookie', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renders = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/matrix',
+        mode: 'isr',
+        revalidateSeconds: ISR_MATRIX_REVALIDATE_SECONDS,
+        render: () => {
+          renders += 1;
+          return { html: `<main>matrix-${renders}</main>` };
+        },
+      },
+    ],
+    isr: { htmlStore, metaStore, varyCookies: ['pref'] },
+  });
+
+  const first = await app.handle({
+    method: 'GET',
+    path: '/matrix',
+    headers: { cookie: ['session=COOKIE_SECRET_A'] },
+  });
+  const second = await app.handle({
+    method: 'GET',
+    path: '/matrix',
+    headers: { cookie: ['session=COOKIE_SECRET_A'] },
+  });
+
+  assert.equal(metaStore.debugSnapshot().length, 1);
+  assert.equal(renders, 1);
+  assert.equal(isrState(second), 'hit');
+  assert.equal(isrCacheControl(first), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  assert.equal(isrCacheControl(second), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+});
+
+test('isr: explicit custom cacheKey fails closed for anonymous and bespoke-auth requests', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/matrix',
+        mode: 'isr',
+        revalidateSeconds: ISR_MATRIX_REVALIDATE_SECONDS,
+        render: () => ({ html: '<main>matrix</main>' }),
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      cacheKey: ({ headers }) =>
+        `custom::${headers?.['x-session-token']?.[0] ?? 'anonymous'}`,
+    },
+  });
+
+  const anonymous = await app.handle({ method: 'GET', path: '/matrix' });
+  const bespoke = await app.handle({
+    method: 'GET',
+    path: '/matrix',
+    headers: { 'x-session-token': ['SESSION_SECRET_VALUE'] },
+  });
+
+  assert.equal(isrCacheControl(anonymous), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  assert.equal(isrCacheControl(bespoke), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  assertHtmlWritesCacheControl(htmlStore.writes, ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+});
+
+test('isr: trusted tenantKey with a custom cacheKey stays guarded under the composed key', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/matrix',
+        mode: 'isr',
+        revalidateSeconds: ISR_MATRIX_REVALIDATE_SECONDS,
+        render: () => ({ html: '<main>matrix</main>' }),
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      tenantKey: tenantKeyFromTrustedHeader('x-tenant-id'),
+      cacheKey: ({ routePattern }) => `custom::${routePattern}`,
+    },
+  });
+
+  const response = await app.handle({
+    method: 'GET',
+    path: '/matrix',
+    headers: {
+      'x-tenant-id': ['tenant-a'],
+      ...ISR_MATRIX_AUTH_HEADERS,
+    },
+  });
+
+  assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  const keys = metaStore.debugSnapshot().map((record) => record.cacheKey);
+  assert.equal(keys.length, 1);
+  assert.ok(keys[0]?.startsWith('isr-tenant:v1:'));
+});
+
+test('isr: explicit cacheControl callback is honored verbatim for anonymous default-key requests', async () => {
+  const { response, writes } = await driveIsrMatrixBranch('miss', {}, {
+    cacheControl: () => 'public, max-age=300',
+  });
+
+  assert.equal(isrCacheControl(response), 'public, max-age=300');
+  // The origin-store write keeps the unchanged framework default; the explicit
+  // callback only shapes the emitted response for unguarded requests.
+  assertHtmlWritesCacheControl(writes, ISR_MATRIX_PUBLIC_CACHE_CONTROL);
+});
+
+test('isr: explicit cacheControl callback cannot override the fail-closed guard', async () => {
+  const { response, writes } = await driveIsrMatrixBranch(
+    'miss',
+    { headers: ISR_MATRIX_AUTH_HEADERS },
+    { cacheControl: () => 'public, max-age=300' },
+  );
+
+  assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  assertHtmlWritesCacheControl(writes, ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+});
+
+test('isr: explicit cacheControl callback is clamped under a custom key even for anonymous requests', async () => {
+  const { response } = await driveIsrMatrixBranch('miss', {}, {
+    cacheKey: ({ routePattern }) => `custom::${routePattern}`,
+    cacheControl: () => 'public, max-age=300',
+  });
+
+  assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+});
+
+test('isr: a private-returning cacheControl callback is preserved verbatim when unguarded', async () => {
+  const { response } = await driveIsrMatrixBranch('miss', {}, {
+    cacheControl: () => 'private, max-age=5',
+  });
+
+  assert.equal(isrCacheControl(response), 'private, max-age=5');
+});
+
+test('isr: createIsrRuntime fails closed for auth-variant requests without app wiring', async () => {
+  const htmlStore = new RecordingHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  const runtime = createIsrRuntime({ htmlStore, metaStore, now: () => 1_000 });
+
+  const face: FaceModule = {
+    route: '/direct',
+    mode: 'isr',
+    revalidateSeconds: ISR_MATRIX_REVALIDATE_SECONDS,
+    render: () => ({ html: '<main>direct</main>' }),
+  };
+  const renderFresh = async (): Promise<FaceResponse> => ({
+    status: 200,
+    headers: {},
+    cookies: [],
+    body: encodeBody('<main>direct</main>'),
+    isBase64: false,
+  });
+  const contextFor = (
+    headers: Record<string, string[]>,
+    cookies: Record<string, string>,
+  ): FaceContext => ({
+    request: {
+      method: 'GET',
+      path: '/direct',
+      query: {},
+      headers,
+      cookies,
+      body: new Uint8Array(),
+      isBase64: false,
+      cspNonce: null,
+    },
+    params: {},
+    proxy: null,
+  });
+
+  const anonymous = await runtime.handleFace({
+    face,
+    ctx: contextFor({}, {}),
+    routePattern: '/direct',
+    renderFresh,
+  });
+  const authenticated = await runtime.handleFace({
+    face,
+    ctx: contextFor({ authorization: ['Bearer SECRET_TOKEN_D'] }, {}),
+    routePattern: '/direct',
+    renderFresh,
+  });
+
+  assert.equal(isrCacheControl(anonymous), ISR_MATRIX_PUBLIC_CACHE_CONTROL);
+  assert.equal(isrCacheControl(authenticated), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+});
+
+test('isr: guarded responses and stored metadata never carry the raw secret', async () => {
+  const secret = 'RAW_SECRET_VALUE_063E';
+  const { response, writes } = await driveIsrMatrixBranch('miss', {
+    headers: {
+      authorization: [`Bearer ${secret}`],
+      cookie: [`session=${secret}`],
+    },
+  });
+
+  const serialized = `${JSON.stringify(response.headers)}\n${JSON.stringify(writes)}`;
+  assert.equal(serialized.includes(secret), false);
+  assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
 });

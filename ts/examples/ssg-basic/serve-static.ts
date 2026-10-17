@@ -30,6 +30,7 @@ async function fileExists(filePath: string): Promise<boolean> {
 async function resolveRequestPath(urlPath: string): Promise<string | null> {
   const safePath = urlPath.replaceAll('\\', '/');
   const cleanPath = safePath.split('?')[0] ?? '/';
+  if (cleanPath.includes('..')) return null;
   const normalized = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
 
   const candidates = new Set<string>();
@@ -44,9 +45,10 @@ async function resolveRequestPath(urlPath: string): Promise<string | null> {
     candidates.add(`${normalized}/index.html`);
   }
 
+  const rootPrefix = rootDir.endsWith(path.sep) ? rootDir : `${rootDir}${path.sep}`;
   for (const candidate of candidates) {
     const absolute = path.resolve(rootDir, `.${candidate}`);
-    if (!absolute.startsWith(rootDir)) continue;
+    if (!absolute.startsWith(rootPrefix)) continue;
     if (await fileExists(absolute)) return absolute;
   }
   return null;

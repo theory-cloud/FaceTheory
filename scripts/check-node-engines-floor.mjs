@@ -105,16 +105,18 @@ function parsePartial(rawText) {
   };
   const major = component(match[1]);
   const minor = component(match[2]);
-  const patch = component(match[3]);
+  const concretePatch = component(match[3]);
   const prerelease = match[4] ?? null;
-  // npm's semver rejects `22.x.1`: a concrete component may not follow a
-  // wildcard one. Accepting it would mean silently coercing an unmodelled range
-  // to `22.x` and then reporting a floor result the declaration does not
-  // actually make, so the range is refused rather than coerced. Caret, tilde,
-  // and hyphen ranges all reach this parser, so `^22.x.1`, `~22.x.1`, and
-  // `22.x.1 - 23` are refused on the same path instead of each operator needing
-  // its own guard.
-  if (minor === null && patch !== null) return null;
+  // npm's semver does not reject a concrete component after a wildcard minor; it
+  // normalizes the component away. `replaceXRange` zeroes both lower components
+  // once the minor is wildcarded, so `22.x.1`, `22.*.1`, and `22.x.0` all
+  // normalize to `>=22.0.0 <23.0.0-0`, exactly like `22.x` (verified against the
+  // vendored semver@7.8.1). Mirroring that keeps the matcher aligned with npm
+  // instead of refusing a range npm accepts; the major is untouched, so this is a
+  // normalization, not a loosening. Caret, tilde, and hyphen ranges reach the
+  // same parser, so `^22.x.1`, `~22.x.1`, and `22.x.1 - 23` normalize on the same
+  // path rather than needing their own operators.
+  const patch = minor === null ? null : concretePatch;
   if (major === null) {
     // `*`, `x`, `X` and `v*` leave the major unconstrained.
     if (minor !== null || patch !== null || prerelease !== null) return null;
@@ -517,6 +519,14 @@ const MATCHER_CASES = [
   ["22", NODE_FLOOR_MAJOR, true],
   ["22.x", NODE_FLOOR_MAJOR, true],
   ["22.4.x", NODE_FLOOR_MAJOR, true],
+  // npm normalizes a concrete component after a wildcard minor away, so this
+  // family admits the floor exactly like `22.x` (verified against semver@7.8.1).
+  ["22.x.1", NODE_FLOOR_MAJOR, true],
+  ["22.*.1", NODE_FLOOR_MAJOR, true],
+  ["22.x.0", NODE_FLOOR_MAJOR, true],
+  ["^22.x.1", NODE_FLOOR_MAJOR, true],
+  ["~22.x.1", NODE_FLOOR_MAJOR, true],
+  ["22.x.1 - 23", NODE_FLOOR_MAJOR, true],
   ["22.0.0 - 22.4.0", NODE_FLOOR_MAJOR, true],
   ["<=22", NODE_FLOOR_MAJOR, true],
   ["<23", NODE_FLOOR_MAJOR, true],
@@ -562,30 +572,10 @@ const MATCHER_CASES = [
 
 // Grammar the matcher does not model must fail the gate, including when another
 // alternative on the same line already admits the floor.
-//
-// The `x.N` family below is semver-INVALID, not merely unmodelled: npm's semver
-// rejects a concrete component that follows a wildcard one, so `22.x.1`,
-// `22.*.1`, and `22.x.0` are not ranges at all. They are asserted here because
-// the refusal is the whole point - the matcher used to read them as `22.x` and
-// report a floor result the declaration never made.
-//
-// The semver-VALID spellings `^22.x.1`, `~22.x.1`, and `22.x.1 - 23` are
-// refused for the same reason and are asserted here too: caret, tilde, and
-// hyphen ranges all reach the same partial parser, so there is one refusal path
-// rather than four, and a refactor that split those paths would fail this
-// self-test instead of quietly re-admitting the coercion.
 const UNMODELLED_CASES = [
   ">=20 || lts/*",
   ">=22 || ^foo",
   "nightly",
-  // A concrete component after a wildcard component.
-  "22.x.1",
-  "22.*.1",
-  "22.x.0",
-  // The same family reached through the caret, tilde, and hyphen operators.
-  "^22.x.1",
-  "~22.x.1",
-  "22.x.1 - 23",
 ];
 
 // [range, admits a release below the floor major]

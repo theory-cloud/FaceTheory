@@ -38,6 +38,60 @@ def run_git(repo_root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def git_tree_entries(repo_root: Path, revision: str) -> dict[str, tuple[str, str]]:
+    """Return {repo-relative path: (mode, blob-sha)} for the tree at revision."""
+    raw = subprocess.run(
+        ["git", "ls-tree", "-r", "-z", revision],
+        cwd=repo_root,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout
+    entries: dict[str, tuple[str, str]] = {}
+    for record in raw.split(b"\0"):
+        if not record:
+            continue
+        meta, _, path = record.partition(b"\t")
+        mode, _otype, sha = meta.split(b" ", 2)
+        entries[path.decode("utf-8")] = (mode.decode("ascii"), sha.decode("ascii"))
+    return entries
+
+
+def git_blob_bytes(repo_root: Path, object_id: str) -> bytes:
+    return subprocess.run(
+        ["git", "cat-file", "blob", object_id],
+        cwd=repo_root,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout
+
+
+def validate_output_root(output_root: Path) -> None:
+    """Fail closed unless the output root is (or becomes) a private real dir.
+
+    Call this on the raw, unresolved path so a precreated symlink at the
+    destination is detected before the path is dereferenced.
+    """
+    if output_root.is_symlink():
+        fail(f"output root is a symlink: {output_root}")
+    if output_root.exists():
+        if not output_root.is_dir():
+            fail(f"output root exists and is not a directory: {output_root}")
+        stat = output_root.stat()
+        if stat.st_uid != os.getuid():
+            fail(f"output root is not owned by the current user: {output_root}")
+        if stat.st_mode & 0o022:
+            fail(
+                f"output root is group/world writable: {output_root} "
+                f"(mode {oct(stat.st_mode & 0o777)})"
+            )
+        return
+    output_root.mkdir(parents=True, mode=0o700, exist_ok=True)
+    if output_root.is_symlink() or not output_root.is_dir():
+        fail(f"output root could not be created safely: {output_root}")
+
+
 def normalize_remote_url(value: str | None) -> str:
     if not value:
         return DEFAULT_SOURCE_REPO
@@ -178,7 +232,9 @@ def main() -> None:
 
     repo_root = Path(args.repo_root).resolve()
     contract_path = (repo_root / args.contract).resolve()
-    output_root = Path(args.output).resolve()
+    # Keep the raw, unresolved path so validate_output_root can reject a
+    # precreated symlink destination before the path is dereferenced.
+    output_root = Path(args.output)
 
     if not (repo_root / ".git").exists():
         fail(f"repo root {repo_root} is not a git repository")
@@ -225,15 +281,43 @@ def main() -> None:
 
     generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
+    try:
+        tree_entries = git_tree_entries(repo_root, source_revision)
+    except subprocess.CalledProcessError as exc:
+        fail(f"unable to read tree at source_revision {source_revision}: {exc.stderr.decode('utf-8', 'replace').strip()}")
+
+    validate_output_root(output_root)
+    output_root = output_root.resolve()
+
     subtree_root = output_root / SUBTREE_NAME
-    shutil.rmtree(subtree_root, ignore_errors=True)
+    if subtree_root.is_symlink():
+        fail(f"staged subtree root is a symlink: {subtree_root}")
+    if subtree_root.exists():
+        try:
+            shutil.rmtree(subtree_root)
+        except OSError as exc:
+            fail(f"unable to clear the previous staged subtree {subtree_root}: {exc}")
     subtree_root.mkdir(parents=True, exist_ok=True)
 
+    # Copy each included file from the committed blob at source_revision, not the
+    # mutable worktree, so the staged bytes are bound to the recorded revision.
     for repo_path, rel_path in zip(included_repo_paths, included_rel_paths, strict=True):
-        source_path = repo_root / repo_path
+        entry = tree_entries.get(repo_path)
+        if entry is None:
+            fail(f"included file is not tracked at source_revision {source_revision}: {repo_path}")
+        mode, blob_sha = entry
+        if mode == "120000":
+            fail(f"included path is a symlink in git: {repo_path}")
+        if mode == "160000":
+            fail(f"included path is a gitlink/submodule: {repo_path}")
+        try:
+            content = git_blob_bytes(repo_root, blob_sha)
+        except subprocess.CalledProcessError as exc:
+            fail(f"unable to read blob {blob_sha} for {repo_path}: {exc.stderr.decode('utf-8', 'replace').strip()}")
         destination_path = subtree_root / rel_path
         destination_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source_path, destination_path)
+        destination_path.write_bytes(content)
+        os.chmod(destination_path, 0o755 if mode == "100755" else 0o644)
 
     manifest = OrderedDict(
         [

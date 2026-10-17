@@ -298,7 +298,11 @@ test('FaceApp: normalizes a trailing DNS root dot in the trusted original host',
   assert.equal(resp.status, 200);
 });
 
-test('FaceApp: normalizes a trailing DNS root dot in both host and canonical URL', async () => {
+test('FaceApp: rejects a trailing DNS root dot in a canonical URL (behavior reversal)', async () => {
+  // Deliberate reversal of the behavior codified by a526684: the dotted canonical
+  // URL used to be accepted because only the comparison side was normalized, while
+  // the dotted value was rendered verbatim. The rendered URL must now be the
+  // validated URL, so a dotted canonical URL fails closed.
   const app = createFaceApp({
     faces: [
       {
@@ -330,7 +334,7 @@ test('FaceApp: normalizes a trailing DNS root dot in both host and canonical URL
     },
   });
 
-  assert.equal(resp.status, 200);
+  assert.equal(resp.status, 500);
 });
 
 test('FaceApp: rejects a second trailing DNS root dot in a canonical URL', async () => {

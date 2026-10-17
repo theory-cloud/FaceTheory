@@ -136,7 +136,7 @@ jobs:
         node-version: ["22", "24"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
@@ -156,7 +156,7 @@ jobs:
         run: bash scripts/verify-lambda-runtime-deprecations.sh
       - name: Upload TypeScript coverage report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: facetheory-ts-coverage-node-${{ matrix.node-version }}
           path: ts/coverage/
@@ -186,7 +186,7 @@ jobs:
         node-version: ["22", "24"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
       - name: Verify tarball
@@ -213,7 +213,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24.13.1"
       - name: Verify deterministic release asset builds
@@ -225,7 +225,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -238,7 +238,7 @@ jobs:
         run: bash gov-infra/verifiers/gov-verify-rubric.sh
       - name: Upload governance evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gov-infra-evidence
           path: gov-infra/evidence/
@@ -257,6 +257,14 @@ jobs:
           bash -n scripts/trigger_theorycloud_publish.sh
           bash -n scripts/test-theorycloud-targets.sh
           bash -n scripts/test-trigger-theorycloud-publish-awscurl.sh
+          bash -n scripts/verify-theorycloud-publish-install.sh
+          bash -n scripts/test-verify-theorycloud-publish-install.sh
+          bash -n scripts/verify-release-python-isolation.sh
+          bash -n scripts/test-verify-release-python-isolation.sh
+          bash -n scripts/verify-pages-deploy-tag.sh
+          bash -n scripts/test-verify-pages-deploy-tag.sh
+          bash -n scripts/verify-release-publish-binding.sh
+          bash -n scripts/test-verify-release-publish-binding.sh
       - name: Verify no-vars publisher workflow contract
         run: |
           set -euo pipefail
@@ -283,3 +291,12 @@ jobs:
         run: |
           bash scripts/test-theorycloud-targets.sh
           bash scripts/test-trigger-theorycloud-publish-awscurl.sh
+      - name: Verify release-trust guards
+        run: |
+          bash scripts/verify-theorycloud-publish-install.sh
+          bash scripts/test-verify-theorycloud-publish-install.sh
+          bash scripts/verify-release-python-isolation.sh
+          bash scripts/test-verify-release-python-isolation.sh
+          bash scripts/test-verify-pages-deploy-tag.sh
+          bash scripts/verify-release-publish-binding.sh
+          bash scripts/test-verify-release-publish-binding.sh

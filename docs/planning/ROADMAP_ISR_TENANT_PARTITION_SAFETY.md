@@ -4,13 +4,15 @@
 
 Deliver a fail-closed ISR tenant-partition guard so FaceTheory cannot silently share tenant-varying cached HTML through the implicit `default` tenant. The roadmap keeps the change inside the existing ISR mode and core runtime, documents the pre-1.0 breaking default, and updates examples so consumers can distinguish tenant-invariant ISR from explicitly partitioned tenant-varying ISR.
 
+> **Amendment (operator-ratified, 2026-10-11) — supersedes the custom-`cacheKey` trust-only criterion:** for tenant-scoped ISR, an explicit, trusted `tenantKey` is required. A custom `cacheKey` alone no longer counts as an explicit partition; it fails closed without `tenantKey`, and with `tenantKey` FaceTheory composes a framework-owned, privacy-preserving tenant partition with the consumer's logical key. The risks and soak steps below reflect this contract.
+
 ## Render modes and adapters affected
 
 | Surface | Impact |
 | --- | --- |
 | SSR | No behavior change; remains the safe fallback for request-authorized or tenant-varying HTML that should not be cached. |
 | SSG | No behavior change. |
-| ISR | Primary behavior change: known tenant boundary signals fail closed unless the app configures an explicit `tenantKey` or custom `cacheKey`. |
+| ISR | Primary behavior change: known tenant boundary signals fail closed unless the app configures an explicit, trusted `tenantKey`; a tenant-scoped custom `cacheKey` requires `tenantKey` and is composed with a framework-owned tenant partition. |
 | SPA | No behavior change. |
 | React | No adapter-specific change expected. |
 | Vue | No adapter-specific change expected. |
@@ -33,7 +35,7 @@ Preserves determinism. The core change affects cache-key safety and deterministi
   - Risks:
     - Breaking behavior may surface in consumers that currently send tenant-like headers on tenant-invariant ISR routes.
     - A guard based only on header presence can produce false positives if infrastructure forwards tenant-like headers even when a route does not vary by tenant.
-    - A custom `cacheKey` may not actually include tenant variance, but FaceTheory cannot prove that; the custom function is treated as an explicit consumer-owned partition contract.
+    - A custom `cacheKey` alone is no longer treated as an explicit consumer-owned partition contract: FaceTheory requires an explicit, trusted `tenantKey` on tenant-scoped custom-key routes and composes a framework-owned tenant partition with the consumer's logical key, rather than trusting the custom function to include tenant variance.
     - Error text must avoid raw tenant/header values to prevent secret leakage.
 
 ### Phase 2: Examples and reference-stack intent
@@ -82,8 +84,8 @@ Minor bump under pre-1.0 semver, driven by a breaking `fix!` commit with a `BREA
 
 ## Cross-phase risks
 
-- **False positives from header presence:** fail-closed default may block tenant-invariant ISR routes when infrastructure forwards `x-tenant-id` globally. This is intentional for confidentiality, but migration guidance must explain how to remove the header, configure `tenantKey`, configure a custom `cacheKey`, or move the route to SSR.
-- **False sense of safety with custom `cacheKey`:** FaceTheory cannot inspect a custom cache-key function to prove it includes tenant variance. Treating custom `cacheKey` as explicit consumer ownership should be documented.
+- **False positives from header presence:** fail-closed default may block tenant-invariant ISR routes when infrastructure forwards `x-tenant-id` globally. This is intentional for confidentiality, but migration guidance must explain how to remove the header, configure `tenantKey` (with a custom `cacheKey` when a richer logical partition is needed), or move the route to SSR.
+- **False sense of safety with custom `cacheKey`:** FaceTheory cannot inspect a custom cache-key function to prove it includes tenant variance. This is why a custom `cacheKey` alone no longer exempts a tenant-scoped route: the runtime requires an explicit, trusted `tenantKey` and composes a framework-owned tenant partition with the logical key.
 - **Security error observability:** logs and errors must identify the missing partition class without including raw tenant values, auth headers, or cookies.
 - **Release-note clarity:** the behavior is intentionally breaking and security-motivated; release notes must call out symptoms and remediation.
 - **Example drift:** built examples under `ts/examples/*/dist` may include generated copies of ISR runtime code. Implementation should avoid editing generated dist manually unless the example build policy requires refreshed outputs.

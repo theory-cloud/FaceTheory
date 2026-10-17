@@ -7,45 +7,50 @@ This file records the currently pinned versions and the exact install strings we
 
 ## Pins
 
-- AppTheory (TypeScript): `v5.0.1`
-- AppTheory (CDK): `v5.0.1`
-- TableTheory (TypeScript): `v4.0.1`
+- AppTheory (TypeScript): `v6.2.0`
+- AppTheory (CDK): `v6.2.0`
+- TableTheory (TypeScript): `v6.0.0`
 
 ## Compatibility Impact
 
-AppTheory `v5.0.1` and TableTheory `v4.0.1` are patch releases on the lines adopted by the previous pin move; the
-coordinated major is AppTheory `v5.0.0`, whose Go module path (`github.com/theory-cloud/apptheory/v5`) and Go data
-layer (TableTheory `v4.0.0`) axes do not reach FaceTheory, because FaceTheory consumes only the **TypeScript** AppTheory
-runtime asset and the **TypeScript** AppTheory CDK asset. The patch move is a dependency-compatibility fix:
+AppTheory `v6.2.0` is a minor-line move inside the `v6` major FaceTheory already consumes, and TableTheory `v6.0.0` is a
+major whose TypeScript package keeps the same consumer surface. FaceTheory consumes only the **TypeScript** AppTheory
+runtime asset, the **TypeScript** AppTheory CDK asset, and the **TypeScript** TableTheory asset, so none of the Go axes
+reach it (the repo has no `go.mod`, no `*.go` files, and only a `.go-version` pin):
 
-- the AppTheory CDK peer floor **moves**: `@theory-cloud/apptheory-cdk` `v5.0.1` declares exact `aws-cdk-lib@2.271.0`
-  (was exact `2.270.0`); `constructs@^10.8.1` is unchanged. Because the peer floor is exact, `ts/` and both infra
-  examples must move `aws-cdk-lib` to `2.271.0` in the same change — `npm ci` otherwise fails with `ERESOLVE` — so the
-  AppTheory CDK pin and the `aws-cdk-lib` pin cannot land separately;
-- the AppTheory CDK construct surface is **unchanged**: the `v5.0.0` -> `v5.0.1` diff across the generated `lib/*.js`
-  files is the jsii runtime type version string plus a documentation comment on the S3 Vectors `encryptionKey` option,
-  so the `AppTheorySsrSite` behavior both reference stacks consume is identical and both templates synthesize unchanged;
-- the AppTheory runtime code is **byte-identical**: the only file that differs between the `v5.0.0` and `v5.0.1` runtime
-  tarballs is `package.json`, so no exported signature changes and the esbuild-bundled Lambda asset — and therefore the
-  infra synth `Code.S3Key` — is unchanged. The published manifest raises the `@aws-sdk/*` floor from `^3.1134.0` to
-  `^3.1141.0` and moves AppTheory's own transitive `@theory-cloud/tabletheory-ts` pin from `v4.0.0` to `v4.0.1`;
-- the TableTheory runtime code is **byte-identical**: the only file that differs between the `v4.0.0` and `v4.0.1`
-  tarballs is `package.json`. Its `@aws-sdk/client-dynamodb`, `@aws-sdk/client-kms`, and `@aws-sdk/client-sts` peer
-  ranges are unchanged (`^3.1092.0`); only the dev-only ranges moved, so no exported surface, removed API, or
-  persisted-shape change reaches FaceTheory.
+- the AppTheory CDK peer floor is **unchanged**: `@theory-cloud/apptheory-cdk` `v6.2.0` still declares exact
+  `aws-cdk-lib@2.273.0` and `constructs@^10.8.1`, so `ts/` and both infra examples stay on `aws-cdk-lib@2.273.0` and no
+  CDK bump lands with this move;
+- the constructs both reference stacks consume are **unchanged**: the `v6.0.0` -> `v6.2.0` diff for `lib/ssr-site.js`
+  (`AppTheorySsrSite`) and `lib/dynamo-table.js` (`AppTheoryDynamoTable`) is the jsii runtime type version string and
+  nothing else. AppTheory `v6.1.0`/`v6.2.0` added constructs and props FaceTheory does not use — the MCP route model
+  (`AppTheoryMcpServer.routeModel` / `routeIdMode`), the `AppTheoryHttpApi` explicit `routes` and validated
+  `routeSettings`, and `AppTheoryRestV1ChallengeRestoration` — so no construct change reaches the synthesized templates;
+- the AppTheory runtime code **changes**, so the esbuild-bundled Lambda asset content — and therefore each reference
+  site's `Code.S3Key` — moves. The runtime deltas are additive or internal: the server-issued request-ID source
+  (`requestIdSource`, `ctx.clientRequestId`, stricter `x-request-id` validation), the always-present nested
+  `error.status_code`, the routed MCP facade metadata (`authorization_response_iss_parameter_supported`), the
+  `registerMcpFacadeSecure` companion, and the OAuth provider hint validation. The published manifest raises the
+  `@aws-sdk/*` floor from `^3.1146.0` to `^3.1149.0` and pins its transitive `@theory-cloud/tabletheory-ts` to the
+  `v6.0.0` tarball;
+- FaceTheory's AppTheory adapter touches only the stable type surface: `Context`, `Handler`, `Request`, and `Response`
+  from `@theory-cloud/apptheory` (the first two as `import type`), `ctx.requestId`/`ctx.request` reads, and the testkit's
+  `createTestEnv`/`buildLambdaFunctionURLRequest`. `dist/types.d.ts` is byte-identical between `v6.0.0` and `v6.2.0`,
+  and `dist/context.d.ts` / `dist/app.d.ts` only gain optional members, so `tsc -p tsconfig.json --noEmit` and the unit
+  suite pass with no source change. The stricter client `x-request-id` handling is inherited upstream behavior, not a
+  FaceTheory edit;
+- the TableTheory TypeScript consumer surface is **unchanged**: TableTheory `v6.0.0` is a Go-only major (module path
+  `/v6` and `LambdaDB.WithLambdaTimeout` returning `core.DB`, per `docs/migration/v6.md`), and FaceTheory imports only
+  `@theory-cloud/tabletheory-ts/facetheory`, whose `dist/facetheory-isr.d.ts` is byte-identical across the TableTheory
+  v5 and v6 TypeScript packages (`FaceTheoryIsrMeta.generatedAtMs`/`revalidateSeconds` and
+  `FaceTheoryIsrLease.leaseExpiresAtMs` stay `number`). FaceTheory never constructs a `TheorydbClient` and never calls
+  `model()`. The generated `dist/**` modules do differ, so the bundled ISR handler asset moves with the AppTheory change;
+- the TableTheory `@aws-sdk/client-dynamodb`, `@aws-sdk/client-kms`, and `@aws-sdk/client-sts` peer ranges are unchanged
+  (`^3.1092.0`), so the hoisted peer resolutions are restored rather than moved;
+- no persisted-shape change reaches FaceTheory: TableTheory `v6.0.0` keeps the `v5` key encoding, marshalling, and
+  written attributes, and the DMS `v0.2` selected-`omitempty` contract is unchanged.
 
-Retained history — the AppTheory `v5.0.0` major: no work outlives the Lambda invocation that started it. Task-augmented
-`tools/call` runs the tool body inside the invocation, the buffered adapters (HTTP API v2, the Lambda Function URL, the
-ALB target group, and the buffered REST v1 shape) drain-and-join a streaming body instead of dropping or detaching it,
-and a response body is joined to its producer before the adapter returns. FaceTheory's infra handlers use the **Lambda
-Function URL streaming** handler and supply a terminating stream, so there is no detached work to remove. TableTheory
-`v4.0.0` removed the ticker-driven memory monitor (`MemoryMonitor.Start` / `Stop`,
-`ResourceProtector.StartMemoryMonitoring` / `StopMemoryMonitoring`, `ResourceLimits.MemoryCheckInterval`) in favor of
-on-demand `MemoryMonitor.Sample` / `ResourceProtector.SampleMemory` / `ResourceProtector.SetMemoryAlertCallback`;
-neither the AppTheory TypeScript runtime nor FaceTheory used the removed API. TableTheory `v4.0.0` also returns
-`ErrInvalidOperator` from `ConsistentRead()` on GSI queries and converges `[]byte`/set-tagged DynamoDB write shapes on
-the cross-runtime DMS matrix; FaceTheory's ISR metadata store uses base-table key conditions only, so neither change
-applies and no persisted-shape migration is required.
+Retained history lives in `CHANGELOG.md`; this file records only the current pin set.
 
 Treat future upstream pin moves as dependency compatibility fixes, not release-process bookkeeping. FaceTheory consumers
 install immutable GitHub Release tarballs, so a changed upstream baseline needs a normal RC for review before stable
@@ -65,9 +70,9 @@ Each hash below is the SHA-256 of the downloaded GitHub Release asset, cross-che
 AppTheory `SHA256SUMS.txt` (runtime + CDK) and TableTheory `tabletheory-SHA256SUMS.txt` (all three matched; a mismatch is
 a release-asset integrity stop condition).
 
-- AppTheory runtime tarball: `b73f6eb3f9baf394e93d3769e490ad1667e91e727131dd83707a4593ebb77fe7`
-- AppTheory CDK tarball: `540427b2672e60eac056bb3951cea1ad042452f892a66be419404afb9c41807b`
-- TableTheory TypeScript tarball: `28e87988afad4140db18ea81b05c3dae3617af20708328bd8dd3d9fca7b95d4e`
+- AppTheory runtime tarball: `de84c9ea26508dfeba635f582caa0f4b90a214d5170de6c7f93c59ae4a219af9`
+- AppTheory CDK tarball: `8f66727a6b68d5497637971f2b273016eb3a35b7ab122a035694ecc2217baa63`
+- TableTheory TypeScript tarball: `bb40ed7a7be26e171eb7bccdd79437a6c76bfd0d5f1273019ada0474bc5bced9`
 
 ## Known Audit Exceptions
 
@@ -79,25 +84,18 @@ those gates and ignores the entry once it expires.
 
 ### Active exceptions
 
-- **bundled `brace-expansion` 5.0.9** — `aws-cdk-lib@2.271.0` bundles `brace-expansion@5.0.9` at
-  `node_modules/aws-cdk-lib/node_modules/brace-expansion` in all three projects. The three advisories below are fixed
-  only at 5.0.10 / 5.0.11 / 5.0.12, which no AppTheory-compatible `aws-cdk-lib` line bundles yet. FaceTheory does not
-  repackage AWS dependencies (operator ruling 2026-10-03: "if a vulnerable dependency is bundled in AWS we make an
-  exception until its updated there"), so a scoped allowlist exception covers this exact copy only:
-  `GHSA-q2hr-2g5m-vwhr`, `GHSA-qhr7-859c-m2p7`, `GHSA-6j4f-fj2g-mc7p`. The entry expires **2026-11-02** and must be
-  rechecked when `aws-cdk-lib` bundles a fixed `brace-expansion` (>= 5.0.12).
+None. The allowlist grants no exception; `scripts/verify-npm-audit.sh` fails on any finding that appears.
 
 ### Recently cleared
 
-- **bundled `brace-expansion`** — `aws-cdk-lib@2.270.0` bundles fixed `brace-expansion@5.0.9`, so the temporary
-  `GHSA-mh99-v99m-4gvg` audit exception has been retired across all three projects.
-- **top-level `brace-expansion`** — non-bundled dependency paths resolve to fixed `brace-expansion@5.0.9`.
-- **`brace-expansion` 4.x/5.x DoS (`GHSA-rgw5-rvv9-x895`)** — cleared at `brace-expansion@5.0.9`, the patched floor for that
-  line, in every lockfile. The gov-infra supply-chain allowlist entry was removed rather than re-granted, so the allowlist
-  grants no exceptions and `scripts/verify-npm-audit.sh` fails on any finding that appears.
-- **`fast-uri`** — AppTheory CDK `v4.3.0` requires `aws-cdk-lib@2.270.0`, and the infra example
-  lockfiles now resolve the previous nested `fast-uri` audit finding to the patched AWS CDK dependency set; `fast-uri` no
-  longer appears anywhere in the `v4.3.0` / `2.270.0` dependency tree.
+- **bundled `brace-expansion` 5.0.9** — retired by the AppTheory v6 CDK pin move and kept retired here. The exception's
+  documented removal condition ("must be rechecked when `aws-cdk-lib` bundles a fixed `brace-expansion` (>= 5.0.12)") is
+  met: `aws-cdk-lib@2.273.0`, the exact peer of `@theory-cloud/apptheory-cdk` `v6.2.0`, bundles `brace-expansion@5.0.12`
+  at `node_modules/aws-cdk-lib/node_modules/brace-expansion` in all three projects, and the three advisories
+  (`GHSA-q2hr-2g5m-vwhr`, `GHSA-qhr7-859c-m2p7`, `GHSA-6j4f-fj2g-mc7p`) are fixed at 5.0.10 / 5.0.11 / 5.0.12. The scoped
+  allowlist entry was removed rather than re-granted; it expired 2026-11-02, and removal happened first because the
+  condition it named was actually satisfied.
+- **top-level `brace-expansion`** — non-bundled dependency paths resolve to fixed `brace-expansion@5.0.12`.
 
 ## Infra Lockfile Note
 
@@ -110,15 +108,15 @@ locks so `npm ci` can validate the AWS CDK package tree under npm 11.
 ```bash
   # AppTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v5.0.1/theory-cloud-apptheory-5.0.1.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v6.2.0/theory-cloud-apptheory-6.2.0.tgz
 
   # TableTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v4.0.1/theory-cloud-tabletheory-ts-4.0.1.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v6.0.0/theory-cloud-tabletheory-ts-6.0.0.tgz
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v5.0.1/theory-cloud-apptheory-cdk-5.0.1.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v6.2.0/theory-cloud-apptheory-cdk-6.2.0.tgz
 ```
 
 ## package.json Snippet (Pinned)
@@ -129,15 +127,19 @@ registry installs:
 ```json
 {
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v5.0.1/theory-cloud-apptheory-5.0.1.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v4.0.1/theory-cloud-tabletheory-ts-4.0.1.tgz"
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v6.2.0/theory-cloud-apptheory-6.2.0.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v6.0.0/theory-cloud-tabletheory-ts-6.0.0.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v4.0.1/theory-cloud-tabletheory-ts-4.0.1.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v6.0.0/theory-cloud-tabletheory-ts-6.0.0.tgz"
     }
   }
 }
 ```
 
-Note: AppTheory `v5.0.1` declares `@theory-cloud/tabletheory-ts` `v4.0.1` transitively, as a pinned GitHub Release tarball URL carrying its own integrity (`…/releases/download/v4.0.1/theory-cloud-tabletheory-ts-4.0.1.tgz#sha512-fOZmjOUJCnicqtAIIJe7zkREwMc0Rfpe38vIj6nkcTVJUl+eyxeTqQI8aunIWjmUKlPzuHm5yLFeb25SJvINjg==`). The local SHA-512 of the downloaded TableTheory `v4.0.1` tarball, the integrity AppTheory `v5.0.1` declares, and the integrity recorded in all three lockfiles agree. The `overrides` block above is therefore **not load-bearing for the resolved version**: the direct dev dependency and AppTheory's transitive requirement name the same `v4.0.1` tarball URL, so both resolve to a single deduped `v4.0.1` node (`npm ls @theory-cloud/tabletheory-ts` reports `apptheory@5.0.1 -> tabletheory-ts@4.0.1 deduped`, plus the top-level `4.0.1`). The override is retained deliberately as a narrow guard: it keeps FaceTheory's validated TableTheory tarball authoritative under `@theory-cloud/apptheory` even if a future upstream release regresses its transitive declaration. The `ts/` and infra lockfiles also keep that upstream-declared `v4.0.1` string verbatim inside the `@theory-cloud/apptheory` package node — that is AppTheory's own published manifest, not a FaceTheory pin, and it is not editable.
+Note: AppTheory `v6.2.0` declares `@theory-cloud/tabletheory-ts` `v6.0.0` transitively, as a pinned GitHub Release tarball URL carrying its own integrity (`…/releases/download/v6.0.0/theory-cloud-tabletheory-ts-6.0.0.tgz#sha512-sJafPYwl9o6ZvMkSxGVpwq7F/pbexq168Vxo8vlIjR2t+D7n+1+gdzWEoOFTplMg8N+r8KIt9flAjADIyNwsDA==`). The local SHA-512 of the downloaded TableTheory `v6.0.0` tarball, the integrity AppTheory `v6.2.0` declares, and the integrity recorded in all three lockfiles agree. The `overrides` block above is therefore **not load-bearing for the resolved version**: the direct dev dependency and AppTheory's transitive requirement name the same `v6.0.0` tarball URL, so both resolve to a single deduped `v6.0.0` node (`npm ls @theory-cloud/tabletheory-ts` reports `apptheory@6.2.0 -> tabletheory-ts@6.0.0 deduped`, plus the top-level `6.0.0`). The override is retained deliberately as a narrow guard: it keeps FaceTheory's validated TableTheory tarball authoritative under `@theory-cloud/apptheory` even if a future upstream release regresses its transitive declaration. The `ts/` and infra lockfiles also keep that upstream-declared `v6.0.0` string verbatim inside the `@theory-cloud/apptheory` package node — that is AppTheory's own published manifest, not a FaceTheory pin, and it is not editable.
+
+`facetheory create` and `facetheory doctor` carry no version constants: the create CLI derives the AppTheory, CDK, and
+TableTheory tarball URLs from `ts/package.json` at runtime, and the doctor CLI checks the generated project's override
+alignment against the tarball it finds there. Both therefore emit and validate exactly the pins above.

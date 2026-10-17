@@ -161,10 +161,30 @@ async function renderVueStreamInternal(
   });
 }
 
-type VueStreamQueueItem =
-  | { kind: 'chunk'; chunk: Uint8Array }
-  | { kind: 'done' }
-  | { kind: 'error'; error: unknown };
+// Vue's `renderToSimpleStream` pushes synchronously and exposes no pause hook,
+// so the adapter bounds what it retains instead: pushes are coalesced into
+// chunks, unread bytes are capped, and production stops (the next push throws)
+// once the cap is exceeded or the consumer cancels.
+const VUE_STREAM_CHUNK_TARGET_BYTES = 16 * 1024;
+const VUE_STREAM_MAX_BUFFERED_BYTES = 5 * 1024 * 1024;
+
+class VueStreamBufferLimitError extends Error {
+  constructor(maxBytes: number) {
+    super(
+      `Vue adapter: streamed response exceeded ${maxBytes} buffered bytes awaiting consumption`,
+    );
+    this.name = 'VueStreamBufferLimitError';
+  }
+}
+
+class VueStreamCancelledError extends Error {
+  constructor() {
+    super('Vue adapter: streamed response was cancelled by its consumer');
+    this.name = 'VueStreamCancelledError';
+  }
+}
+
+type VueStreamState = 'running' | 'done' | 'failed' | 'cancelled';
 
 interface VueAppStream {
   body: AsyncIterable<Uint8Array>;
@@ -173,9 +193,13 @@ interface VueAppStream {
 
 function renderVueAppToAsyncIterable(app: App): VueAppStream {
   const encoder = new TextEncoder();
-  const queue: VueStreamQueueItem[] = [];
+  const queue: Uint8Array[] = [];
+  let queuedBytes = 0;
+  let pending: string[] = [];
+  let pendingLength = 0;
+  let state = 'running' as VueStreamState;
+  let failure: unknown = null;
   let wake: (() => void) | null = null;
-  let settled = false;
   let resolveCompleted: (() => void) | null = null;
   let rejectCompleted: ((error: unknown) => void) | null = null;
 
@@ -184,24 +208,47 @@ function renderVueAppToAsyncIterable(app: App): VueAppStream {
     rejectCompleted = reject;
   });
 
-  const enqueue = (item: VueStreamQueueItem): void => {
-    queue.push(item);
-    wake?.();
+  const wakeConsumer = (): void => {
+    const resume = wake;
     wake = null;
+    resume?.();
+  };
+
+  const flushPending = (): void => {
+    if (pendingLength === 0) return;
+    const chunk = encoder.encode(pending.join(''));
+    pending = [];
+    pendingLength = 0;
+    queue.push(chunk);
+    queuedBytes += chunk.byteLength;
   };
 
   const finish = (): void => {
-    if (settled) return;
-    settled = true;
-    enqueue({ kind: 'done' });
+    if (state !== 'running') return;
+    flushPending();
+    state = 'done';
     resolveCompleted?.();
+    wakeConsumer();
   };
 
   const fail = (error: unknown): void => {
-    if (settled) return;
-    settled = true;
-    enqueue({ kind: 'error', error });
+    if (state !== 'running') return;
+    flushPending();
+    state = 'failed';
+    failure = error;
     rejectCompleted?.(error);
+    wakeConsumer();
+  };
+
+  const cancel = (): void => {
+    if (state !== 'running') return;
+    state = 'cancelled';
+    queue.length = 0;
+    queuedBytes = 0;
+    pending = [];
+    pendingLength = 0;
+    rejectCompleted?.(new VueStreamCancelledError());
+    wakeConsumer();
   };
 
   try {
@@ -214,8 +261,25 @@ function renderVueAppToAsyncIterable(app: App): VueAppStream {
             finish();
             return;
           }
-          if (settled) return;
-          enqueue({ kind: 'chunk', chunk: encoder.encode(chunk) });
+          if (state === 'cancelled') throw new VueStreamCancelledError();
+          if (state !== 'running') return;
+          pending.push(chunk);
+          pendingLength += chunk.length;
+          if (pendingLength >= VUE_STREAM_CHUNK_TARGET_BYTES || wake !== null) {
+            flushPending();
+            wakeConsumer();
+          }
+          if (queuedBytes + pendingLength > VUE_STREAM_MAX_BUFFERED_BYTES) {
+            const error = new VueStreamBufferLimitError(
+              VUE_STREAM_MAX_BUFFERED_BYTES,
+            );
+            queue.length = 0;
+            queuedBytes = 0;
+            pending = [];
+            pendingLength = 0;
+            fail(error);
+            throw error;
+          }
         },
         destroy(error) {
           fail(error);
@@ -228,20 +292,26 @@ function renderVueAppToAsyncIterable(app: App): VueAppStream {
 
   return {
     body: (async function* () {
-      for (;;) {
-        while (queue.length === 0) {
+      try {
+        for (;;) {
+          if (queue.length === 0) flushPending();
+          const chunk = queue.shift();
+          if (chunk !== undefined) {
+            queuedBytes -= chunk.byteLength;
+            yield chunk;
+            continue;
+          }
+          if (state === 'done') return;
+          if (state === 'failed') throw failure;
+          if (state === 'cancelled') return;
           await new Promise<void>((resolve) => {
             wake = resolve;
           });
         }
-
-        const item = queue.shift()!;
-        if (item.kind === 'chunk') {
-          yield item.chunk;
-          continue;
-        }
-        if (item.kind === 'error') throw item.error;
-        return;
+      } finally {
+        // The consumer stopped early (return/throw): drop retained bytes and
+        // make Vue's next push throw so production stops.
+        cancel();
       }
     })(),
     completed,

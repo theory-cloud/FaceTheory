@@ -64,12 +64,27 @@ fi
   npm pack --pack-destination "$OUTPUT_DIR"
 )
 
-mkdir -p "$REFERENCE_DIR/ts"
-cp "$ROOT_DIR/README.md" "$ROOT_DIR/CHANGELOG.md" "$ROOT_DIR/LICENSE" "$REFERENCE_DIR/"
-cp -R "$ROOT_DIR/docs" "$REFERENCE_DIR/docs"
-cp -R "$ROOT_DIR/infra" "$REFERENCE_DIR/infra"
-cp "$ROOT_DIR/ts/README.md" "$ROOT_DIR/ts/LICENSE" "$REFERENCE_DIR/ts/"
-cp -R "$ROOT_DIR/ts/examples" "$REFERENCE_DIR/ts/examples"
+# Assemble the reference bundle from tracked source only. `git archive` emits the
+# committed blobs at HEAD, so untracked files (including sensitive or generated
+# files accidentally left under docs/, infra/, or ts/examples/) can never enter a
+# shipped release asset.
+if ! command -v git >/dev/null 2>&1 || ! git -C "$ROOT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "build-release-assets: FAIL (a git checkout is required to assemble the reference bundle from tracked source)" >&2
+  exit 1
+fi
+
+untracked="$(git -C "$ROOT_DIR" ls-files --others --exclude-standard -- docs infra ts/examples)"
+if [[ -n "${untracked}" ]]; then
+  echo "build-release-assets: FAIL (untracked files under shipped reference roots):" >&2
+  printf '%s\n' "${untracked}" >&2
+  exit 1
+fi
+
+mkdir -p "$REFERENCE_DIR"
+git -C "$ROOT_DIR" archive --format=tar HEAD -- \
+  README.md CHANGELOG.md LICENSE \
+  docs infra ts/README.md ts/LICENSE ts/examples \
+  | tar -x -C "$REFERENCE_DIR"
 
 # Keep the reference bundle focused on source docs and examples, not workspace artifacts.
 find "$REFERENCE_DIR/infra" "$REFERENCE_DIR/ts/examples" \

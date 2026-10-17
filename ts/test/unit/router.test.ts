@@ -79,6 +79,16 @@ test('router: redirect trailing-slash policy exposes canonical redirect paths', 
   assert.equal(r.redirectPath('/missing/'), null);
 });
 
+test('router: trailing-slash redirect target stays single-leading-slash origin-relative', () => {
+  const r = new Router({ trailingSlash: 'redirect' });
+  r.add('/docs');
+
+  assert.equal(r.redirectPath('///docs/'), '/docs');
+  assert.equal(r.redirectPath('//docs/'), '/docs');
+  assert.equal(r.redirectPath('/docs/'), '/docs');
+  assert.equal(r.redirectPath('///missing/'), null);
+});
+
 test('router: normalize trailing-slash policy matches both silently', () => {
   const r = new Router({ trailingSlash: 'normalize' });
   r.add('/docs');

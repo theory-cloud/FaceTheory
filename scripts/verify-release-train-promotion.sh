@@ -71,23 +71,68 @@ branch_sha() {
   sha_for_ref "$(release_ref "$1")"
 }
 
+# Reserved promotion edges (`main -> staging`, `staging -> premain`,
+# `premain -> main`, and the generated release-please PRs) name a protected
+# branch as their PR head, so the gate must bind the submitted head to that
+# branch: the head repository has to be this repository, so a fork branch merely
+# *named* `main`/`premain`/`staging` cannot impersonate a protected promotion,
+# and for the symbolic edges the submitted head SHA must be exactly the fetched
+# protected branch tip.
+require_head_repository_is_trusted() {
+  local description="$1"
+  if [[ "${github_head_repository}" != "${github_repository}" ]]; then
+    fail "${description}: head repository ${github_head_repository} is not ${github_repository}; a fork cannot target a reserved promotion branch"
+  fi
+}
+
+require_reserved_head_binding() {
+  local head_branch="$1"
+  local description="$2"
+  local tip
+
+  [[ -n "${head_sha}" ]] || fail "${description} requires --head-sha"
+  require_head_repository_is_trusted "${description}"
+  tip="$(branch_sha "${head_branch}")"
+  if [[ "${head_sha}" != "${tip}" ]]; then
+    fail "${description}: submitted head ${head_sha} is not the fetched ${head_branch} tip ${tip}"
+  fi
+}
+
 is_ancestor_ref() {
   local ancestor="$1"
   local descendant="$2"
   git merge-base --is-ancestor "${ancestor}" "${descendant}"
 }
 
-target_has_no_extra_non_merge_content() {
+# Release-train promotion requires the protected target to carry no content
+# outside the promoted source. Literal ancestry can over-reject when the target
+# tip is a merge commit whose content is already contained in the source: after
+# `staging -> premain` merges, the new premain tip is a merge whose tree is the
+# staging tree it merged, while staging has since advanced past it.
+#
+# The fallback used to ask only whether `git rev-list --no-merges --count
+# source..target` was zero, but a merge commit carries its own tree and can
+# introduce conflict-resolution or crafted content absent from every parent,
+# which `--no-merges` hides from the count. The two conditions below close that:
+# no non-merge commit may diverge, AND the target tip's tree must be a tree the
+# source already carries in its history. A tip tree the source has never seen
+# means the target holds content outside the promoted source, however it was
+# constructed, so it fails closed.
+target_has_no_content_outside_source() {
   local source_ref="$1"
   local target_ref="$2"
-  local extra_count
+  local extra_count target_tree tree
 
-  # Release-train promotion requires the protected target to carry no content
-  # outside the promoted source. Literal ancestry can over-reject when the target
-  # has a merge commit whose non-merge commits are already in the source, so
-  # inspect source..target and ignore merge commits only for that benign shape.
   extra_count="$(git rev-list --no-merges --count "${source_ref}..${target_ref}")"
-  [[ "${extra_count}" == "0" ]]
+  [[ "${extra_count}" == "0" ]] || return 1
+
+  target_tree="$(git rev-parse "${target_ref}^{tree}")"
+  while IFS= read -r tree; do
+    if [[ "${tree}" == "${target_tree}" ]]; then
+      return 0
+    fi
+  done < <(git log --format=%T "${source_ref}")
+  return 1
 }
 
 require_protected_ancestor() {
@@ -100,7 +145,7 @@ require_protected_ancestor() {
   if is_ancestor_ref "${ancestor_ref}" "${descendant_ref}"; then
     return 0
   fi
-  if target_has_no_extra_non_merge_content "${descendant_ref}" "${ancestor_ref}"; then
+  if target_has_no_content_outside_source "${descendant_ref}" "${ancestor_ref}"; then
     return 0
   fi
   fail "${description}: ${ancestor_branch} is not an ancestor of ${descendant_branch}"
@@ -279,6 +324,70 @@ self_test_release_train_promotion() {
     return 1
   fi
   echo "release-train-promotion: PASS (self-test main -> staging rogue target non-merge content failed closed)"
+
+  # Row 36: a crafted merge commit hides target-only content from the
+  # --no-merges count, so the tree-equivalence condition must reject it.
+  git update-ref "${ref_prefix}/staging" "${source}"
+  git update-ref "${ref_prefix}/premain" "$(self_test_commit "${rogue_tree}" -p "${baseline}" -p "${source}" -m 'Merge source content into target with hidden payload')"
+  if output="$(
+    (
+      remote="${test_remote}"
+      require_protected_ancestor "premain" "staging" "self-test crafted merge hiding target content"
+    ) 2>&1
+  )"; then
+    printf '%s\n' "${output}" >&2
+    echo "release-train-promotion: FAIL (self-test crafted merge hiding target content was accepted)" >&2
+    return 1
+  fi
+  echo "release-train-promotion: PASS (self-test crafted merge hiding target content failed closed)"
+
+  # Row 7: a reserved promotion edge must bind the submitted head to the fetched
+  # protected tip and reject forks, not merely compare upstream refs.
+  git update-ref "${ref_prefix}/main" "${source}"
+  if ! output="$(
+    (
+      remote="${test_remote}"
+      head_sha="${source}"
+      github_repository="theory-cloud/FaceTheory"
+      github_head_repository="theory-cloud/FaceTheory"
+      require_reserved_head_binding "main" "self-test reserved edge head binding"
+    ) 2>&1
+  )"; then
+    printf '%s\n' "${output}" >&2
+    echo "release-train-promotion: FAIL (self-test same-repo reserved head at the fetched tip was rejected)" >&2
+    return 1
+  fi
+  echo "release-train-promotion: PASS (self-test same-repo reserved head at the fetched tip accepted)"
+
+  if output="$(
+    (
+      remote="${test_remote}"
+      head_sha="${source}"
+      github_repository="theory-cloud/FaceTheory"
+      github_head_repository="attacker/FaceTheory"
+      require_reserved_head_binding "main" "self-test reserved edge head binding"
+    ) 2>&1
+  )"; then
+    printf '%s\n' "${output}" >&2
+    echo "release-train-promotion: FAIL (self-test fork reserved head was accepted)" >&2
+    return 1
+  fi
+  echo "release-train-promotion: PASS (self-test fork reserved head failed closed)"
+
+  if output="$(
+    (
+      remote="${test_remote}"
+      head_sha="${baseline}"
+      github_repository="theory-cloud/FaceTheory"
+      github_head_repository="theory-cloud/FaceTheory"
+      require_reserved_head_binding "main" "self-test reserved edge head binding"
+    ) 2>&1
+  )"; then
+    printf '%s\n' "${output}" >&2
+    echo "release-train-promotion: FAIL (self-test substituted reserved head SHA was accepted)" >&2
+    return 1
+  fi
+  echo "release-train-promotion: PASS (self-test substituted reserved head SHA failed closed)"
 }
 
 if [[ "${self_test}" == "true" ]]; then
@@ -324,6 +433,7 @@ if [[ "${base}" == "staging" ]]; then
   esac
 
   if [[ "${head}" == "main" ]]; then
+    require_reserved_head_binding "main" "main -> staging back-merge"
     require_protected_ancestor "staging" "main" "main -> staging back-merge must include staging"
     pass "main -> staging back-merge"
     exit 0
@@ -342,12 +452,14 @@ fi
 if [[ "${base}" == "premain" ]]; then
   case "${head}" in
     staging)
+      require_reserved_head_binding "staging" "staging -> premain prerelease promotion"
       require_protected_ancestor "premain" "staging" "staging -> premain prerelease promotion must include premain"
       require_protected_ancestor "main" "staging" "staging -> premain prerelease promotion must include main"
       pass "staging -> premain prerelease promotion"
       ;;
     release-please--branches--premain)
       [[ -n "${head_sha}" ]] || fail "generated premain release PR requires --head-sha"
+      require_head_repository_is_trusted "generated premain Release Please PR"
       require_sha_contains_branch "premain" "${head_sha}" "generated premain Release Please PR must be based on premain"
       [[ -z "${pr_title}" ]] || require_title_rc
       pass "generated premain RC Release Please PR"
@@ -362,11 +474,13 @@ fi
 if [[ "${base}" == "main" ]]; then
   case "${head}" in
     premain)
+      require_reserved_head_binding "premain" "premain -> main stable promotion"
       require_protected_ancestor "main" "premain" "premain -> main stable promotion must include main"
       pass "premain -> main stable promotion"
       ;;
     release-please--branches--main)
       [[ -n "${head_sha}" ]] || fail "generated main release PR requires --head-sha"
+      require_head_repository_is_trusted "generated main Release Please PR"
       require_sha_contains_branch "main" "${head_sha}" "generated main Release Please PR must be based on main"
       [[ -z "${pr_title}" ]] || require_title_not_rc
       pass "generated main stable Release Please PR"
