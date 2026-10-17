@@ -97,7 +97,11 @@ if [[ "$1" == "api" ]]; then
   done
   case "${method} ${endpoint}" in
     "GET repos/theory-cloud/FaceTheory/releases?per_page=100&page=1")
-      cat "${state}/list.json"
+      if [[ -f "${state}/fallback" ]]; then
+        echo '[]'
+      else
+        cat "${state}/list.json"
+      fi
       ;;
     "GET repos/theory-cloud/FaceTheory/releases/99")
       cat "${state}/release.json"
@@ -125,8 +129,22 @@ if [[ "$1" == "api" ]]; then
   exit 0
 fi
 if [[ "$1 $2" == "release view" ]]; then
+  if [[ -f "${state}/fallback" ]]; then
+    case "$*" in
+      *"--json assets"*)
+        printf '%s\n' 'facetheory-reference-1.2.3-rc.tar.gz'
+        ;;
+      *)
+        cat "${state}/release-view.json"
+        ;;
+    esac
+    exit 0
+  fi
   echo "release view should not be used when releases list returns an id" >&2
   exit 1
+fi
+if [[ "$1 $2" == "release upload" || "$1 $2" == "release edit" ]]; then
+  exit 0
 fi
 echo "unexpected gh invocation: $*" >&2
 exit 1
@@ -192,6 +210,11 @@ publish_patch_reasserts_tag() {
   grep -Eq "PATCH repos/theory-cloud/FaceTheory/releases/99( +[^ ]+)* +tag_name=${tag}( |$)" "${log}"
 }
 
+fallback_release_edit_reasserts_tag() {
+  local log="$1"
+  grep -Fq "release edit ${tag} --repo theory-cloud/FaceTheory --tag ${tag} --draft=false" "${log}"
+}
+
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 bin_dir="${tmpdir}/bin"
@@ -248,6 +271,59 @@ seed_state "${mutated_state}" "${tag}" true true
 run_script "${mutated_state}" "${mutated}" "${mutated_log}" >/dev/null
 if publish_patch_reasserts_tag "${mutated_log}"; then
   fail "removing tag_name from the publish PATCH was not detected"
+fi
+
+# Fallback: drafts without a release id are published through `gh release edit`,
+# which must re-assert the tag name. Without it GitHub publishes the draft under
+# its `untagged-<hex>` placeholder (the 2026-10-17 RC incident shape).
+fallback_state="${tmpdir}/fallback-state"
+fallback_log="${tmpdir}/fallback.log"
+seed_state "${fallback_state}" "${tag}" true true
+touch "${fallback_state}/fallback"
+python3 - "${fallback_state}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+state = Path(sys.argv[1])
+release = json.loads((state / "release.json").read_text(encoding="utf-8"))
+view = {
+    "tagName": release["tag_name"],
+    "targetCommitish": release["target_commitish"],
+    "isDraft": True,
+    "isPrerelease": True,
+    "url": release["html_url"],
+    "uploadUrl": release["upload_url"],
+}
+(state / "release-view.json").write_text(json.dumps(view), encoding="utf-8")
+PY
+fallback_out="$(run_script "${fallback_state}" "${script_path}" "${fallback_log}")"
+grep -Fq "release-assets: published ${tag}" <<<"${fallback_out}" || fail "fallback path did not publish"
+grep -Fq "release upload ${tag} ${dist_dir}/theory-cloud-facetheory-1.2.3-rc.tgz" "${fallback_log}" || fail "fallback package upload missing"
+grep -Fq "release upload ${tag} ${dist_dir}/SHA256SUMS.txt" "${fallback_log}" || fail "fallback checksum upload missing"
+fallback_release_edit_reasserts_tag "${fallback_log}" || fail "fallback release edit must re-assert the tag name"
+grep -Fq -- "--prerelease" "${fallback_log}" || fail "fallback release edit must mark RC drafts prerelease"
+
+# Mutation probe: dropping --tag from the fallback release edit must be detected.
+fallback_mutated="${mutated_dir}/publish-fallback-mutated.sh"
+python3 - "${script_path}" "${fallback_mutated}" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+needle = '--repo "${repo}" --tag "${tag}" --draft=false'
+if needle not in source:
+    raise SystemExit("fallback release edit no longer re-asserts the tag name")
+Path(sys.argv[2]).write_text(source.replace(needle, '--repo "${repo}" --draft=false', 1), encoding="utf-8")
+PY
+fallback_mutated_state="${tmpdir}/fallback-mutated-state"
+fallback_mutated_log="${tmpdir}/fallback-mutated.log"
+seed_state "${fallback_mutated_state}" "${tag}" true true
+touch "${fallback_mutated_state}/fallback"
+cp "${fallback_state}/release-view.json" "${fallback_mutated_state}/release-view.json"
+run_script "${fallback_mutated_state}" "${fallback_mutated}" "${fallback_mutated_log}" >/dev/null
+if fallback_release_edit_reasserts_tag "${fallback_mutated_log}"; then
+  fail "removing --tag from the fallback release edit was not detected"
 fi
 
 echo "test-publish-draft-release-assets: PASS"
