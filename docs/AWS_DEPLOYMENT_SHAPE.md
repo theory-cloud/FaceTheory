@@ -31,7 +31,7 @@ your SSR Lambda function.
 FaceTheory's SSG/ISR reference stack (`infra/apptheory-ssg-isr-site/`) uses `AppTheorySsrSite` with
 `mode: AppTheorySsrSiteMode.SSG_ISR` for the CloudFront distribution, Lambda Function URL origin, generated edge
 rewrite/request-id functions, and ISR runtime env wiring. The stack keeps explicit FaceTheory-owned `BucketDeployment`
-resources for immutable assets, the Vite manifest, and SSG HTML because AppTheory v5.0.1 does not yet expose
+resources for immutable assets, the Vite manifest, and SSG HTML because AppTheory v6.2.0 does not yet expose
 per-deployment `distributionPaths` invalidation controls for those uploads. Treat that as the remaining AppTheory
 coordination item; it is not permission to hand-roll the CloudFront distribution or origin group in FaceTheory.
 
@@ -227,8 +227,10 @@ Notes:
 
 ### ISR (blocking)
 
-- FaceTheory runtime default helper (`blockingIsrCacheControl`) emits:
+- FaceTheory runtime default helper (`blockingIsrCacheControl`) emits, for an ordinary anonymous default-key request:
   - `cache-control: public, max-age=0, s-maxage=0, stale-if-error=<revalidateSeconds>, must-revalidate`
+- Authenticated requests (any default auth-vary header or any cookie) and every request on a deployment with an explicit custom `cacheKey` fail closed:
+  - `cache-control: private, no-store`
 - Runtime ISR state marker header:
   - `x-facetheory-isr: miss | hit | wait-hit | stale`
 - CloudFront should not treat ISR HTML as long-lived immutable content; freshness is runtime-controlled via metadata.
@@ -236,7 +238,7 @@ Notes:
 ## ISR Request Flow
 
 1. Request reaches Lambda URL behavior.
-2. FaceTheory verifies tenant partition safety. Requests carrying known tenant boundary headers (`x-tenant-id` or `x-facetheory-tenant`) fail closed unless `tenantKey` or a custom `cacheKey` is configured.
+2. FaceTheory verifies tenant partition safety. Requests carrying known tenant boundary headers (`x-tenant-id` or `x-facetheory-tenant`) fail closed unless an explicit, trusted `tenantKey` is configured; a custom `cacheKey` alone does not exempt a tenant-scoped route.
 3. FaceTheory computes cache key (`tenant + route + params + query + authorization-like header/cookie digests` by default).
 4. Metadata lookup in DynamoDB:
    - fresh -> serve cached HTML pointer from S3
@@ -248,7 +250,7 @@ Notes:
 
 Default tenant note:
 - FaceTheory uses the `default` tenant unless `tenantKey` is configured.
-- If tenant identity comes from auth/session/host mapping or a trusted header, provide an explicit `tenantKey` or custom `cacheKey`, or keep that route on SSR.
+- If tenant identity comes from auth/session/host mapping or a trusted header, provide an explicit, trusted `tenantKey` (a custom `cacheKey` alone does not exempt a tenant-scoped route and must be paired with `tenantKey`), or keep that route on SSR.
 - Tenant-invariant ISR routes should not receive tenant-like headers; if they do, FaceTheory fails closed rather than sharing cached HTML through the implicit `default` tenant.
 
 ## Operational Checklist

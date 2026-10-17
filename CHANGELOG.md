@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased]
+
+### ⚠ BREAKING CHANGES
+
+* **dev:** `createViteMiddlewareDevServer().listen()` now binds a loopback address (`127.0.0.1`) by default instead of every interface, and the returned `url` reports the actual bound host rather than masking a wildcard bind as `localhost`. Ordinary local development is unchanged; callers that relied on the implicit all-interfaces bind must pass an explicit `host` (for example `--host 0.0.0.0`) to restore the previous reachability. No version bump, tag, or release is performed by this change.
+* **isr:** Tenant-scoped ISR custom `cacheKey` routes now require an explicit, trusted `tenantKey`. A custom `cacheKey` alone no longer counts as an explicit tenant partition: it fails closed when a tenant-boundary header is present without a trusted `tenantKey`, and when `tenantKey` is configured FaceTheory composes a framework-owned, privacy-preserving tenant digest with the consumer's logical key. Existing tenant-scoped custom-key cache identities change, so those entries miss and repopulate after upgrade; there is no fallback to the old unpartitioned keys. This is release-major material, not a patch or minor; no version bump, tag, or release is performed by this change.
+* **head:** Strict-CSP head-script URLs whose hostname carries a trailing DNS root dot (for example `https://real.example./assets/entry.js`) are now rejected instead of being accepted and rendered verbatim while only the comparison URL was normalized. Use the dotless host form (`https://real.example/assets/entry.js`). This is a deliberate reversal of the behavior codified by `a526684` and is release-major material, not a patch or minor; no version bump, tag, or release is performed by this change.
+* **isr:** ISR responses for authenticated requests (any default auth-vary header — `Authorization`, `Proxy-Authorization`, `X-API-Key`, `X-Amz-Security-Token` — or any request cookie) and for every request on a deployment with an explicit custom `cacheKey` now fail closed with `cache-control: private, no-store` instead of a shared `public` value; the stored `HtmlStore` object cache-control is guarded on the same condition, so a guarded render's object metadata never stays public. An anonymous request on the default cache key keeps the previous `public` value, and an explicit `FaceIsrOptions.cacheControl` callback still shapes unguarded responses (a `private, no-store`-returning callback is preserved verbatim) but can no longer widen a guarded request. Deployments with a custom `cacheKey` lose the public shared-cache hint for all requests, including anonymous ones, and `varyCookies` does not exempt a cookie-bearing request from the guard. This is release-major material, not a patch or minor; no version bump, tag, or release is performed by this change.
+
+## [4.2.1](https://github.com/theory-cloud/FaceTheory/compare/v4.2.0...v4.2.1) (2026-10-05)
+
+
+### Bug Fixes
+
+* **deps:** adopt AppTheory 5.0.1 and TableTheory 4.0.1 ([b742a70](https://github.com/theory-cloud/FaceTheory/commit/b742a70058ff26e35d43a5bc015081a41171d49d))
+* **deps:** adopt AppTheory 5.0.1 and TableTheory 4.0.1 ([c0cfe7c](https://github.com/theory-cloud/FaceTheory/commit/c0cfe7c81a791b8c4fdb54a1d05f905f9bcecb9d))
+* **deps:** bump ts brace-expansion override to 5.0.12 ([66b39a4](https://github.com/theory-cloud/FaceTheory/commit/66b39a4c8e982e10146af0a13771ebd8d2f35385))
+* **deps:** clear fixable brace-expansion advisory + cooldown-gated routine updates (Wave 1) ([6e117f6](https://github.com/theory-cloud/FaceTheory/commit/6e117f61a943dbba6015113d16c6ccaa6830495d))
+
 ## [4.2.0](https://github.com/theory-cloud/FaceTheory/compare/v4.1.2...v4.2.0) (2026-09-29)
 
 

@@ -103,7 +103,7 @@ const app = createFaceApp({
 Why this is incorrect:
 
 - It omits the coordinated HTML and metadata stores that blocking ISR expects in production.
-- If the page renders tenant-specific HTML, it also omits the explicit `tenantKey` or custom `cacheKey` required to partition that cache. FaceTheory fails closed when known tenant boundary headers reach ISR without such a partition.
+- If the page renders tenant-specific HTML, it also omits the explicit, trusted `tenantKey` required to partition that cache. A custom `cacheKey` alone does not exempt a tenant-scoped route. FaceTheory fails closed when known tenant boundary headers reach ISR without a trusted `tenantKey`.
 
 
 ## Pattern: Pick an explicit trailing-slash policy
@@ -891,7 +891,7 @@ Why this is incorrect:
 ISR note:
 
 - Use ISR for operator visibility only when the rendered HTML is non-personalized or fully partitioned. If the output varies by identity, role, tenant, cookie, locale, environment, or data-source variant, include those dimensions in explicit `cacheKey` and `tenantKey` functions or keep the route on SSR.
-- Tenant-invariant ISR routes should not receive tenant-like headers such as `x-tenant-id` or `x-facetheory-tenant`; those headers trigger FaceTheory's fail-closed partition guard unless `tenantKey` or a custom `cacheKey` is configured.
+- Tenant-invariant ISR routes should not receive tenant-like headers such as `x-tenant-id` or `x-facetheory-tenant`; those headers trigger FaceTheory's fail-closed partition guard unless an explicit, trusted `tenantKey` is configured. A custom `cacheKey` alone does not exempt a tenant-scoped route.
 
 ## Pattern Selection Notes
 

@@ -25,7 +25,22 @@ for subject in "${commit_subjects[@]}"; do
   fi
 done
 
-mapfile -t changed_files < <(git diff --name-only --diff-filter=ACMR "${diff_range}")
+# Read the full name-status change set rather than only the added/copied/
+# modified destinations. A deletion (`D`) or either side of a rename (`R`/`C`)
+# can otherwise hide a non-allowlisted path from the release-infrastructure
+# exception, so every path the range touches is collected and put through the
+# allowlist below. Paths are tab-separated by git, so a path with spaces survives
+# the read.
+mapfile -t change_lines < <(git diff --name-status "${diff_range}")
+changed_files=()
+for change_line in "${change_lines[@]}"; do
+  [[ -n "${change_line}" ]] || continue
+  IFS=$'\t' read -r change_status change_from change_to <<< "${change_line}"
+  case "${change_status}" in
+    R*|C*) changed_files+=("${change_from}" "${change_to}") ;;
+    *) changed_files+=("${change_from}") ;;
+  esac
+done
 if [[ "${#changed_files[@]}" -gt 0 ]]; then
   release_sync_only="true"
   for path in "${changed_files[@]}"; do
@@ -35,6 +50,7 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
       | release-please-config*.json \
       | VERSION \
       | CHANGELOG.md \
+      | CHANGELOG.prerelease.md \
       | README.md \
       | Makefile \
       | .gitignore \

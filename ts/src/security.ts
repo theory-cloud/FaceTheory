@@ -218,9 +218,9 @@ function normalizeStrictCspDirectiveValue(
       `FaceTheory strict CSP directive "${directiveName}" contains an empty value`,
     );
   }
-  if (/[\s;]/.test(normalized)) {
+  if (/[\s;,]/.test(normalized)) {
     throw new Error(
-      `FaceTheory strict CSP directive "${directiveName}" values must be individual CSP tokens without whitespace or semicolons`,
+      `FaceTheory strict CSP directive "${directiveName}" values must be individual CSP tokens without whitespace, commas, or semicolons`,
     );
   }
 
@@ -254,6 +254,22 @@ function validateNoInlineScriptElements(
   expectedNonce: string | null,
 ): void {
   const normalizedExpectedNonce = normalizeCspNonce(expectedNonce);
+  // One validation pass shares a single tag-end resolver, a single document
+  // head boundary, and a monotone script-end cursor so script-heavy or
+  // malformed documents are validated in near-linear time.
+  const hasTagEnd = createHtmlTagEndResolver(html);
+  const findScriptEnd = createScriptEndTagFinder(html, hasTagEnd);
+  let headBounds: HtmlRange | null | undefined;
+  const isInsideHead = (tagStart: number): boolean => {
+    if (headBounds === undefined) {
+      headBounds = findDocumentHeadBounds(html, hasTagEnd);
+    }
+    return (
+      headBounds !== null &&
+      tagStart >= headBounds.start &&
+      tagStart < headBounds.end
+    );
+  };
   const scriptStartTags: Array<{
     allowInlineBody: boolean;
     tag: HtmlStartTag;
@@ -264,9 +280,9 @@ function validateNoInlineScriptElements(
     if (tagName !== SCRIPT_TAG_NAME) continue;
 
     const allowInlineBody = isNonceCarriedHeadJsonLdScript(
-      html,
       startTag,
       normalizedExpectedNonce,
+      isInsideHead,
     );
     scriptStartTags.push({ allowInlineBody, tag: startTag });
 
@@ -276,7 +292,7 @@ function validateNoInlineScriptElements(
   }
 
   for (const { allowInlineBody, tag: startTag } of scriptStartTags) {
-    const bodyEnd = findScriptEndTagStart(html, startTag.end);
+    const bodyEnd = findScriptEnd(startTag.end);
     const body = html.slice(startTag.end, bodyEnd);
     if (!allowInlineBody && body.trim().length > 0) {
       throw new Error('FaceTheory strict CSP rejects inline script tags in document');
@@ -346,7 +362,30 @@ function* scanHtmlStartTags(html: string): Generator<HtmlStartTag> {
   }
 }
 
-function findScriptEndTagStart(html: string, bodyStart: number): number {
+function createScriptEndTagFinder(
+  html: string,
+  hasTagEnd: (start: number) => boolean,
+): (bodyStart: number) => number {
+  // Script bodies are resolved in document order. The first parser-valid end
+  // tag at or after `bodyStart` is also the answer for any later body start
+  // that does not pass it, so the forward scan never revisits a region.
+  let cachedFrom = -1;
+  let cachedEnd = -1;
+  return (bodyStart) => {
+    if (cachedFrom !== -1 && bodyStart >= cachedFrom && bodyStart <= cachedEnd) {
+      return cachedEnd;
+    }
+    cachedFrom = bodyStart;
+    cachedEnd = findScriptEndTagStart(html, bodyStart, hasTagEnd);
+    return cachedEnd;
+  };
+}
+
+function findScriptEndTagStart(
+  html: string,
+  bodyStart: number,
+  hasTagEnd: (start: number) => boolean,
+): number {
   let cursor = bodyStart;
   while (cursor < html.length) {
     const closeStart = html.indexOf('</', cursor);
@@ -357,7 +396,7 @@ function findScriptEndTagStart(html: string, bodyStart: number): number {
     if (
       htmlStartsWithAsciiCaseInsensitive(html, nameStart, SCRIPT_TAG_NAME) &&
       isScriptEndTagBoundary(html, nameEnd) &&
-      findHtmlTagEnd(html, nameEnd) !== -1
+      hasTagEnd(nameEnd)
     ) {
       return closeStart;
     }
@@ -395,29 +434,80 @@ function isHtmlTagCloseBoundary(html: string, index: number): boolean {
   return code === 47 || code === 62 || isHtmlWhitespace(code);
 }
 
-function findHtmlTagEnd(html: string, start: number): number {
-  let cursor = start;
-  let quote: '"' | "'" | null = null;
+/**
+ * Returns whether a quote-aware scan starting at an index reaches an unquoted
+ * `>` (a parser-valid tag end). Quoted runs are skipped as a unit, so every
+ * scan is a walk over `>`/quote positions. Those positions are indexed once
+ * per document and walk results are memoized at each landing point, so many
+ * incomplete closing candidates cost O(log n) each instead of a suffix rescan.
+ */
+function createHtmlTagEndResolver(html: string): (start: number) => boolean {
+  let index: { gt: number[]; dq: number[]; sq: number[] } | null = null;
+  const memo = new Map<number, boolean>();
 
-  while (cursor < html.length) {
-    const char = html[cursor];
-    if (quote) {
-      if (char === quote) quote = null;
-      cursor += 1;
-      continue;
+  const positionsOf = (char: string): number[] => {
+    const positions: number[] = [];
+    let cursor = html.indexOf(char);
+    while (cursor !== -1) {
+      positions.push(cursor);
+      cursor = html.indexOf(char, cursor + 1);
+    }
+    return positions;
+  };
+
+  return (start) => {
+    index ??= { gt: positionsOf('>'), dq: positionsOf('"'), sq: positionsOf("'") };
+    const { gt, dq, sq } = index;
+    const path: number[] = [];
+    let cursor = start;
+    let result: boolean;
+
+    for (;;) {
+      const known = memo.get(cursor);
+      if (known !== undefined) {
+        result = known;
+        break;
+      }
+      path.push(cursor);
+
+      const nextGt = firstPositionAtOrAfter(gt, cursor);
+      const nextDq = firstPositionAtOrAfter(dq, cursor);
+      const nextSq = firstPositionAtOrAfter(sq, cursor);
+      const nextQuote = Math.min(nextDq, nextSq);
+      if (nextGt < nextQuote) {
+        result = true;
+        break;
+      }
+      if (nextQuote === Infinity) {
+        result = false;
+        break;
+      }
+
+      const closingQuote = firstPositionAtOrAfter(
+        nextQuote === nextDq ? dq : sq,
+        nextQuote + 1,
+      );
+      if (closingQuote === Infinity) {
+        result = false;
+        break;
+      }
+      cursor = closingQuote + 1;
     }
 
-    if (char === '"' || char === "'") {
-      quote = char;
-      cursor += 1;
-      continue;
-    }
+    for (const visited of path) memo.set(visited, result);
+    return result;
+  };
+}
 
-    if (char === '>') return cursor;
-    cursor += 1;
+function firstPositionAtOrAfter(positions: readonly number[], start: number): number {
+  let low = 0;
+  let high = positions.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if ((positions[mid] ?? Infinity) < start) low = mid + 1;
+    else high = mid;
   }
-
-  return -1;
+  return positions[low] ?? Infinity;
 }
 
 function hasHtmlAttribute(attrs: string, name: string): boolean {
@@ -490,11 +580,10 @@ function* scanHtmlAttributes(attrs: string): Generator<HtmlAttribute> {
 }
 
 function isNonceCarriedHeadJsonLdScript(
-  html: string,
   startTag: HtmlStartTag,
   expectedNonce: string | null,
+  isInsideHead: (tagStart: number) => boolean,
 ): boolean {
-  if (!isInsideDocumentHead(html, startTag.start)) return false;
   if (hasHtmlAttribute(startTag.attrs, 'src')) return false;
 
   const type = readHtmlAttributeValue(startTag.attrs, 'type');
@@ -503,7 +592,7 @@ function isNonceCarriedHeadJsonLdScript(
   const nonce = readHtmlAttributeValue(startTag.attrs, 'nonce');
   if (!nonce) return false;
   if (expectedNonce && nonce !== expectedNonce) return false;
-  return true;
+  return isInsideHead(startTag.start);
 }
 
 function normalizeScriptType(value: string | null): string {
@@ -511,7 +600,15 @@ function normalizeScriptType(value: string | null): string {
   return mediaType.trim().toLowerCase();
 }
 
-function isInsideDocumentHead(html: string, tagStart: number): boolean {
+interface HtmlRange {
+  start: number;
+  end: number;
+}
+
+function findDocumentHeadBounds(
+  html: string,
+  hasTagEnd: (start: number) => boolean,
+): HtmlRange | null {
   let headOpenEnd: number | null = null;
   for (const startTag of scanHtmlStartTags(html)) {
     const tagName = startTag.tagName.toLowerCase();
@@ -520,17 +617,18 @@ function isInsideDocumentHead(html: string, tagStart: number): boolean {
       break;
     }
   }
-  if (headOpenEnd === null) return false;
+  if (headOpenEnd === null) return null;
 
-  const headCloseStart = findClosingTagStart(html, 'head', headOpenEnd);
-  if (headCloseStart === -1) return false;
-  return tagStart >= headOpenEnd && tagStart < headCloseStart;
+  const headCloseStart = findClosingTagStart(html, 'head', headOpenEnd, hasTagEnd);
+  if (headCloseStart === -1) return null;
+  return { start: headOpenEnd, end: headCloseStart };
 }
 
 function findClosingTagStart(
   html: string,
   tagName: string,
   start: number,
+  hasTagEnd: (start: number) => boolean,
 ): number {
   let cursor = start;
   while (cursor < html.length) {
@@ -541,7 +639,7 @@ function findClosingTagStart(
     if (
       htmlStartsWithAsciiCaseInsensitive(html, nameStart, tagName) &&
       isHtmlTagCloseBoundary(html, nameEnd) &&
-      findHtmlTagEnd(html, nameEnd) !== -1
+      hasTagEnd(nameEnd)
     ) {
       return closeStart;
     }

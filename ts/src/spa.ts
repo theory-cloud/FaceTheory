@@ -645,22 +645,15 @@ function importHeadNode(doc: Document, node: Node): Node | null {
     return doc.importNode(element, true);
   }
 
+  // Only inert JSON data scripts (including the hydration marker) survive head
+  // synchronization, and they are imported as parsed rather than recreated
+  // with createElement('script'), which would revive them as live scripts.
   if (!isInertHeadScript(element)) return null;
-
-  const script = doc.createElement('script');
-  for (const name of element.getAttributeNames()) {
-    const value = element.getAttribute(name);
-    if (value === null) continue;
-    script.setAttribute(name, value);
-  }
-  script.textContent = element.textContent ?? '';
-  return script;
+  return doc.importNode(element, true);
 }
 
 function isInertHeadScript(element: Element): boolean {
-  if (element.id === HYDRATION_DATA_SCRIPT_ID) return true;
-  const type = String(element.getAttribute('type') ?? '').trim().toLowerCase();
-  return type === 'application/json' || type.endsWith('+json');
+  return isJsonScriptType(element.getAttribute('type'));
 }
 
 function createBootstrapContext(

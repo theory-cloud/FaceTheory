@@ -61,13 +61,13 @@
 // no version such as `fromString('provided')`) is recorded and fails closed
 // instead of vanishing, while a runtime-shaped string that is not a runtime
 // argument - a log message, a description, `'nodejs22.x'` beside a genuinely
-// dynamic `fromString(config.runtime)` - is no longer read as a declaration
-// that rescues the surface. Two consequences are deliberate rather than
-// oversights: `fromString` with a non-literal argument declares nothing
-// readable, and a call whose receiver is not traceable to a Runtime binding
-// (a bare `fromString('nodejs18.x')` in a helper) is not read either. Both leave
-// the surface without the declaration that would otherwise be judged, so they
-// end in the same fail-closed rule as an obfuscated surface.
+// dynamic `fromString(config.runtime)` - is not read as a declaration. A
+// `fromString` whose argument is not a literal, on one of those receivers, is
+// itself recorded and fails closed: it cannot be resolved to a runtime the gate
+// can judge, so it must not be dropped behind a supported declaration sitting
+// beside it. A call whose receiver is not traceable to a Runtime binding (a bare
+// `fromString(...)` in a helper) is still not read, because it cannot be
+// attributed to Lambda at all.
 //
 // Two directories are deliberately outside the walk, for stated reasons rather
 // than convenience:
@@ -238,10 +238,12 @@ function fail(message) {
 // What stays outside the model, deliberately and now by measurement rather than
 // by omission: a member read through a computed key (`R[process.env.NAME]`), a
 // runtime hidden behind a lookup table or a helper, a `['Runtime']` read bound
-// to a local name and used later, an enum member read as `R['NODEJS_20_X']`, and
-// a bare `fromString('nodejs20.x')` on no receiver. None of them yields a
-// declaration, so a surface written that way fails closed on the "declares no
-// modelled Lambda runtime" rule instead of passing unjudged.
+// to a local name and used later, and a bare `fromString('nodejs20.x')` on no
+// receiver. Each yields no declaration, so a surface written that way fails
+// closed on the "declares no modelled Lambda runtime" rule instead of passing
+// unjudged - unless another declaration on the surface is judged, which is the
+// masking case the quoted enum index (`R['NODEJS_20_X']`) and the non-literal
+// `fromString` receiver now cover.
 const RUNTIME_NAMESPACE_RECEIVERS = ["lambda\\.Runtime", "Runtime"];
 
 // Names a surface binds to the Runtime enum (`R` beside `R.NODEJS_20_X`) or to
@@ -339,6 +341,19 @@ function enumDeclarationPattern(text) {
   return new RegExp(`\\b(${runtimeReceiverAlternation(text)})\\.${ENUM_MEMBER_NAME}\\b`, "g");
 }
 
+// The quoted-enum-member pattern for one surface: `<receiver>['NODEJS_20_X']`.
+// The member used to be read only through a dot, so a deprecated runtime named
+// through a quoted index declared nothing and slipped past - masked whenever the
+// same surface also held a supported dot-form declaration. The quoted index is
+// now judged exactly like the dot form: a supported enum passes, a deprecated or
+// unmodelled one fails.
+function quotedEnumDeclarationPattern(text) {
+  return new RegExp(
+    `\\b(${runtimeReceiverAlternation(text)})\\[\\s*["']${ENUM_MEMBER_NAME}["']\\s*\\]`,
+    "g",
+  );
+}
+
 // The runtime-literal pattern for one surface: the argument of `fromString` on a
 // receiver that surface binds. The value pattern is deliberately loose - the
 // predicate below decides - so an unfamiliar runtime family still reaches the
@@ -349,6 +364,19 @@ function enumDeclarationPattern(text) {
 function literalDeclarationPattern(text) {
   return new RegExp(
     `\\b(${runtimeReceiverAlternation(text)})\\.fromString\\s*\\(\\s*["'\`]([^"'\`]+)["'\`]`,
+    "g",
+  );
+}
+
+// The dynamic-runtime pattern for one surface: `fromString(<non-literal>)` on a
+// receiver that surface binds. A non-literal argument cannot be resolved to a
+// runtime, so it is recorded as a declaration that fails closed instead of being
+// dropped - otherwise a surface could keep a supported declaration and add a
+// dynamic Lambda runtime beside it without the gate noticing. A `fromString` on
+// no receiver is still not read: it cannot be attributed to Lambda at all.
+function dynamicRuntimeDeclarationPattern(text) {
+  return new RegExp(
+    `\\b(${runtimeReceiverAlternation(text)})\\.fromString\\s*\\(\\s*(?!["'\`])`,
     "g",
   );
 }
@@ -375,13 +403,14 @@ function lineOf(text, index) {
 }
 
 // Collects every runtime declaration in a surface's text, in source order, as
-// { line, form, identifier, enumName, literal }. `identifier` is null when the
-// form could not be resolved to a modelled runtime, and that is a declaration
-// all the same: it is what makes an unmodelled name fail closed instead of
-// dropping out of the count. `enumName` is null for literal forms and `literal`
-// is null for enum forms. `form` is the receiver and member exactly as written,
-// so a violation reports the idiom the surface actually used rather than the one
-// the gate prefers.
+// { line, form, identifier, enumName, literal, dynamic }. `identifier` is null
+// when the form could not be resolved to a modelled runtime, and that is a
+// declaration all the same: it is what makes an unmodelled name fail closed
+// instead of dropping out of the count. `enumName` is null for literal and
+// dynamic forms; `literal` is null for enum and dynamic forms; `dynamic` is true
+// for a `fromString` whose argument is not a literal. `form` is the receiver and
+// member exactly as written, so a violation reports the idiom the surface
+// actually used rather than the one the gate prefers.
 function collectDeclarations(text) {
   const declarations = [];
   for (const match of text.matchAll(enumDeclarationPattern(text))) {
@@ -396,6 +425,18 @@ function collectDeclarations(text) {
       identifier: LAMBDA_RUNTIME_ENUMS.get(enumName) ?? null,
     });
   }
+  for (const match of text.matchAll(quotedEnumDeclarationPattern(text))) {
+    const receiver = match[1];
+    const enumName = match[2];
+    declarations.push({
+      index: match.index,
+      line: lineOf(text, match.index),
+      form: `${receiver}['${enumName}']`,
+      enumName,
+      literal: null,
+      identifier: LAMBDA_RUNTIME_ENUMS.get(enumName) ?? null,
+    });
+  }
   for (const match of text.matchAll(literalDeclarationPattern(text))) {
     const literal = match[2];
     declarations.push({
@@ -405,6 +446,17 @@ function collectDeclarations(text) {
       enumName: null,
       literal,
       identifier: runtimeIdentifierFromLiteral(literal),
+    });
+  }
+  for (const match of text.matchAll(dynamicRuntimeDeclarationPattern(text))) {
+    declarations.push({
+      index: match.index,
+      line: lineOf(text, match.index),
+      form: `${match[1]}.fromString(<non-literal>)`,
+      enumName: null,
+      literal: null,
+      identifier: null,
+      dynamic: true,
     });
   }
   declarations.sort((left, right) => left.index - right.index);
@@ -424,6 +476,19 @@ function classifyDeclaration(declaration) {
       detail:
         `names the moving alias lambda.Runtime.${declaration.enumName}, which follows the CDK ` +
         `version instead of pinning a runtime`,
+    };
+  }
+  if (declaration.dynamic === true) {
+    // A `fromString` whose argument is not a literal cannot be resolved to a
+    // runtime, so it fails closed rather than being dropped behind another
+    // declaration on the surface.
+    return {
+      kind: "unresolved-dynamic-runtime",
+      line: declaration.line,
+      form: declaration.form,
+      detail:
+        `passes a non-literal argument to fromString, which cannot be resolved to a runtime this ` +
+        `gate can judge; name the runtime with a pinned enum or a literal instead`,
     };
   }
   if (declaration.identifier === null) {
@@ -664,15 +729,12 @@ const CLASSIFIER_CASES = [
     expected: ["unmodelled-literal"],
   },
   // The other direction: a runtime-shaped string that is not a `fromString`
-  // argument is not a declaration, so it cannot be judged in place of a dynamic
-  // runtime. Before the fix this surface was reported as declaring the stray
-  // literal, which is a false violation the surface never wrote.
+  // argument is not a declaration, so it cannot be judged in place of a runtime.
+  // Before the fix this surface was reported as declaring the stray literal,
+  // which is a false violation the surface never wrote.
   {
     name: "stray-runtime-literal-is-not-a-declaration",
-    text:
-      "runtime: lambda.Runtime.fromString(config.runtime),\n" +
-      "const releaseNote = 'nodejs18.x';\n" +
-      "runtime: lambda.Runtime.NODEJS_24_X,\n",
+    text: "const releaseNote = 'nodejs18.x';\nruntime: lambda.Runtime.NODEJS_24_X,\n",
     expected: [],
   },
   // The receiver idioms the enum rule now reads. Each of these declared nothing
@@ -708,6 +770,60 @@ const CLASSIFIER_CASES = [
     text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst { Runtime: RT } = lambda;\nruntime: RT.NODEJS_24_X,\n",
     expected: [],
   },
+  // Row 34: the quoted enum index is judged like the dot form, so a deprecated
+  // runtime written that way cannot hide behind a supported declaration on the
+  // same surface.
+  {
+    name: "deprecated-runtime-through-a-quoted-enum-index",
+    text: "runtime: lambda.Runtime['NODEJS_20_X'],\n",
+    expected: ["deprecated"],
+  },
+  {
+    name: "supported-runtime-through-a-quoted-enum-index",
+    text: "runtime: lambda.Runtime['NODEJS_24_X'],\n",
+    expected: [],
+  },
+  {
+    name: "unmodelled-runtime-through-a-quoted-enum-index",
+    text: "runtime: lambda.Runtime['PYTHON_3_13'],\n",
+    expected: ["unmodelled-enum"],
+  },
+  {
+    name: "deprecated-runtime-through-an-aliased-quoted-enum-index",
+    text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst R = lambda.Runtime;\nruntime: R['NODEJS_18_X'],\n",
+    expected: ["deprecated"],
+  },
+  {
+    name: "supported-declaration-does-not-mask-a-quoted-enum-index",
+    text: "runtime: lambda.Runtime.NODEJS_24_X,\nruntime: lambda.Runtime['NODEJS_20_X'],\n",
+    expected: ["deprecated"],
+  },
+  // Row 34: a non-literal `fromString` on a bound receiver cannot be resolved, so
+  // it is a declaration that fails closed instead of being dropped behind a
+  // supported declaration on the same surface.
+  {
+    name: "dynamic-fromString-declares-an-unresolved-runtime",
+    text: "runtime: lambda.Runtime.fromString(config.runtime),\n",
+    expected: ["unresolved-dynamic-runtime"],
+  },
+  {
+    name: "supported-declaration-does-not-mask-a-dynamic-fromString",
+    text: "runtime: lambda.Runtime.NODEJS_24_X,\nruntime: lambda.Runtime.fromString(config.runtime),\n",
+    expected: ["unresolved-dynamic-runtime"],
+  },
+  {
+    name: "dynamic-fromString-with-a-stray-runtime-literal-still-fails",
+    text: "runtime: lambda.Runtime.fromString(config.runtime),\nconst releaseNote = 'nodejs22.x';\n",
+    expected: ["unresolved-dynamic-runtime"],
+  },
+  // A `fromString` whose receiver is not traceable to a Runtime binding cannot be
+  // attributed to Lambda, so it is still not read, and the surface is judged on
+  // the declaration it does carry.
+  {
+    name: "non-receiver-fromString-is-not-a-declaration",
+    text: "runtime: lambda.Runtime.NODEJS_24_X;\nhelper.fromString(config.runtime);\n",
+    expected: [],
+  },
 ];
 
 const FAIL_CLOSED_CASES = [
@@ -723,7 +839,9 @@ const FAIL_CLOSED_CASES = [
   },
   // Binding the namespace and then hiding the member is not a way to declare
   // nothing and still pass: the surface has no readable declaration, so it fails
-  // closed on the same rule that catches an obfuscated surface.
+  // closed on the same rule that catches an obfuscated surface. A dynamic
+  // `fromString` no longer lands here: it is a judged declaration now and fails
+  // closed through the classifier instead.
   {
     name: "named-import-with-an-unreadable-member",
     text: "import { Runtime } from 'aws-cdk-lib/aws-lambda';\nruntime: Runtime[legacyRuntimeName],\n",
@@ -732,24 +850,6 @@ const FAIL_CLOSED_CASES = [
   {
     name: "aliased-namespace-with-an-unreadable-member",
     text: "import * as lambda from 'aws-cdk-lib/aws-lambda';\nconst R = lambda.Runtime;\nruntime: R[process.env.FACETHEORY_RUNTIME],\n",
-    expectFailureReason: "declares no modelled Lambda runtime",
-  },
-  // D1, the false-declaration direction. A dynamic `fromString` declares nothing
-  // readable, and an unrelated runtime-shaped string must not stand in for it.
-  // Before the literal rule was scoped, the stray literal WAS the declaration, so
-  // this surface was judged as declaring a supported runtime and passed.
-  {
-    name: "dynamic-fromString-rescued-by-a-stray-runtime-literal",
-    text: "runtime: lambda.Runtime.fromString(config.runtime),\nconst releaseNote = 'nodejs22.x';\n",
-    expectFailureReason: "declares no modelled Lambda runtime",
-  },
-  // Lock-in for the same rule rather than a pin of the defect: a non-literal
-  // argument was already not a declaration before the fix. It is here so that a
-  // future rule which read bare quoted strings again could not reintroduce the
-  // rescue above without turning this case red.
-  {
-    name: "dynamic-fromString-with-no-literal-at-all",
-    text: "runtime: lambda.Runtime.fromString(config.runtime),\n",
     expectFailureReason: "declares no modelled Lambda runtime",
   },
 ];

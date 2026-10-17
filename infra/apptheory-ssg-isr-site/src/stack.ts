@@ -94,12 +94,32 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
     });
 
     const ssgDir = requireDir('ssg output', '../deploy/ssg');
+    // Pre-rendered SSG HTML must land at the primary CloudFront HTML origin: the
+    // ISR html store bucket under the `isr` prefix. That prefix is shared with
+    // runtime ISR writes, so pruning must stay off to preserve objects this
+    // deployment did not place. The hydration sidecars are excluded here because
+    // they are served from a different origin and deploy separately below.
     new s3deploy.BucketDeployment(this, 'AssetsDeploymentSsg', {
-      sources: [s3deploy.Source.asset(ssgDir)],
-      destinationBucket: assetsBucket,
-      destinationKeyPrefix: '',
-      prune: true,
+      sources: [s3deploy.Source.asset(ssgDir, { exclude: ['_facetheory/**'] })],
+      destinationBucket: isrBucket,
+      destinationKeyPrefix: 'isr',
+      prune: false,
       // Reasonable default for build output; tune per environment.
+      cacheControl: [s3deploy.CacheControl.fromString('public,max-age=0,s-maxage=600')],
+    });
+
+    // FaceTheory external hydration data (`__FACETHEORY_DATA_URL__`, e.g.
+    // `_facetheory/data/<page>.json`) is fetched through the `/_facetheory/data/*`
+    // path pattern, which the edge routes to the assets bucket origin, not the ISR
+    // html store. Deploy the sidecars to that bucket under the exact
+    // `_facetheory/data` prefix. The assets bucket is shared with the immutable
+    // assets and manifest deployments, so this deployment must not prune.
+    const ssgSidecarDir = requireDir('ssg hydration sidecars', '../deploy/ssg/_facetheory/data');
+    new s3deploy.BucketDeployment(this, 'AssetsDeploymentSsgSidecars', {
+      sources: [s3deploy.Source.asset(ssgSidecarDir)],
+      destinationBucket: assetsBucket,
+      destinationKeyPrefix: '_facetheory/data',
+      prune: false,
       cacheControl: [s3deploy.CacheControl.fromString('public,max-age=0,s-maxage=600')],
     });
 

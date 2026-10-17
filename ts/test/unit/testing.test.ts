@@ -107,3 +107,59 @@ test('testing subpath: strict CSP assertions and fixture fetch are reusable by c
   assert.deepEqual(await response.json(), { ok: true });
   assert.deepEqual(requests, ['http://localhost/data.json']);
 });
+
+test('testing subpath: strict CSP assertions accept nonce-carried head JSON-LD only', async () => {
+  const jsonLdDocument = (script: string, location: 'head' | 'body' = 'head') =>
+    location === 'head'
+      ? `<!doctype html><html><head>${script}<script src="/app.js"></script></head><body><main id="root"></main></body></html>`
+      : `<!doctype html><html><head><script src="/app.js"></script></head><body>${script}<main id="root"></main></body></html>`;
+  const validJsonLd =
+    '<script nonce="nonce-test" type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage"}</script>';
+
+  await assertStrictCspDocument(jsonLdDocument(validJsonLd), {
+    cspNonce: 'nonce-test',
+  });
+
+  await assert.rejects(
+    () =>
+      assertStrictCspDocument(jsonLdDocument(validJsonLd), {
+        cspNonce: 'nonce-other',
+      }),
+    /inline script/,
+  );
+  await assert.rejects(
+    () =>
+      assertStrictCspDocument(
+        jsonLdDocument(
+          '<script type="application/ld+json">{"@type":"WebPage"}</script>',
+        ),
+        { cspNonce: 'nonce-test' },
+      ),
+    /inline script/,
+  );
+  await assert.rejects(
+    () =>
+      assertStrictCspDocument(jsonLdDocument(validJsonLd, 'body'), {
+        cspNonce: 'nonce-test',
+      }),
+    /inline script/,
+  );
+  await assert.rejects(
+    () =>
+      assertStrictCspDocument(
+        jsonLdDocument('<script nonce="nonce-test">window.__bad = true</script>'),
+        { cspNonce: 'nonce-test' },
+      ),
+    /inline script/,
+  );
+  await assert.rejects(
+    () =>
+      assertStrictCspDocument(
+        jsonLdDocument(
+          '<script nonce="nonce-test" type="application/ld+json">window.__bad = true</script>',
+        ),
+        { cspNonce: 'nonce-test' },
+      ),
+    /inline script/,
+  );
+});

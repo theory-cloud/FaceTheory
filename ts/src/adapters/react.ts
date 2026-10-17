@@ -182,9 +182,11 @@ async function renderReactStreamInternal(
         rejectAllReady = reject;
       });
 
-      if (styleStrategy === 'shell') {
-        void allReady.catch(() => undefined);
-      }
+      // Observe both readiness promises up front: only one of them is awaited
+      // below, and a pre-shell error or abort rejects both. The awaited
+      // promise still surfaces the rejection to the caller.
+      void shellReady.catch(() => undefined);
+      void allReady.catch(() => undefined);
 
       const settleShellReady = (): void => {
         if (shellSettled) return;

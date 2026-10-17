@@ -23,7 +23,7 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
 ```bash
-export FACETHEORY_VERSION=4.2.1-rc # x-release-please-version
+export FACETHEORY_VERSION=4.2.1 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -137,7 +137,7 @@ Render-mode guidance:
 - SSR is the default for request-authorized operator dashboards because each request can derive fresh guard, role, tenant, and visibility state.
 - A deterministic SPA shell is acceptable when the first paint is stable and any client refresh starts from serialized hydration data.
 - SSG is only for static documentation, training, or non-authorized snapshots; do not use it for live auth-varying operator visibility.
-- ISR requires safe partitioning. If HTML varies by user, role, tenant, cookie, locale, environment, or visibility source, encode that variance in explicit `cacheKey` / `tenantKey` functions or keep the route on SSR. Requests carrying known tenant boundary headers without an explicit ISR partition fail closed instead of sharing the implicit `default` tenant cache entry.
+- ISR requires safe partitioning. If HTML varies by user, role, tenant, cookie, locale, environment, or visibility source, encode that variance in explicit `tenantKey` (plus a custom `cacheKey` when a richer logical partition is needed) or keep the route on SSR. Requests carrying known tenant boundary headers fail closed unless an explicit, trusted `tenantKey` is configured; a custom `cacheKey` alone does not exempt a tenant-scoped route.
 
 ## Core Runtime Contracts
 
@@ -154,7 +154,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 | `FaceRenderResult`  | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head.title`, `headTags`, `styleTags`, `csp`, `html`, cookies, headers, and hydration payload. Use `head.title` for the page title and structured `headTags` / `styleTags` for all other head output.                                                                                                                                                                                                                                                                           |
 | `FaceContext`       | Per-request context                  | Exposes normalized request, route params, and proxy match.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `FaceAppOptions`    | App constructor options              | Accepts `faces`, optional `canonicalOrigin` for explicit strict head URL validation, optional raw `resources`, optional framework-owned SSR hydration sidecars, optional ISR config, optional observability hooks, and optional strict-CSP runtime limits.                                                                                                                                                                                                                                                                                        |
-| `FaceIsrOptions`    | ISR runtime tuning                   | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `FaceIsrOptions`    | ISR runtime tuning                   | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation. ISR responses fail closed to `private, no-store` for authenticated requests (a default auth-vary header or any cookie) and for every request on a deployment with an explicit custom `cacheKey`; the anonymous default-key value is unchanged.                                                                                                                                                                       |
 
 Structured head/style emission is the supported default:
 
@@ -525,12 +525,13 @@ Default ISR partitioning:
 
 - `defaultIsrCacheKey(input)` includes sorted route params, sorted query-string keys/values, and hashed request-identity partitions for cookies and common auth headers (`Authorization`, `Proxy-Authorization`, `X-API-Key`, `X-Amz-Security-Token`). Raw cookie and auth values are not written to cache keys.
 - The default tenant resolver intentionally ignores request tenant headers and uses `default`. For authenticated tenant boundaries, supply `tenantKey` explicitly (for example `tenantKeyFromTrustedHeader('x-tenant-id')` after trusted middleware strips client-supplied copies).
-- If a request includes a known tenant boundary header (`x-tenant-id` or `x-facetheory-tenant`) and the app has not configured an explicit `tenantKey` or custom `cacheKey`, ISR fails closed before cache lookup or HTML writes. Remove tenant-like headers for tenant-invariant ISR, provide a trusted `tenantKey`, provide a custom `cacheKey`, or keep the route on SSR.
-- If HTML varies by other request headers or identity inputs, supply an explicit `cacheKey` / `tenantKey` or keep that route on SSR.
+- If a request includes a known tenant boundary header (`x-tenant-id` or `x-facetheory-tenant`), ISR fails closed unless an explicit, trusted `tenantKey` is configured. A custom `cacheKey` alone does not exempt a tenant-scoped route: when both are configured, FaceTheory composes a privacy-preserving digest of the trusted tenant with the consumer's logical key, and refuses before cache lookup, lease acquisition, or HTML writes when the trusted `tenantKey` is missing (or resolves empty) on a tenant-scoped custom-key route. Remove tenant-like headers for tenant-invariant ISR, provide a trusted `tenantKey`, or keep the route on SSR.
+- If HTML varies by other request headers or identity inputs, supply an explicit `tenantKey` (with a custom `cacheKey` when a richer logical partition is needed) or keep that route on SSR.
+- ISR responses fail closed to `cache-control: private, no-store` — on every emission path and on the stored `HtmlStore` object — when the request carries an auth-variant signal (any default auth-vary header or any request cookie) or when the deployment configures an explicit custom `cacheKey` (which fails closed for all requests, including anonymous ones). `IsrCacheHeaderInput` is unchanged, and `FaceIsrOptions.cacheControl` still shapes only unguarded responses; it cannot widen a guarded request. `varyCookies` scopes the default key digest only and does not exempt a cookie-bearing request from the guard. Bespoke auth headers outside the default auth-vary set require an explicit `cacheKey` to be protected.
 - For tenant-scoped rotation workflows, keep the route on SSR unless the owner can pair rotation with cache identity or
-  invalidation. The usual ISR shape is to include a trusted rotation/version dimension in a custom `cacheKey` so newly
-  rotated material does not reuse old cached HTML; direct metadata/object invalidation remains a host-owned
-  TableTheory/S3 operation rather than a generic FaceTheory browser-rendering primitive.
+  invalidation. The usual ISR shape is to include a trusted rotation/version dimension in a custom `cacheKey`, paired with
+  an explicit trusted `tenantKey`, so newly rotated material does not reuse old cached HTML; direct metadata/object
+  invalidation remains a host-owned TableTheory/S3 operation rather than a generic FaceTheory browser-rendering primitive.
 
 Important deployment note:
 

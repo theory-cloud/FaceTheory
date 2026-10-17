@@ -2,7 +2,11 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { utf8 } from './bytes.js';
 import { safeJson } from './html.js';
-import { reportFaceError, type FaceObservabilityHooks } from './ops.js';
+import {
+  reportFaceError,
+  type FaceMetricRecord,
+  type FaceObservabilityHooks,
+} from './ops.js';
 import {
   requiresStrictCspDocumentValidation,
   validateStrictCspDocument,
@@ -41,6 +45,7 @@ const DEFAULT_TENANT_BOUNDARY_HEADERS = [
 const ISR_HYDRATION_QUERY_PARAM = '__facetheory_isr_hydration';
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 const HYDRATION_SIDECAR_CACHE_CONTROL = 'no-store';
+const ISR_PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store';
 const ISR_HTML_METADATA_CONTENT_SECURITY_POLICY =
   'facetheory-content-security-policy';
 const ISR_HTML_METADATA_STATUS = 'facetheory-status';
@@ -578,14 +583,17 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
       const revalidateSeconds = normalizeRevalidateSeconds(
         input.face.revalidateSeconds,
       );
-      assertPartitionedTenantBoundary(runtimeOptions, input.ctx);
+      const tenantPartition = resolveTenantPartition(runtimeOptions, input.ctx);
 
       const hydrationSidecarPointer = hydrationSidecarPointerFromRequest(
         input.ctx.request.query,
         runtimeOptions.htmlPointerPrefix,
       );
 
-      const tenant = resolveTenant(runtimeOptions, input.ctx);
+      const tenant =
+        tenantPartition.mode === 'partitioned'
+          ? tenantPartition.tenant
+          : resolveTenant(runtimeOptions, input.ctx);
       const query = hydrationSidecarPointer.present
         ? queryWithoutHydrationSidecar(input.ctx.request.query)
         : input.ctx.request.query;
@@ -600,7 +608,14 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
       if (runtimeOptions.varyCookies !== null) {
         cacheKeyInput.varyCookies = runtimeOptions.varyCookies;
       }
-      const cacheKey = runtimeOptions.cacheKey(cacheKeyInput);
+      const logicalCacheKey = runtimeOptions.cacheKey(cacheKeyInput);
+      const cacheKey =
+        tenantPartition.mode === 'partitioned'
+          ? composeTenantPartitionedCacheKey(
+              tenantPartition.tenant,
+              logicalCacheKey,
+            )
+          : logicalCacheKey;
 
       if (hydrationSidecarPointer.present) {
         if (
@@ -619,6 +634,12 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         );
       }
 
+      const guarded = isGuardedIsrRequest(
+        runtimeOptions,
+        input.ctx.request.headers,
+        input.ctx.request.cookies,
+      );
+
       const currentNow = runtimeOptions.now();
       let existing: IsrMetaRecord | null;
       try {
@@ -630,6 +651,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           input,
           lastKnownRecord(cacheKey),
           err,
+          guarded,
         );
         if (stale) return stale;
         throw err;
@@ -642,6 +664,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           'hit',
           currentNow,
           false,
+          guarded,
         );
         if (cachedFresh) {
           rememberRecord(existing);
@@ -666,6 +689,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           input,
           existing ?? lastKnownRecord(cacheKey),
           err,
+          guarded,
         );
         if (stale) return stale;
         throw err;
@@ -685,6 +709,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           revalidateSeconds,
           existing ?? acquire.record,
           rememberRecord,
+          guarded,
         );
       }
 
@@ -707,6 +732,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
             input,
             staleRecord,
             err,
+            guarded,
           );
           if (stale) return stale;
           throw err;
@@ -718,6 +744,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
             'wait-hit',
             runtimeOptions.now(),
             true,
+            guarded,
           );
           if (cached) return cached;
         }
@@ -739,6 +766,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           input,
           staleRecord,
           err,
+          guarded,
         );
         if (stale) return stale;
         throw err;
@@ -753,6 +781,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           revalidateSeconds,
           staleRecord,
           rememberRecord,
+          guarded,
         );
       }
 
@@ -766,6 +795,7 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           'stale',
           runtimeOptions.now(),
           true,
+          guarded,
         );
         if (stale) return stale;
       }
@@ -910,6 +940,7 @@ async function regenerateAndCommit(
   revalidateSeconds: number,
   staleRecord: IsrMetaRecord,
   rememberRecord: (record: IsrMetaRecord | null) => void,
+  guarded: boolean,
 ): Promise<FaceResponse> {
   const regenerationMetricStartedAt = metricNow();
   let regenerationOutcome = 'error';
@@ -958,7 +989,9 @@ async function regenerateAndCommit(
       key: htmlPointer,
       body: prepared.body,
       contentType: prepared.contentType,
-      cacheControl: blockingIsrCacheControl(revalidateSeconds),
+      cacheControl: guarded
+        ? ISR_PRIVATE_NO_STORE_CACHE_CONTROL
+        : blockingIsrCacheControl(revalidateSeconds),
       ...(htmlMetadata ? { metadata: htmlMetadata } : {}),
     });
     const etag = prepared.etag ?? write.etag ?? null;
@@ -1001,6 +1034,7 @@ async function regenerateAndCommit(
       prepared.body,
       'miss',
       runtimeOptions.now(),
+      guarded,
     );
   } catch (err) {
     if (runtimeOptions.failurePolicy === 'serve-stale') {
@@ -1010,6 +1044,7 @@ async function regenerateAndCommit(
         'stale',
         runtimeOptions.now(),
         true,
+        guarded,
       );
       if (stale) {
         regenerationOutcome = 'stale_after_error';
@@ -1036,7 +1071,7 @@ function emitIsrLeaseContentionMetric(
   runtimeOptions: CreateIsrRuntimeOptions,
   input: HandleIsrFaceInput,
 ): void {
-  runtimeOptions.observability?.metric?.({
+  emitIsrMetric(runtimeOptions, {
     name: 'facetheory.isr.lease_contention',
     value: 1,
     tags: {
@@ -1053,7 +1088,7 @@ function emitIsrRegenerationMetric(
   durationMs: number,
   outcome: string,
 ): void {
-  runtimeOptions.observability?.metric?.({
+  emitIsrMetric(runtimeOptions, {
     name: 'facetheory.isr.regeneration_ms',
     value: durationMs,
     tags: {
@@ -1062,6 +1097,26 @@ function emitIsrRegenerationMetric(
       outcome,
     },
   });
+}
+
+/**
+ * Emits an ISR metric through the host sink while containing any exception it
+ * throws. Telemetry must never bypass lease release (the regeneration metric is
+ * emitted before `releaseLease` in the same `finally`) or fail an otherwise
+ * ordinary ISR regeneration/contention journey. Ordinary emissions pass through
+ * unchanged.
+ */
+function emitIsrMetric(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  record: FaceMetricRecord,
+): void {
+  const sink = runtimeOptions.observability?.metric;
+  if (!sink) return;
+  try {
+    sink(record);
+  } catch {
+    // Contained: a throwing metric callback cannot strand a lease or fail the request.
+  }
 }
 
 function metricNow(): number {
@@ -1073,6 +1128,7 @@ async function staleResponseForMetadataFailure(
   input: HandleIsrFaceInput,
   record: IsrMetaRecord | null,
   err: unknown,
+  guarded: boolean,
 ): Promise<FaceResponse | null> {
   if (runtimeOptions.failurePolicy !== 'serve-stale') return null;
 
@@ -1082,6 +1138,7 @@ async function staleResponseForMetadataFailure(
     ISR_STATE_STALE_METADATA_ERROR,
     runtimeOptions.now(),
     true,
+    guarded,
   );
   if (!response) return null;
 
@@ -1154,6 +1211,7 @@ async function cachedResponseFromRecord(
   state: IsrCacheState,
   nowMs: number,
   allowStale: boolean,
+  guarded: boolean,
 ): Promise<FaceResponse | null> {
   if (!record?.htmlPointer) return null;
   if (!allowStale && !isFresh(record, nowMs)) return null;
@@ -1168,6 +1226,7 @@ async function cachedResponseFromRecord(
     body,
     state,
     nowMs,
+    guarded,
     html.metadata,
   );
 }
@@ -1178,6 +1237,7 @@ function responseFromStoredHtml(
   body: Uint8Array,
   state: IsrCacheState,
   nowMs: number,
+  guarded: boolean,
   htmlMetadata?: Record<string, string> | undefined,
 ): FaceResponse {
   const contentType = normalizeContentType(
@@ -1204,11 +1264,13 @@ function responseFromStoredHtml(
   const isRecordFresh = isFresh(record, nowMs);
   const headers: FaceHeaders = {
     'cache-control': [
-      runtimeOptions.cacheControl({
-        revalidateSeconds: record.revalidateSeconds,
-        state,
-        isFresh: isRecordFresh,
-      }),
+      guarded
+        ? ISR_PRIVATE_NO_STORE_CACHE_CONTROL
+        : runtimeOptions.cacheControl({
+            revalidateSeconds: record.revalidateSeconds,
+            state,
+            isFresh: isRecordFresh,
+          }),
     ],
     'content-type': [contentType],
     'x-facetheory-isr': [state],
@@ -1343,23 +1405,76 @@ function normalizeStringListOption(
   });
 }
 
-function assertPartitionedTenantBoundary(
+type IsrTenantPartition =
+  | { readonly mode: 'plain' }
+  | { readonly mode: 'partitioned'; readonly tenant: string };
+
+/**
+ * Resolves whether a request must compose a framework-owned tenant partition and
+ * enforces the fail-closed rules before any cache interaction. A tenant-boundary
+ * signal proves only that the route is tenant-scoped; it never supplies tenant
+ * authority. Authoritative tenant identity comes from the explicit trusted
+ * `tenantKey` callback alone.
+ */
+function resolveTenantPartition(
   runtimeOptions: CreateIsrRuntimeOptions,
   ctx: FaceContext,
-): void {
-  if (runtimeOptions.hasExplicitTenantKey || runtimeOptions.hasExplicitCacheKey)
-    return;
-  if (
-    !hasNonEmptyHeader(
-      ctx.request.headers,
-      runtimeOptions.tenantBoundaryHeaders,
-    )
-  )
-    return;
-
-  throw new Error(
-    'ISR tenant boundary header requires explicit tenantKey or cacheKey configuration',
+): IsrTenantPartition {
+  const hasTenantBoundarySignal = hasNonEmptyHeader(
+    ctx.request.headers,
+    runtimeOptions.tenantBoundaryHeaders,
   );
+
+  if (runtimeOptions.hasExplicitCacheKey) {
+    if (!runtimeOptions.hasExplicitTenantKey) {
+      if (hasTenantBoundarySignal) {
+        throw new Error(
+          'ISR custom cacheKey requires an explicit tenantKey when a tenant boundary signal is present',
+        );
+      }
+      return { mode: 'plain' };
+    }
+
+    const tenant = String(runtimeOptions.tenantKey(ctx) ?? '').trim();
+    if (tenant.length === 0) {
+      throw new Error(
+        'ISR custom cacheKey requires a non-empty trusted tenantKey for tenant partitioning',
+      );
+    }
+    return { mode: 'partitioned', tenant };
+  }
+
+  if (!runtimeOptions.hasExplicitTenantKey && hasTenantBoundarySignal) {
+    throw new Error(
+      'ISR tenant boundary header requires explicit tenantKey or cacheKey configuration',
+    );
+  }
+
+  return { mode: 'plain' };
+}
+
+const CUSTOM_CACHE_KEY_TENANT_PARTITION_PREFIX = 'isr-tenant:v1:';
+
+/**
+ * Composes the framework-owned effective cache identity for a custom cache key.
+ * The framework-owned partition prefix folds the trusted tenant in as a short
+ * digest so distinct tenants never share a stored key even when their logical
+ * custom keys coincide, while the logical key remains consumer-owned. The
+ * partition prefix never embeds the raw tenant, but the consumer-owned logical
+ * key may (the recommended `defaultIsrCacheKey` does), which keeps the composed
+ * custom-key representation distinct from the unchanged default key's raw-tenant
+ * representation. That representation separation is not a global collision-freedom
+ * or confidentiality guarantee.
+ */
+function composeTenantPartitionedCacheKey(
+  tenant: string,
+  logicalCacheKey: string,
+): string {
+  const tenantDigest = createHash('sha256')
+    .update(utf8(tenant))
+    .digest('hex')
+    .slice(0, 24);
+  return `${CUSTOM_CACHE_KEY_TENANT_PARTITION_PREFIX}${tenantDigest}::${logicalCacheKey}`;
 }
 
 function hasNonEmptyHeader(
@@ -1372,6 +1487,28 @@ function hasNonEmptyHeader(
     if (values.some((value) => String(value).trim().length > 0)) return true;
   }
   return false;
+}
+
+/**
+ * Returns whether an ISR request must fail closed with a private `no-store`
+ * cache-control value instead of a shared-cacheable one.
+ *
+ * A request is guarded when the deployment configured an explicit, opaque
+ * custom `cacheKey` (a consumer-owned identity the framework cannot attribute to
+ * a shared viewer) or when the request itself carries an auth-variant signal: any
+ * `DEFAULT_AUTH_VARY_HEADERS` value or any request cookie. Every cookie counts,
+ * independent of `varyCookies` (which only scopes the default key digest), so an
+ * unlisted cookie can never re-share a request-private response. The ordinary
+ * anonymous default-key request stays shared-cacheable.
+ */
+function isGuardedIsrRequest(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  headers: FaceHeaders | undefined,
+  cookies: CookieMap | undefined,
+): boolean {
+  if (runtimeOptions.hasExplicitCacheKey) return true;
+  if (hasNonEmptyHeader(headers, DEFAULT_AUTH_VARY_HEADERS)) return true;
+  return cookies !== undefined && Object.keys(cookies).length > 0;
 }
 
 function resolveTenant(

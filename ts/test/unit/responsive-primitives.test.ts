@@ -487,3 +487,29 @@ test('responsive primitives: Button suppression and Link rel helpers are determi
   );
   assert.equal(forcedSafeLinkRel({ href: '/local' }), undefined);
 });
+
+test('responsive primitives: protocol-relative links are external for safe rel', () => {
+  assert.equal(
+    forcedSafeLinkRel({
+      href: '//cdn.example.com/x',
+      sameOriginBaseHref: 'https://app.example.com',
+    }),
+    'noopener noreferrer',
+  );
+  assert.equal(
+    forcedSafeLinkRel({
+      href: '//app.example.com/x',
+      sameOriginBaseHref: 'https://app.example.com',
+    }),
+    undefined,
+  );
+  assert.equal(
+    forcedSafeLinkRel({
+      href: 'https://cdn.example.com/x',
+      sameOriginBaseHref: 'https://app.example.com',
+    }),
+    'noopener noreferrer',
+  );
+  assert.equal(forcedSafeLinkRel({ href: '/local' }), undefined);
+  assert.equal(forcedSafeLinkRel({ href: './local' }), undefined);
+});

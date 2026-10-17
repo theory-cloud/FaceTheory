@@ -825,3 +825,105 @@ test('spa helpers: loadFaceNavigationModule rejects cross-origin bootstrap modul
     dom.window.close();
   }
 });
+
+test('spa helpers: head sync drops id-only hydration markers and never revives live scripts', async () => {
+  const currentDom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body><main data-facetheory-view><p>Home</p></main></body>
+      </html>`,
+    { runScripts: 'dangerously', url: 'http://localhost/' },
+  );
+  const win = currentDom.window as unknown as Window & {
+    __facetheoryHeadSyncExecuted?: string[];
+  };
+  win.__facetheoryHeadSyncExecuted = [];
+
+  try {
+    const nextSnapshot = parseFaceNavigationSnapshot(
+      `<!doctype html>
+        <html lang="en">
+          <head>
+            <title>Next</title>
+            <script id="__FACETHEORY_DATA__">window.__facetheoryHeadSyncExecuted.push('id-only')</script>
+            <script type="text/javascript">window.__facetheoryHeadSyncExecuted.push('classic')</script>
+            <script type="application/ld+json">{"@type":"WebPage","name":"Next"}</script>
+            <meta content="next" name="description">
+          </head>
+          <body><main data-facetheory-view><p>Next</p></main></body>
+        </html>`,
+      {
+        parser: new currentDom.window.DOMParser(),
+        url: 'http://localhost/next',
+        viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
+      },
+    );
+
+    applyFaceNavigationSnapshot(nextSnapshot, {
+      document: currentDom.window.document,
+      viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
+    });
+    await flushEventLoop();
+
+    const doc = currentDom.window.document;
+    assert.deepEqual(win.__facetheoryHeadSyncExecuted, []);
+    assert.equal(doc.getElementById('__FACETHEORY_DATA__'), null);
+    assert.equal(readFaceHydrationData(doc), null);
+    assert.equal(doc.head.querySelectorAll('script').length, 1);
+    assert.equal(
+      doc.head.querySelector('script')?.getAttribute('type'),
+      'application/ld+json',
+    );
+    assert.equal(doc.title, 'Next');
+    assert.equal(
+      doc.head.querySelector('meta[name="description"]')?.getAttribute('content'),
+      'next',
+    );
+    assert.equal(doc.querySelector(DEFAULT_FACE_VIEW_SELECTOR)?.textContent, 'Next');
+  } finally {
+    currentDom.window.close();
+  }
+});
+
+test('spa helpers: head sync keeps typed JSON hydration markers readable and inert', async () => {
+  const currentDom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body><main data-facetheory-view><p>Home</p></main></body>
+      </html>`,
+    { runScripts: 'dangerously', url: 'http://localhost/' },
+  );
+
+  try {
+    const nextSnapshot = parseFaceNavigationSnapshot(
+      `<!doctype html>
+        <html lang="en">
+          <head>
+            <title>Typed</title>
+            <script id="__FACETHEORY_DATA__" type="application/json; charset=utf-8">{"page":"typed"}</script>
+          </head>
+          <body><main data-facetheory-view><p>Typed</p></main></body>
+        </html>`,
+      {
+        parser: new currentDom.window.DOMParser(),
+        url: 'http://localhost/typed',
+        viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
+      },
+    );
+
+    applyFaceNavigationSnapshot(nextSnapshot, {
+      document: currentDom.window.document,
+      viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
+    });
+    await flushEventLoop();
+
+    const doc = currentDom.window.document;
+    assert.deepEqual(readFaceHydrationData(doc), { page: 'typed' });
+    assert.equal(doc.title, 'Typed');
+    assert.equal(doc.querySelector(DEFAULT_FACE_VIEW_SELECTOR)?.textContent, 'Typed');
+  } finally {
+    currentDom.window.close();
+  }
+});

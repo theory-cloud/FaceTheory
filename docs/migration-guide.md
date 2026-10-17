@@ -98,8 +98,11 @@ Expected:
 
 Use this path when upgrading an app that already has ISR routes and request traffic may carry tenant boundary
 headers such as `x-tenant-id` or `x-facetheory-tenant`. FaceTheory now fails closed before ISR metadata lookup or
-HTML writes when those headers reach an ISR route without an explicit `isr.tenantKey` or custom `isr.cacheKey`.
-This prevents tenant-varying HTML from silently sharing the default ISR cache partition.
+HTML writes when those headers reach an ISR route without an explicit, trusted `isr.tenantKey`. A custom
+`isr.cacheKey` alone no longer exempts a tenant-scoped route: FaceTheory composes a framework-owned,
+privacy-preserving digest of the trusted tenant with the consumer's logical key, so existing tenant-scoped custom-key
+cache identities change and repopulate after upgrade. This prevents tenant-varying HTML from silently sharing the
+default ISR cache partition.
 
 1. Classify every ISR route:
    - **Tenant-invariant** routes do not read tenant headers, auth headers, cookies, or other request-varying tenant
@@ -109,10 +112,12 @@ This prevents tenant-varying HTML from silently sharing the default ISR cache pa
    the request reaches FaceTheory.
 3. For tenant-varying pages that are personalized or permission-sensitive, prefer `mode: 'ssr'` unless the rendered
    HTML is safe to cache independently per tenant.
-4. For tenant-varying ISR that is safe to cache, configure an explicit partition:
+4. For tenant-varying ISR that is safe to cache, configure an explicit, trusted partition:
    - use `tenantKey: tenantKeyFromTrustedHeader('x-tenant-id')` only after CloudFront/AppTheory has stripped
-     viewer-supplied values and injected trusted tenant context, or
-   - provide a custom `cacheKey` that includes every request-varying dimension that affects the HTML.
+     viewer-supplied values and injected trusted tenant context, and
+   - add a custom `cacheKey` (for example one that delegates to `defaultIsrCacheKey`) when you need a richer logical
+     partition. A custom `cacheKey` alone no longer exempts a tenant-scoped route: FaceTheory requires the trusted
+     `tenantKey` and composes it into the effective custom-key identity.
 5. Do not trust tenant identity from a raw viewer header. Treat tenant headers as deployment-internal context after
    the trusted boundary has normalized them.
 
