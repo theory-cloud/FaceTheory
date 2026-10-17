@@ -12,7 +12,8 @@
 #
 # Invariants enforced after the publish PATCH at every publication site
 # (prerelease, stable, existing-tag):
-#   A. the release read back by id is published (`draft == false`);
+#   A. the release read back by id is published: `draft` is present and exactly
+#      `false` (a missing or null field fails closed);
 #   B. its `tag_name` is exactly the intended tag;
 #   C. its `prerelease` flag matches the tag shape (RC tag => prerelease);
 #   D. `git/ref/tags/<tag>` exists and resolves (dereferencing annotated tag
@@ -79,7 +80,12 @@ import json
 import os
 
 data = json.loads(os.environ["RELEASE_JSON"])
-print("true" if data.get("draft") is True else "false")
+if "draft" not in data:
+    print("missing")
+elif data.get("draft") is False:
+    print("false")
+else:
+    print("true")
 print(data.get("tag_name") or "")
 print("true" if data.get("prerelease") is True else "false")
 PY
@@ -90,7 +96,7 @@ release_tag="${release_fields[1]:-}"
 is_prerelease="${release_fields[2]:-}"
 
 if [[ "${is_draft}" != "false" ]]; then
-  fail "release ${release_id} is still a draft (${tag} was not published)"
+  fail "release ${release_id} is not published (draft=${is_draft:-<missing>}, expected exactly false)"
 fi
 if [[ "${release_tag}" != "${tag}" ]]; then
   fail "published release ${release_id} tag_name ${release_tag:-<empty>} != ${tag}"

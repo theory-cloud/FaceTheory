@@ -347,15 +347,19 @@ esac
 SH
 chmod +x "${post_stub_dir}/gh"
 
-run_postcondition() {
-  local tag="$1" release_json="$2" ref_json="$3" tag_json="$4" log="$5"
+run_postcondition_script() {
+  local script="$1" tag="$2" release_json="$3" ref_json="$4" tag_json="$5" log="$6"
   PATH="${post_stub_dir}:${PATH}" \
   GH_BIN="${post_stub_dir}/gh" \
   GITHUB_REPOSITORY="theory-cloud/FaceTheory" \
   FAKE_RELEASE_JSON="${release_json}" \
   FAKE_REF_JSON="${ref_json}" \
   FAKE_TAG_JSON="${tag_json}" \
-    bash "${post_script}" "${tag}" "99" "${expected_sha}" >"${log}" 2>&1
+    bash "${script}" "${tag}" "99" "${expected_sha}" >"${log}" 2>&1
+}
+
+run_postcondition() {
+  run_postcondition_script "${post_script}" "$@"
 }
 
 published_rc='{"draft":false,"tag_name":"v1.2.3-rc","prerelease":true}'
@@ -404,6 +408,19 @@ if run_postcondition "v1.2.3-rc" '{"draft":true,"tag_name":"v1.2.3-rc","prerelea
   fail "draft release unexpectedly passed the publish postcondition"
 fi
 
+# Negative: the release object omits the draft field. Only an explicit
+# `draft: false` proves publication; absence must fail closed.
+if run_postcondition "v1.2.3-rc" '{"tag_name":"v1.2.3-rc","prerelease":true}' "${ref_commit}" "" "${tmpdir}/post-missing-draft.log"; then
+  fail "release without a draft field unexpectedly passed"
+fi
+grep -Fq 'draft=missing, expected exactly false' "${tmpdir}/post-missing-draft.log" ||
+  fail "missing draft field did not fail closed with a draft diagnostic"
+
+# Negative: a null draft field must fail closed as well.
+if run_postcondition "v1.2.3-rc" '{"draft":null,"tag_name":"v1.2.3-rc","prerelease":true}' "${ref_commit}" "" "${tmpdir}/post-null-draft.log"; then
+  fail "release with a null draft field unexpectedly passed"
+fi
+
 # Negative: the prerelease flag does not match the tag shape.
 if run_postcondition "v1.2.3-rc" '{"draft":false,"tag_name":"v1.2.3-rc","prerelease":false}' "${ref_commit}" "" "${tmpdir}/post-rc-flag.log"; then
   fail "RC published as a stable release unexpectedly passed"
@@ -415,6 +432,34 @@ fi
 # Negative: the release cannot be read back.
 if run_postcondition "v1.2.3-rc" "" "${ref_commit}" "" "${tmpdir}/post-missing-release.log"; then
   fail "unreadable release unexpectedly passed"
+fi
+
+# Mutation probe: restoring the lenient parser that treated a missing draft
+# field as published must make the missing-draft case pass. That is precisely
+# what the negative assertion above rejects, proving the case is sensitive to
+# the strict `draft == false` check.
+lenient_postcondition="${tmpdir}/verify-published-release-tag-lenient.sh"
+python3 - "${post_script}" "${lenient_postcondition}" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+needle = '''if "draft" not in data:
+    print("missing")
+elif data.get("draft") is False:
+    print("false")
+else:
+    print("true")
+'''
+if needle not in source:
+    raise SystemExit("strict draft parsing no longer present")
+Path(sys.argv[2]).write_text(
+    source.replace(needle, 'print("false" if data.get("draft") is not True else "true")\n', 1),
+    encoding="utf-8",
+)
+PY
+if ! run_postcondition_script "${lenient_postcondition}" "v1.2.3-rc" '{"tag_name":"v1.2.3-rc","prerelease":true}' "${ref_commit}" "" "${tmpdir}/post-missing-draft-lenient.log"; then
+  fail "lenient draft parsing still rejected a missing draft field"
 fi
 
 echo "test-verify-release-publish-binding: PASS"
