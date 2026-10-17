@@ -81,12 +81,18 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 lines = path.read_text(encoding="utf-8").splitlines()
-pin = next(
-    i for i, line in enumerate(lines) if 'gh api --method PATCH "repos/${repo}/releases/${release_id}" -f "target_commitish=${expected_source_commit}"' in line
+target = next(
+    i for i, line in enumerate(lines) if '-f "target_commitish=${expected_source_commit}" >/dev/null' in line
 )
-pin_line = lines.pop(pin)
+start = max(
+    i
+    for i in range(target)
+    if 'gh api --method PATCH "repos/${repo}/releases/${release_id}"' in lines[i]
+)
+pin_lines = lines[start : target + 1]
+del lines[start : target + 1]
 draft = next(i for i, line in enumerate(lines) if "-F draft=false" in line)
-lines.insert(draft + 1, pin_line)
+lines[draft + 1 : draft + 1] = pin_lines
 path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 PY
 if run_guard "${tmpdir}/late-pin" >/dev/null 2>&1; then
@@ -103,11 +109,18 @@ path = Path(sys.argv[1])
 text = path.read_text(encoding="utf-8")
 needle = (
     '            -F draft=false \\\n'
+    '            -f "tag_name=${TAG_NAME}" \\\n'
     '            -f "target_commitish=${expected_source_commit}" \\\n'
     '            -F prerelease=false \\\n'
 )
 path.write_text(
-    text.replace(needle, "            -F draft=false \\\n            -F prerelease=false \\\n", 1),
+    text.replace(
+        needle,
+        '            -F draft=false \\\n'
+        '            -f "tag_name=${TAG_NAME}" \\\n'
+        '            -F prerelease=false \\\n',
+        1,
+    ),
     encoding="utf-8",
 )
 PY
