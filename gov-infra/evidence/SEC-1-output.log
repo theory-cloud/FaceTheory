@@ -2,11 +2,8 @@ Verifier: gov_check_security
 Repository: /Users/theorycloud/AgentSpace/factory/products/frameworks/FaceTheory
 Rubric ID: SEC-1
 
-npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
 npm-audit: PASS (ts)
-npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
 npm-audit: PASS (infra/apptheory-ssr-site)
-npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
 npm-audit: PASS (infra/apptheory-ssg-isr-site)
   self-test scan scope: lockfiles 3
   self-test synthetic dependency-excludes-floor: FAIL dependency node_modules/floor-too-high >=24
@@ -22,10 +19,10 @@ npm-audit: PASS (infra/apptheory-ssg-isr-site)
   self-test synthetic non-object-engines: FAIL CLOSED (non-object engines)
   self-test synthetic root-without-engines-node: FAIL CLOSED (does not declare engines.node for its root entry)
   self-test synthetic root-entry-absent: FAIL CLOSED (does not declare engines.node for its root entry)
-  ts/package-lock.json project engines.node ">=22" (312 dependency engine ranges)
+  ts/package-lock.json project engines.node ">=22" (311 dependency engine ranges)
   infra/apptheory-ssr-site/package-lock.json project engines.node ">=24" (112 dependency engine ranges)
   infra/apptheory-ssg-isr-site/package-lock.json project engines.node ">=24" (112 dependency engine ranges)
-node-engines-floor: PASS (self-test 88 matcher and scope cases + 13 synthetic lockfiles; floor Node 22.x; lockfiles 3; dependency engine ranges 536; distinct ranges 72)
+node-engines-floor: PASS (self-test 88 matcher and scope cases + 13 synthetic lockfiles; floor Node 22.x; lockfiles 3; dependency engine ranges 535; distinct ranges 72)
   self-test scan scope: surfaces 3
   self-test coverage scope: roots 2
   self-test coverage walk: 3 surfaces
