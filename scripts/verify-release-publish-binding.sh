@@ -17,7 +17,12 @@
 #   C. the block PATCHes `target_commitish` to the verified full SHA BEFORE the
 #      draft is published (`-F draft=false`);
 #   D. the final `draft=false` publish PATCH re-asserts the verified full SHA,
-#      so the asset-upload window cannot repoint the release tag.
+#      so the asset-upload window cannot repoint the release tag;
+#   E. EVERY draft release PATCH re-asserts `tag_name`, so GitHub cannot
+#      replace the draft's tag with its `untagged-<hex>` placeholder (the
+#      2026-10-17 FACESEC45-M1 regression);
+#   F. the job runs scripts/verify-published-release-tag.sh AFTER publishing,
+#      with the release id exported by the publish step.
 set -euo pipefail
 
 repo_root="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -119,6 +124,51 @@ for relative, job_id in sites:
         if "target_commitish=${expected_source_commit}" not in final_publish:
             errors.append(
                 f"{relative}:{job_id}: final publish PATCH must re-assert the pinned target_commitish"
+            )
+
+    patch_statements = []
+    index = 0
+    while index < len(block):
+        if "--method PATCH" not in block[index]:
+            index += 1
+            continue
+        end = index
+        while end < len(block) and ">/dev/null" not in block[end]:
+            end += 1
+        patch_statements.append((index, "\n".join(block[index : end + 1])))
+        index = end + 1
+    if not patch_statements:
+        errors.append(f"{relative}:{job_id}: missing a release publish PATCH statement")
+    for _, statement in patch_statements:
+        if "releases/${release_id}" not in statement:
+            continue
+        if "tag_name=${TAG_NAME}" not in statement:
+            errors.append(
+                f"{relative}:{job_id}: every draft release PATCH must re-assert tag_name"
+            )
+            break
+
+    post_index = next(
+        (i for i, line in enumerate(block) if "scripts/verify-published-release-tag.sh" in line),
+        None,
+    )
+    if post_index is None:
+        errors.append(
+            f"{relative}:{job_id}: publish step must verify the published release tag"
+        )
+    else:
+        if publish_index is not None and post_index < publish_index:
+            errors.append(
+                f"{relative}:{job_id}: published release tag must be verified after the draft is published"
+            )
+        post_window = "\n".join(block[max(0, post_index - 8) : post_index + 1])
+        if "steps.publish.outputs.release_id" not in post_window:
+            errors.append(
+                f"{relative}:{job_id}: published release tag check must read the publish step release id"
+            )
+        if 'echo "release_id=${release_id}" >> "${GITHUB_OUTPUT}"' not in "\n".join(block):
+            errors.append(
+                f"{relative}:{job_id}: publish step must export the release id for the tag postcondition"
             )
 
 distinct = set(blocks.values())
