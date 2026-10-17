@@ -26,9 +26,10 @@
 # make an exception until its updated there."
 #
 # The file currently grants no exception. The last entry — bundled
-# brace-expansion 5.0.9 in aws-cdk-lib 2.271.0 (the aws-cdk-lib peer of
-# apptheory-cdk 5.0.1) — was retired by the apptheory-cdk 6.0.0 pin move:
-# aws-cdk-lib 2.273.0 bundles fixed brace-expansion 5.0.12, so real
+# brace-expansion 5.0.9 in aws-cdk-lib 2.271.0 (the aws-cdk-lib peer of the
+# AppTheory CDK pin at that time) — was retired when the AppTheory v6 CDK pin
+# moved aws-cdk-lib to 2.273.0, which stays the exact peer of the current
+# apptheory-cdk: that release bundles fixed brace-expansion 5.0.12, so real
 # `npm audit --package-lock-only` output in ts, infra/apptheory-ssr-site, and
 # infra/apptheory-ssg-isr-site reports zero findings and the entry matched
 # nothing. Recorded in docs/UPSTREAM_RELEASE_PINS.md under "Known Audit
