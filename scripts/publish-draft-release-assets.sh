@@ -140,6 +140,7 @@ PY
     --method PATCH \
     "repos/${repo}/releases/${release_id}" \
     -F draft=false \
+    -f "tag_name=${tag}" \
     -F prerelease="${prerelease_field}" \
     >/dev/null
   echo "release-assets: published ${tag}${release_url:+ (${release_url})}"
@@ -161,5 +162,5 @@ prerelease_flag=""
 if [[ "${tag}" =~ -rc(\.|$) ]]; then
   prerelease_flag="--prerelease"
 fi
-"${gh_bin}" release edit "${tag}" --repo "${repo}" --draft=false ${prerelease_flag}
+"${gh_bin}" release edit "${tag}" --repo "${repo}" --tag "${tag}" --draft=false ${prerelease_flag}
 echo "release-assets: published ${tag}"

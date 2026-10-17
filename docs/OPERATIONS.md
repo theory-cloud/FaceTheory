@@ -285,6 +285,33 @@ The workflow guardrails are intentionally fail-closed:
 - The full rubric and deterministic release-asset build verifier run only for `staging` PRs (or explicit manual CI dispatch), not on release-branch pushes or release publication jobs.
 - Release workflows run hygiene/build/postcondition checks only and never automate the post-release `main` -> `staging` sync.
 
+### Release tag identity (2026-10-17 RC incident)
+
+The 5.0.0 RC cycle stalled because the publish path stopped preserving the release's tag identity. The
+FACESEC45-M1 `release-publish-target-binding` step PATCHed the draft release's `target_commitish` without
+re-asserting `tag_name`; GitHub replaced the draft tag name with its `untagged-<hex>` placeholder, and the final
+`-F draft=false` PATCH then created that placeholder tag. The prerelease run reported success while no `v5.0.0-rc`
+tag existed, and the stable Release PR gate then refused to open a 5.0.0 release PR because the RC never appeared
+fully published.
+
+The publish path now pins the tag identity end to end:
+
+- every draft release PATCH (prerelease, stable, and existing-tag sites) re-asserts `tag_name=<intended tag>`
+  alongside `target_commitish`/`draft`/`prerelease`;
+- after the publish PATCH, `scripts/verify-published-release-tag.sh` re-reads the release by id and fails the job
+  unless it is published (`draft == false`), its `tag_name` is exactly the intended tag, its `prerelease` flag
+  matches the tag shape, and `refs/tags/<tag>` resolves (annotated tag objects dereferenced) to the verified
+  source commit;
+- `scripts/verify-release-publish-binding.sh` keeps these invariants, and the publish-target binding, in force for
+  every publication site so a later edit cannot silently drop them.
+
+`cleanup-failed-draft` still selects drafts only, so a failed postcondition on a release that did publish is
+reported by the failing job and is not auto-cleaned.
+
+Note: the bad 5.0.0 prerelease (release `415791926`) and the stray `untagged-fb5dc7816e2a84b46b74` tag are cleaned
+up by the operator by hand. Release and tag cleanup is never automated for published releases; no workflow deletes
+a published release.
+
 ### ISR lock contention diagnostics
 
 Symptoms:
