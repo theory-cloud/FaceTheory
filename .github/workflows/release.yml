@@ -258,6 +258,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout release workflow scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
       - name: Download existing tag asset bundle
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -265,6 +272,7 @@ jobs:
           path: dist
 
       - name: Upload and publish existing tag draft release
+        id: publish
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
@@ -433,7 +441,16 @@ jobs:
             -f "target_commitish=${expected_source_commit}" \
             -F prerelease="${prerelease_field}" \
             >/dev/null
+          echo "release_id=${release_id}" >> "${GITHUB_OUTPUT}"
           echo "release-assets: published ${TAG_NAME}${release_url:+ (${release_url})}"
+
+      - name: Verify published release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
+          RELEASE_ID: ${{ steps.publish.outputs.release_id }}
+          EXPECTED_SOURCE_COMMIT: ${{ needs.build-existing-tag-assets.outputs.source_commit }}
+        run: scripts/verify-published-release-tag.sh "${TAG_NAME}" "${RELEASE_ID}" "${EXPECTED_SOURCE_COMMIT}"
 
   stable-preflight:
     if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.tag_name == '')
@@ -730,6 +747,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout release workflow scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
       - name: Download release asset bundle
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -737,6 +761,7 @@ jobs:
           path: dist
 
       - name: Upload and publish draft release assets
+        id: publish
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
@@ -897,7 +922,16 @@ jobs:
             -f "target_commitish=${expected_source_commit}" \
             -F prerelease=false \
             >/dev/null
+          echo "release_id=${release_id}" >> "${GITHUB_OUTPUT}"
           echo "release-assets: published ${TAG_NAME}${release_url:+ (${release_url})}"
+
+      - name: Verify published release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_ID: ${{ steps.publish.outputs.release_id }}
+          EXPECTED_SOURCE_COMMIT: ${{ github.sha }}
+        run: scripts/verify-published-release-tag.sh "${TAG_NAME}" "${RELEASE_ID}" "${EXPECTED_SOURCE_COMMIT}"
 
   # Hands docs publication off to pages.yml. Releases are published with the
   # default GITHUB_TOKEN, whose events can never trigger other workflows —
