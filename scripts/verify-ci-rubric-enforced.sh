@@ -222,7 +222,7 @@ rubric_job = jobs.get("rubric")
 if rubric_job is None:
     raise SystemExit("ci-rubric: FAIL (missing rubric job)")
 
-PINNED_UPLOAD = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+PINNED_UPLOAD = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9"
 PINNED_USES_RE = re.compile(r"^" + re.escape(PINNED_UPLOAD) + r"(\s+#.*)?$")
 
 

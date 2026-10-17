@@ -587,7 +587,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "79a40bbd8538001322c5c52def82617af22879a93873508b1f35126041645bf9.zip"
+          "S3Key": "ce312622a7eee129f6d09ad5d9eab9f9d0567787ad2fada6c7b41c56344d5112.zip"
         },
         "Environment": {
           "Variables": {
@@ -1471,6 +1471,39 @@
             "FunctionArn"
           ]
         },
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":cloudfront::",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":distribution/",
+              {
+                "Ref": "SiteDistribution390DED28"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "SiteDistributionOrigin2InvokeFunctionFromCloudFrontForFaceTheoryAppTheorySsgIsrSiteDistributionOrigin29095DE93C233A21D": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "SiteSsrUrl2D74149D",
+            "FunctionArn"
+          ]
+        },
+        "InvokedViaFunctionUrl": true,
         "Principal": "cloudfront.amazonaws.com",
         "SourceArn": {
           "Fn::Join": [

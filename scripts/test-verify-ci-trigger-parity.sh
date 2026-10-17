@@ -318,7 +318,7 @@ for position, start in enumerate(step_starts):
         continue
     lines[start + name_index + 1:end] = [
         "        run: |",
-        '          echo "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1"',
+        '          echo "uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2"',
         '          echo "path: gov-infra/evidence/"',
         '          echo "name: gov-infra-evidence"',
     ]
