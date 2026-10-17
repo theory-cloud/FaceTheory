@@ -1,5 +1,80 @@
 # Changelog
 
+## [5.0.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.2.1...v5.0.0-rc) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **isr:** authenticated ISR requests (any default auth-vary header `authorization`, `proxy-authorization`, `x-api-key`, or `x-amz-security-token`, or any request cookie) now fail closed with `cache-control: private, no-store` instead of the shared `public` value, including the stored HtmlStore object metadata. Deployments with an explicit custom `cacheKey` fail closed for all requests, including anonymous ones, losing the public shared-cache hint. An explicit `FaceIsrOptions.cacheControl` callback no longer influences guarded requests; a callback returning `private, no-store` is preserved verbatim for unguarded requests. Anonymous default-key responses are unchanged.
+* **dev:** the public dev server is no longer reachable from other network interfaces unless a host is passed explicitly (for example `--host 0.0.0.0`), and the returned URL now reflects the real bind address rather than being displayed as `localhost`.
+* **isr:** tenant-scoped ISR cache identities for routes that configure a custom `cacheKey` change. The framework composes a tenant digest into the stored key, so existing tenant-scoped custom-key entries miss and repopulate, and a custom `cacheKey` alone no longer exempts a tenant-scoped route from requiring an explicit trusted `tenantKey`. There is no fallback to the old unpartitioned keys.
+* **head:** strict CSP head URLs that carry a trailing DNS root dot (for example https://real.example./assets/entry.js) are now rejected instead of being accepted and rendered verbatim. Use the dotless host form.
+
+### Bug Fixes
+
+* **ci:** bind release publishing to verified immutable sources ([d517c15](https://github.com/theory-cloud/FaceTheory/commit/d517c15e5b3689fb8660d87c85002e28c62806a3))
+* **ci:** bind release publishing to verified immutable sources ([45bf48b](https://github.com/theory-cloud/FaceTheory/commit/45bf48b6c2f4b78392bd0602918e1f6f9d6ee350))
+* **ci:** bind reserved release-train heads and verify target trees ([4dee43f](https://github.com/theory-cloud/FaceTheory/commit/4dee43f5a427afc235aa97d21fd9c9d6ab8c4f10))
+* **ci:** close quoted enum and dynamic Lambda runtime blind spots ([18eecfb](https://github.com/theory-cloud/FaceTheory/commit/18eecfb6315169acf219abc31fe8556c20df27b5))
+* **ci:** close R1 governance-upload and condition-correlation false passes ([3af5a9a](https://github.com/theory-cloud/FaceTheory/commit/3af5a9a3597f3ebdd4a8ea6adde60458992c0f89))
+* **ci:** detect bare pip installs in the publisher guard ([a74cdab](https://github.com/theory-cloud/FaceTheory/commit/a74cdab1e79ea0197743f25862e4940cec40bf5b))
+* **ci:** evaluate CI gate conditions and bind the governance upload step ([29d7403](https://github.com/theory-cloud/FaceTheory/commit/29d7403774cc6fa2c512cb696d227f1d92feb043))
+* **ci:** M3 CI verifier gate integrity (FACESEC45-M3) ([b38455e](https://github.com/theory-cloud/FaceTheory/commit/b38455e69e6a48acafec12b08e5ff1e5ff305b68))
+* **ci:** make install-hardening comment stripping escape-aware ([5a3732a](https://github.com/theory-cloud/FaceTheory/commit/5a3732a16306dba7527d6e262b2d0ba9248894c0))
+* **ci:** normalize wildcard-minor-with-patch engine ranges ([a9b95c9](https://github.com/theory-cloud/FaceTheory/commit/a9b95c9a4209be5976df71c8cf35488a682935f5))
+* **ci:** pin the publish target in the final release PATCH ([90e65c7](https://github.com/theory-cloud/FaceTheory/commit/90e65c77ee18c425f1406f531c7cba84db4f5c16))
+* **ci:** read deletions and both rename endpoints in release readiness ([7d336b9](https://github.com/theory-cloud/FaceTheory/commit/7d336b923e29c20d1122e98bfc00c40cfa74bd71))
+* **ci:** source the Pages provenance verifier from trusted main ([65513b8](https://github.com/theory-cloud/FaceTheory/commit/65513b857440389bcf1a10ddc8602b490a0109cf))
+* **ci:** treat CHANGELOG.prerelease.md as a release-please sync file in release readiness ([f234c1f](https://github.com/theory-cloud/FaceTheory/commit/f234c1fdf31ad201e9422c4bc0550ea2de7fe112))
+* **ci:** treat CHANGELOG.prerelease.md as a release-please sync file in release readiness ([7a6a140](https://github.com/theory-cloud/FaceTheory/commit/7a6a140a3d33faa1fb6673ff0b44c83698c10dd7))
+* **client:** make hydration redirect rejection non-overridable ([c2e7d8f](https://github.com/theory-cloud/FaceTheory/commit/c2e7d8fff1b2fdaa21f9e02457fe37677b06fda5))
+* **deps:** adopt AppTheory 6.0.0 and TableTheory 5.0.0 ([e4e379d](https://github.com/theory-cloud/FaceTheory/commit/e4e379db2e6d03be917a3755a82bfe15e156b45d))
+* **deps:** adopt AppTheory 6.2.0 and TableTheory 6.0.0 ([e102d29](https://github.com/theory-cloud/FaceTheory/commit/e102d29c1517a9ab4341c3fe39942b971696a316))
+* **deps:** adopt AppTheory 6.2.0 and TableTheory 6.0.0 ([5a57e33](https://github.com/theory-cloud/FaceTheory/commit/5a57e33b57cfa2f1850940a57c91181334792ccc))
+* **deps:** apply cooldown-eligible dependency updates (2026-10-10) ([682138f](https://github.com/theory-cloud/FaceTheory/commit/682138f0483f64d492e602896f1f357d048dcee6))
+* **deps:** apply cooldown-eligible dependency updates (2026-10-10) ([d99d134](https://github.com/theory-cloud/FaceTheory/commit/d99d13406ecf1b073d37383120a85139b2e8d63e))
+* **deps:** bump the AWS SDK in ts and the ssg-isr site within the cooldown ([0756296](https://github.com/theory-cloud/FaceTheory/commit/075629660f52e09dd4f09c3371d19e3f7054ca31))
+* **deps:** bump the AWS SDK in ts and the ssg-isr site within the cooldown ([b1694a0](https://github.com/theory-cloud/FaceTheory/commit/b1694a08faa5a3306e47419c9d501b2588003507))
+* **deps:** bump the ts [@typescript-eslint](https://github.com/typescript-eslint) toolchain to 8.71.0 ([fdf25c5](https://github.com/theory-cloud/FaceTheory/commit/fdf25c506a650f41168e1ffa0f79b03268094da1))
+* **deps:** clear source-map-js event-loop DoS in ts ([534848a](https://github.com/theory-cloud/FaceTheory/commit/534848a09905f99a166db52bcebde5da70fbd87e))
+* **deps:** consolidate eligible ts dependency updates (source-map-js security + typescript-eslint) ([e13ac22](https://github.com/theory-cloud/FaceTheory/commit/e13ac22531284b3cc6228447e316fe235fbe282b))
+* **dev:** bind the Vite middleware dev server to loopback by default ([1cffcab](https://github.com/theory-cloud/FaceTheory/commit/1cffcabf2e5869c4e21442ab61a0a3ff4cb5282d))
+* **examples:** catch malformed percent paths and per-request errors in Vite SSR servers ([a0a6e98](https://github.com/theory-cloud/FaceTheory/commit/a0a6e9893bc57916abebe0bd133e8345c8a50db1))
+* **examples:** contain static file resolution within its root in SSG example servers ([b913760](https://github.com/theory-cloud/FaceTheory/commit/b913760cfd36dab06c58d16b05b15779ff5328da))
+* **examples:** hydrate the routed component in the Svelte SSR example ([4780e8a](https://github.com/theory-cloud/FaceTheory/commit/4780e8a2980453ac5c0867a8de37dc6d7905623f))
+* **head:** reject trailing DNS root dot in strict CSP URLs ([d27fa22](https://github.com/theory-cloud/FaceTheory/commit/d27fa22a0596c129e778d3c4288d1da66e6bd0a3))
+* **html:** reject unsafe document-shell attribute names ([ba3fe97](https://github.com/theory-cloud/FaceTheory/commit/ba3fe970d29974bddf6d0799bcb61655476c11fd))
+* **infra:** build FaceTheory dist before reference stack synth ([7f656dc](https://github.com/theory-cloud/FaceTheory/commit/7f656dcf66878e163a25b0738c6c82c11fefc726))
+* **infra:** deploy reference SSG HTML to the ISR html store origin ([9d92028](https://github.com/theory-cloud/FaceTheory/commit/9d920283d0a911c992d6de782bddf970296aa729))
+* **infra:** deploy reference SSG hydration sidecars to the assets origin ([c574c46](https://github.com/theory-cloud/FaceTheory/commit/c574c46adc4b973e0cadf987563c6c0b41ce51fa))
+* **isr:** fail closed ISR cache-control for authenticated or custom-key requests ([8ba021a](https://github.com/theory-cloud/FaceTheory/commit/8ba021aa4f04ddd326b35ba0d2ee997b1b79cd42))
+* **isr:** partition custom cache keys by an explicit trusted tenant key ([13bd4d1](https://github.com/theory-cloud/FaceTheory/commit/13bd4d1128185e4ad62f2230ac17773d310edd2c))
+* **ops:** use a fixed metric route label for unmatched requests ([2ae8110](https://github.com/theory-cloud/FaceTheory/commit/2ae811047c62bfcf4e068e91f636048f21b8825a))
+* **react:** observe both streaming readiness promises ([62b7fed](https://github.com/theory-cloud/FaceTheory/commit/62b7fed40f11e682c238bd21a561d851907d630d))
+* **responsive-primitives:** treat protocol-relative links as external ([b1d2a5b](https://github.com/theory-cloud/FaceTheory/commit/b1d2a5bb7b1c886d7a26b29851e5a6ec0ce705c0))
+* **router:** keep trailing-slash redirect targets origin-relative ([3c59243](https://github.com/theory-cloud/FaceTheory/commit/3c59243de92611533641de4cd2b9e4c930db86f2))
+* **scripts:** assemble the release reference bundle from tracked source ([0346729](https://github.com/theory-cloud/FaceTheory/commit/0346729ecbce4a575bbb3a26ee224472b743ff94))
+* **scripts:** bind staged theorycloud subtree bytes to the source revision ([3f5f0aa](https://github.com/theory-cloud/FaceTheory/commit/3f5f0aa5f30e555321f693cf153d764cfe4c5fb9))
+* **scripts:** build dev archives in a private validated directory ([b12d749](https://github.com/theory-cloud/FaceTheory/commit/b12d749da94de22881c4fe8360d809b5bd10ca8a))
+* **scripts:** make the subtree sync destination private and cleanup fatal ([804687e](https://github.com/theory-cloud/FaceTheory/commit/804687e282f639df4a099cd15f953715ab8bbd85))
+* **scripts:** validate the raw stage output path before resolving it ([763e2d0](https://github.com/theory-cloud/FaceTheory/commit/763e2d072330e5b77d14041c843f8115bdd632d8))
+* **security:** FACESEC45-M4 streaming, SPA and validation resilience ([3e968e9](https://github.com/theory-cloud/FaceTheory/commit/3e968e95b468de5110dda3960b243dfb8816ecf1))
+* **security:** FACESEC45-M8 example servers and reference stacks (whole milestone, one PR) ([657247d](https://github.com/theory-cloud/FaceTheory/commit/657247d0ce3ac75f3bc2836bda03a319a7991976))
+* **security:** make strict-CSP script validation linear ([7201e90](https://github.com/theory-cloud/FaceTheory/commit/7201e908bb8b097df827d8e32561a817575e4cca))
+* **security:** reject commas in strict CSP directive values ([33ad8e4](https://github.com/theory-cloud/FaceTheory/commit/33ad8e4b933b9091755f80ad45582edc105b4ffd))
+* **spa:** keep head-synced scripts inert JSON data ([604695e](https://github.com/theory-cloud/FaceTheory/commit/604695efe95b003b67e1681ff00f57a43c893871))
+* **stitch-admin:** redact audit events for an empty redactedMarker ([b326c84](https://github.com/theory-cloud/FaceTheory/commit/b326c84814bb527fb4df00c40f97fff6ff536507))
+* **stitch-shell:** reject unsafe NavItem paths across adapters ([5d2872e](https://github.com/theory-cloud/FaceTheory/commit/5d2872ef86afdfef16f88c996807e94bd6034900))
+* **svelte:** align hosted-auth declarations with the actual snippet props ([ba17c97](https://github.com/theory-cloud/FaceTheory/commit/ba17c972890ceb917b2d4171b96ced82f0f2a6aa))
+* **testing:** accept nonce-carried head JSON-LD in strict CSP asserts ([97374d0](https://github.com/theory-cloud/FaceTheory/commit/97374d04d3a4d4c62f4d6b613896ea2dff3d1142))
+* **ui:** FACESEC45-M7 UI component contracts and parity ([62f4761](https://github.com/theory-cloud/FaceTheory/commit/62f4761f29526ae1e7f840a50dbbe73bf46fd83a))
+* **vue:** bound streaming buffers and stop production on cancel ([5b8f2af](https://github.com/theory-cloud/FaceTheory/commit/5b8f2af77b251a1497955ecd7a12958e81e73e2a))
+
+
+### Reverts
+
+* **gov-infra:** drop the unauthorized M5 test wiring from the rubric verifier ([76dd0b8](https://github.com/theory-cloud/FaceTheory/commit/76dd0b81e6e7f08625e472cce4204d1e88432b13))
+
 ## [4.2.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.2.0...v4.2.1-rc) (2026-10-05)
 
 
