@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.0.0-rc.1](https://github.com/theory-cloud/FaceTheory/compare/v5.0.0-rc...v5.0.0-rc.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **ci:** fail closed when a published release keeps the wrong tag ([b378688](https://github.com/theory-cloud/FaceTheory/commit/b378688ebaa280fce835df0d3915fbe85cc24c52))
+* **ci:** fail closed when a published release omits the draft field ([55f8845](https://github.com/theory-cloud/FaceTheory/commit/55f8845f0aac2fc9c05e8bac21c03877a23b0ea3))
+* **ci:** keep the release tag name on every draft release PATCH ([7805156](https://github.com/theory-cloud/FaceTheory/commit/7805156aea927ec6a9125816f6f7d7223a40163f))
+* **ci:** keep the release tag when binding and publishing a draft ([5864c32](https://github.com/theory-cloud/FaceTheory/commit/5864c32f200cb6d273fa877efc5bdcd1b960ca14))
+
 ## [5.0.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v4.2.1...v5.0.0-rc) (2026-10-17)
 
 
