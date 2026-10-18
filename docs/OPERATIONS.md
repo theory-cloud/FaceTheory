@@ -234,12 +234,15 @@ dispatches pages.yml with the exact tag (`workflow_dispatch` is the one event ki
 create, so no PAT or other secret is involved), and the build checks out that tag rather than a mutable branch head.
 The site therefore updates automatically whenever a stable release publishes — stamped with the release that just
 shipped, never the previous one — and manual `workflow_dispatch` re-deploys are available for docs-only fixes
-between releases.
+between releases. Every dispatch is ref-gated before any build work runs: only the `main` branch ref and stable
+`vX.Y.Z` tag refs are accepted, so a dispatch from any other branch is refused instead of publishing that branch's
+docs stamped with an unrelated release tag.
 
 The Pages deploy job is the only job with `pages: write` and `id-token: write`, and both the build and deploy jobs
 keep job-level guards so only `main` pushes and dispatches deploy; dispatch tag inputs are validated as stable
-`vX.Y.Z` tags, so prereleases never publish the site. Do not broaden the Pages environment's allowed refs without
-recording an explicit, reviewed protected deployment posture for that environment.
+`vX.Y.Z` tags, and dispatch refs are validated to `main` or a stable tag, so prereleases never publish the site and
+no arbitrary branch head can. Do not broaden the Pages environment's allowed refs without recording an explicit,
+reviewed protected deployment posture for that environment.
 
 ### Strict CSP RC and stable release handoff
 

@@ -17,7 +17,14 @@
 #   B. the verifier is invoked from that checked-out subdirectory, never from a
 #      bare repo-root path (which would run an unverified tree's own verifier);
 #   C. a later checkout supplies the immutable run SHA (github.sha) as the build
-#      tree, so the graded site is exactly the verified run ref.
+#      tree, so the graded site is exactly the verified run ref;
+#   D. exactly one dispatch-ref provenance step runs on workflow_dispatch and
+#      invokes scripts/verify-pages-dispatch-ref.sh from the same trusted
+#      subdirectory, before the run-SHA build checkout, so a bare dispatch can
+#      never publish an arbitrary branch head validated against an unrelated
+#      release tag;
+#   E. that dispatch-ref step keeps its `github.event_name == 'workflow_dispatch'`
+#      gate; a step that runs on every event would break push deploys.
 set -euo pipefail
 
 repo_root="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -137,11 +144,73 @@ if verify_index is not None:
             "(${{ github.sha }}) as the build tree"
         )
 
+# D/E. The dispatch-ref gate: one trusted-subdirectory invocation, gated on
+# workflow_dispatch, running before the run-SHA build checkout.
+dispatch_name = "verify-pages-dispatch-ref.sh"
+dispatch_indexes = [
+    i for i, text in enumerate(step_texts) if dispatch_name in text
+]
+if len(dispatch_indexes) != 1:
+    errors.append(
+        f"expected exactly one step invoking {dispatch_name}; "
+        f"found {len(dispatch_indexes)}"
+    )
+else:
+    dispatch_index = dispatch_indexes[0]
+    dispatch_text = step_texts[dispatch_index]
+
+    if re.search(rf"(?<![\w./-])scripts/{re.escape(dispatch_name)}", dispatch_text):
+        errors.append(
+            "dispatch-ref verifier must not be invoked from the repo root "
+            "(that executes the unverified run tree's own copy)"
+        )
+
+    if "github.event_name == 'workflow_dispatch'" not in dispatch_text:
+        errors.append(
+            "dispatch-ref verifier must stay gated on "
+            "github.event_name == 'workflow_dispatch'"
+        )
+
+    trusted_dispatch_predecessor = None
+    for i in range(dispatch_index):
+        text = step_texts[i]
+        if not checkout_re.search(text):
+            continue
+        ref = field(text, "ref")
+        path = field(text, "path")
+        persist = field(text, "persist-credentials")
+        if not ref or not re.match(r"^refs/heads/[A-Za-z0-9._/-]+$", ref):
+            continue
+        if not path or path in {".", "./"}:
+            continue
+        if persist != "false":
+            continue
+        if f"{path.rstrip('/')}/scripts/{dispatch_name}" not in dispatch_text:
+            continue
+        trusted_dispatch_predecessor = (ref, path)
+        break
+    if trusted_dispatch_predecessor is None:
+        errors.append(
+            "dispatch-ref verifier has no preceding checkout sourcing it from a "
+            "constant protected branch ref into the path it invokes"
+        )
+
+    run_sha_indexes = [
+        i
+        for i in range(dispatch_index + 1, len(step_texts))
+        if checkout_re.search(step_texts[i])
+        and "${{ github.sha }}" in (field(step_texts[i], "ref") or "")
+    ]
+    if not run_sha_indexes:
+        errors.append(
+            "dispatch-ref verifier must run before the immutable run SHA "
+            "(${{ github.sha }}) build checkout"
+        )
+
 if errors:
     print("pages-workflow-order: FAIL")
     for error in errors:
         print(f"- {error}")
     sys.exit(1)
-
 print("pages-workflow-order: PASS")
 PY
