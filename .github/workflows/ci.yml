@@ -47,6 +47,7 @@ jobs:
           PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           set -euo pipefail
 
@@ -58,6 +59,14 @@ jobs:
             "+refs/heads/staging:refs/remotes/origin/staging" \
             "+refs/heads/premain:refs/remotes/origin/premain" \
             "+refs/heads/main:refs/remotes/origin/main"
+
+          # A generated release-please branch lives in this repository, so its
+          # content can be fetched and compared with the base tree. Fork heads
+          # are never fetched; the verifier rejects them before reading content.
+          if [[ "${PR_HEAD_REPOSITORY}" == "${GITHUB_REPOSITORY}" && "${PR_HEAD_REF}" == release-please--branches--* ]]; then
+            git fetch --no-tags origin \
+              "+refs/heads/${PR_HEAD_REF}:refs/remotes/origin/${PR_HEAD_REF}"
+          fi
 
           base_ref_args=()
           case "${PR_BASE_REF}" in
@@ -78,7 +87,8 @@ jobs:
             --head-sha "${PR_HEAD_SHA}" \
             --github-repository "${GITHUB_REPOSITORY}" \
             --github-head-repository "${PR_HEAD_REPOSITORY}" \
-            --pr-title "${PR_TITLE}"
+            --pr-title "${PR_TITLE}" \
+            --pr-author "${PR_AUTHOR}"
 
   prerelease-readiness:
     name: Prerelease readiness (staging -> premain)
