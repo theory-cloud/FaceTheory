@@ -2,4 +2,4 @@ Verifier: gov_check_maintainability
 Repository: /Users/theorycloud/AgentSpace/factory/products/frameworks/FaceTheory
 Rubric ID: MAI-1
 
-ts-pack: PASS (theory-cloud-facetheory-5.0.0-rc.tgz)
+ts-pack: PASS (theory-cloud-facetheory-5.0.0.tgz)
