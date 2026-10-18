@@ -8,11 +8,13 @@ import type { FaceAttributes } from './types.js';
 
 /**
  * Inline capability summary for a destination `Content-Security-Policy` response
- * header: whether the policy permits inline scripts (including inline event
- * handlers and `javascript:` URLs) and inline styles.
+ * header: whether the policy permits inline script elements and executable
+ * `javascript:`/`data:` URLs, inline event handler attributes, and inline
+ * styles.
  */
 export interface FaceCspInlinePolicy {
   inlineScriptsAllowed: boolean;
+  inlineEventHandlersAllowed: boolean;
   inlineStylesAllowed: boolean;
 }
 
@@ -39,29 +41,35 @@ export function cspInlinePolicyFromHeader(
   if (!header) return null;
 
   let inlineScriptsAllowed = true;
+  let inlineEventHandlersAllowed = true;
   let inlineStylesAllowed = true;
 
   for (const rawPolicy of header.split(',')) {
     const directives = parseNavigationCspDirectives(rawPolicy);
-    if (
-      !directiveAllowsUnsafeInline(
-        directives.get('script-src') ?? directives.get('default-src'),
-      )
-    ) {
+    if (!directiveChainAllowsInline(directives, ['script-src', 'default-src'])) {
       inlineScriptsAllowed = false;
     }
     if (
-      !directiveAllowsUnsafeInline(
-        directives.get('style-src-attr') ??
-          directives.get('style-src') ??
-          directives.get('default-src'),
-      )
+      !directiveChainAllowsInline(directives, [
+        'script-src-attr',
+        'script-src',
+        'default-src',
+      ])
+    ) {
+      inlineEventHandlersAllowed = false;
+    }
+    if (
+      !directiveChainAllowsInline(directives, [
+        'style-src-attr',
+        'style-src',
+        'default-src',
+      ])
     ) {
       inlineStylesAllowed = false;
     }
   }
 
-  return { inlineScriptsAllowed, inlineStylesAllowed };
+  return { inlineScriptsAllowed, inlineEventHandlersAllowed, inlineStylesAllowed };
 }
 
 /**
@@ -98,7 +106,13 @@ export function validateFaceNavigationCspDocument(
   html: string,
   policy: FaceCspInlinePolicy,
 ): void {
-  if (policy.inlineScriptsAllowed && policy.inlineStylesAllowed) return;
+  if (
+    policy.inlineScriptsAllowed &&
+    policy.inlineEventHandlersAllowed &&
+    policy.inlineStylesAllowed
+  ) {
+    return;
+  }
 
   for (const startTag of scanHtmlStartTags(String(html ?? ''))) {
     validateFaceNavigationCspStartTag(
@@ -120,7 +134,13 @@ export function validateFaceNavigationCspSnapshot(
   content: FaceCspSnapshotContent,
   policy: FaceCspInlinePolicy,
 ): void {
-  if (policy.inlineScriptsAllowed && policy.inlineStylesAllowed) return;
+  if (
+    policy.inlineScriptsAllowed &&
+    policy.inlineEventHandlersAllowed &&
+    policy.inlineStylesAllowed
+  ) {
+    return;
+  }
 
   validateFaceNavigationCspStartTag(
     'html',
@@ -157,13 +177,16 @@ function validateFaceNavigationCspStartTag(
     }
   }
 
-  if (!policy.inlineScriptsAllowed) {
+  if (!policy.inlineEventHandlersAllowed) {
     const eventName = findInlineEventHandlerAttribute(attributes);
     if (eventName) {
       throw new Error(
         `FaceTheory SPA navigation refused to inject inline event handler attribute "${eventName}" that the destination Content-Security-Policy blocks`,
       );
     }
+  }
+
+  if (!policy.inlineScriptsAllowed) {
     if (tagName === 'iframe' && hasHtmlAttributeName(attributes, 'srcdoc')) {
       throw new Error(
         'FaceTheory SPA navigation refused to inject an iframe srcdoc document that the destination Content-Security-Policy would isolate',
@@ -233,19 +256,55 @@ function parseNavigationCspDirectives(policy: string): Map<string, string[]> {
   return directives;
 }
 
-function directiveAllowsUnsafeInline(
-  sources: readonly string[] | undefined,
+function directiveChainAllowsInline(
+  directives: Map<string, string[]>,
+  names: readonly string[],
 ): boolean {
-  if (!sources || sources.length === 0) return true;
-  const normalized = sources.map((source) =>
-    source.replace(/^'+|'+$/g, '').toLowerCase(),
-  );
-  if (!normalized.includes('unsafe-inline')) return false;
-  // CSP3 ignores 'unsafe-inline' when the directive also carries a nonce or hash.
-  return !normalized.some(
-    (source) =>
-      source.startsWith('nonce-') || /^sha(256|384|512)-/.test(source),
-  );
+  for (const name of names) {
+    const sources = directives.get(name);
+    if (sources !== undefined) return sourceListAllowsInline(sources);
+  }
+  return true;
+}
+
+function sourceListAllowsInline(sources: readonly string[]): boolean {
+  let allowsUnsafeInline = false;
+  let restrictsInline = false;
+
+  for (const source of sources) {
+    const keyword = readCspKeyword(source);
+    if (keyword === null) continue;
+    if (keyword === 'unsafe-inline') {
+      allowsUnsafeInline = true;
+      continue;
+    }
+    // CSP3 ignores 'unsafe-inline' when the directive also carries a nonce, a
+    // hash, or 'strict-dynamic'.
+    if (
+      keyword === 'strict-dynamic' ||
+      keyword.startsWith('nonce-') ||
+      /^sha(256|384|512)-/.test(keyword)
+    ) {
+      restrictsInline = true;
+    }
+  }
+
+  // A present directive with no matching source blocks inline content.
+  return allowsUnsafeInline && !restrictsInline;
+}
+
+/**
+ * Reads a single-quoted CSP keyword-source. Bare tokens are never keywords:
+ * `unsafe-inline` without quotes, a double-quoted `"unsafe-inline"`, and host
+ * sources such as `unsafe-inline.example.com` all stay non-matching, exactly as
+ * a browser parses them.
+ */
+function readCspKeyword(source: string): string | null {
+  if (source.length < 3) return null;
+  if (!source.startsWith("'") || !source.endsWith("'")) return null;
+  const keyword = source.slice(1, -1);
+  if (keyword.length === 0 || keyword.includes("'")) return null;
+  return keyword.toLowerCase();
 }
 
 function isExecutableUrlAttributeValue(

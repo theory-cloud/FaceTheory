@@ -971,6 +971,7 @@ test('spa helpers: destination CSP is carried on the snapshot and a compliant pa
 
     assert.deepEqual(snapshot.csp, {
       inlineScriptsAllowed: false,
+      inlineEventHandlersAllowed: false,
       inlineStylesAllowed: false,
     });
     assert.equal(snapshot.viewHtml?.trim(), '<p>Cached-safe content</p>');

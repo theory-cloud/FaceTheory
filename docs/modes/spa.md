@@ -78,10 +78,15 @@ blocks them:
 
 A destination that complies with its own policy — including FaceTheory's
 strict-CSP output — passes unchanged, and the derived policy is available on
-`snapshot.csp`. The default controller reports a refusal through `onError`; use
-that hook to fall back to a full page load (`window.location.assign(url)`) when
-the destination legitimately needs content its own policy blocks. Report-only
-headers never block and are ignored.
+`snapshot.csp`. The policy is read the way a browser reads it: `script-src-attr`
+governs inline event handlers (falling back to `script-src`, then `default-src`),
+and only a single-quoted `'unsafe-inline'` keyword permits inline content, so a
+bare token, a host source such as `unsafe-inline.example.com`, or
+`'unsafe-inline'` alongside a nonce, hash, or `'strict-dynamic'` still blocks.
+The default controller reports a refusal through `onError`; use that hook to fall
+back to a full page load (`window.location.assign(url)`) when the destination
+legitimately needs content its own policy blocks. Report-only headers never
+block and are ignored.
 
 ## Related docs
 

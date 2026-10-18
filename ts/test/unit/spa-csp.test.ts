@@ -132,3 +132,84 @@ test('spa CSP screen: an event-handler-looking attribute name stays inert', asyn
   // this is an attribute named `on&#99;lick`, not an `onclick` handler.
   assert.match(snapshot.bodyHtml, /<button on&#99;lick="alert\(1\)">Go<\/button>/);
 });
+
+test('spa CSP screen: honors script-src-attr for inline event handlers', async () => {
+  await assert.rejects(
+    fetchDestination(
+      '<button onclick="alert(1)">Go</button>',
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'",
+    ),
+    /refused to inject inline event handler attribute "onclick"/,
+  );
+});
+
+test('spa CSP screen: script-src-attr can allow handlers while executable URLs stay blocked', async () => {
+  const headers = "default-src 'self'; script-src 'self'; script-src-attr 'unsafe-inline'";
+  const snapshot = await fetchDestination('<button onclick="alert(1)">Go</button>', headers);
+
+  assert.match(snapshot.bodyHtml, /onclick="alert\(1\)"/);
+  await assert.rejects(
+    fetchDestination('<a href="javascript:alert(1)">Open</a>', headers),
+    /refused to inject executable URL attribute "href"/,
+  );
+});
+
+test('spa CSP screen: event handlers fall back from script-src-attr to script-src to default-src', async () => {
+  const allowed = await fetchDestination(
+    '<button onclick="alert(1)">Go</button>',
+    "default-src 'self'; script-src 'self' 'unsafe-inline'",
+  );
+  assert.match(allowed.bodyHtml, /onclick="alert\(1\)"/);
+
+  await assert.rejects(
+    fetchDestination('<button onclick="alert(1)">Go</button>', "default-src 'self'"),
+    /refused to inject inline event handler attribute "onclick"/,
+  );
+});
+
+// CSP keywords are single-quoted source expressions. Bare tokens, host sources,
+// and malformed quoting are not the `'unsafe-inline'` keyword, so a policy that
+// uses them does not permit inline content.
+const unsafeInlineTokenCases: ReadonlyArray<readonly [string, string, boolean]> = [
+  ["'unsafe-inline'", 'the quoted keyword', true],
+  ["'UNSAFE-INLINE'", 'the quoted keyword in mixed case', true],
+  ['"unsafe-inline"', 'a double-quoted token', false],
+  ['unsafe-inline', 'a bare token', false],
+  ["'unsafe-inline", 'an unterminated quote', false],
+  ["unsafe-inline'", 'a stray trailing quote', false],
+  ["''unsafe-inline''", 'doubled quotes', false],
+  ['https://unsafe-inline.example.com', 'a host source', false],
+  ["'unsafe-inline.example.com'", 'a quoted host source', false],
+  ["'unsafe-inline' 'nonce-abc'", 'a nonce in the same directive', false],
+  ["'unsafe-inline' 'sha256-abc'", 'a hash in the same directive', false],
+  ["'unsafe-inline' 'strict-dynamic'", 'strict-dynamic in the same directive', false],
+];
+
+for (const [token, label, allowed] of unsafeInlineTokenCases) {
+  test(`spa CSP screen: treats ${label} as ${allowed ? 'permitting' : 'not permitting'} inline event handlers`, async () => {
+    const destination = async (): Promise<FaceNavigationSnapshot> =>
+      fetchDestination(
+        '<button onclick="alert(1)">Go</button>',
+        `default-src 'self'; script-src ${token}`,
+      );
+
+    if (allowed) {
+      assert.match((await destination()).bodyHtml, /onclick="alert\(1\)"/);
+      return;
+    }
+    await assert.rejects(
+      destination(),
+      /refused to inject inline event handler attribute "onclick"/,
+    );
+  });
+}
+
+test('spa CSP screen: an empty source list blocks inline content', async () => {
+  await assert.rejects(
+    fetchDestination(
+      '<button onclick="alert(1)">Go</button>',
+      "default-src 'self'; script-src;",
+    ),
+    /refused to inject inline event handler attribute "onclick"/,
+  );
+});
