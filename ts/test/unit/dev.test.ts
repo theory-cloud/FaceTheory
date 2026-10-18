@@ -200,6 +200,39 @@ test('vite dev server: binds loopback by default and reports the real address', 
   }
 });
 
+test('vite dev server: rejects request bodies above the size limit', async () => {
+  const devServer = await createDevServer();
+  const { url } = await devServer.listen({ port: 0 });
+  try {
+    const declared = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: 'x'.repeat(1024 * 1024 + 1),
+    });
+    assert.equal(declared.status, 413);
+    assert.equal(await declared.text(), 'Payload Too Large');
+
+    const chunk = new TextEncoder().encode('x'.repeat(64 * 1024));
+    const streamed = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: new ReadableStream({
+        start(controller) {
+          for (let index = 0; index < 20; index += 1) {
+            controller.enqueue(chunk);
+          }
+          controller.close();
+        },
+      }),
+      duplex: 'half',
+    } as RequestInit);
+    assert.equal(streamed.status, 413);
+    assert.equal(await streamed.text(), 'Payload Too Large');
+  } finally {
+    await devServer.close();
+  }
+});
+
 test('vite dev server: an explicit host opt-in is honored and shown without masking', async () => {
   const wildcard = await createDevServer();
   const wildcardResult = await wildcard.listen({ port: 0, host: '0.0.0.0' });
