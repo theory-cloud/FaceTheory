@@ -1045,6 +1045,49 @@ for (const emptyTenant of [null, undefined, '', '   '] as const) {
   });
 }
 
+for (const emptyTenant of [null, undefined, '', '   '] as const) {
+  test(`isr: explicit tenantKey resolving to ${JSON.stringify(emptyTenant)} fails closed for the default cache key`, async () => {
+    const htmlStore = new CountingHtmlStore();
+    const metaStore = new CountingMetaStore();
+    let renderCount = 0;
+
+    const app = createFaceApp({
+      faces: [
+        {
+          route: '/tenant/{slug}',
+          mode: 'isr',
+          revalidateSeconds: 60,
+          render: async () => {
+            const seq = ++renderCount;
+            return { html: `<main>tenant-${seq}</main>` };
+          },
+        },
+      ],
+      isr: {
+        htmlStore,
+        metaStore,
+        tenantKey: () => emptyTenant,
+      },
+    });
+
+    const response = await app.handle({
+      method: 'GET',
+      path: '/tenant/home',
+      headers: { 'x-tenant-id': ['tenant-a'] },
+    });
+
+    assert.equal(response.status, 500);
+    assert.equal(renderCount, 0);
+    assert.equal(metaStore.getCalls, 0);
+    assert.equal(metaStore.leaseCalls, 0);
+    assert.equal(metaStore.commitCalls, 0);
+    assert.equal(metaStore.releaseCalls, 0);
+    assert.equal(htmlStore.readCalls, 0);
+    assert.equal(htmlStore.writeCalls, 0);
+    assert.deepEqual(metaStore.debugSnapshot(), []);
+  });
+}
+
 test('isr: default cache key partitions by auth headers and cookies without raw secrets', async () => {
   const htmlStore = new InMemoryHtmlStore();
   const metaStore = new InMemoryIsrMetaStore();

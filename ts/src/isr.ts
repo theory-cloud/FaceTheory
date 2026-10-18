@@ -594,6 +594,14 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         tenantPartition.mode === 'partitioned'
           ? tenantPartition.tenant
           : resolveTenant(runtimeOptions, input.ctx);
+      if (tenant === null) {
+        if (hydrationSidecarPointer.present) {
+          return hydrationSidecarNotFoundResponse();
+        }
+        throw new Error(
+          'ISR explicit tenantKey resolved to an empty tenant; refusing to fall back to the shared default tenant',
+        );
+      }
       const query = hydrationSidecarPointer.present
         ? queryWithoutHydrationSidecar(input.ctx.request.query)
         : input.ctx.request.query;
@@ -1514,10 +1522,11 @@ function isGuardedIsrRequest(
 function resolveTenant(
   runtimeOptions: CreateIsrRuntimeOptions,
   ctx: FaceContext,
-): string {
+): string | null {
   const rawTenant = runtimeOptions.tenantKey(ctx);
   const tenant = String(rawTenant ?? '').trim();
-  return tenant.length > 0 ? tenant : 'default';
+  if (tenant.length > 0) return tenant;
+  return runtimeOptions.hasExplicitTenantKey ? null : 'default';
 }
 
 function defaultTenantKey(ctx: FaceContext): string {
