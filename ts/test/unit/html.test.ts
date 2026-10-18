@@ -292,6 +292,61 @@ test('security: strict CSP start tag scan skips quoted greater-than signs', () =
   );
 });
 
+test('security: strict CSP start tag scan keeps scanning past a stray quote in an unquoted value', () => {
+  const policy = { inlineScripts: false, rawHead: false } as const;
+
+  // A stray quote in an unquoted value is value text, not an attribute quote.
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><head></head><body><div a=1" onclick="alert(1)">x</div></body></html>',
+        { policy },
+      ),
+    /inline event handler attribute "onclick"/,
+  );
+});
+
+test('security: strict CSP start tag scan does not abort after an unbalanced quote', () => {
+  const scriptsOnlyPolicy = { inlineScripts: false, rawHead: false } as const;
+  const stylesOnlyPolicy = { inlineStyles: false, rawHead: false } as const;
+
+  // The unbalanced quote must not stop the scan before a later live script.
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><head></head><body><div a=1" onclick=alert(1)>x</div><script>alert(1)</script></body></html>',
+        { policy: scriptsOnlyPolicy },
+      ),
+    /rejects inline script tags/,
+  );
+  // Nor before a later style attribute.
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><head></head><body><div a=1" style=color:red>x</div></body></html>',
+        { policy: stylesOnlyPolicy },
+      ),
+    /inline style attributes/,
+  );
+});
+
+test('security: strict CSP start tag scan accepts benign unquoted and unterminated values', () => {
+  const policy = { inlineScripts: false, inlineStyles: false, rawHead: false } as const;
+
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(
+      '<!doctype html><html><head></head><body><div data-note=it\'s>x</div></body></html>',
+      { policy },
+    ),
+  );
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(
+      '<!doctype html><html><head></head><body><div title="unclosed> <span>ok</span></div></body></html>',
+      { policy },
+    ),
+  );
+});
+
 test('renderHTMLDocument rejects event-handler and delimiter-bearing shell attribute names', () => {
   for (const htmlAttrs of [
     { onload: 'alert(1)' },
