@@ -557,7 +557,3 @@ function toAsciiLowercaseCode(code: number): number {
   if (code >= 65 && code <= 90) return code + 32;
   return code;
 }
-
-
-
-

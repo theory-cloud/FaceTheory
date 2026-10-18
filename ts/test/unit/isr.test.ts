@@ -3107,5 +3107,3 @@ test('isr: maxQueryVariantsPerRoute 0 disables the query-variant cap', async () 
   assert.ok(decodeBody(repeat.body as Uint8Array).includes('feed-1-1'));
   assert.equal(metaStore.debugSnapshot().length, 2);
 });
-
-
