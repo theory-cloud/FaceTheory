@@ -103,8 +103,8 @@ sync_dir="${tmpdir}/sync-only"
 current_case="setup release sync-only"
 setup_repo "${sync_dir}"
 sync_script="$(copy_script "${sync_dir}")"
-printf '%s\n' '# release sync test change' >> "${sync_dir}/scripts/verify-release-readiness.sh"
-commit_file "${sync_dir}" "chore(release): update readiness helper" scripts/verify-release-readiness.sh
+printf '%s\n' '4.2.1' > "${sync_dir}/VERSION"
+commit_file "${sync_dir}" "chore(release): update release metadata" VERSION
 current_case="release sync-only"
 sync_out="$(cd "${sync_dir}" && bash "${sync_script}" base HEAD release)"
 assert_contains "${sync_out}" 'release-readiness: OK (release sync only change)' "release sync-only"
@@ -241,6 +241,50 @@ commit_staged "${allow_rename_dir}" "chore(release): rename release helper"
 current_case="rename wholly inside the allowlist passes"
 allow_rename_text="$(cd "${allow_rename_dir}" && bash "${allow_rename_script}" base HEAD release)"
 assert_contains "${allow_rename_text}" 'release-readiness: OK (release sync only change)' "rename inside allowlist"
+
+# Workflow files, verifier scripts, their test harnesses, and the installed
+# dependency lockfile are user-facing changes: the fast path must not admit a
+# range that only edits them, even with a chore commit.
+assert_fast_path_rejects() {
+  local label="$1"
+  local relative_path="$2"
+
+  local reject_dir="${tmpdir}/reject-${label// /-}"
+  current_case="setup rejected fast path ${label}"
+  setup_repo "${reject_dir}"
+  local reject_script
+  reject_script="$(copy_script "${reject_dir}")"
+  mkdir -p "$(dirname "${reject_dir}/${relative_path}")"
+  printf '%s\n' 'changed outside the fast path' >"${reject_dir}/${relative_path}"
+  commit_file "${reject_dir}" "chore(release): touch ${relative_path}" "${relative_path}"
+  local reject_out="${tmpdir}/readiness-reject-${label// /-}.out"
+  current_case="rejected fast path ${label}"
+  if (cd "${reject_dir}" && bash "${reject_script}" base HEAD release >"${reject_out}" 2>&1); then
+    fail "a release-sync range that only changes ${relative_path} unexpectedly passed"
+  fi
+  assert_contains "$(cat "${reject_out}")" 'release-readiness: FAIL' "rejected fast path ${label}"
+}
+
+assert_fast_path_rejects "workflow" ".github/workflows/ci.yml"
+assert_fast_path_rejects "verifier" "scripts/verify-release-train-promotion.sh"
+assert_fast_path_rejects "verifier-test" "scripts/test-verify-release-readiness.sh"
+assert_fast_path_rejects "lockfile" "ts/package-lock.json"
+
+# The remaining release metadata and helper paths still clear the fast path.
+remaining_dir="${tmpdir}/remaining-allowlist"
+current_case="setup remaining fast path"
+setup_repo "${remaining_dir}"
+remaining_script="$(copy_script "${remaining_dir}")"
+mkdir -p "${remaining_dir}/scripts" "${remaining_dir}/ts"
+printf '%s\n' '4.2.1' > "${remaining_dir}/VERSION"
+printf '%s\n' '# 4.2.1' > "${remaining_dir}/CHANGELOG.md"
+printf '%s\n' 'helper' > "${remaining_dir}/scripts/read-version.sh"
+printf '%s\n' '{"version":"4.2.1"}' > "${remaining_dir}/ts/package.json"
+commit_file "${remaining_dir}" "chore(release): sync remaining release metadata" \
+  VERSION CHANGELOG.md scripts/read-version.sh ts/package.json
+current_case="remaining fast path"
+remaining_out="$(cd "${remaining_dir}" && bash "${remaining_script}" base HEAD release)"
+assert_contains "${remaining_out}" 'release-readiness: OK (release sync only change)' "remaining fast path"
 
 delete_allowed_dir="${tmpdir}/deletion-allowed"
 current_case="setup deletion of an allowlisted path"

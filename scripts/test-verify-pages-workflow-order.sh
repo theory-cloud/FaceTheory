@@ -130,4 +130,110 @@ path.write_text(text.replace("          ref: ${{ github.sha }}\n", "          re
 PY
 expect_fail "build tree without the immutable run SHA" "${tmpdir}/no-run-sha"
 
+
+# === dispatch-ref gate =====================================================
+# The trusted dispatch-ref verifier admits only the production docs line and
+# stable release tags; every other dispatch ref must fail before any build work.
+dispatch_guard="${repo_root}/scripts/verify-pages-dispatch-ref.sh"
+
+expect_ref_pass() {
+  local label="$1" ref="$2"
+  if ! bash "${dispatch_guard}" "${ref}" >/dev/null 2>&1; then
+    fail "${label}: dispatch ref ${ref} unexpectedly failed the guard"
+  fi
+}
+
+expect_ref_fail() {
+  local label="$1" ref="$2"
+  if bash "${dispatch_guard}" "${ref}" >/dev/null 2>&1; then
+    fail "${label}: dispatch ref ${ref} unexpectedly passed the guard"
+  fi
+}
+
+expect_ref_pass "production branch" "refs/heads/main"
+expect_ref_pass "stable release tag" "refs/tags/v5.0.0"
+expect_ref_fail "integration branch" "refs/heads/staging"
+expect_ref_fail "feature branch" "refs/heads/feat/pages"
+expect_ref_fail "prerelease tag" "refs/tags/v5.0.0-rc.1"
+expect_ref_fail "pull request merge ref" "refs/pull/12/merge"
+expect_ref_fail "empty ref" ""
+
+# Negative: the dispatch-ref step is removed from the build job.
+seed "${tmpdir}/no-dispatch-step"
+python3 - "${tmpdir}/no-dispatch-step/${workflow_rel}" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines()
+start = next(
+    i
+    for i, line in enumerate(lines)
+    if line.strip() == "- name: Verify dispatch ref provenance"
+)
+end = next(i for i in range(start + 1, len(lines)) if lines[i].startswith("      - "))
+del lines[start:end]
+path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+expect_fail "dispatch-ref step removed" "${tmpdir}/no-dispatch-step"
+
+# Negative: the dispatch-ref verifier runs from the unverified run tree.
+seed "${tmpdir}/dispatch-root-invocation"
+python3 - "${tmpdir}/dispatch-root-invocation/${workflow_rel}" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+path.write_text(
+    text.replace(
+        ".trusted-pages-verifier/scripts/verify-pages-dispatch-ref.sh",
+        "scripts/verify-pages-dispatch-ref.sh",
+    ),
+    encoding="utf-8",
+)
+PY
+expect_fail "root-path dispatch verifier invocation" "${tmpdir}/dispatch-root-invocation"
+
+# Negative: the dispatch-ref step loses its workflow_dispatch gate.
+seed "${tmpdir}/dispatch-ungated"
+python3 - "${tmpdir}/dispatch-ungated/${workflow_rel}" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+path.write_text(
+    text.replace(
+        "        if: github.event_name == 'workflow_dispatch'\n        env:\n          DISPATCH_REF:",
+        "        if: github.event_name == 'push'\n        env:\n          DISPATCH_REF:",
+    ),
+    encoding="utf-8",
+)
+PY
+expect_fail "dispatch-ref step without its gate" "${tmpdir}/dispatch-ungated"
+
+# Negative: the dispatch-ref step runs after the run-SHA build checkout.
+seed "${tmpdir}/dispatch-after-build-tree"
+python3 - "${tmpdir}/dispatch-after-build-tree/${workflow_rel}" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines()
+start = next(
+    i
+    for i, line in enumerate(lines)
+    if line.strip() == "- name: Verify dispatch ref provenance"
+)
+end = next(i for i in range(start + 1, len(lines)) if lines[i].startswith("      - "))
+block = lines[start:end]
+rest = lines[:start] + lines[end:]
+anchor = next(i for i, line in enumerate(rest) if line.strip() == "- name: Setup Ruby")
+path.write_text(
+    "\n".join(rest[:anchor] + block + rest[anchor:]) + "\n", encoding="utf-8"
+)
+PY
+expect_fail "dispatch-ref step after the build tree" "${tmpdir}/dispatch-after-build-tree"
+
 echo "test-verify-pages-workflow-order: PASS"

@@ -2904,3 +2904,206 @@ test('isr: guarded responses and stored metadata never carry the raw secret', as
   assert.equal(serialized.includes(secret), false);
   assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
 });
+
+test('isr: non-GET/HEAD requests render fresh and never touch the shared cache', async () => {
+  const htmlStore = new CountingHtmlStore();
+  const metaStore = new CountingMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/submit',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>submit-${seq}</main>` };
+        },
+      },
+    ],
+    isr: { htmlStore, metaStore },
+  });
+
+  const firstPost = await app.handle({ method: 'POST', path: '/submit' });
+  const secondPost = await app.handle({ method: 'POST', path: '/submit' });
+
+  assert.ok(decodeBody(firstPost.body as Uint8Array).includes('submit-1'));
+  assert.ok(decodeBody(secondPost.body as Uint8Array).includes('submit-2'));
+  assert.equal(renderCount, 2);
+  assert.equal(metaStore.getCalls, 0);
+  assert.equal(metaStore.leaseCalls, 0);
+  assert.equal(metaStore.commitCalls, 0);
+  assert.equal(htmlStore.writeCalls, 0);
+  assert.deepEqual(metaStore.debugSnapshot(), []);
+
+  for (const response of [firstPost, secondPost]) {
+    assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+    assert.deepEqual(response.headers['x-facetheory-isr'], ['bypass']);
+  }
+});
+
+test('isr: body-bearing GET/HEAD requests bypass the shared cache', async () => {
+  const htmlStore = new CountingHtmlStore();
+  const metaStore = new CountingMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/search',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>search-${seq}</main>` };
+        },
+      },
+    ],
+    isr: { htmlStore, metaStore },
+  });
+
+  const first = await app.handle({
+    method: 'GET',
+    path: '/search',
+    body: encodeBody('{"q":"one"}'),
+  });
+  const second = await app.handle({
+    method: 'GET',
+    path: '/search',
+    body: encodeBody('{"q":"two"}'),
+  });
+
+  assert.ok(decodeBody(first.body as Uint8Array).includes('search-1'));
+  assert.ok(decodeBody(second.body as Uint8Array).includes('search-2'));
+  assert.equal(renderCount, 2);
+  assert.equal(metaStore.leaseCalls, 0);
+  assert.equal(htmlStore.writeCalls, 0);
+  assert.deepEqual(metaStore.debugSnapshot(), []);
+
+  const cached = await app.handle({ method: 'GET', path: '/search' });
+  const cachedAgain = await app.handle({ method: 'GET', path: '/search' });
+  assert.ok(decodeBody(cached.body as Uint8Array).includes('search-3'));
+  assert.ok(decodeBody(cachedAgain.body as Uint8Array).includes('search-3'));
+  assert.equal(renderCount, 3);
+  assert.equal(metaStore.debugSnapshot().length, 1);
+});
+
+test('isr: HEAD shares the body-less GET cache identity', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/head',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async () => {
+          const seq = ++renderCount;
+          return { html: `<main>head-${seq}</main>` };
+        },
+      },
+    ],
+    isr: { htmlStore, metaStore },
+  });
+
+  await app.handle({ method: 'GET', path: '/head' });
+  const head = await app.handle({ method: 'HEAD', path: '/head' });
+
+  assert.equal(renderCount, 1);
+  assert.equal(head.headers['x-facetheory-isr']?.[0], 'hit');
+  assert.equal(metaStore.debugSnapshot().length, 1);
+});
+
+test('isr: query-variant cap stops persisting new variants without breaking rendering', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  const metrics: Array<Record<string, unknown>> = [];
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/feed',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async (ctx) => {
+          const seq = ++renderCount;
+          const page = ctx.request.query.page?.[0] ?? 'none';
+          return { html: `<main>feed-${page}-${seq}</main>` };
+        },
+      },
+    ],
+    observability: {
+      metric: (record) =>
+        metrics.push(record as unknown as Record<string, unknown>),
+    },
+    isr: { htmlStore, metaStore, maxQueryVariantsPerRoute: 2 },
+  });
+
+  const first = await app.handle({ method: 'GET', path: '/feed?page=1' });
+  const firstAgain = await app.handle({ method: 'GET', path: '/feed?page=1' });
+  const second = await app.handle({ method: 'GET', path: '/feed?page=2' });
+
+  assert.ok(decodeBody(first.body as Uint8Array).includes('feed-1-1'));
+  assert.ok(decodeBody(firstAgain.body as Uint8Array).includes('feed-1-1'));
+  assert.ok(decodeBody(second.body as Uint8Array).includes('feed-2-2'));
+  assert.equal(renderCount, 2);
+  assert.equal(metaStore.debugSnapshot().length, 2);
+
+  const capped = await app.handle({ method: 'GET', path: '/feed?page=3' });
+  const cappedAgain = await app.handle({
+    method: 'GET',
+    path: '/feed?page=3',
+  });
+
+  assert.ok(decodeBody(capped.body as Uint8Array).includes('feed-3-3'));
+  assert.ok(decodeBody(cappedAgain.body as Uint8Array).includes('feed-3-4'));
+  assert.equal(renderCount, 4);
+  assert.equal(metaStore.debugSnapshot().length, 2);
+  for (const response of [capped, cappedAgain]) {
+    assert.deepEqual(response.headers['x-facetheory-isr'], ['bypass']);
+    assert.equal(isrCacheControl(response), ISR_MATRIX_PRIVATE_CACHE_CONTROL);
+  }
+
+  const admitted = await app.handle({ method: 'GET', path: '/feed?page=1' });
+  assert.ok(decodeBody(admitted.body as Uint8Array).includes('feed-1-1'));
+  assert.equal(renderCount, 4);
+
+  const capMetrics = metrics.filter(
+    (record) => record.name === 'facetheory.isr.query_variant_cap',
+  );
+  assert.equal(capMetrics.length, 2);
+});
+
+test('isr: maxQueryVariantsPerRoute 0 disables the query-variant cap', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/feed',
+        mode: 'isr',
+        revalidateSeconds: 60,
+        render: async (ctx) => {
+          const seq = ++renderCount;
+          const page = ctx.request.query.page?.[0] ?? 'none';
+          return { html: `<main>feed-${page}-${seq}</main>` };
+        },
+      },
+    ],
+    isr: { htmlStore, metaStore, maxQueryVariantsPerRoute: 0 },
+  });
+
+  await app.handle({ method: 'GET', path: '/feed?page=1' });
+  await app.handle({ method: 'GET', path: '/feed?page=2' });
+  const repeat = await app.handle({ method: 'GET', path: '/feed?page=1' });
+
+  assert.equal(renderCount, 2);
+  assert.ok(decodeBody(repeat.body as Uint8Array).includes('feed-1-1'));
+  assert.equal(metaStore.debugSnapshot().length, 2);
+});

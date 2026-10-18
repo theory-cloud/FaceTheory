@@ -76,6 +76,30 @@ Blocking ISR is **fail-closed** when known tenant-boundary headers (e.g. `x-tena
 
 See [ISR tenant safety](../features/isr-tenant-safety.md) and [Migration Guide → Adopt ISR tenant fail-closed defaults](../migration-guide.md).
 
+## Request methods and bodies (uncached passes)
+
+The shared ISR cache identity represents a body-less `GET` or `HEAD` only. Every
+other request — any other method, or a `GET`/`HEAD` that carries a request body —
+renders fresh through `load`/`render` and never reads, leases, commits, or writes a
+shared cache entry. The response carries `x-facetheory-isr: bypass` and
+`cache-control: private, no-store`, so a downstream shared cache cannot store a
+response whose method or body the ISR identity does not represent. `GET` and `HEAD`
+without a body keep the existing keys, cache headers, and entries unchanged.
+
+## Query request variants (bounded)
+
+The default cache key partitions by the full query string, so `?page=2` and
+`?page=3` are distinct entries. To keep that partitioning from becoming an
+unbounded fan-out of metadata records, leases, and HTML objects, the runtime
+tracks distinct query-bearing cache keys per route pattern and stops persisting
+new variants after `maxQueryVariantsPerRoute` (default `1024`, `0` disables the
+cap). A request past the cap still renders correct fresh output; it just does not
+read, lease, commit, or write a shared entry, and it carries
+`x-facetheory-isr: bypass` with `cache-control: private, no-store`. Keys that
+were admitted before the cap keep their existing entries and headers. Tracking is
+per runtime instance, so a cold start starts a fresh budget; pair the cap with
+edge rate limiting when a deployment needs a hard global bound.
+
 ## Cookie request variants
 
 The built-in ISR cache key includes all request cookies in a hashed variant by default. This preserves the fail-safe behavior for unknown personalization cookies. To share entries across non-render-affecting cookies, configure an allowlist:
