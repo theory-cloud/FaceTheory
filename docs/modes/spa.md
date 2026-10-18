@@ -53,6 +53,29 @@ Avoid SPA navigation when:
 - The site is primarily document-style content where full page loads are fine.
 - You can't keep client-side and server-side render output deterministic.
 
+## Destination Content-Security-Policy
+
+`fetchFaceNavigationSnapshot` reads the destination response's
+`Content-Security-Policy` and validates the fetched document against it before
+returning a snapshot. SPA navigation injects the destination's HTML into the
+active document, and `fetch` cannot install the destination's CSP headers, so
+content the destination policy would have blocked must not be revived under the
+shell's policy. The helper refuses a document that carries, under a policy that
+blocks them:
+
+- inline event handler attributes (`onclick` and friends)
+- `javascript:` / `vbscript:` URLs in `href`, `src`, `action`, `formaction`,
+  `poster`, `background`, `data`, or `xlink:href`
+- `iframe srcdoc` documents
+- inline `style` attributes or `<style>` elements
+
+A destination that complies with its own policy — including FaceTheory's
+strict-CSP output — passes unchanged, and the derived policy is available on
+`snapshot.csp`. The default controller reports a refusal through `onError`; use
+that hook to fall back to a full page load (`window.location.assign(url)`) when
+the destination legitimately needs content its own policy blocks. Report-only
+headers never block and are ignored.
+
 ## Related docs
 
 - [Browser hydration loader (`@theory-cloud/facetheory/client`)](../api-reference.md#browser-hydration-loader)

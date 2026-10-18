@@ -1,4 +1,11 @@
 import type { FaceAttributes, FaceHydration } from './types.js';
+import {
+  cspInlinePolicyFromHeader,
+  validateFaceNavigationCspDocument,
+  type FaceCspInlinePolicy,
+} from './navigation-csp.js';
+
+export type { FaceCspInlinePolicy } from './navigation-csp.js';
 
 export const DEFAULT_FACE_VIEW_SELECTOR = '[data-facetheory-view]';
 
@@ -18,6 +25,13 @@ export interface FaceNavigationSnapshot {
   bodyHtml: string;
   viewHtml: string | null;
   hydration: FaceHydration | null;
+  /**
+   * Inline capability policy of the destination response's
+   * `Content-Security-Policy`, when the snapshot came from a response that
+   * declared one. The fetched document is validated against this policy before
+   * the snapshot is returned.
+   */
+  csp?: FaceCspInlinePolicy;
 }
 
 export interface SnapshotFaceDocumentOptions {
@@ -234,7 +248,17 @@ export async function fetchFaceNavigationSnapshot(
     parseOptions.parser = options.parser;
   }
 
-  const snapshot = parseFaceNavigationSnapshot(await response.text(), parseOptions);
+  const destinationCsp = cspInlinePolicyFromHeader(
+    response.headers.get('content-security-policy'),
+  );
+  const html = await response.text();
+  if (destinationCsp !== null) {
+    validateFaceNavigationCspDocument(html, destinationCsp);
+  }
+  const snapshot = parseFaceNavigationSnapshot(html, parseOptions);
+  if (destinationCsp !== null) {
+    snapshot.csp = destinationCsp;
+  }
   if (options.loadExternalHydration === false) return snapshot;
 
   const hydrationOptions: LoadFaceNavigationHydrationDataOptions = {};
