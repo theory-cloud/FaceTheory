@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { AddressInfo } from 'node:net';
+import { createConnection, type AddressInfo } from 'node:net';
 
 import { createFaceApp } from '../../src/app.js';
 import {
@@ -200,34 +200,77 @@ test('vite dev server: binds loopback by default and reports the real address', 
   }
 });
 
+function rawPostStatus(
+  url: URL,
+  headers: string[],
+  body: Buffer[] = [],
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const socket = createConnection({
+      host: url.hostname,
+      port: Number(url.port),
+    });
+    let head = '';
+    let settled = false;
+    const finish = (status?: number, err?: Error) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      if (err) reject(err);
+      else resolve(status ?? 0);
+    };
+
+    socket.setTimeout(5_000, () =>
+      finish(undefined, new Error('timed out waiting for the 413 response')),
+    );
+    socket.on('error', (err) => finish(undefined, err));
+    socket.on('close', () =>
+      finish(
+        undefined,
+        new Error(`dev server closed before responding: ${head.trim()}`),
+      ),
+    );
+    socket.on('connect', () => {
+      socket.write(
+        `POST / HTTP/1.1\r\nHost: ${url.host}\r\n${headers.join('\r\n')}\r\n\r\n`,
+      );
+      for (const chunk of body) socket.write(chunk);
+    });
+    socket.on('data', (chunk) => {
+      head += chunk.toString('utf8');
+      const match = /^HTTP\/1\.1 (\d{3})/.exec(head);
+      if (match) finish(Number(match[1]));
+    });
+  });
+}
+
 test('vite dev server: rejects request bodies above the size limit', async () => {
   const devServer = await createDevServer();
   const { url } = await devServer.listen({ port: 0 });
+  const bodyLimit = 1024 * 1024;
   try {
-    const declared = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'text/plain' },
-      body: 'x'.repeat(1024 * 1024 + 1),
-    });
-    assert.equal(declared.status, 413);
-    assert.equal(await declared.text(), 'Payload Too Large');
+    const declared = await rawPostStatus(new URL(url), [
+      'Content-Type: text/plain',
+      `Content-Length: ${bodyLimit + 1}`,
+      'Connection: close',
+    ]);
+    assert.equal(declared, 413);
 
-    const chunk = new TextEncoder().encode('x'.repeat(64 * 1024));
-    const streamed = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'text/plain' },
-      body: new ReadableStream({
-        start(controller) {
-          for (let index = 0; index < 20; index += 1) {
-            controller.enqueue(chunk);
-          }
-          controller.close();
-        },
-      }),
-      duplex: 'half',
-    } as RequestInit);
-    assert.equal(streamed.status, 413);
-    assert.equal(await streamed.text(), 'Payload Too Large');
+    const chunk = Buffer.alloc(bodyLimit + 1, 0x78);
+    const streamed = await rawPostStatus(
+      new URL(url),
+      [
+        'Content-Type: text/plain',
+        'Transfer-Encoding: chunked',
+        'Connection: close',
+      ],
+      [
+        Buffer.from(`${chunk.byteLength.toString(16)}\r\n`),
+        chunk,
+        Buffer.from('\r\n0\r\n\r\n'),
+      ],
+    );
+    assert.equal(streamed, 413);
   } finally {
     await devServer.close();
   }

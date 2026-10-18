@@ -204,7 +204,10 @@ async function handleFaceAppRequest(
     if (!(err instanceof DevRequestBodyTooLargeError)) throw err;
     req.resume();
     if (!res.headersSent) {
-      res.writeHead(413, { 'content-type': 'text/plain; charset=utf-8' });
+      res.writeHead(413, {
+        connection: 'close',
+        'content-type': 'text/plain; charset=utf-8',
+      });
     }
     res.end('Payload Too Large');
     return;
