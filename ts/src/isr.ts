@@ -52,6 +52,7 @@ const ISR_HTML_METADATA_STATUS = 'facetheory-status';
 const ISR_HTML_METADATA_CONTENT_TYPE = 'facetheory-content-type';
 const ISR_STATE_STALE_METADATA_ERROR = 'stale-metadata-error';
 const DEFAULT_LAST_KNOWN_ISR_RECORD_LIMIT = 128;
+const DEFAULT_MAX_QUERY_VARIANTS_PER_ROUTE = 1024;
 
 /**
  * Policy for metadata/storage failures: either serve the last known stale entry when
@@ -284,6 +285,14 @@ export interface FaceIsrOptions {
    * option to keep the fail-safe all-cookies request variant.
    */
   varyCookies?: string[];
+  /**
+   * Maximum distinct query-bearing cache keys tracked and therefore persisted per
+   * route pattern per runtime instance. Once the cap is reached, a new query
+   * variant renders fresh without touching the shared cache, so a caller cannot
+   * force unbounded metadata records, leases, and object-store writes. `0`
+   * disables the cap; the default is 1024.
+   */
+  maxQueryVariantsPerRoute?: number;
   tenantBoundaryHeaders?: string[];
   htmlPointerPrefix?: string;
   cacheControl?: (input: IsrCacheHeaderInput) => string;
@@ -306,6 +315,7 @@ interface CreateIsrRuntimeOptions {
   hasExplicitCacheKey: boolean;
   varyCookies: readonly string[] | null;
   tenantBoundaryHeaders: readonly string[];
+  maxQueryVariantsPerRoute: number;
   htmlPointerPrefix: string;
   cacheControl: (input: IsrCacheHeaderInput) => string;
   observability: FaceObservabilityHooks | null;
@@ -572,6 +582,7 @@ export class S3HtmlStore implements HtmlStore {
 export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
   const runtimeOptions = normalizeRuntimeOptions(options);
   const lastKnownRecords = new Map<string, IsrMetaRecord>();
+  const queryVariantKeysByRoute = new Map<string, Set<string>>();
   const rememberRecord = (record: IsrMetaRecord | null): void => {
     rememberLastKnownRecord(lastKnownRecords, record);
   };
@@ -658,6 +669,19 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           runtimeOptions,
           hydrationSidecarPointer.pointer,
         );
+      }
+
+      if (
+        !allowQueryVariantCaching(
+          runtimeOptions,
+          queryVariantKeysByRoute,
+          input.routePattern,
+          cacheKey,
+          query,
+        )
+      ) {
+        emitIsrQueryVariantCapMetric(runtimeOptions, input);
+        return uncachedIsrResponse(await input.renderFresh());
       }
 
       const guarded = isGuardedIsrRequest(
@@ -1157,6 +1181,57 @@ function emitIsrBypassMetric(
   });
 }
 
+function hasQuerySurface(query: Query): boolean {
+  return Object.keys(query).some((key) => (query[key]?.length ?? 0) > 0);
+}
+
+/**
+ * Admits a query-bearing cache key into the per-route variant budget. A key that
+ * was already admitted keeps its cache behavior. Once the budget is exhausted, a
+ * new variant is not persisted, so a caller cannot force unbounded metadata
+ * records, leases, and object-store writes by walking query strings; the request
+ * still renders correct fresh output. Tracking is per runtime instance and
+ * digest-based, so the tracked set cannot grow past the configured cap.
+ */
+function allowQueryVariantCaching(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  trackedByRoute: Map<string, Set<string>>,
+  routePattern: string,
+  cacheKey: string,
+  query: Query,
+): boolean {
+  const limit = runtimeOptions.maxQueryVariantsPerRoute;
+  if (limit === 0 || !hasQuerySurface(query)) return true;
+
+  const route = normalizePath(routePattern);
+  let tracked = trackedByRoute.get(route);
+  if (!tracked) {
+    tracked = new Set<string>();
+    trackedByRoute.set(route, tracked);
+  }
+
+  const digest = cacheKeyDigest(cacheKey);
+  if (tracked.has(digest)) return true;
+  if (tracked.size >= limit) return false;
+  tracked.add(digest);
+  return true;
+}
+
+function emitIsrQueryVariantCapMetric(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  input: HandleIsrFaceInput,
+): void {
+  emitIsrMetric(runtimeOptions, {
+    name: 'facetheory.isr.query_variant_cap',
+    value: 1,
+    tags: {
+      method: input.ctx.request.method,
+      route_pattern: input.routePattern,
+      limit: String(runtimeOptions.maxQueryVariantsPerRoute),
+    },
+  });
+}
+
 function emitIsrRegenerationMetric(
   runtimeOptions: CreateIsrRuntimeOptions,
   input: HandleIsrFaceInput,
@@ -1426,6 +1501,10 @@ function normalizeRuntimeOptions(
     varyCookies,
     tenantBoundaryHeaders: normalizeTenantBoundaryHeaders(
       input.tenantBoundaryHeaders,
+    ),
+    maxQueryVariantsPerRoute: normalizeNonNegativeInt(
+      input.maxQueryVariantsPerRoute,
+      DEFAULT_MAX_QUERY_VARIANTS_PER_ROUTE,
     ),
     htmlPointerPrefix: normalizeObjectPrefix(input.htmlPointerPrefix ?? 'isr'),
     cacheControl:
