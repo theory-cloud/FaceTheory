@@ -111,7 +111,13 @@ export function validateFaceNavigationCspDocument(
         if (!EXECUTABLE_URL_ATTRIBUTES.has(attribute.name.toLowerCase())) {
           continue;
         }
-        if (isExecutableUrlAttributeValue(attribute.value)) {
+        if (
+          isExecutableUrlAttributeValue(
+            tagName,
+            attribute.name.toLowerCase(),
+            attribute.value,
+          )
+        ) {
           throw new Error(
             `FaceTheory SPA navigation refused to inject executable URL attribute "${attribute.name}" that the destination Content-Security-Policy blocks`,
           );
@@ -152,11 +158,52 @@ function directiveAllowsUnsafeInline(
 }
 
 function isExecutableUrlAttributeValue(
+  tagName: string,
+  attributeName: string,
   value: string | null | undefined,
 ): boolean {
   if (value === null || value === undefined) return false;
   const normalized = value.replace(/[\u0000-\u0020\u007f]+/g, '').toLowerCase();
+  if (normalized.startsWith('javascript:') || normalized.startsWith('vbscript:')) {
+    return true;
+  }
+  if (!normalized.startsWith('data:')) return false;
+  if (!isScriptCapableDataUrl(normalized)) return false;
+
+  // Script-capable data: documents execute only where the element navigates or
+  // embeds a document. Image and media contexts treat the same bytes as an
+  // image, so `data:image/svg+xml` in an <img> stays a legitimate asset.
+  if (
+    attributeName === 'href' ||
+    attributeName === 'xlink:href' ||
+    attributeName === 'action' ||
+    attributeName === 'formaction'
+  ) {
+    return true;
+  }
   return (
-    normalized.startsWith('javascript:') || normalized.startsWith('vbscript:')
+    DOCUMENT_EMBEDDING_TAG_NAMES.has(tagName) &&
+    (attributeName === 'src' || attributeName === 'data')
+  );
+}
+
+const DOCUMENT_EMBEDDING_TAG_NAMES = new Set([
+  'embed',
+  'frame',
+  'iframe',
+  'object',
+  'script',
+]);
+
+function isScriptCapableDataUrl(value: string): boolean {
+  const mediaType = value.slice('data:'.length).split(/[;,]/, 1)[0]?.trim() ?? '';
+  return (
+    mediaType === 'text/html' ||
+    mediaType === 'application/xhtml+xml' ||
+    mediaType === 'image/svg+xml' ||
+    mediaType === 'text/javascript' ||
+    mediaType === 'application/javascript' ||
+    mediaType === 'application/ecmascript' ||
+    mediaType === 'text/ecmascript'
   );
 }

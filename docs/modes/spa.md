@@ -66,6 +66,9 @@ blocks them:
 - inline event handler attributes (`onclick` and friends)
 - `javascript:` / `vbscript:` URLs in `href`, `src`, `action`, `formaction`,
   `poster`, `background`, `data`, or `xlink:href`
+- script-capable `data:` documents (`text/html`, `image/svg+xml`, XHTML/XML, or
+  JavaScript media types) in navigable or document-embedding attributes;
+  ordinary image `data:` URLs such as inline PNG or SVG icons stay allowed
 - `iframe srcdoc` documents
 - inline `style` attributes or `<style>` elements
 

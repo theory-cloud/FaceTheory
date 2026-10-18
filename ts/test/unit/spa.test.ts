@@ -1149,3 +1149,48 @@ test('spa helpers: startFaceNavigation refuses a CSP-protected injection without
     dom.window.close();
   }
 });
+
+test('spa helpers: destination CSP refuses script-capable data URLs but keeps image data URLs', async () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'http://localhost/',
+  });
+
+  try {
+    for (const body of [
+      '<iframe src="data:text/html,<script>alert(1)</script>"></iframe>',
+      '<a href="data:image/svg+xml,<svg onload=alert(1)></svg>">Open</a>',
+    ]) {
+      await assert.rejects(
+        fetchFaceNavigationSnapshot('http://localhost/next', {
+          allowedOrigin: 'http://localhost',
+          parser: new dom.window.DOMParser(),
+          fetcher: cspProtectedFetcher(
+            navigationDocument(body),
+            STRICT_DESTINATION_CSP,
+          ),
+          loadExternalHydration: false,
+        }),
+        /refused to inject executable URL attribute/,
+      );
+    }
+
+    const snapshot = await fetchFaceNavigationSnapshot('http://localhost/next', {
+      allowedOrigin: 'http://localhost',
+      parser: new dom.window.DOMParser(),
+      fetcher: cspProtectedFetcher(
+        navigationDocument(
+          '<img src="data:image/png;base64,iVBORw0KGgo=" alt="dot"><img src="data:image/svg+xml,<svg></svg>" alt="icon">',
+        ),
+        STRICT_DESTINATION_CSP,
+      ),
+      loadExternalHydration: false,
+    });
+
+    assert.equal(
+      snapshot.viewHtml?.trim(),
+      '<img src="data:image/png;base64,iVBORw0KGgo=" alt="dot"><img src="data:image/svg+xml,<svg></svg>" alt="icon">',
+    );
+  } finally {
+    dom.window.close();
+  }
+});
