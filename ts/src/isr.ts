@@ -636,6 +636,15 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         ) {
           return hydrationSidecarNotFoundResponse();
         }
+        if (
+          !(await isCurrentHydrationSidecarPointer(
+            runtimeOptions,
+            cacheKey,
+            hydrationSidecarPointer.pointer,
+          ))
+        ) {
+          return hydrationSidecarNotFoundResponse();
+        }
         return cachedHydrationSidecarResponse(
           runtimeOptions,
           hydrationSidecarPointer.pointer,
@@ -1646,6 +1655,27 @@ function queryWithoutHydrationSidecar(query: Query): Query {
     out[key] = [...(values ?? [])];
   }
   return out;
+}
+
+/**
+ * Sidecar pointers are generation-scoped: only the sidecar paired with the
+ * current metadata record's HTML pointer stays readable. Superseded pointers
+ * must not keep serving hydration data after a regeneration.
+ */
+async function isCurrentHydrationSidecarPointer(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  cacheKey: string,
+  pointer: string,
+): Promise<boolean> {
+  try {
+    const record = await runtimeOptions.metaStore.get(cacheKey);
+    if (!record) return false;
+    return (
+      buildHydrationSidecarPointerFromHtmlPointer(record.htmlPointer) === pointer
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function cachedHydrationSidecarResponse(

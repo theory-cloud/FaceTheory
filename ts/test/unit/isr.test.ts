@@ -2058,6 +2058,62 @@ test('isr: strict CSP hydration sidecars are bound to tenant and auth variants',
   assert.equal(renderCount, 1);
 });
 
+test('isr: superseded strict CSP hydration sidecars are no longer readable', async () => {
+  const htmlStore = new InMemoryHtmlStore();
+  const metaStore = new InMemoryIsrMetaStore();
+  let nowMs = 1_000;
+  let renderCount = 0;
+
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/accounts/{id}',
+        mode: 'isr',
+        revalidateSeconds: 1,
+        render: () => {
+          const seq = ++renderCount;
+          return {
+            csp: {
+              inlineScripts: false,
+              inlineStyles: false,
+              rawHead: false,
+            },
+            html: `<main>account-${seq}</main>`,
+            hydration: {
+              data: { seq },
+              bootstrapModule: '/assets/account-entry.js',
+            },
+          };
+        },
+      },
+    ],
+    isr: {
+      htmlStore,
+      metaStore,
+      now: () => nowMs,
+    },
+  });
+
+  const first = await app.handle({ method: 'GET', path: '/accounts/42' });
+  const firstHref = externalHydrationHref(decodeBody(first.body as Uint8Array));
+  const firstSidecar = await app.handle({ method: 'GET', path: firstHref });
+  assert.equal(firstSidecar.status, 200);
+
+  nowMs += 2_000;
+  const second = await app.handle({ method: 'GET', path: '/accounts/42' });
+  assert.equal(second.headers['x-facetheory-isr']?.[0], 'miss');
+  const secondHref = externalHydrationHref(
+    decodeBody(second.body as Uint8Array),
+  );
+  assert.notEqual(secondHref, firstHref);
+
+  const superseded = await app.handle({ method: 'GET', path: firstHref });
+  assert.equal(superseded.status, 404);
+  const current = await app.handle({ method: 'GET', path: secondHref });
+  assert.equal(current.status, 200);
+  assert.equal(renderCount, 2);
+});
+
 class FailingSidecarHtmlStore extends InMemoryHtmlStore {
   failSidecarWrites = false;
 
