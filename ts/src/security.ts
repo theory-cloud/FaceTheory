@@ -331,6 +331,27 @@ function validateNoUnsafeAttributes(
   }
 }
 
+/**
+ * Finds the `>` that ends a start tag, skipping quoted attribute values so a
+ * `>` inside `title="a > b"` cannot hide attributes that follow it.
+ */
+function findHtmlStartTagEnd(html: string, from: number): number {
+  let quote = -1;
+  for (let cursor = from; cursor < html.length; cursor += 1) {
+    const code = html.charCodeAt(cursor);
+    if (quote !== -1) {
+      if (code === quote) quote = -1;
+      continue;
+    }
+    if (code === 34 || code === 39) {
+      quote = code;
+      continue;
+    }
+    if (code === 62) return cursor;
+  }
+  return -1;
+}
+
 function* scanHtmlStartTags(html: string): Generator<HtmlStartTag> {
   let cursor = 0;
   while (cursor < html.length) {
@@ -349,7 +370,7 @@ function* scanHtmlStartTags(html: string): Generator<HtmlStartTag> {
       nameEnd += 1;
     }
 
-    const tagEnd = html.indexOf('>', nameEnd);
+    const tagEnd = findHtmlStartTagEnd(html, nameEnd);
     if (tagEnd === -1) return;
 
     yield {

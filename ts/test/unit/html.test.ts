@@ -261,6 +261,37 @@ test('security: strict CSP document validator rejects slash-separated unsafe att
   );
 });
 
+test('security: strict CSP start tag scan skips quoted greater-than signs', () => {
+  const policy = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><head></head><body><div title="a > b" onclick="alert(1)"></div></body></html>',
+        { policy },
+      ),
+    /inline event handler attribute "onclick"/,
+  );
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><head></head><body><div title="a > b" style="color:red"></div></body></html>',
+        { policy },
+      ),
+    /inline style attributes/,
+  );
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(
+      '<!doctype html><html><head></head><body><div title="a > b"></div></body></html>',
+      { policy },
+    ),
+  );
+});
+
 test('renderHTMLDocument rejects event-handler and delimiter-bearing shell attribute names', () => {
   for (const htmlAttrs of [
     { onload: 'alert(1)' },
