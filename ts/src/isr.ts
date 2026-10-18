@@ -65,13 +65,14 @@ export type IsrFailurePolicy = 'serve-stale' | 'error';
 export type IsrLockContentionPolicy = 'wait' | 'serve-stale';
 /**
  * Cache-state label emitted in ISR cache headers and observability for miss, hit,
- * stale, wait-hit, and degraded metadata-error paths.
+ * stale, wait-hit, uncached bypass, and degraded metadata-error paths.
  */
 export type IsrCacheState =
   | 'miss'
   | 'hit'
   | 'stale'
   | 'wait-hit'
+  | 'bypass'
   | typeof ISR_STATE_STALE_METADATA_ERROR;
 
 /**
@@ -602,6 +603,14 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
           'ISR explicit tenantKey resolved to an empty tenant; refusing to fall back to the shared default tenant',
         );
       }
+      const requestMethod = normalizeIsrRequestMethod(
+        input.ctx.request.method,
+      );
+      if (!isShareableIsrRequest(requestMethod, input.ctx.request.body)) {
+        emitIsrBypassMetric(runtimeOptions, input, requestMethod);
+        return uncachedIsrResponse(await input.renderFresh());
+      }
+
       const query = hydrationSidecarPointer.present
         ? queryWithoutHydrationSidecar(input.ctx.request.query)
         : input.ctx.request.query;
@@ -1095,6 +1104,55 @@ function emitIsrLeaseContentionMetric(
       method: input.ctx.request.method,
       route_pattern: input.routePattern,
       policy: runtimeOptions.lockContentionPolicy,
+    },
+  });
+}
+
+function normalizeIsrRequestMethod(value: string | undefined): string {
+  return String(value ?? 'GET').trim().toUpperCase() || 'GET';
+}
+
+/**
+ * Returns whether a request may read or write shared ISR cache entries. Only a
+ * body-less GET or HEAD is representable by the shared cache identity, so every
+ * other method or a body-bearing safe request renders fresh without touching the
+ * cache; that keeps method- and body-dependent output from being served under
+ * another request's key.
+ */
+function isShareableIsrRequest(
+  method: string,
+  body: Uint8Array | undefined,
+): boolean {
+  if (method !== 'GET' && method !== 'HEAD') return false;
+  return (body?.byteLength ?? 0) === 0;
+}
+
+/**
+ * Marks an uncached ISR render request-private so no shared cache downstream can
+ * store a response whose identity the ISR cache does not represent.
+ */
+function uncachedIsrResponse(response: FaceResponse): FaceResponse {
+  const headers = canonicalizeHeaders(response.headers);
+  headers['cache-control'] = [ISR_PRIVATE_NO_STORE_CACHE_CONTROL];
+  headers['x-facetheory-isr'] = ['bypass'];
+  return {
+    ...response,
+    headers: sortHeaders(headers),
+  };
+}
+
+function emitIsrBypassMetric(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  input: HandleIsrFaceInput,
+  method: string,
+): void {
+  emitIsrMetric(runtimeOptions, {
+    name: 'facetheory.isr.cache_bypass',
+    value: 1,
+    tags: {
+      method: input.ctx.request.method,
+      route_pattern: input.routePattern,
+      reason: method === 'GET' || method === 'HEAD' ? 'request-body' : 'method',
     },
   });
 }
