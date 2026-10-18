@@ -1669,7 +1669,7 @@ async function isCurrentHydrationSidecarPointer(
 ): Promise<boolean> {
   try {
     const record = await runtimeOptions.metaStore.get(cacheKey);
-    if (!record) return false;
+    if (!record || !record.htmlPointer) return false;
     return (
       buildHydrationSidecarPointerFromHtmlPointer(record.htmlPointer) === pointer
     );
