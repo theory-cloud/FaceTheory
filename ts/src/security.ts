@@ -331,6 +331,54 @@ function validateNoUnsafeAttributes(
   }
 }
 
+/**
+ * Finds the `>` that ends a start tag by following the attribute states a
+ * browser tokenizer reaches after the tag name. Quoted attribute values are
+ * skipped as a unit, so a `>` inside `title="a > b"` cannot hide attributes
+ * that follow it, while a quote inside an unquoted value stays value text.
+ * An unterminated quoted value falls back to the first `>` boundary so a
+ * malformed tag can never stop the scan before later tags.
+ */
+function findHtmlStartTagEnd(html: string, from: number): number {
+  let cursor = from;
+  while (cursor < html.length) {
+    const code = html.charCodeAt(cursor);
+    // Before an attribute name the tokenizer ignores whitespace and solidus.
+    if (isHtmlWhitespace(code) || code === 47) {
+      cursor += 1;
+      continue;
+    }
+    if (code === 62) return cursor;
+
+    while (
+      cursor < html.length &&
+      !isHtmlAttributeNameDelimiter(html.charCodeAt(cursor))
+    ) {
+      cursor += 1;
+    }
+
+    cursor = skipHtmlWhitespace(html, cursor);
+    if (html.charCodeAt(cursor) !== 61) continue;
+    cursor = skipHtmlWhitespace(html, cursor + 1);
+
+    const quoteCode = html.charCodeAt(cursor);
+    if (quoteCode === 34 || quoteCode === 39) {
+      const closingQuote = html.indexOf(html[cursor] ?? '', cursor + 1);
+      if (closingQuote === -1) return html.indexOf('>', from);
+      cursor = closingQuote + 1;
+      continue;
+    }
+
+    // Unquoted values end at whitespace or `>`; quotes are ordinary text.
+    while (cursor < html.length) {
+      const valueCode = html.charCodeAt(cursor);
+      if (valueCode === 62 || isHtmlWhitespace(valueCode)) break;
+      cursor += 1;
+    }
+  }
+  return -1;
+}
+
 function* scanHtmlStartTags(html: string): Generator<HtmlStartTag> {
   let cursor = 0;
   while (cursor < html.length) {
@@ -349,7 +397,7 @@ function* scanHtmlStartTags(html: string): Generator<HtmlStartTag> {
       nameEnd += 1;
     }
 
-    const tagEnd = html.indexOf('>', nameEnd);
+    const tagEnd = findHtmlStartTagEnd(html, nameEnd);
     if (tagEnd === -1) return;
 
     yield {

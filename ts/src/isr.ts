@@ -594,6 +594,14 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         tenantPartition.mode === 'partitioned'
           ? tenantPartition.tenant
           : resolveTenant(runtimeOptions, input.ctx);
+      if (tenant === null) {
+        if (hydrationSidecarPointer.present) {
+          return hydrationSidecarNotFoundResponse();
+        }
+        throw new Error(
+          'ISR explicit tenantKey resolved to an empty tenant; refusing to fall back to the shared default tenant',
+        );
+      }
       const query = hydrationSidecarPointer.present
         ? queryWithoutHydrationSidecar(input.ctx.request.query)
         : input.ctx.request.query;
@@ -625,6 +633,15 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
             cacheKey,
             runtimeOptions.htmlPointerPrefix,
           )
+        ) {
+          return hydrationSidecarNotFoundResponse();
+        }
+        if (
+          !(await isCurrentHydrationSidecarPointer(
+            runtimeOptions,
+            cacheKey,
+            hydrationSidecarPointer.pointer,
+          ))
         ) {
           return hydrationSidecarNotFoundResponse();
         }
@@ -1514,10 +1531,11 @@ function isGuardedIsrRequest(
 function resolveTenant(
   runtimeOptions: CreateIsrRuntimeOptions,
   ctx: FaceContext,
-): string {
+): string | null {
   const rawTenant = runtimeOptions.tenantKey(ctx);
   const tenant = String(rawTenant ?? '').trim();
-  return tenant.length > 0 ? tenant : 'default';
+  if (tenant.length > 0) return tenant;
+  return runtimeOptions.hasExplicitTenantKey ? null : 'default';
 }
 
 function defaultTenantKey(ctx: FaceContext): string {
@@ -1637,6 +1655,27 @@ function queryWithoutHydrationSidecar(query: Query): Query {
     out[key] = [...(values ?? [])];
   }
   return out;
+}
+
+/**
+ * Sidecar pointers are generation-scoped: only the sidecar paired with the
+ * current metadata record's HTML pointer stays readable. Superseded pointers
+ * must not keep serving hydration data after a regeneration.
+ */
+async function isCurrentHydrationSidecarPointer(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  cacheKey: string,
+  pointer: string,
+): Promise<boolean> {
+  try {
+    const record = await runtimeOptions.metaStore.get(cacheKey);
+    if (!record || !record.htmlPointer) return false;
+    return (
+      buildHydrationSidecarPointerFromHtmlPointer(record.htmlPointer) === pointer
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function cachedHydrationSidecarResponse(

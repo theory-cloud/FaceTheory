@@ -8,6 +8,7 @@
     OperatorVisibilityMetadata,
     StalenessState,
   } from './types.js';
+  import { safeMetadataHref } from '../../stitch-admin/safe-url.js';
 
   let {
     title = 'Operator health',
@@ -122,7 +123,8 @@
         detail: metadata.provenance.source,
         tone: 'info',
       };
-      if (metadata.provenance.href !== undefined) badge.href = metadata.provenance.href;
+      const href = safeMetadataHref(metadata.provenance.href);
+      if (href !== undefined) badge.href = href;
       if (metadata.provenance.observedAt !== undefined) badge.title = metadata.provenance.observedAt;
       out.push(badge);
     }

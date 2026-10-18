@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { JSDOM } from 'jsdom';
 import { compile } from 'svelte/compiler';
+import { existsSync } from 'node:fs';
 import { mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -59,10 +60,19 @@ async function renderComponent(
   // Rewrite ./Foo.svelte imports in the main component's compiled JS to
   // point at the sibling .mjs files we just emitted, so Node can resolve
   // them under the temp dir.
-  const rewrittenCode = compiled.js.code.replace(
-    /(['"])(\.\/[A-Za-z0-9_\-]+)\.svelte\1/g,
-    '$1$2.mjs$1',
-  );
+  const rewrittenCode = compiled.js.code
+    .replace(/(['"])(\.\/[A-Za-z0-9_\-]+)\.svelte\1/g, '$1$2.mjs$1')
+    .replace(
+      /from\s+(['"])(\.{1,2}\/[^'"]+\.js)\1/g,
+      (full, quote: string, specifier: string) => {
+        const tsPath = path
+          .resolve(componentDir, specifier)
+          .replace(/\.js$/, '.ts');
+        return existsSync(tsPath)
+          ? `from ${quote}${pathToFileURL(tsPath).href}${quote}`
+          : (full as string);
+      },
+    );
 
   const file = path.join(
     dir,
@@ -488,6 +498,97 @@ test('svelte stitch-admin: HealthStatusPanel renders empty observations', async 
 
   assert.ok(body.includes('facetheory-stitch-health-status-panel-empty'));
   assert.ok(body.includes('No API health observations available yet.'));
+});
+
+test('svelte stitch-admin: HealthStatusPanel omits executable provenance hrefs', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/HealthStatusPanel.svelte'),
+    {
+      rows: [
+        {
+          key: 'checkout-api',
+          label: 'Checkout API',
+          status: 'healthy',
+          metadata: {
+            provenance: {
+              source: 'lambda-health-check',
+              href: 'javascript:alert(1)',
+            },
+          },
+        },
+      ],
+    },
+  );
+
+  assert.ok(body.includes('lambda-health-check'));
+  assert.equal(body.includes('javascript:'), false);
+  assert.equal(body.includes('href='), false);
+});
+
+test('svelte stitch-admin: HealthStatusPanel keeps http provenance hrefs', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/HealthStatusPanel.svelte'),
+    {
+      rows: [
+        {
+          key: 'checkout-api',
+          label: 'Checkout API',
+          status: 'healthy',
+          metadata: {
+            provenance: {
+              source: 'lambda-health-check',
+              href: 'https://evidence.example/req_001',
+            },
+          },
+        },
+      ],
+    },
+  );
+
+  assert.ok(body.includes('href="https://evidence.example/req_001"'));
+});
+
+test('svelte stitch-admin: VisibilityMatrix omits executable provenance hrefs', async () => {
+  const body = await renderComponent(
+    path.resolve('src/svelte/stitch-admin/VisibilityMatrix.svelte'),
+    {
+      dimensions: [{ key: 'prod', label: 'Production' }],
+      rows: [
+        {
+          entity: {
+            key: 'partner-alpha',
+            label: 'Partner Alpha',
+            metadata: {
+              provenance: {
+                source: 'entity-import',
+                href: 'javascript:alert(1)',
+              },
+            },
+          },
+          cells: [
+            {
+              entityKey: 'partner-alpha',
+              dimensionKey: 'prod',
+              state: 'visible',
+              label: 'Live',
+              metadata: {
+                provenance: {
+                  source: 'visibility-import',
+                  href: 'data:text/html,<script>alert(1)</script>',
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  );
+
+  assert.ok(body.includes('entity-import'));
+  assert.ok(body.includes('visibility-import'));
+  assert.equal(body.includes('javascript:'), false);
+  assert.equal(body.includes('data:text/html'), false);
+  assert.equal(body.includes('href='), false);
 });
 
 test('svelte stitch-admin: VisibilityMatrix renders cell metadata and states', async () => {

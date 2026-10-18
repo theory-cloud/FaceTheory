@@ -34,6 +34,35 @@ test('renderAttributes sorts, escapes, and omits falsey attrs', () => {
   );
 });
 
+test('renderAttributes rejects attribute names that break out of the attribute', () => {
+  for (const name of [
+    'data-x onload=alert(1)',
+    'data-x=y',
+    'data-x"y',
+    'data-x>y',
+    'data-x\ny',
+    'data-x/y',
+    ' data-x',
+  ]) {
+    assert.throws(
+      () => renderAttributes({ [name]: 'value' }),
+      /attribute name is unsafe/,
+    );
+  }
+});
+
+test('renderAttributes keeps ordinary attribute names byte-identical', () => {
+  assert.equal(
+    renderAttributes({
+      'aria-label': 'x',
+      class: 'y',
+      'data-theme': 'light',
+      'xml:lang': 'fr',
+    }),
+    ' aria-label="x" class="y" data-theme="light" xml:lang="fr"',
+  );
+});
+
 test('renderHTMLDocument emits doctype', () => {
   const html = renderHTMLDocument({ body: 'ok' });
   assert.ok(html.startsWith('<!doctype html>'));
@@ -228,6 +257,92 @@ test('security: strict CSP document validator rejects slash-separated unsafe att
       {
         policy: fullPolicy,
       },
+    ),
+  );
+});
+
+test('security: strict CSP start tag scan skips quoted greater-than signs', () => {
+  const policy = {
+    inlineScripts: false,
+    inlineStyles: false,
+    rawHead: false,
+  } as const;
+
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><head></head><body><div title="a > b" onclick="alert(1)"></div></body></html>',
+        { policy },
+      ),
+    /inline event handler attribute "onclick"/,
+  );
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><head></head><body><div title="a > b" style="color:red"></div></body></html>',
+        { policy },
+      ),
+    /inline style attributes/,
+  );
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(
+      '<!doctype html><html><head></head><body><div title="a > b"></div></body></html>',
+      { policy },
+    ),
+  );
+});
+
+test('security: strict CSP start tag scan keeps scanning past a stray quote in an unquoted value', () => {
+  const policy = { inlineScripts: false, rawHead: false } as const;
+
+  // A stray quote in an unquoted value is value text, not an attribute quote.
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><head></head><body><div a=1" onclick="alert(1)">x</div></body></html>',
+        { policy },
+      ),
+    /inline event handler attribute "onclick"/,
+  );
+});
+
+test('security: strict CSP start tag scan does not abort after an unbalanced quote', () => {
+  const scriptsOnlyPolicy = { inlineScripts: false, rawHead: false } as const;
+  const stylesOnlyPolicy = { inlineStyles: false, rawHead: false } as const;
+
+  // The unbalanced quote must not stop the scan before a later live script.
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><head></head><body><div a=1" onclick=alert(1)>x</div><script>alert(1)</script></body></html>',
+        { policy: scriptsOnlyPolicy },
+      ),
+    /rejects inline script tags/,
+  );
+  // Nor before a later style attribute.
+  assert.throws(
+    () =>
+      validateStrictCspDocument(
+        '<!doctype html><html><head></head><body><div a=1" style=color:red>x</div></body></html>',
+        { policy: stylesOnlyPolicy },
+      ),
+    /inline style attributes/,
+  );
+});
+
+test('security: strict CSP start tag scan accepts benign unquoted and unterminated values', () => {
+  const policy = { inlineScripts: false, inlineStyles: false, rawHead: false } as const;
+
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(
+      '<!doctype html><html><head></head><body><div data-note=it\'s>x</div></body></html>',
+      { policy },
+    ),
+  );
+  assert.doesNotThrow(() =>
+    validateStrictCspDocument(
+      '<!doctype html><html><head></head><body><div title="unclosed> <span>ok</span></div></body></html>',
+      { policy },
     ),
   );
 });
