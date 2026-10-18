@@ -1,9 +1,10 @@
 import {
-  findInlineEventAttribute,
-  hasHtmlAttribute,
+  isInlineEventAttributeName,
   scanHtmlAttributes,
   scanHtmlStartTags,
+  type HtmlAttribute,
 } from './html-tokenizer.js';
+import type { FaceAttributes } from './types.js';
 
 /**
  * Inline capability summary for a destination `Content-Security-Policy` response
@@ -64,12 +65,34 @@ export function cspInlinePolicyFromHeader(
 }
 
 /**
+ * The slice of a navigation snapshot that is injected into the active document.
+ * `applyFaceNavigationSnapshot` assigns `viewHtml` (or `bodyHtml` when the shell
+ * has no view) through `innerHTML`, copies `headHtml` into `<head>`, and sets the
+ * document/body attributes directly, so these are the strings and attributes a
+ * destination policy has to clear.
+ */
+export interface FaceCspSnapshotContent {
+  htmlAttrs: FaceAttributes;
+  bodyAttrs: FaceAttributes;
+  headHtml: string;
+  bodyHtml: string;
+  viewHtml: string | null;
+}
+
+/**
  * Refuses fetched same-origin HTML that carries active content the destination
  * CSP would have blocked. SPA navigation injects a snapshot into the active
  * document, and fetch cannot install the destination response's CSP headers, so
  * inline event handlers, executable URLs, `iframe srcdoc` documents, and
  * destination-disallowed inline styles would run under the shell's weaker policy.
  * A destination that complies with its own policy passes unchanged.
+ *
+ * The scan runs on markup that a document parser has already serialized. Fetched
+ * bytes are not safe input here: attribute values keep their character
+ * references until parsing, so `href="javascript&#58;..."` would pass a raw
+ * scan and still become an executable URL once the parsed value is injected.
+ * Callers that screen fetched bytes must parse them first and use
+ * `validateFaceNavigationCspSnapshot` instead.
  */
 export function validateFaceNavigationCspDocument(
   html: string,
@@ -77,54 +100,122 @@ export function validateFaceNavigationCspDocument(
 ): void {
   if (policy.inlineScriptsAllowed && policy.inlineStylesAllowed) return;
 
-  const documentHtml = String(html ?? '');
-  for (const startTag of scanHtmlStartTags(documentHtml)) {
-    const tagName = startTag.tagName.toLowerCase();
-    const attrs = startTag.attrs;
+  for (const startTag of scanHtmlStartTags(String(html ?? ''))) {
+    validateFaceNavigationCspStartTag(
+      startTag.tagName.toLowerCase(),
+      Array.from(scanHtmlAttributes(startTag.attrs)),
+      policy,
+    );
+  }
+}
 
-    if (!policy.inlineStylesAllowed) {
-      if (tagName === 'style') {
-        throw new Error(
-          'FaceTheory SPA navigation refused to inject an inline style element that the destination Content-Security-Policy blocks',
-        );
-      }
-      if (hasHtmlAttribute(attrs, 'style')) {
-        throw new Error(
-          'FaceTheory SPA navigation refused to inject an inline style attribute that the destination Content-Security-Policy blocks',
-        );
-      }
+/**
+ * Screens the parsed snapshot content that `applyFaceNavigationSnapshot` will
+ * inject. Attribute values have already been decoded by the destination parse, so
+ * character-reference encodings of `javascript:`/`data:` URLs cannot survive this
+ * screen, and the document/body attributes that are applied with `setAttribute`
+ * are screened alongside the serialized markup.
+ */
+export function validateFaceNavigationCspSnapshot(
+  content: FaceCspSnapshotContent,
+  policy: FaceCspInlinePolicy,
+): void {
+  if (policy.inlineScriptsAllowed && policy.inlineStylesAllowed) return;
+
+  validateFaceNavigationCspStartTag(
+    'html',
+    readSnapshotAttributes(content.htmlAttrs),
+    policy,
+  );
+  validateFaceNavigationCspStartTag(
+    'body',
+    readSnapshotAttributes(content.bodyAttrs),
+    policy,
+  );
+  validateFaceNavigationCspDocument(content.headHtml, policy);
+  validateFaceNavigationCspDocument(content.bodyHtml, policy);
+  if (content.viewHtml !== null) {
+    validateFaceNavigationCspDocument(content.viewHtml, policy);
+  }
+}
+
+function validateFaceNavigationCspStartTag(
+  tagName: string,
+  attributes: readonly HtmlAttribute[],
+  policy: FaceCspInlinePolicy,
+): void {
+  if (!policy.inlineStylesAllowed) {
+    if (tagName === 'style') {
+      throw new Error(
+        'FaceTheory SPA navigation refused to inject an inline style element that the destination Content-Security-Policy blocks',
+      );
     }
+    if (hasInlineStyleAttribute(attributes)) {
+      throw new Error(
+        'FaceTheory SPA navigation refused to inject an inline style attribute that the destination Content-Security-Policy blocks',
+      );
+    }
+  }
 
-    if (!policy.inlineScriptsAllowed) {
-      const eventName = findInlineEventAttribute(attrs);
-      if (eventName) {
-        throw new Error(
-          `FaceTheory SPA navigation refused to inject inline event handler attribute "${eventName}" that the destination Content-Security-Policy blocks`,
-        );
+  if (!policy.inlineScriptsAllowed) {
+    const eventName = findInlineEventHandlerAttribute(attributes);
+    if (eventName) {
+      throw new Error(
+        `FaceTheory SPA navigation refused to inject inline event handler attribute "${eventName}" that the destination Content-Security-Policy blocks`,
+      );
+    }
+    if (tagName === 'iframe' && hasHtmlAttributeName(attributes, 'srcdoc')) {
+      throw new Error(
+        'FaceTheory SPA navigation refused to inject an iframe srcdoc document that the destination Content-Security-Policy would isolate',
+      );
+    }
+    for (const attribute of attributes) {
+      if (!EXECUTABLE_URL_ATTRIBUTES.has(attribute.name.toLowerCase())) {
+        continue;
       }
-      if (tagName === 'iframe' && hasHtmlAttribute(attrs, 'srcdoc')) {
+      if (
+        isExecutableUrlAttributeValue(
+          tagName,
+          attribute.name.toLowerCase(),
+          attribute.value,
+        )
+      ) {
         throw new Error(
-          'FaceTheory SPA navigation refused to inject an iframe srcdoc document that the destination Content-Security-Policy would isolate',
+          `FaceTheory SPA navigation refused to inject executable URL attribute "${attribute.name}" that the destination Content-Security-Policy blocks`,
         );
-      }
-      for (const attribute of scanHtmlAttributes(attrs)) {
-        if (!EXECUTABLE_URL_ATTRIBUTES.has(attribute.name.toLowerCase())) {
-          continue;
-        }
-        if (
-          isExecutableUrlAttributeValue(
-            tagName,
-            attribute.name.toLowerCase(),
-            attribute.value,
-          )
-        ) {
-          throw new Error(
-            `FaceTheory SPA navigation refused to inject executable URL attribute "${attribute.name}" that the destination Content-Security-Policy blocks`,
-          );
-        }
       }
     }
   }
+}
+
+function readSnapshotAttributes(attrs: FaceAttributes): HtmlAttribute[] {
+  const out: HtmlAttribute[] = [];
+  for (const [name, value] of Object.entries(attrs)) {
+    // `syncAttributes` drops these, so they are never injected.
+    if (value === undefined || value === null || value === false) continue;
+    out.push({ name, value: value === true ? '' : String(value) });
+  }
+  return out;
+}
+
+function hasInlineStyleAttribute(attributes: readonly HtmlAttribute[]): boolean {
+  return hasHtmlAttributeName(attributes, 'style');
+}
+
+function hasHtmlAttributeName(
+  attributes: readonly HtmlAttribute[],
+  name: string,
+): boolean {
+  return attributes.some((attribute) => attribute.name.toLowerCase() === name);
+}
+
+function findInlineEventHandlerAttribute(
+  attributes: readonly HtmlAttribute[],
+): string | null {
+  for (const attribute of attributes) {
+    if (isInlineEventAttributeName(attribute.name)) return attribute.name;
+  }
+  return null;
 }
 
 function parseNavigationCspDirectives(policy: string): Map<string, string[]> {

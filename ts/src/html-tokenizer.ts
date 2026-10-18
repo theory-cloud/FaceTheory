@@ -122,9 +122,18 @@ export function readHtmlAttributeValue(
 
 export function findInlineEventAttribute(attrs: string): string | null {
   for (const attributeName of scanHtmlAttributeNames(attrs)) {
-    if (/^on[a-z][\w:-]*$/i.test(attributeName)) return attributeName;
+    if (isInlineEventAttributeName(attributeName)) return attributeName;
   }
   return null;
+}
+
+/**
+ * Reports whether an attribute name is an inline event handler (`onclick` and
+ * friends). Attribute names are matched as browsers parse them: a character
+ * reference in a name stays literal text, so `on&#99;lick` is not a handler.
+ */
+export function isInlineEventAttributeName(name: string): boolean {
+  return /^on[a-z][\w:-]*$/i.test(name);
 }
 
 export function* scanHtmlAttributeNames(attrs: string): Generator<string> {

@@ -56,11 +56,15 @@ Avoid SPA navigation when:
 ## Destination Content-Security-Policy
 
 `fetchFaceNavigationSnapshot` reads the destination response's
-`Content-Security-Policy` and validates the fetched document against it before
+`Content-Security-Policy` and validates the parsed snapshot against it before
 returning a snapshot. SPA navigation injects the destination's HTML into the
 active document, and `fetch` cannot install the destination's CSP headers, so
 content the destination policy would have blocked must not be revived under the
-shell's policy. The helper refuses a document that carries, under a policy that
+shell's policy. The screen runs on the serialized content that
+`applyFaceNavigationSnapshot` injects, not on the fetched bytes: the destination
+parse decodes character references first, so an attribute such as
+`href="javascript&#58;alert(1)"` is classified as the executable `javascript:`
+URL it becomes. The helper refuses a document that carries, under a policy that
 blocks them:
 
 - inline event handler attributes (`onclick` and friends)

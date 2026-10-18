@@ -1,7 +1,7 @@
 import type { FaceAttributes, FaceHydration } from './types.js';
 import {
   cspInlinePolicyFromHeader,
-  validateFaceNavigationCspDocument,
+  validateFaceNavigationCspSnapshot,
   type FaceCspInlinePolicy,
 } from './navigation-csp.js';
 
@@ -252,11 +252,9 @@ export async function fetchFaceNavigationSnapshot(
     response.headers.get('content-security-policy'),
   );
   const html = await response.text();
-  if (destinationCsp !== null) {
-    validateFaceNavigationCspDocument(html, destinationCsp);
-  }
   const snapshot = parseFaceNavigationSnapshot(html, parseOptions);
   if (destinationCsp !== null) {
+    validateFaceNavigationCspSnapshot(snapshot, destinationCsp);
     snapshot.csp = destinationCsp;
   }
   if (options.loadExternalHydration === false) return snapshot;
