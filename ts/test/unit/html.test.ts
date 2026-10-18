@@ -34,6 +34,35 @@ test('renderAttributes sorts, escapes, and omits falsey attrs', () => {
   );
 });
 
+test('renderAttributes rejects attribute names that break out of the attribute', () => {
+  for (const name of [
+    'data-x onload=alert(1)',
+    'data-x=y',
+    'data-x"y',
+    'data-x>y',
+    'data-x\ny',
+    'data-x/y',
+    ' data-x',
+  ]) {
+    assert.throws(
+      () => renderAttributes({ [name]: 'value' }),
+      /attribute name is unsafe/,
+    );
+  }
+});
+
+test('renderAttributes keeps ordinary attribute names byte-identical', () => {
+  assert.equal(
+    renderAttributes({
+      'aria-label': 'x',
+      class: 'y',
+      'data-theme': 'light',
+      'xml:lang': 'fr',
+    }),
+    ' aria-label="x" class="y" data-theme="light" xml:lang="fr"',
+  );
+});
+
 test('renderHTMLDocument emits doctype', () => {
   const html = renderHTMLDocument({ body: 'ok' });
   assert.ok(html.startsWith('<!doctype html>'));
