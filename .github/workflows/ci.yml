@@ -87,8 +87,7 @@ jobs:
             --head-sha "${PR_HEAD_SHA}" \
             --github-repository "${GITHUB_REPOSITORY}" \
             --github-head-repository "${PR_HEAD_REPOSITORY}" \
-            --pr-title "${PR_TITLE}" \
-            --pr-author "${PR_AUTHOR}"
+            --pr-title "${PR_TITLE}"
 
   prerelease-readiness:
     name: Prerelease readiness (staging -> premain)

@@ -10,7 +10,10 @@ head_sha=""
 github_repository="${GITHUB_REPOSITORY:-}"
 github_head_repository=""
 pr_title=""
-pr_author=""
+# The CI job runs this verifier from the protected staging lane, so the caller
+# supplies the PR author as an environment value that an older staged copy
+# ignores instead of as an argument it would reject.
+pr_author="${PR_AUTHOR:-}"
 remote="origin"
 self_test="false"
 
