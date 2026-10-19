@@ -1,5 +1,38 @@
 # Changelog
 
+## [5.0.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.0.0...v5.0.1-rc) (2026-10-19)
+
+
+### Bug Fixes
+
+* **app:** reject ambiguous face route registrations ([b70bae0](https://github.com/theory-cloud/FaceTheory/commit/b70bae0dabb72fe13d3cbca18f63ae997e65b57e))
+* **ci:** bind generated Release Please PRs to identity and content ([59cc175](https://github.com/theory-cloud/FaceTheory/commit/59cc1752d488a4c4b6668107919c92b79585c776))
+* **ci:** drop gate code from the release-sync fast path ([85d7798](https://github.com/theory-cloud/FaceTheory/commit/85d7798297158605e1e3aaa3bb186d134caa917b))
+* **ci:** reject unapproved refs on a bare Pages dispatch ([fc133b7](https://github.com/theory-cloud/FaceTheory/commit/fc133b7788cd49e9de76b74d702e568bbdf10749))
+* **ci:** take the Release Please author from the environment ([da716af](https://github.com/theory-cloud/FaceTheory/commit/da716af4c30359793e82bd461a136d4b72b5f22a))
+* **deps:** pin AppTheory v6.3.0 and TableTheory v6.1.0 release assets ([464ef5e](https://github.com/theory-cloud/FaceTheory/commit/464ef5ed34132787f7a59ab18ff02217c09db03f))
+* **deps:** pin AppTheory v6.3.0 and TableTheory v6.1.0 release assets ([e253f50](https://github.com/theory-cloud/FaceTheory/commit/e253f5029c470eb31e4037d44a139a0446e725a3))
+* **dev:** bound request body buffering in the Vite dev server ([731579d](https://github.com/theory-cloud/FaceTheory/commit/731579dc96466fe495b45ee7811fa02a0e02992b))
+* **dev:** close the connection when rejecting oversized bodies ([fc8d46e](https://github.com/theory-cloud/FaceTheory/commit/fc8d46efd255afc84968249cdff00f8b80ca3941))
+* **examples:** bind local example servers to loopback ([b735597](https://github.com/theory-cloud/FaceTheory/commit/b7355971252dc84affdb9fd6c001a65ad91719d4))
+* **examples:** log the listening URL after the socket binds ([16e7baf](https://github.com/theory-cloud/FaceTheory/commit/16e7baf49693e684e67663a148bf85d4e458f15a))
+* **html:** validate attribute names before serializing ([8b49221](https://github.com/theory-cloud/FaceTheory/commit/8b49221ab4e5af59c60b7c5fbe6256cf5a804ee4))
+* **isr:** bind hydration sidecars to the current generation ([b8200dd](https://github.com/theory-cloud/FaceTheory/commit/b8200dd944d0157244795eacbf8815a7577bd368))
+* **isr:** bypass the shared cache for non-GET/HEAD and body-bearing requests ([cb7b93b](https://github.com/theory-cloud/FaceTheory/commit/cb7b93b80d146d9239d5dd4d2debdfc7ff996d4e))
+* **isr:** cap query-variant cache keys per route ([cd761d9](https://github.com/theory-cloud/FaceTheory/commit/cd761d97328b0cba3823e55ca27e7f7144446b48))
+* **isr:** fail closed when an explicit tenantKey resolves empty ([e9e83fc](https://github.com/theory-cloud/FaceTheory/commit/e9e83fc5babbb772fe55f6c4943635a185522b0e))
+* **isr:** guard null HTML pointers in sidecar binding ([a969b78](https://github.com/theory-cloud/FaceTheory/commit/a969b7850dffad48ad2f2201d028ac951597f325))
+* **security:** close the wave-1 Codex Security exclusions (2026-10-18 wave 2) ([9e7e376](https://github.com/theory-cloud/FaceTheory/commit/9e7e376d808b130b4082e1e32047c860c955c358))
+* **security:** make strict CSP start tag scan quote-aware ([1479419](https://github.com/theory-cloud/FaceTheory/commit/1479419c4e4cd209f9a6ee902ae9e445d6fea316))
+* **security:** remediate Codex Security packet 2026-10-18 ([fd01a07](https://github.com/theory-cloud/FaceTheory/commit/fd01a0714c013ba6f878022a9e7738335a87c43b))
+* **security:** scan start tags through browser attribute states ([d525715](https://github.com/theory-cloud/FaceTheory/commit/d5257158f8c0891c25ab09c6756db38d9765598e))
+* **spa:** enforce the destination CSP before injecting fetched HTML ([b678548](https://github.com/theory-cloud/FaceTheory/commit/b6785486c27fa23b326ee3b35a08440593bbaebd))
+* **spa:** parse destination CSP source tokens the way browsers do ([8892fce](https://github.com/theory-cloud/FaceTheory/commit/8892fcefd7e5a768b75743d37738939377800613))
+* **spa:** screen the injected snapshot, not the fetched bytes ([c1343b8](https://github.com/theory-cloud/FaceTheory/commit/c1343b8ca52ebf59a0afcb78a17506c282c453e9))
+* **spa:** treat script-capable data URLs as executable content ([bec8e30](https://github.com/theory-cloud/FaceTheory/commit/bec8e3038821b9ffc7b35392386ec7df3794f5c0))
+* **stitch-admin:** sanitize Svelte provenance hrefs ([d449246](https://github.com/theory-cloud/FaceTheory/commit/d449246601d29ed0612d6f1084cb85d058ed753b))
+* **stitch-shell:** sanitize breadcrumb hrefs ([28b25f4](https://github.com/theory-cloud/FaceTheory/commit/28b25f4df0c636247c7bdedf3bedc980042f3252))
+
 ## [5.0.0-rc.1](https://github.com/theory-cloud/FaceTheory/compare/v5.0.0-rc...v5.0.0-rc.1) (2026-10-17)
 
 
