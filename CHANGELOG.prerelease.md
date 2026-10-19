@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.0.1-rc.1](https://github.com/theory-cloud/FaceTheory/compare/v5.0.1-rc...v5.0.1-rc.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* **ci:** admit version-only lockfile bumps to the release-sync fast path ([ab7f553](https://github.com/theory-cloud/FaceTheory/commit/ab7f553c916dfedcfead526b1817c4e6944e5ab2))
+* **ci:** admit version-only lockfile bumps to the release-sync fast path ([c254d13](https://github.com/theory-cloud/FaceTheory/commit/c254d13f939f964e24a81b19abb22f15496bd4e1))
+
 ## [5.0.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.0.0...v5.0.1-rc) (2026-10-19)
 
 
