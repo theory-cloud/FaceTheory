@@ -181,6 +181,26 @@ test('PageFrame renders breadcrumb anchors without a client navigation handler',
   assert.ok(body.includes('page body'));
 });
 
+test('PageFrame breadcrumbs render unsafe paths inert and keep safe paths navigable', async () => {
+  const body = await renderSSR(
+    h(PageFrame, {
+      breadcrumbs: [
+        { key: 'js', label: 'JsCrumb', path: 'javascript:alert(1)' },
+        { key: 'data', label: 'DataCrumb', path: 'data:text/html,<b>x</b>' },
+        { key: 'safe', label: 'SafeCrumb', path: '/partners' },
+      ],
+      title: 'Crumb',
+      children: h('p', null, 'page body'),
+    }),
+  );
+
+  assert.ok(!body.includes('javascript:'));
+  assert.ok(!body.includes('data:text'));
+  assert.ok(body.includes('JsCrumb'));
+  assert.ok(body.includes('DataCrumb'));
+  assert.ok(body.includes('href="/partners"'));
+});
+
 test('Section renders title, description, actions, and children', async () => {
   const body = await renderSSR(
     h(Section, {

@@ -143,6 +143,19 @@ test('head helpers: title template treats dollar sequences as literal title text
   );
 });
 
+test('head helpers: reject attribute names that break out of the tag', () => {
+  assert.throws(
+    () =>
+      renderFaceHead({
+        html: '<main>ok</main>',
+        headTags: [
+          { type: 'meta', attrs: { 'data-x onload=alert(1)': 'y' } },
+        ],
+      }),
+    /attribute name is unsafe/,
+  );
+});
+
 test('head helpers: JSON-LD carries request nonce through strict CSP', () => {
   const strictCsp = {
     inlineScripts: false,

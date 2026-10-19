@@ -137,6 +137,25 @@ test('vue stitch-shell: PageFrame and section primitives render tokenized conten
   assert.ok(body.includes('--stitch-color-tertiary'));
 });
 
+test('vue stitch-shell: breadcrumbs render unsafe paths inert and keep safe paths navigable', async () => {
+  const body = await renderSSR(
+    h(PageFrame, {
+      breadcrumbs: [
+        { key: 'js', label: 'JsCrumb', path: 'javascript:alert(1)' },
+        { key: 'data', label: 'DataCrumb', path: 'data:text/html,<b>x</b>' },
+        { key: 'safe', label: 'SafeCrumb', path: '/partners' },
+      ],
+      title: 'Crumb',
+    }),
+  );
+
+  assert.ok(!body.includes('javascript:'));
+  assert.ok(!body.includes('data:text'));
+  assert.ok(body.includes('JsCrumb'));
+  assert.ok(body.includes('DataCrumb'));
+  assert.ok(body.includes('href="/partners"'));
+});
+
 test('vue stitch-shell: Callout renders variant classes, note/alert roles, and actions', async () => {
   const body = await renderSSR(
     h('div', null, [

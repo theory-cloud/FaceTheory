@@ -76,6 +76,6 @@ const server = createServer(async (req, res) => {
   res.end('Not Found');
 });
 
-server.listen(port, () => {
+server.listen(port, '127.0.0.1', () => {
   console.log(`Serving SSG output at http://localhost:${port}`);
 });

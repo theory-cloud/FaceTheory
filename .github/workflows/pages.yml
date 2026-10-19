@@ -14,7 +14,10 @@
 #     enforces that the tag input matches the run ref and names a
 #     published stable release. Manual dispatch works too: dispatch from
 #     the tag ref and pass `tag`, or omit `tag` to redeploy the current
-#     ref's docs stamped with the latest stable release.
+#     ref's docs stamped with the latest stable release. Every dispatch is
+#     ref-gated before any build work runs: only `refs/heads/main` and
+#     stable `vX.Y.Z` tag refs are accepted, so no arbitrary branch can
+#     publish docs validated against an unrelated release tag.
 #
 # A release-please PR merge pushes `main`, so the push trigger rebuilds at
 # release time; the release itself is published moments later by
@@ -53,8 +56,11 @@
 # by dispatching without `tag` instead.
 #
 # The github-pages environment's deployment policy accepts the `main` and
-# `staging` branches and `v*` tag refs, which covers every trigger above; a
-# manual dispatch from any other ref is rejected by the environment policy.
+# `staging` branches and `v*` tag refs as defense in depth. The workflow
+# validates every dispatch ref itself — `refs/heads/main` or a stable
+# `vX.Y.Z` tag — before any build work runs, so a dispatch from `staging`
+# or any other branch is refused even though the environment policy would
+# admit it.
 #
 # This workflow is independent of release.yml / prerelease.yml /
 # ci.yml — it never publishes packages, never mutates tags,
@@ -181,6 +187,17 @@ jobs:
         run: |
           set -euo pipefail
           .trusted-pages-verifier/scripts/verify-pages-deploy-tag.sh "${DEPLOY_TAG}" "${RUN_SHA}" "${RUN_REF_TYPE}"
+
+      - name: Verify dispatch ref provenance
+        # A dispatch builds github.sha from the selected ref. Allow only the
+        # production docs line and stable release tags, never an arbitrary
+        # branch whose docs would be stamped with an unrelated release tag.
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          .trusted-pages-verifier/scripts/verify-pages-dispatch-ref.sh "${DISPATCH_REF}"
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -204,6 +204,49 @@ test('FaceApp resources: ambiguous face/resource routes fail closed', () => {
   );
 });
 
+test('FaceApp resources: ambiguous face routes fail closed', () => {
+  assert.throws(
+    () =>
+      createFaceApp({
+        faces: [
+          {
+            route: '/api/{id}',
+            mode: 'ssr',
+            render: () => ({ html: '<main>by id</main>' }),
+          },
+          {
+            route: '/api/{name}',
+            mode: 'ssr',
+            render: () => ({ html: '<main>by name</main>' }),
+          },
+        ],
+      }),
+    /ambiguous face routes: \/api\/\{id\} and \/api\/\{name\}/,
+  );
+});
+
+test('FaceApp resources: differently-ranked overlapping face routes stay distinct', async () => {
+  const app = createFaceApp({
+    faces: [
+      {
+        route: '/api/{proxy+}',
+        mode: 'ssr',
+        render: () => ({ html: '<main>proxy</main>' }),
+      },
+      {
+        route: '/api/status',
+        mode: 'ssr',
+        render: () => ({ html: '<main>status</main>' }),
+      },
+    ],
+  });
+
+  const response = await app.handle({ method: 'GET', path: '/api/status' });
+  assert.ok(
+    decodeBody(response.body as Uint8Array).includes('<main>status</main>'),
+  );
+});
+
 test('resource helpers: are exported from the public core surface', () => {
   assert.equal(core.jsonResourceResponse({ ok: true }).status, 200);
   assert.equal(core.textResourceResponse('ok').status, 200);

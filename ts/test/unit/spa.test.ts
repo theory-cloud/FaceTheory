@@ -6,6 +6,7 @@ import { JSDOM } from 'jsdom';
 import {
   applyFaceNavigationSnapshot,
   DEFAULT_FACE_VIEW_SELECTOR,
+  fetchFaceNavigationSnapshot,
   loadFaceNavigationHydrationData,
   loadFaceNavigationModule,
   parseFaceNavigationSnapshot,
@@ -925,5 +926,272 @@ test('spa helpers: head sync keeps typed JSON hydration markers readable and ine
     assert.equal(doc.querySelector(DEFAULT_FACE_VIEW_SELECTOR)?.textContent, 'Typed');
   } finally {
     currentDom.window.close();
+  }
+});
+
+const STRICT_DESTINATION_CSP = "default-src 'self'; script-src 'self'; style-src 'self'";
+
+function cspProtectedFetcher(
+  html: string,
+  csp: string,
+): (input: string | URL | Request) => Promise<Response> {
+  return async () =>
+    new Response(html, {
+      status: 200,
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'content-security-policy': csp,
+      },
+    });
+}
+
+function navigationDocument(body: string, head = ''): string {
+  return `<!doctype html>
+    <html lang="en">
+      <head><title>Next</title>${head}</head>
+      <body><main data-facetheory-view>${body}</main></body>
+    </html>`;
+}
+
+test('spa helpers: destination CSP is carried on the snapshot and a compliant page navigates', async () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'http://localhost/',
+  });
+
+  try {
+    const snapshot = await fetchFaceNavigationSnapshot('http://localhost/next', {
+      allowedOrigin: 'http://localhost',
+      parser: new dom.window.DOMParser(),
+      fetcher: cspProtectedFetcher(
+        navigationDocument('<p>Cached-safe content</p>'),
+        STRICT_DESTINATION_CSP,
+      ),
+      loadExternalHydration: false,
+    });
+
+    assert.deepEqual(snapshot.csp, {
+      inlineScriptsAllowed: false,
+      inlineEventHandlersAllowed: false,
+      inlineStylesAllowed: false,
+    });
+    assert.equal(snapshot.viewHtml?.trim(), '<p>Cached-safe content</p>');
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('spa helpers: destination CSP blocks injecting inline event handlers', async () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'http://localhost/',
+  });
+
+  try {
+    await assert.rejects(
+      fetchFaceNavigationSnapshot('http://localhost/next', {
+        allowedOrigin: 'http://localhost',
+        parser: new dom.window.DOMParser(),
+        fetcher: cspProtectedFetcher(
+          navigationDocument('<button onclick="alert(1)">Go</button>'),
+          STRICT_DESTINATION_CSP,
+        ),
+        loadExternalHydration: false,
+      }),
+      /refused to inject inline event handler attribute "onclick"/,
+    );
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('spa helpers: destination CSP allows unsafe-inline event handlers unchanged', async () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'http://localhost/',
+  });
+
+  try {
+    const snapshot = await fetchFaceNavigationSnapshot('http://localhost/next', {
+      allowedOrigin: 'http://localhost',
+      parser: new dom.window.DOMParser(),
+      fetcher: cspProtectedFetcher(
+        navigationDocument('<button onclick="alert(1)">Go</button>'),
+        "default-src 'self'; script-src 'self' 'unsafe-inline'",
+      ),
+      loadExternalHydration: false,
+    });
+
+    assert.equal(snapshot.csp?.inlineScriptsAllowed, true);
+    assert.equal(snapshot.viewHtml?.trim(), '<button onclick="alert(1)">Go</button>');
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('spa helpers: destination CSP blocks executable URLs and srcdoc documents', async () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'http://localhost/',
+  });
+
+  try {
+    for (const [body, expected] of [
+      [
+        '<a href=" JaVaScRiPt:alert(1)">Open</a>',
+        /refused to inject executable URL attribute "href"/,
+      ],
+      [
+        '<iframe srcdoc="<script>alert(1)</script>"></iframe>',
+        /refused to inject an iframe srcdoc document/,
+      ],
+    ] as const) {
+      await assert.rejects(
+        fetchFaceNavigationSnapshot('http://localhost/next', {
+          allowedOrigin: 'http://localhost',
+          parser: new dom.window.DOMParser(),
+          fetcher: cspProtectedFetcher(
+            navigationDocument(body),
+            STRICT_DESTINATION_CSP,
+          ),
+          loadExternalHydration: false,
+        }),
+        expected,
+      );
+    }
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('spa helpers: destination CSP blocks injecting inline styles it would not allow', async () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'http://localhost/',
+  });
+
+  try {
+    for (const [html, expected] of [
+      [
+        navigationDocument('<div style="color:red">Styled</div>'),
+        /refused to inject an inline style attribute/,
+      ],
+      [
+        navigationDocument('<p>Body</p>', '<style>body{display:none}</style>'),
+        /refused to inject an inline style element/,
+      ],
+    ] as const) {
+      await assert.rejects(
+        fetchFaceNavigationSnapshot('http://localhost/next', {
+          allowedOrigin: 'http://localhost',
+          parser: new dom.window.DOMParser(),
+          fetcher: cspProtectedFetcher(html, STRICT_DESTINATION_CSP),
+          loadExternalHydration: false,
+        }),
+        expected,
+      );
+    }
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('spa helpers: startFaceNavigation refuses a CSP-protected injection without mutating the DOM', async () => {
+  const dom = new JSDOM(
+    `<!doctype html>
+      <html lang="en">
+        <head><title>Home</title></head>
+        <body class="shell">
+          <nav><a href="/next" id="next-link">Next</a></nav>
+          <main data-facetheory-view><p>Home</p></main>
+        </body>
+      </html>`,
+    { url: 'http://localhost/' },
+  );
+  dom.window.scrollTo = (() => {}) as typeof dom.window.scrollTo;
+
+  const errors: unknown[] = [];
+  const controller = startFaceNavigation({
+    document: dom.window.document,
+    window: dom.window as unknown as Window,
+    viewSelector: DEFAULT_FACE_VIEW_SELECTOR,
+    fetcher: cspProtectedFetcher(
+      navigationDocument('<button onclick="alert(1)">Go</button>'),
+      STRICT_DESTINATION_CSP,
+    ),
+    onError: (error) => {
+      errors.push(error);
+    },
+  });
+
+  try {
+    const link = dom.window.document.getElementById('next-link');
+    assert.ok(link instanceof dom.window.HTMLAnchorElement);
+
+    link.dispatchEvent(
+      new dom.window.MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    );
+    await flushEventLoop();
+
+    assert.equal(errors.length, 1);
+    assert.match(
+      String((errors[0] as Error).message),
+      /inline event handler attribute "onclick"/,
+    );
+    assert.equal(dom.window.location.pathname, '/');
+    assert.equal(dom.window.document.title, 'Home');
+    assert.equal(
+      dom.window.document
+        .querySelector(DEFAULT_FACE_VIEW_SELECTOR)
+        ?.textContent?.trim(),
+      'Home',
+    );
+  } finally {
+    controller.stop();
+    dom.window.close();
+  }
+});
+
+test('spa helpers: destination CSP refuses script-capable data URLs but keeps image data URLs', async () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'http://localhost/',
+  });
+
+  try {
+    for (const body of [
+      '<iframe src="data:text/html,<script>alert(1)</script>"></iframe>',
+      '<a href="data:image/svg+xml,<svg onload=alert(1)></svg>">Open</a>',
+    ]) {
+      await assert.rejects(
+        fetchFaceNavigationSnapshot('http://localhost/next', {
+          allowedOrigin: 'http://localhost',
+          parser: new dom.window.DOMParser(),
+          fetcher: cspProtectedFetcher(
+            navigationDocument(body),
+            STRICT_DESTINATION_CSP,
+          ),
+          loadExternalHydration: false,
+        }),
+        /refused to inject executable URL attribute/,
+      );
+    }
+
+    const snapshot = await fetchFaceNavigationSnapshot('http://localhost/next', {
+      allowedOrigin: 'http://localhost',
+      parser: new dom.window.DOMParser(),
+      fetcher: cspProtectedFetcher(
+        navigationDocument(
+          '<img src="data:image/png;base64,iVBORw0KGgo=" alt="dot"><img src="data:image/svg+xml,<svg></svg>" alt="icon">',
+        ),
+        STRICT_DESTINATION_CSP,
+      ),
+      loadExternalHydration: false,
+    });
+
+    assert.equal(
+      snapshot.viewHtml?.trim(),
+      '<img src="data:image/png;base64,iVBORw0KGgo=" alt="dot"><img src="data:image/svg+xml,<svg></svg>" alt="icon">',
+    );
+  } finally {
+    dom.window.close();
   }
 });

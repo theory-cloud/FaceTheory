@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Breadcrumb as AntBreadcrumb, Typography } from 'antd';
 
+import { safeNavHref } from '../../stitch-shell/safe-nav-href.js';
 import type { BreadcrumbNode } from './nav-types.js';
 
 const h = React.createElement;
@@ -15,10 +16,11 @@ export function Breadcrumb(props: BreadcrumbProps): React.ReactElement | null {
   if (items.length === 0) return null;
 
   const antItems = items.map((node) => {
-    if (node.path === undefined) return { key: node.key, title: node.label };
+    const safePath = safeNavHref(node.path);
+    if (safePath === undefined) return { key: node.key, title: node.label };
 
     const anchorProps: React.AnchorHTMLAttributes<HTMLAnchorElement> = {
-      href: node.path,
+      href: safePath,
     };
     if (onNavigate !== undefined) {
       anchorProps.onClick = (event) => {

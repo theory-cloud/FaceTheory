@@ -140,8 +140,9 @@ async function main() {
   });
 
   const port = Number(process.env.PORT ?? 4180);
-  server.listen(port);
-  console.log(`listening on http://localhost:${port}/`);
+  server.listen(port, '127.0.0.1', () => {
+    console.log(`listening on http://localhost:${port}/`);
+  });
 }
 
 main().catch((err) => {

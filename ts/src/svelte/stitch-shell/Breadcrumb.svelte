@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BreadcrumbNode } from './nav-types.js';
+  import { safeNavHref } from '../../stitch-shell/safe-nav-href.js';
 
   let {
     items = [],
@@ -13,6 +14,7 @@
 {#if items.length > 0}
   <nav class="facetheory-stitch-breadcrumb" aria-label="Breadcrumb">
     {#each items as node, index (node.key)}
+      {@const safePath = safeNavHref(node.path)}
       {#if index > 0}
         <span
           aria-hidden="true"
@@ -21,9 +23,9 @@
         >
       {/if}
 
-      {#if node.path}
+      {#if safePath}
         <a
-          href={node.path}
+          href={safePath}
           onclick={(event) => {
             if (!onNavigate) return;
             event.preventDefault();
