@@ -2,8 +2,11 @@ Verifier: gov_check_security
 Repository: /Users/theorycloud/AgentSpace/factory/products/frameworks/FaceTheory
 Rubric ID: SEC-1
 
+npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
 npm-audit: PASS (ts)
+npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
 npm-audit: PASS (infra/apptheory-ssr-site)
+npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
 npm-audit: PASS (infra/apptheory-ssg-isr-site)
   self-test scan scope: lockfiles 3
   self-test synthetic dependency-excludes-floor: FAIL dependency node_modules/floor-too-high >=24
