@@ -264,6 +264,17 @@ export class FaceApp {
       if (this.faceByPattern.has(pattern)) {
         throw new Error(`duplicate face route: ${pattern}`);
       }
+      for (const facePattern of this.faceByPattern.keys()) {
+        const conflict = routePatternConflict(facePattern, pattern);
+        if (conflict === 'duplicate') {
+          throw new Error(`duplicate face route: ${pattern}`);
+        }
+        if (conflict === 'ambiguous') {
+          throw new Error(
+            `ambiguous face routes: ${facePattern} and ${pattern}`,
+          );
+        }
+      }
       this.router.add(pattern);
       this.faceByPattern.set(pattern, face);
     }

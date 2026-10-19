@@ -30,6 +30,21 @@ export interface HTMLDocumentParts {
   body: string;
 }
 
+const ATTRIBUTE_NAME = /^[A-Za-z0-9_:.-]+$/;
+
+/**
+ * Rejects attribute names that are not a single valid HTML attribute name.
+ * Names are emitted verbatim in the attribute position, so whitespace, `=`,
+ * quotes, or control characters would otherwise start an extra attribute.
+ */
+function assertSafeAttributeName(name: string): void {
+  if (!ATTRIBUTE_NAME.test(name)) {
+    throw new Error(
+      `FaceTheory attribute name is unsafe: ${JSON.stringify(name)}`,
+    );
+  }
+}
+
 export function renderAttributes(attrs: FaceAttributes | undefined): string {
   if (!attrs) return '';
 
@@ -39,6 +54,7 @@ export function renderAttributes(attrs: FaceAttributes | undefined): string {
     const value = attrs[key];
     if (value === undefined || value === null || value === false) continue;
 
+    assertSafeAttributeName(key);
     const name = escapeHTML(key);
     if (value === true) {
       out += ` ${name}`;

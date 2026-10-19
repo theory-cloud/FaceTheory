@@ -1,6 +1,7 @@
 import { defineComponent, h } from 'vue';
 import type { PropType } from 'vue';
 
+import { safeNavHref } from '../../stitch-shell/safe-nav-href.js';
 import type { BreadcrumbNode } from './nav-types.js';
 import {
   renderDefaultSlot,
@@ -30,38 +31,41 @@ export const Breadcrumb = defineComponent({
           class: 'facetheory-stitch-breadcrumb',
           'aria-label': 'Breadcrumb',
         },
-        props.items.map((node, index) => [
-          index > 0
-            ? h(
-                'span',
-                {
-                  'aria-hidden': 'true',
-                  style: {
-                    margin: '0 8px',
-                    color: 'var(--stitch-color-on-surface-variant, #464553)',
+        props.items.map((node, index) => {
+          const safePath = safeNavHref(node.path);
+          return [
+            index > 0
+              ? h(
+                  'span',
+                  {
+                    'aria-hidden': 'true',
+                    style: {
+                      margin: '0 8px',
+                      color: 'var(--stitch-color-on-surface-variant, #464553)',
+                    },
                   },
-                },
-                '›',
-              )
-            : null,
-          node.path !== undefined
-            ? h(
-                'a',
-                {
-                  href: node.path,
-                  ...(props.onNavigate !== undefined
-                    ? {
-                        onClick: (event: MouseEvent) => {
-                          event.preventDefault();
-                          props.onNavigate?.(node);
-                        },
-                      }
-                    : {}),
-                },
-                node.label,
-              )
-            : h('span', null, node.label),
-        ]),
+                  '›',
+                )
+              : null,
+            safePath !== undefined
+              ? h(
+                  'a',
+                  {
+                    href: safePath,
+                    ...(props.onNavigate !== undefined
+                      ? {
+                          onClick: (event: MouseEvent) => {
+                            event.preventDefault();
+                            props.onNavigate?.(node);
+                          },
+                        }
+                      : {}),
+                  },
+                  node.label,
+                )
+              : h('span', null, node.label),
+          ];
+        }),
       );
     };
   },

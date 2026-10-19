@@ -23,7 +23,7 @@ Primary package exports are defined in `ts/package.json`. The repository also in
 Install the exact release asset before wiring one of the adapter surfaces into your application:
 
 ```bash
-export FACETHEORY_VERSION=5.0.0 # x-release-please-version
+export FACETHEORY_VERSION=5.0.1-rc # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -154,7 +154,7 @@ These contracts shape every adapter and delivery mode. If you change one of thes
 | `FaceRenderResult`  | Render output before HTTP conversion | Supports document-shell attrs (`lang`, `htmlAttrs`, `bodyAttrs`), `head.title`, `headTags`, `styleTags`, `csp`, `html`, cookies, headers, and hydration payload. Use `head.title` for the page title and structured `headTags` / `styleTags` for all other head output.                                                                                                                                                                                                                                                                           |
 | `FaceContext`       | Per-request context                  | Exposes normalized request, route params, and proxy match.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `FaceAppOptions`    | App constructor options              | Accepts `faces`, optional `canonicalOrigin` for explicit strict head URL validation, optional raw `resources`, optional framework-owned SSR hydration sidecars, optional ISR config, optional observability hooks, and optional strict-CSP runtime limits.                                                                                                                                                                                                                                                                                        |
-| `FaceIsrOptions`    | ISR runtime tuning                   | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, and cache-control generation. ISR responses fail closed to `private, no-store` for authenticated requests (a default auth-vary header or any cookie) and for every request on a deployment with an explicit custom `cacheKey`; the anonymous default-key value is unchanged.                                                                                                                                                                       |
+| `FaceIsrOptions`    | ISR runtime tuning                   | Configures HTML store, metadata store, lease timing, contention policy, cache key, tenant key, cache-control generation, and the per-route query-variant cap. ISR responses fail closed to `private, no-store` for authenticated requests (a default auth-vary header or any cookie), for every request on a deployment with an explicit custom `cacheKey`, and for every uncached bypass (a non-GET/HEAD or body-bearing request, or a query variant past `maxQueryVariantsPerRoute`); the anonymous default-key value is unchanged.             |
 
 Structured head/style emission is the supported default:
 
@@ -808,7 +808,7 @@ Core helpers:
 
 - `readFaceHydrationData(document?)` reads the `__FACETHEORY_DATA__` payload from the current document
 - `parseFaceNavigationSnapshot(html, options)` converts a rendered FaceTheory document into a structured navigation snapshot
-- `fetchFaceNavigationSnapshot(url, options)` fetches and parses the next route as HTML and rejects redirected cross-origin responses when an `allowedOrigin` is supplied
+- `fetchFaceNavigationSnapshot(url, options)` fetches and parses the next route as HTML, rejects redirected cross-origin responses when an `allowedOrigin` is supplied, and validates the document against the destination response's `Content-Security-Policy` before returning
 - `applyFaceNavigationSnapshot(snapshot, options)` syncs document attrs, non-executable head tags, and either the configured view container or the full body
 - `loadFaceNavigationModule(snapshot, options)` invokes an exported `hydrateFaceNavigation(...)` hook when present, or reloads the bootstrap module when the hook is absent, but rejects cross-origin bootstrap modules
 - `startFaceNavigation(options)` intercepts same-origin links, rejects cross-origin programmatic navigations, fetches the next FaceTheory document, applies it, and triggers hydration
@@ -819,6 +819,7 @@ Recommended host pattern:
 - export `hydrateFaceNavigation(context)` from the client bootstrap module when you need persistent app state across navigations
 - rely on the default module reload only as a compatibility fallback for existing entry modules that hydrate by top-level side effect
 - keep SPA navigation same-origin; redirects to another origin and remote hydration modules fail closed
+- a destination response that declares a `Content-Security-Policy` is enforced before injection: inline event handlers, `javascript:`/`vbscript:` URLs, `iframe srcdoc`, and inline styles or style elements the policy blocks are refused instead of injected. Fetch cannot install response CSP headers on the active document, so the default controller reports the refusal through `onError`; fall back to a full navigation (`window.location.assign(url)`) there if the destination legitimately needs that content. A destination that complies with its own policy, including FaceTheory's strict-CSP output, navigates unchanged.
 
 ## Navigation Pending
 

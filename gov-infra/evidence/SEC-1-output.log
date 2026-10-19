@@ -2,8 +2,11 @@ Verifier: gov_check_security
 Repository: /Users/theorycloud/AgentSpace/factory/products/frameworks/FaceTheory
 Rubric ID: SEC-1
 
+npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
 npm-audit: PASS (ts)
+npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
 npm-audit: PASS (infra/apptheory-ssr-site)
+npm warn Unknown project config "allow-remote". This will stop working in the next major version of npm.
 npm-audit: PASS (infra/apptheory-ssg-isr-site)
   self-test scan scope: lockfiles 3
   self-test synthetic dependency-excludes-floor: FAIL dependency node_modules/floor-too-high >=24
@@ -73,6 +76,6 @@ node-engines-floor: PASS (self-test 88 matcher and scope cases + 13 synthetic lo
   infra/apptheory-ssg-isr-site/src/stack.ts declares 1 Lambda runtime(s)
   ts/src/create-templates/index.ts declares 1 Lambda runtime(s)
 lambda-runtime-deprecations: PASS (self-test 42 synthetic surfaces + 2 scope cases + 1 entry-point probe; surfaces 3; declarations 3; deprecated set 11; supported nodejs22.x, nodejs24.x)
-ci-install-hardening: PASS (69 surfaces)
+ci-install-hardening: PASS (70 surfaces)
 theorycloud-publish-install: PASS
 workflow-action-pins: PASS

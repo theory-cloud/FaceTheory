@@ -98,11 +98,31 @@ function headersFromIncomingMessage(req: IncomingMessage): FaceHeaders {
   return headers;
 }
 
+const DEV_MAX_REQUEST_BODY_BYTES = 1024 * 1024;
+
+class DevRequestBodyTooLargeError extends Error {
+  constructor() {
+    super('FaceTheory dev server request body exceeds the size limit');
+    this.name = 'DevRequestBodyTooLargeError';
+  }
+}
+
 async function readIncomingBody(req: IncomingMessage): Promise<Uint8Array> {
+  const declared = Number(req.headers['content-length'] ?? '');
+  if (Number.isFinite(declared) && declared > DEV_MAX_REQUEST_BODY_BYTES) {
+    throw new DevRequestBodyTooLargeError();
+  }
+
   const chunks: Buffer[] = [];
+  let total = 0;
 
   for await (const chunk of req) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    const buffer = typeof chunk === 'string' ? Buffer.from(chunk) : chunk;
+    total += buffer.byteLength;
+    if (total > DEV_MAX_REQUEST_BODY_BYTES) {
+      throw new DevRequestBodyTooLargeError();
+    }
+    chunks.push(buffer);
   }
 
   return Buffer.concat(chunks);
@@ -177,7 +197,22 @@ async function handleFaceAppRequest(
   req: IncomingMessage,
   res: ServerResponse,
 ) {
-  const body = await readIncomingBody(req);
+  let body: Uint8Array;
+  try {
+    body = await readIncomingBody(req);
+  } catch (err) {
+    if (!(err instanceof DevRequestBodyTooLargeError)) throw err;
+    req.resume();
+    if (!res.headersSent) {
+      res.writeHead(413, {
+        connection: 'close',
+        'content-type': 'text/plain; charset=utf-8',
+      });
+    }
+    res.end('Payload Too Large');
+    return;
+  }
+
   const response = await app.handle(faceRequestFromIncomingMessage(req, body));
   await writeFaceResponse(req, res, response);
 }

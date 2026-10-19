@@ -45,8 +45,13 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
   release_sync_only="true"
   for path in "${changed_files[@]}"; do
     case "${path}" in
-      .github/workflows/* \
-      | .release-please-manifest*.json \
+      # Release metadata, the docs that carry version markers, and the release
+      # helpers that only publish the generated assets. Workflow files,
+      # verifier scripts (including their test harnesses), and the installed
+      # dependency lockfile are deliberately absent: a range that changes gate
+      # or CI code, or resolves dependencies, is user-facing and needs a
+      # conventional release commit like any other change.
+      .release-please-manifest*.json \
       | release-please-config*.json \
       | VERSION \
       | CHANGELOG.md \
@@ -58,31 +63,13 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
       | docs/api-reference.md \
       | docs/getting-started.md \
       | scripts/build-release-assets.sh \
-      | scripts/check-release-baseline-ready.sh \
       | scripts/release-json-by-tag.sh \
       | scripts/resolve-release-source-ref.sh \
       | scripts/publish-draft-release-assets.sh \
-      | scripts/test-check-release-baseline-ready.sh \
-      | scripts/test-resolve-release-source-ref.sh \
-      | scripts/test-publish-draft-release-assets.sh \
       | scripts/generate-checksums.sh \
       | scripts/read-version.sh \
       | scripts/render-release-notes.sh \
-      | scripts/test-release-workflow-changelog-preservation.sh \
-      | scripts/verify-release-branch.sh \
-      | scripts/verify-ci-rubric-enforced.sh \
-      | scripts/verify-deterministic-builds.sh \
-      | scripts/verify-release-draft-target.sh \
-      | scripts/verify-release-pr-postcondition.sh \
-      | scripts/verify-release-publish-postcondition.sh \
-      | scripts/verify-release-readiness.sh \
-      | scripts/verify-release-train-promotion.sh \
-      | scripts/test-verify-release-draft-target.sh \
-      | scripts/test-verify-release-readiness.sh \
-      | scripts/verify-ts-pack.sh \
-      | scripts/verify-version-alignment.sh \
       | ts/README.md \
-      | ts/package-lock.json \
       | ts/package.json)
         ;;
       *)

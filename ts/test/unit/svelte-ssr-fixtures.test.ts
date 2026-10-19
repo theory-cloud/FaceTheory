@@ -87,6 +87,27 @@ test('svelte SSR fixtures preserve current output across SSR, SSG, and ISR', asy
   });
 });
 
+test('svelte stitch-shell Breadcrumb renders unsafe paths inert and keeps safe paths navigable', async () => {
+  await withSvelteSsrFixtureRenderer(async (renderer) => {
+    const rendered = await renderer.render({
+      componentPath: 'src/svelte/stitch-shell/Breadcrumb.svelte',
+      props: {
+        items: [
+          { key: 'js', label: 'JsCrumb', path: 'javascript:alert(1)' },
+          { key: 'data', label: 'DataCrumb', path: 'data:text/html,<b>x</b>' },
+          { key: 'safe', label: 'SafeCrumb', path: '/partners' },
+        ],
+      },
+    });
+    const html = rendered.htmlByMode.ssr;
+    assert.ok(!html.includes('javascript:'));
+    assert.ok(!html.includes('data:text'));
+    assert.ok(html.includes('JsCrumb'));
+    assert.ok(html.includes('DataCrumb'));
+    assert.ok(html.includes('href="/partners"'));
+  });
+});
+
 test('svelte stitch-shell SidebarItems renders unsafe NavItem paths inert and keeps safe paths navigable', async () => {
   await withSvelteSsrFixtureRenderer(async (renderer) => {
     const rendered = await renderer.render({

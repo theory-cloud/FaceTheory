@@ -52,6 +52,7 @@ const ISR_HTML_METADATA_STATUS = 'facetheory-status';
 const ISR_HTML_METADATA_CONTENT_TYPE = 'facetheory-content-type';
 const ISR_STATE_STALE_METADATA_ERROR = 'stale-metadata-error';
 const DEFAULT_LAST_KNOWN_ISR_RECORD_LIMIT = 128;
+const DEFAULT_MAX_QUERY_VARIANTS_PER_ROUTE = 1024;
 
 /**
  * Policy for metadata/storage failures: either serve the last known stale entry when
@@ -65,13 +66,14 @@ export type IsrFailurePolicy = 'serve-stale' | 'error';
 export type IsrLockContentionPolicy = 'wait' | 'serve-stale';
 /**
  * Cache-state label emitted in ISR cache headers and observability for miss, hit,
- * stale, wait-hit, and degraded metadata-error paths.
+ * stale, wait-hit, uncached bypass, and degraded metadata-error paths.
  */
 export type IsrCacheState =
   | 'miss'
   | 'hit'
   | 'stale'
   | 'wait-hit'
+  | 'bypass'
   | typeof ISR_STATE_STALE_METADATA_ERROR;
 
 /**
@@ -283,6 +285,14 @@ export interface FaceIsrOptions {
    * option to keep the fail-safe all-cookies request variant.
    */
   varyCookies?: string[];
+  /**
+   * Maximum distinct query-bearing cache keys tracked and therefore persisted per
+   * route pattern per runtime instance. Once the cap is reached, a new query
+   * variant renders fresh without touching the shared cache, so a caller cannot
+   * force unbounded metadata records, leases, and object-store writes. `0`
+   * disables the cap; the default is 1024.
+   */
+  maxQueryVariantsPerRoute?: number;
   tenantBoundaryHeaders?: string[];
   htmlPointerPrefix?: string;
   cacheControl?: (input: IsrCacheHeaderInput) => string;
@@ -305,6 +315,7 @@ interface CreateIsrRuntimeOptions {
   hasExplicitCacheKey: boolean;
   varyCookies: readonly string[] | null;
   tenantBoundaryHeaders: readonly string[];
+  maxQueryVariantsPerRoute: number;
   htmlPointerPrefix: string;
   cacheControl: (input: IsrCacheHeaderInput) => string;
   observability: FaceObservabilityHooks | null;
@@ -571,6 +582,7 @@ export class S3HtmlStore implements HtmlStore {
 export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
   const runtimeOptions = normalizeRuntimeOptions(options);
   const lastKnownRecords = new Map<string, IsrMetaRecord>();
+  const queryVariantKeysByRoute = new Map<string, Set<string>>();
   const rememberRecord = (record: IsrMetaRecord | null): void => {
     rememberLastKnownRecord(lastKnownRecords, record);
   };
@@ -594,6 +606,22 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         tenantPartition.mode === 'partitioned'
           ? tenantPartition.tenant
           : resolveTenant(runtimeOptions, input.ctx);
+      if (tenant === null) {
+        if (hydrationSidecarPointer.present) {
+          return hydrationSidecarNotFoundResponse();
+        }
+        throw new Error(
+          'ISR explicit tenantKey resolved to an empty tenant; refusing to fall back to the shared default tenant',
+        );
+      }
+      const requestMethod = normalizeIsrRequestMethod(
+        input.ctx.request.method,
+      );
+      if (!isShareableIsrRequest(requestMethod, input.ctx.request.body)) {
+        emitIsrBypassMetric(runtimeOptions, input, requestMethod);
+        return uncachedIsrResponse(await input.renderFresh());
+      }
+
       const query = hydrationSidecarPointer.present
         ? queryWithoutHydrationSidecar(input.ctx.request.query)
         : input.ctx.request.query;
@@ -628,10 +656,32 @@ export function createIsrRuntime(options: FaceIsrOptions): IsrRuntime {
         ) {
           return hydrationSidecarNotFoundResponse();
         }
+        if (
+          !(await isCurrentHydrationSidecarPointer(
+            runtimeOptions,
+            cacheKey,
+            hydrationSidecarPointer.pointer,
+          ))
+        ) {
+          return hydrationSidecarNotFoundResponse();
+        }
         return cachedHydrationSidecarResponse(
           runtimeOptions,
           hydrationSidecarPointer.pointer,
         );
+      }
+
+      if (
+        !allowQueryVariantCaching(
+          runtimeOptions,
+          queryVariantKeysByRoute,
+          input.routePattern,
+          cacheKey,
+          query,
+        )
+      ) {
+        emitIsrQueryVariantCapMetric(runtimeOptions, input);
+        return uncachedIsrResponse(await input.renderFresh());
       }
 
       const guarded = isGuardedIsrRequest(
@@ -1082,6 +1132,106 @@ function emitIsrLeaseContentionMetric(
   });
 }
 
+function normalizeIsrRequestMethod(value: string | undefined): string {
+  return String(value ?? 'GET').trim().toUpperCase() || 'GET';
+}
+
+/**
+ * Returns whether a request may read or write shared ISR cache entries. Only a
+ * body-less GET or HEAD is representable by the shared cache identity, so every
+ * other method or a body-bearing safe request renders fresh without touching the
+ * cache; that keeps method- and body-dependent output from being served under
+ * another request's key.
+ */
+function isShareableIsrRequest(
+  method: string,
+  body: Uint8Array | undefined,
+): boolean {
+  if (method !== 'GET' && method !== 'HEAD') return false;
+  return (body?.byteLength ?? 0) === 0;
+}
+
+/**
+ * Marks an uncached ISR render request-private so no shared cache downstream can
+ * store a response whose identity the ISR cache does not represent.
+ */
+function uncachedIsrResponse(response: FaceResponse): FaceResponse {
+  const headers = canonicalizeHeaders(response.headers);
+  headers['cache-control'] = [ISR_PRIVATE_NO_STORE_CACHE_CONTROL];
+  headers['x-facetheory-isr'] = ['bypass'];
+  return {
+    ...response,
+    headers: sortHeaders(headers),
+  };
+}
+
+function emitIsrBypassMetric(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  input: HandleIsrFaceInput,
+  method: string,
+): void {
+  emitIsrMetric(runtimeOptions, {
+    name: 'facetheory.isr.cache_bypass',
+    value: 1,
+    tags: {
+      method: input.ctx.request.method,
+      route_pattern: input.routePattern,
+      reason: method === 'GET' || method === 'HEAD' ? 'request-body' : 'method',
+    },
+  });
+}
+
+function hasQuerySurface(query: Query): boolean {
+  return Object.keys(query).some((key) => (query[key]?.length ?? 0) > 0);
+}
+
+/**
+ * Admits a query-bearing cache key into the per-route variant budget. A key that
+ * was already admitted keeps its cache behavior. Once the budget is exhausted, a
+ * new variant is not persisted, so a caller cannot force unbounded metadata
+ * records, leases, and object-store writes by walking query strings; the request
+ * still renders correct fresh output. Tracking is per runtime instance and
+ * digest-based, so the tracked set cannot grow past the configured cap.
+ */
+function allowQueryVariantCaching(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  trackedByRoute: Map<string, Set<string>>,
+  routePattern: string,
+  cacheKey: string,
+  query: Query,
+): boolean {
+  const limit = runtimeOptions.maxQueryVariantsPerRoute;
+  if (limit === 0 || !hasQuerySurface(query)) return true;
+
+  const route = normalizePath(routePattern);
+  let tracked = trackedByRoute.get(route);
+  if (!tracked) {
+    tracked = new Set<string>();
+    trackedByRoute.set(route, tracked);
+  }
+
+  const digest = cacheKeyDigest(cacheKey);
+  if (tracked.has(digest)) return true;
+  if (tracked.size >= limit) return false;
+  tracked.add(digest);
+  return true;
+}
+
+function emitIsrQueryVariantCapMetric(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  input: HandleIsrFaceInput,
+): void {
+  emitIsrMetric(runtimeOptions, {
+    name: 'facetheory.isr.query_variant_cap',
+    value: 1,
+    tags: {
+      method: input.ctx.request.method,
+      route_pattern: input.routePattern,
+      limit: String(runtimeOptions.maxQueryVariantsPerRoute),
+    },
+  });
+}
+
 function emitIsrRegenerationMetric(
   runtimeOptions: CreateIsrRuntimeOptions,
   input: HandleIsrFaceInput,
@@ -1352,6 +1502,10 @@ function normalizeRuntimeOptions(
     tenantBoundaryHeaders: normalizeTenantBoundaryHeaders(
       input.tenantBoundaryHeaders,
     ),
+    maxQueryVariantsPerRoute: normalizeNonNegativeInt(
+      input.maxQueryVariantsPerRoute,
+      DEFAULT_MAX_QUERY_VARIANTS_PER_ROUTE,
+    ),
     htmlPointerPrefix: normalizeObjectPrefix(input.htmlPointerPrefix ?? 'isr'),
     cacheControl:
       input.cacheControl ??
@@ -1514,10 +1668,11 @@ function isGuardedIsrRequest(
 function resolveTenant(
   runtimeOptions: CreateIsrRuntimeOptions,
   ctx: FaceContext,
-): string {
+): string | null {
   const rawTenant = runtimeOptions.tenantKey(ctx);
   const tenant = String(rawTenant ?? '').trim();
-  return tenant.length > 0 ? tenant : 'default';
+  if (tenant.length > 0) return tenant;
+  return runtimeOptions.hasExplicitTenantKey ? null : 'default';
 }
 
 function defaultTenantKey(ctx: FaceContext): string {
@@ -1637,6 +1792,27 @@ function queryWithoutHydrationSidecar(query: Query): Query {
     out[key] = [...(values ?? [])];
   }
   return out;
+}
+
+/**
+ * Sidecar pointers are generation-scoped: only the sidecar paired with the
+ * current metadata record's HTML pointer stays readable. Superseded pointers
+ * must not keep serving hydration data after a regeneration.
+ */
+async function isCurrentHydrationSidecarPointer(
+  runtimeOptions: CreateIsrRuntimeOptions,
+  cacheKey: string,
+  pointer: string,
+): Promise<boolean> {
+  try {
+    const record = await runtimeOptions.metaStore.get(cacheKey);
+    if (!record || !record.htmlPointer) return false;
+    return (
+      buildHydrationSidecarPointerFromHtmlPointer(record.htmlPointer) === pointer
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function cachedHydrationSidecarResponse(
