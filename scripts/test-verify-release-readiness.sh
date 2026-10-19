@@ -242,9 +242,11 @@ current_case="rename wholly inside the allowlist passes"
 allow_rename_text="$(cd "${allow_rename_dir}" && bash "${allow_rename_script}" base HEAD release)"
 assert_contains "${allow_rename_text}" 'release-readiness: OK (release sync only change)' "rename inside allowlist"
 
-# Workflow files, verifier scripts, their test harnesses, and the installed
-# dependency lockfile are user-facing changes: the fast path must not admit a
-# range that only edits them, even with a chore commit.
+# Workflow files and verifier scripts (including their test harnesses) are
+# user-facing changes: the fast path must not admit a range that only edits
+# them, even with a chore commit. The lockfile control below puts non-lockfile
+# content at the lockfile path, so it exercises the content inspection rather
+# than the path allowlist.
 assert_fast_path_rejects() {
   local label="$1"
   local relative_path="$2"
@@ -302,6 +304,252 @@ commit_staged "${delete_allowed_dir}" "chore(release): drop docs readme"
 current_case="deletion of an allowlisted path passes"
 delete_allowed_text="$(cd "${delete_allowed_dir}" && bash "${delete_allowed_script}" base HEAD release)"
 assert_contains "${delete_allowed_text}" 'release-readiness: OK (release sync only change)' "deletion of allowlisted path"
+
+# The installed dependency lockfile is admitted on its two npm project version
+# fields alone. Release Please rewrites exactly those fields on every release,
+# so a release PR would otherwise be blocked by the gate that exists to keep
+# dependency-resolution diffs out of a chore-only range.
+write_lockfile_variant() {
+  local path="$1"
+  local variant="$2"
+
+  LOCK_VARIANT="${variant}" python3 - "${path}" <<'PY'
+import json
+import os
+import sys
+
+VARIANT = os.environ["LOCK_VARIANT"]
+PATH = sys.argv[1]
+BASE_VERSION = "5.0.1-rc"
+NEXT_VERSION = "5.0.1"
+
+
+def base_document():
+    return {
+        "name": "@theory-cloud/facetheory",
+        "version": BASE_VERSION,
+        "lockfileVersion": 3,
+        "requires": True,
+        "packages": {
+            "": {
+                "name": "@theory-cloud/facetheory",
+                "version": BASE_VERSION,
+                "license": "Apache-2.0",
+                "dependencies": {"left-pad": "^1.0.0"},
+            },
+            "node_modules/left-pad": {
+                "version": "1.3.0",
+                "resolved": "https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz",
+                "integrity": "sha512-XI5MPzVNAhjAyhQzphX8BkmKsKUxD4LdyK24iZeQGinBN9yTQT3bFlCBy/aVx2HrNcqQGsdot8ghrjyrvMCoEA==",
+                "license": "WTFPL",
+            },
+        },
+    }
+
+
+def write(document, indent=2):
+    with open(PATH, "w", encoding="utf-8") as handle:
+        handle.write(json.dumps(document, indent=indent, ensure_ascii=False) + "\n")
+
+
+def bump(document, indent=2):
+    document["version"] = NEXT_VERSION
+    document["packages"][""]["version"] = NEXT_VERSION
+    write(document, indent)
+
+
+if VARIANT == "base":
+    write(base_document())
+    raise SystemExit(0)
+
+if VARIANT == "deleted":
+    os.remove(PATH)
+    raise SystemExit(0)
+
+if VARIANT == "renamed":
+    os.replace(PATH, os.path.join(os.path.dirname(PATH), "package-lock.bak"))
+    raise SystemExit(0)
+
+if VARIANT == "mode-only":
+    os.chmod(PATH, 0o755)
+    raise SystemExit(0)
+
+if VARIANT == "binary":
+    with open(PATH, "wb") as handle:
+        handle.write(b"\x00\x01\x02 binary lockfile\n")
+    raise SystemExit(0)
+
+if VARIANT == "truncated-json":
+    with open(PATH, "w", encoding="utf-8") as handle:
+        handle.write('{\n  "version": "5.0.1",\n')
+    raise SystemExit(0)
+
+with open(PATH, encoding="utf-8") as handle:
+    document = json.load(handle)
+
+project = document["packages"][""]
+left_pad = document["packages"]["node_modules/left-pad"]
+
+if VARIANT == "version-bump":
+    bump(document)
+elif VARIANT == "version-bump-reformat":
+    bump(document, indent=4)
+elif VARIANT == "version-bump-unicode":
+    document["version"] = "5.0.1\u200b"
+    project["version"] = "5.0.1\u200b"
+    write(document)
+elif VARIANT == "version-bump-duplicate-key":
+    text = json.dumps(document, indent=2) + "\n"
+    text = text.replace(
+        '  "version": "5.0.1-rc",\n',
+        '  "version": "5.0.1",\n  "version": "5.0.1-rc",\n',
+        1,
+    )
+    with open(PATH, "w", encoding="utf-8") as handle:
+        handle.write(text)
+elif VARIANT == "nested-version":
+    left_pad["version"] = "1.3.1"
+    bump(document)
+elif VARIANT == "nested-integrity":
+    left_pad["integrity"] = "sha512-boundary-marker"
+    bump(document)
+elif VARIANT == "nested-resolved":
+    left_pad["resolved"] = "https://registry.npmjs.org/left-pad/-/left-pad-1.3.1.tgz"
+    bump(document)
+elif VARIANT == "root-dependency":
+    project["dependencies"] = {"left-pad": "^1.1.0"}
+    bump(document)
+elif VARIANT == "root-license":
+    project["license"] = "MIT"
+    bump(document)
+elif VARIANT == "added-package":
+    document["packages"]["node_modules/right-pad"] = {
+        "version": "1.0.1",
+        "resolved": "https://registry.npmjs.org/right-pad/-/right-pad-1.0.1.tgz",
+        "integrity": "sha512-right-pad",
+    }
+    bump(document)
+elif VARIANT == "removed-package":
+    del document["packages"]["node_modules/left-pad"]
+    bump(document)
+elif VARIANT == "root-only-version":
+    document["version"] = NEXT_VERSION
+    write(document)
+elif VARIANT == "manifest-only-version":
+    project["version"] = NEXT_VERSION
+    write(document)
+elif VARIANT == "extra-root-key":
+    document["sideEffects"] = False
+    bump(document)
+else:
+    raise SystemExit("unknown lockfile variant: {0}".format(VARIANT))
+PY
+}
+
+seed_lockfile_repo() {
+  local work_dir="$1"
+
+  git init -b main "${work_dir}" >/dev/null
+  git -C "${work_dir}" config user.name "FaceTheory Test"
+  git -C "${work_dir}" config user.email "facetheory-test@example.com"
+  git -C "${work_dir}" config core.fileMode true
+  printf '%s\n' seed > "${work_dir}/README.md"
+  mkdir -p "${work_dir}/ts"
+  write_lockfile_variant "${work_dir}/ts/package-lock.json" base
+  commit_file "${work_dir}" "chore: seed release lockfile" README.md ts/package-lock.json
+  git -C "${work_dir}" branch base
+}
+
+commit_everything() {
+  local work_dir="$1"
+  local message="$2"
+
+  git -C "${work_dir}" add -A -- . ':(exclude)scripts/verify-release-readiness.sh'
+  commit_staged "${work_dir}" "${message}"
+}
+
+assert_lockfile_case() {
+  local label="$1"
+  local variant="$2"
+  local expectation="$3"
+  local reason="$4"
+  local also_touch="${5:-}"
+
+  local case_dir="${tmpdir}/lockfile-${label}"
+  current_case="setup lockfile case ${label}"
+  seed_lockfile_repo "${case_dir}"
+  local case_script
+  case_script="$(copy_script "${case_dir}")"
+  write_lockfile_variant "${case_dir}/ts/package-lock.json" "${variant}"
+  if [[ -n "${also_touch}" ]]; then
+    mkdir -p "$(dirname "${case_dir}/${also_touch}")"
+    printf '%s\n' '# release notes' >> "${case_dir}/${also_touch}"
+  fi
+  commit_everything "${case_dir}" "chore(release): exercise lockfile variant ${label}"
+
+  local case_out="${tmpdir}/readiness-lockfile-${label}.out"
+  current_case="lockfile case ${label}"
+  if (cd "${case_dir}" && bash "${case_script}" base HEAD release >"${case_out}" 2>&1); then
+    if [[ "${expectation}" != "pass" ]]; then
+      fail "lockfile case ${label} unexpectedly passed the fast path; output: $(cat "${case_out}")"
+    fi
+    assert_contains "$(cat "${case_out}")" 'release-readiness: OK (release sync only change)' "lockfile case ${label}"
+  else
+    if [[ "${expectation}" != "fail" ]]; then
+      fail "lockfile case ${label} unexpectedly failed the fast path; output: $(cat "${case_out}")"
+    fi
+    assert_contains "$(cat "${case_out}")" 'release-readiness: FAIL' "lockfile case ${label}"
+    assert_contains "$(cat "${case_out}")" "ts/package-lock.json (" "lockfile case ${label} disqualifier"
+    assert_contains "$(cat "${case_out}")" "${reason}" "lockfile case ${label} reason"
+  fi
+}
+
+# Release-shaped version bump: the fast path must admit it.
+assert_lockfile_case "version-bump" version-bump pass ""
+
+# A version bump riding alongside an allowlisted docs change still passes.
+assert_lockfile_case "version-bump-with-docs" version-bump pass "" "docs/README.md"
+
+# Any lockfile content beyond the two version fields disqualifies the range.
+assert_lockfile_case "nested-version" nested-version fail 'packages["node_modules/left-pad"].version value differs'
+assert_lockfile_case "nested-integrity" nested-integrity fail 'packages["node_modules/left-pad"].integrity value differs'
+assert_lockfile_case "nested-resolved" nested-resolved fail 'packages["node_modules/left-pad"].resolved value differs'
+assert_lockfile_case "root-dependency" root-dependency fail 'packages[""].dependencies["left-pad"] value differs'
+assert_lockfile_case "root-license" root-license fail 'packages[""].license value differs'
+assert_lockfile_case "added-package" added-package fail "packages object keys differ"
+assert_lockfile_case "removed-package" removed-package fail "packages object keys differ"
+assert_lockfile_case "extra-root-key" extra-root-key fail "<root> object keys differ"
+assert_lockfile_case "root-only-version" root-only-version fail 'disagree'
+assert_lockfile_case "manifest-only-version" manifest-only-version fail 'disagree'
+
+# Content and encoding tricks that a textual or line-count check could miss.
+assert_lockfile_case "version-bump-unicode" version-bump-unicode fail "is not a plain version string"
+assert_lockfile_case "version-bump-reformat" version-bump-reformat fail "is not the canonical JSON form"
+assert_lockfile_case "version-bump-duplicate-key" version-bump-duplicate-key fail "repeats the object key"
+assert_lockfile_case "binary" binary fail "is not valid JSON"
+assert_lockfile_case "truncated-json" truncated-json fail "is not valid JSON"
+
+# Rename, deletion, and mode edge cases stay excluded.
+assert_lockfile_case "deleted" deleted fail "is added or deleted"
+assert_lockfile_case "renamed" renamed fail "is added or deleted"
+assert_lockfile_case "mode-only" mode-only fail "file mode changed"
+
+# Keep the gate fail-closed when the range has no comparable history.
+current_case="lockfile case unrelated history"
+no_base_dir="${tmpdir}/lockfile-no-merge-base"
+seed_lockfile_repo "${no_base_dir}"
+no_base_script="$(copy_script "${no_base_dir}")"
+write_lockfile_variant "${no_base_dir}/ts/package-lock.json" version-bump
+commit_everything "${no_base_dir}" "chore(release): bump lockfile version"
+git -C "${no_base_dir}" checkout -q --orphan unrelated
+git -C "${no_base_dir}" -c commit.gpgSign=false -c core.hooksPath=/dev/null \
+  commit -q -m "chore: unrelated root" --allow-empty
+no_base_out="${tmpdir}/readiness-lockfile-no-merge-base.out"
+current_case="lockfile case unrelated history"
+if (cd "${no_base_dir}" && bash "${no_base_script}" base HEAD release >"${no_base_out}" 2>&1); then
+  fail "a lockfile range with unrelated history unexpectedly passed"
+fi
+assert_contains "$(cat "${no_base_out}")" 'release-readiness: FAIL' "lockfile case unrelated history"
 
 trap - ERR
 echo "test-verify-release-readiness: PASS"
