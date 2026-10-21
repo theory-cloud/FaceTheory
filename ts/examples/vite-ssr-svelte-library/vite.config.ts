@@ -29,7 +29,7 @@ export default defineConfig(({ isSsrBuild }) => {
       assetsInlineLimit: 0,
       manifest: !ssr,
       ...(ssr ? { ssr: entry } : {}),
-      rollupOptions: {
+      rolldownOptions: {
         input: entry,
         ...(ssr
           ? {
