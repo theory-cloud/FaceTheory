@@ -40,8 +40,14 @@ export default defineConfig(({ isSsrBuild }) => {
               assetFileNames: 'assets/[name]-[hash][extname]',
             }
           : {
-              manualChunks: (id) =>
-                id.endsWith('src/chunk.ts') ? 'chunk' : undefined,
+              codeSplitting: {
+                groups: [
+                  {
+                    name: 'chunk',
+                    test: (id) => id.endsWith('src/chunk.ts'),
+                  },
+                ],
+              },
             },
       },
     },
