@@ -82,6 +82,18 @@ expect_fail "unfrozen bundle install"
 write_probe "bundle install --deployment"
 expect_pass "deployment-frozen bundle install"
 
+# The deprecated flag's replacement, the frozen setting, is the form the docs
+# deploy now uses: an assignment on the same simple command freezes that run.
+write_probe "BUNDLE_FROZEN=true bundle install"
+expect_pass "frozen setting on the bundle install command"
+
+# A falsy or empty setting is not a freeze; the guard must not credit it.
+write_probe "BUNDLE_FROZEN=false bundle install"
+expect_fail "falsy frozen setting"
+
+write_probe "BUNDLE_FROZEN= bundle install"
+expect_fail "empty frozen setting"
+
 # ADV-503-R0-01: an npx-prefixed install is still an unprotected install.
 write_probe "npx npm ci"
 expect_fail "npx-prefixed unprotected npm ci"

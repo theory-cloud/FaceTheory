@@ -224,9 +224,11 @@ jobs:
       - name: Install Jekyll dependencies
         # Without bundler-cache, setup-ruby installs Ruby but no gems;
         # install the Gemfile explicitly so the build step's bundle exec
-        # finds jekyll on a cold runner.
+        # finds jekyll on a cold runner. Freeze through the bundler setting,
+        # not `--frozen`, which Bundler 2 deprecates along with every other
+        # install-time flag it would have to remember across invocations.
         working-directory: docs
-        run: bundle install --frozen
+        run: BUNDLE_FROZEN=true bundle install
 
       - name: Configure Pages
         id: pages
