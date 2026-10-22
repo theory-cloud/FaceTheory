@@ -8,6 +8,11 @@
 # verifier -- .github/workflows/*.yml, Makefile, scripts/*.sh, and
 # gov-infra/verifiers/*.sh.
 #
+# A Ruby install is frozen when its own command carries `--frozen`/`--deployment`
+# or when the same simple command sets `BUNDLE_FROZEN=true`. Both express the
+# same guarantee: `--frozen` is Bundler's CLI shortcut for that setting, and
+# Bundler 2 deprecates it precisely because the setting is the durable form.
+#
 # A lockfile install counts only in command position (start of line, after a
 # shell separator, after a workflow `run:` key, or behind an `npx` prefix).
 # `scripts/render-release-notes.sh` embeds an `npm install` usage line inside
@@ -42,7 +47,13 @@ surface = (
     + sorted(glob.glob("gov-infra/verifiers/*.sh"))
 )
 
-PREFIX = r"(?:^|[;&|()]|&&|\|\||run:[ \t]+|npx[ \t]+)[ \t]*"
+# A command may be preceded by environment assignments (`BUNDLE_FROZEN=true
+# bundle install`). Those are part of the invoked command, so they stay outside
+# capture group 1 and inside the prefix the rules read.
+PREFIX = (
+    r"(?:^|[;&|()]|&&|\|\||run:[ \t]+|npx[ \t]+)"
+    r"[ \t]*(?:[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+)*"
+)
 
 # (matcher with the command in capture group 1, required flags, human label)
 INSTALL_RULES = [
@@ -70,6 +81,22 @@ INSTALL_RULES = [
 
 BUNDLE = re.compile(PREFIX + r"(bundle[ \t]+install)(?=[ \t]|$)")
 SEPARATOR = re.compile(r"&&|\|\||[;&|]")
+FROZEN_ENV = re.compile(
+    r"(?:^|[ \t])BUNDLE_FROZEN=(?:true|1|yes|\"true\"|\"1\"|\"yes\")(?=[ \t]|$)"
+)
+
+
+def command_prefix(code, start):
+    """Text of the same simple command that precedes `start`.
+
+    Stops at the last shell separator, so an assignment only counts when it is
+    part of the command that runs `bundle install` -- `VAR=1 bundle install`
+    scopes the variable to that invocation, while a separate statement does not.
+    """
+    last = None
+    for last in SEPARATOR.finditer(code, 0, start):
+        pass
+    return code[last.end() : start] if last else code[:start]
 
 
 def strip_comment(text):
@@ -144,10 +171,15 @@ for path in surface:
                     break
         for match in BUNDLE.finditer(code):
             span = command_span(code, match.start(1))
-            if "--frozen" not in span and "--deployment" not in span:
+            frozen = (
+                "--frozen" in span
+                or "--deployment" in span
+                or FROZEN_ENV.search(command_prefix(code, match.start(1))) is not None
+            )
+            if not frozen:
                 failures.append(
                     f"{path}:{start_line}: bundle install must pin Gemfile.lock "
-                    f"(pass --frozen or --deployment): {code.strip()}"
+                    f"(pass --frozen/--deployment or set BUNDLE_FROZEN=true): {code.strip()}"
                 )
                 break
         index += 1
@@ -155,7 +187,10 @@ for path in surface:
 pages = Path(".github/workflows/pages.yml")
 if not pages.is_file():
     failures.append("missing .github/workflows/pages.yml")
-elif not BUNDLE.search(pages.read_text(encoding="utf-8")):
+elif not any(
+    BUNDLE.search(line)
+    for line in pages.read_text(encoding="utf-8").splitlines()
+):
     failures.append(".github/workflows/pages.yml: expected a bundle install step")
 
 if failures:

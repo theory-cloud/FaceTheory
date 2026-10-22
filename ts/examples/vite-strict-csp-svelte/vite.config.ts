@@ -21,7 +21,7 @@ export default defineConfig(({ isSsrBuild }) => {
       assetsInlineLimit: 0,
       manifest: !ssr,
       ...(ssr ? { ssr: entry } : {}),
-      rollupOptions: {
+      rolldownOptions: {
         ...(!ssr ? { preserveEntrySignatures: 'exports-only' as const } : {}),
         input: entry,
         ...(ssr

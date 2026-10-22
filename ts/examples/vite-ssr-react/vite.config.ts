@@ -31,7 +31,7 @@ export default defineConfig(({ isSsrBuild }) => {
       assetsInlineLimit: 0,
       manifest: !ssr,
       ...(ssr ? { ssr: entry } : {}),
-      rollupOptions: {
+      rolldownOptions: {
         input: entry,
         output: ssr
           ? {
@@ -40,8 +40,14 @@ export default defineConfig(({ isSsrBuild }) => {
               assetFileNames: 'assets/[name]-[hash][extname]',
             }
           : {
-              manualChunks: (id) =>
-                id.endsWith('src/chunk.ts') ? 'chunk' : undefined,
+              codeSplitting: {
+                groups: [
+                  {
+                    name: 'chunk',
+                    test: (id) => id.endsWith('src/chunk.ts'),
+                  },
+                ],
+              },
             },
       },
     },

@@ -184,7 +184,7 @@ ${plugins}  build: {
     manifest: true,
     outDir: 'dist/client',
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       input: '${entry}',
       output: {
         entryFileNames: 'client.js',
