@@ -1,5 +1,20 @@
 # Changelog
 
+## [5.0.2-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.0.1...v5.0.2-rc) (2026-10-22)
+
+
+### Bug Fixes
+
+* **ci:** freeze the docs bundle through the frozen setting ([0f77fdf](https://github.com/theory-cloud/FaceTheory/commit/0f77fdfe69dba75d1eb600e0cf4ce5a213a31b58))
+* clear four Rolldown and Bundler deprecations ([f5b1635](https://github.com/theory-cloud/FaceTheory/commit/f5b16353cef51f9ea865a9b8e1b4e2604bc33358))
+* **deps:** adopt AppTheory v6.3.1 + TableTheory v6.1.1 ([0761100](https://github.com/theory-cloud/FaceTheory/commit/0761100a889a3c17cc440d3fbe773e551e04c00f))
+* **deps:** bump certifi to 2026.10.19 in the publish toolchain ([5a6bf1c](https://github.com/theory-cloud/FaceTheory/commit/5a6bf1c3439d4379adcf4d835d1be72ee9e17305))
+* **deps:** bump certifi to 2026.10.19 in the publish toolchain ([607aaf4](https://github.com/theory-cloud/FaceTheory/commit/607aaf45f5be5fe05d4cacf7b23a69eceae33941))
+* **deps:** pin AppTheory v6.3.1 and TableTheory v6.1.1 release assets ([fc35ddb](https://github.com/theory-cloud/FaceTheory/commit/fc35ddbd4fcf674e5db36d66b2154ef09fe98ed4))
+* **examples:** migrate manualChunks to output.codeSplitting ([f786ccb](https://github.com/theory-cloud/FaceTheory/commit/f786ccb26f665f6c0e495cc8dff73d82186afa11))
+* **examples:** use build.rolldownOptions in the Vite example configs ([c652639](https://github.com/theory-cloud/FaceTheory/commit/c6526393ffd64dd3c86503871dd3578915846ea8))
+* **scaffold:** generate a rolldownOptions Vite config ([44b7e8b](https://github.com/theory-cloud/FaceTheory/commit/44b7e8ba33623ff9adf0c590cff15ad6ec4fc7b7))
+
 ## [5.0.1-rc.1](https://github.com/theory-cloud/FaceTheory/compare/v5.0.1-rc...v5.0.1-rc.1) (2026-10-19)
 
 
