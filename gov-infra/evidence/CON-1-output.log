@@ -2,5 +2,5 @@ Verifier: gov_check_consistency
 Repository: /Users/theorycloud/AgentSpace/factory/products/frameworks/FaceTheory
 Rubric ID: CON-1
 
-version-alignment: PASS (5.0.1)
+version-alignment: PASS (5.0.2)
 go-version-pin: PASS (go1.27.3)
