@@ -1,5 +1,18 @@
 # Changelog
 
+## [5.0.3-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.0.2...v5.0.3-rc) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** bump the SSG+ISR AWS SDK clients to 3.1156.0 ([122a93b](https://github.com/theory-cloud/FaceTheory/commit/122a93b2966f36ffa7a8c1c238d240b013f71b43))
+* **deps:** bump the ts AWS client, typescript-eslint, antd, and vite ([c26f961](https://github.com/theory-cloud/FaceTheory/commit/c26f961b729f17e7db052ec9c01173e18632662c))
+* **deps:** consolidate Dependabot ts-runtime, Node typings, and setup-ruby updates ([7ae1270](https://github.com/theory-cloud/FaceTheory/commit/7ae12704d4125777b921344505a8b1e88016efaa))
+* **deps:** consolidate Dependabot ts-runtime, Node typings, and setup-ruby updates ([12201a7](https://github.com/theory-cloud/FaceTheory/commit/12201a7be741b0649d67283346f75d2d87f0e4d4))
+* **deps:** consolidate post-merge Dependabot currency for setup-ruby, SSG+ISR, and ts ([1a27007](https://github.com/theory-cloud/FaceTheory/commit/1a270074b119b69bef400a3c2a82c5f49ec7fd4c))
+* **deps:** pin AppTheory v6.4.0 runtime and CDK tarballs ([0c4ef31](https://github.com/theory-cloud/FaceTheory/commit/0c4ef31fde16acd096504534bf67b06a25d98770))
+* **deps:** pin AppTheory v6.4.0 runtime and CDK tarballs ([f8770b9](https://github.com/theory-cloud/FaceTheory/commit/f8770b94a2568e5940fb343a816584c92dfe165a))
+
 ## [5.0.2-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.0.1...v5.0.2-rc) (2026-10-22)
 
 
