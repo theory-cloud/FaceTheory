@@ -2,10 +2,10 @@
 
 `@theory-cloud/facetheory` is a TypeScript runtime for three AWS-first server render modes (SSR, SSG, and blocking ISR) plus the SPA client runtime on Node.js `>=22`, with package exports for React, Vue, and Svelte adapters plus AppTheory and TableTheory integration surfaces.
 
-## Install v5.0.2-rc <!-- x-release-please-version -->
+## Install v5.0.2 <!-- x-release-please-version -->
 
 ```bash
-export FACETHEORY_VERSION=5.0.2-rc # x-release-please-version
+export FACETHEORY_VERSION=5.0.2 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -33,8 +33,8 @@ The Svelte peer range is `>=5.55.7`. FaceTheory v4.0.0 dropped Svelte 4 support 
 
 Optional companion packages:
 
-- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v6.3.1/theory-cloud-apptheory-6.3.1.tgz`
-- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v6.3.1/theory-cloud-apptheory-cdk-6.3.1.tgz`
+- AppTheory runtime: `https://github.com/theory-cloud/AppTheory/releases/download/v6.4.0/theory-cloud-apptheory-6.4.0.tgz`
+- AppTheory CDK: `https://github.com/theory-cloud/AppTheory/releases/download/v6.4.0/theory-cloud-apptheory-cdk-6.4.0.tgz`
 - TableTheory runtime: `https://github.com/theory-cloud/TableTheory/releases/download/v6.1.1/theory-cloud-tabletheory-ts-6.1.1.tgz`
 
 ## Minimal App
@@ -108,12 +108,12 @@ Every public subpath below is declared in `ts/package.json` and mirrored in `doc
 
 <!-- x-release-please-start-version -->
 
-- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v5.0.2-rc/docs/getting-started.md)
-- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v5.0.2-rc/docs/api-reference.md)
-- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v5.0.2-rc/docs/core-patterns.md)
-- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v5.0.2-rc/docs/testing-guide.md)
-- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v5.0.2-rc/docs/cdk/README.md)
+- [Getting Started](https://github.com/theory-cloud/FaceTheory/blob/v5.0.2/docs/getting-started.md)
+- [API Reference](https://github.com/theory-cloud/FaceTheory/blob/v5.0.2/docs/api-reference.md)
+- [Core Patterns](https://github.com/theory-cloud/FaceTheory/blob/v5.0.2/docs/core-patterns.md)
+- [Testing Guide](https://github.com/theory-cloud/FaceTheory/blob/v5.0.2/docs/testing-guide.md)
+- [CDK And AWS Notes](https://github.com/theory-cloud/FaceTheory/blob/v5.0.2/docs/cdk/README.md)
 
 <!-- x-release-please-end -->
 
-The `v5.0.2-rc` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->
+The `v5.0.2` release also includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle with the canonical docs, runnable examples, and reference deployment stacks. <!-- x-release-please-version -->

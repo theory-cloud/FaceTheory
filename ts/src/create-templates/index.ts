@@ -64,7 +64,7 @@ function renderPackageJson(ctx: CreateTemplateContext): string {
   }
 
   const devDependencies: Record<string, string> = {
-    '@types/node': dependencyVersion(ctx, '@types/node', '^24'),
+    '@types/node': dependencyVersion(ctx, '@types/node', '^26'),
     'aws-cdk-lib': dependencyVersion(ctx, 'aws-cdk-lib', '2.263.0'),
     constructs: dependencyVersion(ctx, 'constructs', '10.8.0'),
     esbuild: dependencyVersion(ctx, 'esbuild', '^0.28.1'),
