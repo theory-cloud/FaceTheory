@@ -85,10 +85,11 @@ function renderPackageJson(ctx: CreateTemplateContext): string {
       '^19',
     );
   } else if (ctx.adapter === 'svelte') {
-    devDependencies['@sveltejs/vite-plugin-svelte'] = dependencyVersion(
+    devDependencies.rollup = dependencyVersion(ctx, 'rollup', '4.65.0');
+    devDependencies['rollup-plugin-svelte'] = dependencyVersion(
       ctx,
-      '@sveltejs/vite-plugin-svelte',
-      '^7',
+      'rollup-plugin-svelte',
+      '7.2.3',
     );
   }
 
@@ -173,9 +174,12 @@ function renderViteConfig(ctx: CreateTemplateContext): string {
   const entry = ctx.adapter === 'react' ? 'src/client.tsx' : 'src/client.ts';
   const pluginImport =
     ctx.adapter === 'svelte'
-      ? "import { svelte } from '@sveltejs/vite-plugin-svelte';\n"
+      ? "import svelte from 'rollup-plugin-svelte';\n"
       : '';
-  const plugins = ctx.adapter === 'svelte' ? '  plugins: [svelte()],\n' : '';
+  const plugins =
+    ctx.adapter === 'svelte'
+      ? "  plugins: [svelte({ emitCss: true, compilerOptions: { generate: 'client' } })],\n"
+      : '';
 
   return withFinalNewline(`${pluginImport}import { defineConfig } from 'vite';
 
@@ -482,6 +486,19 @@ function renderSvelteFiles(): CreateTemplateFile[] {
 
   const component: Component<Record<string, unknown>>;
   export default component;
+}
+
+declare module 'rollup-plugin-svelte' {
+  import type { Plugin } from 'rollup';
+  import type { CompileOptions } from 'svelte/compiler';
+
+  interface Options {
+    emitCss: boolean;
+    compilerOptions: CompileOptions;
+  }
+
+  function svelte(options?: Partial<Options>): Plugin;
+  export = svelte;
 }
 `),
     },

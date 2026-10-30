@@ -23,6 +23,7 @@ const packageRoot = path.resolve(
   '../..',
 );
 const tscBin = path.resolve(packageRoot, 'node_modules/typescript/bin/tsc');
+const viteBin = path.resolve(packageRoot, 'node_modules/vite/bin/vite.js');
 
 class CaptureStream extends Writable {
   public text = '';
@@ -108,6 +109,34 @@ async function execTsc(
   });
 }
 
+async function runGeneratedClientBuild(
+  cwd: string,
+): Promise<{ stderr: string; stdout: string }> {
+  return await new Promise((resolve, reject) => {
+    execFile(
+      process.execPath,
+      [viteBin, 'build', '--config', 'vite.config.ts'],
+      {
+        cwd,
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024,
+        timeout: 120_000,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(
+            new Error(
+              `vite build failed\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+            ),
+          );
+          return;
+        }
+        resolve({ stderr, stdout });
+      },
+    );
+  });
+}
+
 async function prepareLocalFaceTheoryPackage(appDir: string): Promise<void> {
   const localPackageDir = path.resolve(
     appDir,
@@ -161,13 +190,11 @@ async function linkTypecheckDependencies(appDir: string): Promise<void> {
     ['constructs', installedPackagePath('constructs')],
     ['react', installedPackagePath('react')],
     ['react-dom', installedPackagePath('react-dom')],
+    ['rollup', installedPackagePath('rollup')],
+    ['rollup-plugin-svelte', installedPackagePath('rollup-plugin-svelte')],
     ['vue', installedPackagePath('vue')],
     ['@vue/server-renderer', installedPackagePath('@vue/server-renderer')],
     ['svelte', installedPackagePath('svelte')],
-    [
-      '@sveltejs/vite-plugin-svelte',
-      installedPackagePath('@sveltejs/vite-plugin-svelte'),
-    ],
     ['vite', installedPackagePath('vite')],
   ];
 
@@ -246,7 +273,7 @@ test('facetheory create emits a React starter that typechecks', async () => {
   }
 });
 
-test('facetheory create emits Vue and Svelte starters that typecheck', async () => {
+test('facetheory create emits Vue and Svelte starters that typecheck and build', async () => {
   const tempRoot = await mkdtemp(
     path.join(tmpdir(), 'facetheory-create-adapters-'),
   );
@@ -280,10 +307,47 @@ test('facetheory create emits Vue and Svelte starters that typecheck', async () 
     assert.doesNotMatch(svelteClient, /getElementById\(['"]root['"]\)/);
     assert.match(svelteClient, /loadFaceHydrationData<HomeData>/);
 
+    const sveltePackageJson = await readGeneratedJson<{
+      devDependencies: Record<string, string>;
+    }>(path.resolve(tempRoot, 'svelte-app'), 'package.json');
+    assert.equal(sveltePackageJson.devDependencies.rollup, '4.65.0');
+    assert.equal(
+      sveltePackageJson.devDependencies['rollup-plugin-svelte'],
+      '7.2.3',
+    );
+    assert.equal(
+      sveltePackageJson.devDependencies['@sveltejs/vite-plugin-svelte'],
+      undefined,
+    );
+
+    const svelteViteConfig = await readFile(
+      path.resolve(tempRoot, 'svelte-app/vite.config.ts'),
+      'utf8',
+    );
+    assert.match(
+      svelteViteConfig,
+      /import svelte from 'rollup-plugin-svelte';/,
+    );
+    assert.match(svelteViteConfig, /compilerOptions: \{ generate: 'client' \}/);
+    assert.match(svelteViteConfig, /emitCss: true/);
+    assert.doesNotMatch(svelteViteConfig, /@sveltejs\/vite-plugin-svelte/);
+
     for (const adapter of ['vue', 'svelte'] as const) {
       const appDir = path.resolve(tempRoot, `${adapter}-app`);
       await linkTypecheckDependencies(appDir);
       await runGeneratedTypecheck(appDir);
+      if (adapter === 'svelte') {
+        await runGeneratedClientBuild(appDir);
+        const manifest = await readGeneratedJson<{
+          [entry: string]: { file: string };
+        }>(appDir, 'dist/client/.vite/manifest.json');
+        assert.equal(manifest['src/client.ts']?.file, 'client.js');
+        const builtClient = await readFile(
+          path.resolve(appDir, 'dist/client/client.js'),
+          'utf8',
+        );
+        assert.match(builtClient, /hydrate/);
+      }
     }
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
