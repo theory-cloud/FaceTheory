@@ -290,6 +290,13 @@ jobs:
         run: |
           bash scripts/stage_theorycloud_facetheory_subtree.sh --output /tmp/facetheory-theorycloud
           bash scripts/verify_theorycloud_facetheory_subtree.sh /tmp/facetheory-theorycloud
+      - name: Verify subtree destination test as ordinary user
+        run: |
+          echo "ordinary-user uid=$(id -u) user=$(id -un)"
+          bash scripts/test-theorycloud-subtree-destination.sh
+      - name: Verify subtree destination test as UID 0 (sudo -n)
+        run: |
+          sudo -n bash scripts/test-theorycloud-subtree-destination.sh
       - name: Verify sync/publish helper dry runs
         run: |
           THEORYCLOUD_S3_SYNC_DRY_RUN=true bash scripts/sync_theorycloud_facetheory_subtree.sh --stage lab
