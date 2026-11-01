@@ -25,12 +25,16 @@
 # Operator ruling 2026-10-03: "if a vulnerable dependency is bundled in AWS we
 # make an exception until its updated there."
 #
-# The file currently grants no exception. The last entry — bundled
-# brace-expansion 5.0.9 in aws-cdk-lib 2.271.0 (the aws-cdk-lib peer of the
-# AppTheory CDK pin at that time) — was retired when the AppTheory v6 CDK pin
-# moved aws-cdk-lib to 2.273.0, which stays the exact peer of the current
-# apptheory-cdk: that release bundles fixed brace-expansion 5.0.12, so real
-# `npm audit --package-lock-only` output in ts, infra/apptheory-ssr-site, and
-# infra/apptheory-ssg-isr-site reports zero findings and the entry matched
-# nothing. Recorded in docs/UPSTREAM_RELEASE_PINS.md under "Known Audit
-# Exceptions".
+# minimatch 10.2.5 is bundled inside aws-cdk-lib 2.273.0, the exact peer of
+# @theory-cloud/apptheory-cdk v6.4.0. The copy at
+# node_modules/aws-cdk-lib/node_modules/minimatch is published inside the AWS
+# tarball and cannot be upgraded from this repository; the newest aws-cdk-lib
+# (2.275.0) still bundles minimatch ^10.2.6. Every non-bundled minimatch copy is
+# resolved by the ts/package.json override to 11.0.1, so this exception covers
+# only the AWS-published copy and no other path.
+# Operator ruling 2026-10-03 (extended 2026-10-04 to AWS-published
+# build-toolchain chains): "if a vulnerable dependency is bundled in AWS we make
+# an exception until its updated there."
+# Removal: retire this entry when the pinned aws-cdk-lib bundles
+# minimatch >= 11.0.1.
+allow ids=GHSA-g3hv-75wg-m249 package=minimatch version=10.2.5 nodes=node_modules/aws-cdk-lib/node_modules/minimatch projects=ts,infra/apptheory-ssr-site,infra/apptheory-ssg-isr-site expires=2026-12-01

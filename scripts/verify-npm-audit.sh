@@ -145,21 +145,50 @@ function isScopedAllowlisted(exception, name, vulnerability) {
   );
 }
 
-const allowed = [];
-const unexpected = [];
+const reasons = new Map();
 for (const [name, vulnerability] of entries) {
   const advisoryIds = viaAdvisories(vulnerability)
     .map((entry) => entry.id)
     .join(',');
   if (isBareAllowlisted(vulnerability)) {
-    allowed.push(`npm-audit: ALLOW (${project}) ${name} via ${advisoryIds} [allowlist id]`);
+    reasons.set(name, `via ${advisoryIds} [allowlist id]`);
     continue;
   }
   const match = scoped.find((exception) => isScopedAllowlisted(exception, name, vulnerability));
   if (match) {
-    allowed.push(
-      `npm-audit: ALLOW (${project}) ${name} via ${advisoryIds} [scoped exception, expires ${match.expires}]`,
-    );
+    reasons.set(name, `via ${advisoryIds} [scoped exception, expires ${match.expires}]`);
+  }
+}
+
+// npm also reports a package that is vulnerable only through vulnerable
+// dependencies as its own entry, with their names in `via` in place of
+// advisories. Such an entry may inherit an allowance only when it carries no
+// advisory of its own and every named dependency is already allowed; an entry
+// naming an unknown dependency, or one that is not allowed, still fails.
+function transitiveVia(vulnerability) {
+  const via = Array.isArray(vulnerability?.via) ? vulnerability.via : [];
+  if (via.length === 0) return null;
+  return via.every((entry) => typeof entry === 'string') ? via : null;
+}
+
+for (let changed = true; changed; ) {
+  changed = false;
+  for (const [name, vulnerability] of entries) {
+    if (reasons.has(name)) continue;
+    const via = transitiveVia(vulnerability);
+    if (via === null) continue;
+    if (!via.every((dependency) => reasons.has(dependency))) continue;
+    reasons.set(name, `via ${via.join(',')} [transitive of allowed finding]`);
+    changed = true;
+  }
+}
+
+const allowed = [];
+const unexpected = [];
+for (const [name, vulnerability] of entries) {
+  const reason = reasons.get(name);
+  if (reason !== undefined) {
+    allowed.push(`npm-audit: ALLOW (${project}) ${name} ${reason}`);
   } else {
     unexpected.push([name, vulnerability]);
   }

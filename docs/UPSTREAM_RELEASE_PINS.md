@@ -84,11 +84,26 @@ The gov-infra supply-chain allowlist (`gov-infra/planning/facetheory-supply-chai
 `npm audit` finding may be allowed, and `scripts/verify-npm-audit.sh` requires a clean audit in `ts`,
 `infra/apptheory-ssr-site`, and `infra/apptheory-ssg-isr-site` otherwise. A scoped exception entry names an exact
 advisory set, package, installed version, node path, project list, and UTC expiry; the gate fails on anything outside
-those gates and ignores the entry once it expires.
+those gates and ignores the entry once it expires. A parent package that npm reports only because an allowed dependency
+is vulnerable (an entry whose `via` lists dependency names rather than advisories) inherits the allowance only when
+every dependency it names is itself allowed and it carries no advisory of its own.
 
 ### Active exceptions
 
-None. The allowlist grants no exception; `scripts/verify-npm-audit.sh` fails on any finding that appears.
+- **bundled `minimatch` 10.2.5 in `aws-cdk-lib@2.273.0`** — `GHSA-g3hv-75wg-m249` (DoS via globparts amplification),
+  fixed in `minimatch@11.0.1`. The affected copy at `node_modules/aws-cdk-lib/node_modules/minimatch` ships inside the
+  AWS-published `aws-cdk-lib` tarball and cannot be upgraded from this repository; the newest `aws-cdk-lib` (`2.275.0`)
+  still bundles `minimatch ^10.2.6`. The scoped entry names exactly that package, version, node path, all three audited
+  projects, and the single advisory, and expires 2026-12-01. Authorised by the operator ruling of 2026-10-03 ("if a
+  vulnerable dependency is bundled in AWS we make an exception until its updated there"), extended 2026-10-04 to
+  AWS-published build-toolchain chains. Removal condition: the pinned `aws-cdk-lib` bundles `minimatch >= 11.0.1`.
+
+### Non-bundled remediation
+
+Non-bundled copies are not eligible for an exception and are resolved by upgrade instead. The same advisory batch
+(2026-10-30) also published `GHSA-3g3m-2fjr-6pw4` against `glob` (patched `14.0.2`), so `ts/package.json` overrides
+`minimatch` to `11.0.1` and `glob` to `14.0.3`; `ts/package-lock.json` resolves every non-bundled `minimatch` to
+`11.0.1` and `glob` to `14.0.3`, leaving only the AWS-bundled node above.
 
 ### Recently cleared
 
