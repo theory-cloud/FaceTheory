@@ -37,19 +37,23 @@ reach:
   only the app handler surfaces, and a metafile-instrumented bundle of the reference handler contains no
   `initialSessionListenerEnabled` symbol. Both infra synth snapshots pass without regeneration (551.9 kB SSR /
   720.8 kB SSG+ISR, the same bytes the `v6.3.1` snapshots recorded);
-- the AppTheory CDK peer floor is **unchanged**: `@theory-cloud/apptheory-cdk` `v6.4.0` still declares exact
-  `aws-cdk-lib@2.273.0` and `constructs@^10.8.1`, so `ts/` and both infra examples stay on `aws-cdk-lib@2.273.0` and no
-  CDK bump lands with this move;
+- the AppTheory CDK peer declaration is **unchanged**: `@theory-cloud/apptheory-cdk` `v6.4.0` still declares exact
+  `aws-cdk-lib@2.273.0` and `constructs@^10.8.1`. That adoption landed no CDK bump; the later dependency refresh moves
+  `ts/` and both infra examples to `aws-cdk-lib@2.275.0` and reconciles the exact peer with a scoped
+  `@theory-cloud/apptheory-cdk -> aws-cdk-lib` override in each manifest, so this declaration still gates the peer
+  version a framework release is allowed to request;
 - the AppTheory CDK assembly has **no substantive code change**: of 153 `lib/` files, 107 are byte-identical and all 46
   that differ do so only in the jsii runtime type version string (`6.3.1` -> `6.4.0`); the `.jsii` assembly differs only
   in its `version` and `fingerprint`. The constructs both reference stacks consume are unchanged and no synthesized
   template moves, which is why the snapshots are stable;
-- the raised `@aws-sdk/*` floor moves the transitive AWS SDK graph even though no FaceTheory source changes: npm
-  resolves the six AppTheory runtime clients to `3.1156.0` and nests the newer `@aws-sdk/core`, `credential-provider-*`,
-  `@aws-sdk/types`, and middleware versions those clients now require. The locks were regenerated with
-  `--before=2026-10-26T00:00:00.000Z` so the graph holds at the declared floor (`@aws-sdk/core@3.978.5`,
-  `@smithy/core@3.36.2`, matching the existing `@aws-sdk/client-s3@3.1156.0` in this repo) instead of floating to the
-  `3.1157.0` line published 2026-10-26;
+- the raised `@aws-sdk/*` floor moves the transitive AWS SDK graph even though no FaceTheory source changes. The
+  v6.4.0 adoption resolved the six AppTheory runtime clients at `3.1156.0` and held the graph at that floor with
+  `--before=2026-10-26T00:00:00.000Z`; the 2026-11-01 dependency refresh moves every `@aws-sdk/client-*` in `ts/` to
+  `3.1161.0`, drops the previously nested duplicate copies, and resolves a single `@aws-sdk/core@3.979.1` and
+  `@smithy/core@3.38.1` for the whole graph. The refresh also adopts the releases published that day: `parse5` 8.1.0
+  and `globals` 17.14.0. parse5 8.1.0 escapes `<` in attribute values as `&lt;` during fragment serialization, which
+  is additional escaping in the safe direction; the SPA destination-CSP screen still accepts both image data URLs, and
+  its snapshot assertion now compares the re-parsed attributes instead of serialization bytes;
 - the `v6.3` line's **required `RouteRefreshPolicy`** remains a startup-breaking change for consumers of AppTheory's
   framework-owned MCP front channel only (`mcpfacade.RegisterMCPFacade` / `registerMcpFacade` with `Provider` set).
   FaceTheory does not consume it (see above), so the new validation cannot fire.
@@ -90,13 +94,14 @@ every dependency it names is itself allowed and it carries no advisory of its ow
 
 ### Active exceptions
 
-- **bundled `minimatch` 10.2.5 in `aws-cdk-lib@2.273.0`** — `GHSA-g3hv-75wg-m249` (DoS via globparts amplification),
+- **bundled `minimatch` 10.2.6 in `aws-cdk-lib@2.275.0`** — `GHSA-g3hv-75wg-m249` (DoS via globparts amplification),
   fixed in `minimatch@11.0.1`. The affected copy at `node_modules/aws-cdk-lib/node_modules/minimatch` ships inside the
-  AWS-published `aws-cdk-lib` tarball and cannot be upgraded from this repository; the newest `aws-cdk-lib` (`2.275.0`)
-  still bundles `minimatch ^10.2.6`. The scoped entry names exactly that package, version, node path, all three audited
-  projects, and the single advisory, and expires 2026-12-01. Authorised by the operator ruling of 2026-10-03 ("if a
-  vulnerable dependency is bundled in AWS we make an exception until its updated there"), extended 2026-10-04 to
-  AWS-published build-toolchain chains. Removal condition: the pinned `aws-cdk-lib` bundles `minimatch >= 11.0.1`.
+  AWS-published `aws-cdk-lib` tarball and cannot be upgraded from this repository; `2.275.0` is the newest published
+  `aws-cdk-lib` and it still declares `minimatch ^10.2.6`, so no available CDK release fixes this. The scoped entry
+  names exactly that package, version, node path, all three audited projects, and the single advisory, and expires
+  2026-12-01. Authorised by the operator ruling of 2026-10-03 ("if a vulnerable dependency is bundled in AWS we make an
+  exception until its updated there"), extended 2026-10-04 to AWS-published build-toolchain chains. Removal condition:
+  the pinned `aws-cdk-lib` bundles `minimatch >= 11.0.1`.
 
 ### Non-bundled remediation
 
@@ -110,10 +115,11 @@ Non-bundled copies are not eligible for an exception and are resolved by upgrade
 - **bundled `brace-expansion` 5.0.9** — retired by the AppTheory v6 CDK pin move and kept retired here. The exception's
   documented removal condition ("must be rechecked when `aws-cdk-lib` bundles a fixed `brace-expansion` (>= 5.0.12)") is
   met: `aws-cdk-lib@2.273.0`, the exact peer of `@theory-cloud/apptheory-cdk` `v6.4.0`, bundles `brace-expansion@5.0.12`
-  at `node_modules/aws-cdk-lib/node_modules/brace-expansion` in all three projects, and the three advisories
-  (`GHSA-q2hr-2g5m-vwhr`, `GHSA-qhr7-859c-m2p7`, `GHSA-6j4f-fj2g-mc7p`) are fixed at 5.0.10 / 5.0.11 / 5.0.12. The scoped
-  allowlist entry was removed rather than re-granted; it expired 2026-11-02, and removal happened first because the
-  condition it named was actually satisfied.
+  at `node_modules/aws-cdk-lib/node_modules/brace-expansion` in all three projects, and the current
+  `aws-cdk-lib@2.275.0` pin bundles the same `5.0.12`; the three advisories (`GHSA-q2hr-2g5m-vwhr`,
+  `GHSA-qhr7-859c-m2p7`, `GHSA-6j4f-fj2g-mc7p`) are fixed at 5.0.10 / 5.0.11 / 5.0.12. The scoped allowlist entry was
+  removed rather than re-granted; it expired 2026-11-02, and removal happened first because the condition it named was
+  actually satisfied.
 - **top-level `brace-expansion`** — non-bundled dependency paths resolve to fixed `brace-expansion@5.0.12`.
 
 ## Infra Lockfile Note
@@ -133,7 +139,11 @@ That restore rule stops at the pinned runtime's own declared dependency floor. A
 `credential-provider-*`, `@aws-sdk/types`, and middleware versions they require must move with it; restoring them to
 their `v6.3.1` versions would make the lock violate the manifest it installs. This adoption resolved them at that
 declared floor (`@aws-sdk/core@3.978.5`, `@smithy/core@3.36.2`) with `--before=2026-10-26T00:00:00.000Z`, deliberately
-not floating to the `3.1157.0` line published 2026-10-26.
+not floating to the `3.1157.0` line published 2026-10-26. The 2026-11-01 dependency refresh supersedes that hold by
+design: it refreshes the whole graph within the declared ranges, so every `@aws-sdk/client-*` now resolves at
+`3.1161.0` with a single `@aws-sdk/core@3.979.1` and `@smithy/core@3.38.1`. The same-day `parse5` 8.1.0 and `globals`
+17.14.0 releases are adopted with it. The restore rule above continues to apply to pin-only PRs that do not carry a
+dependency refresh.
 
 ## Install (npm)
 

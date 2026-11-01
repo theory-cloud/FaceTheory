@@ -25,11 +25,13 @@
 # Operator ruling 2026-10-03: "if a vulnerable dependency is bundled in AWS we
 # make an exception until its updated there."
 #
-# minimatch 10.2.5 is bundled inside aws-cdk-lib 2.273.0, the exact peer of
-# @theory-cloud/apptheory-cdk v6.4.0. The copy at
-# node_modules/aws-cdk-lib/node_modules/minimatch is published inside the AWS
-# tarball and cannot be upgraded from this repository; the newest aws-cdk-lib
-# (2.275.0) still bundles minimatch ^10.2.6. Every non-bundled minimatch copy is
+# minimatch 10.2.6 is bundled inside aws-cdk-lib 2.275.0, the pin this repo
+# carries ahead of the exact peer (@theory-cloud/apptheory-cdk v6.4.0 still
+# declares aws-cdk-lib 2.273.0; the ts/ and infra overrides reconcile the two).
+# The copy at node_modules/aws-cdk-lib/node_modules/minimatch is published
+# inside the AWS tarball and cannot be upgraded from this repository; 2.275.0
+# is the newest published aws-cdk-lib and it still declares minimatch ^10.2.6,
+# so no available CDK release fixes this. Every non-bundled minimatch copy is
 # resolved by the ts/package.json override to 11.0.1, so this exception covers
 # only the AWS-published copy and no other path.
 # Operator ruling 2026-10-03 (extended 2026-10-04 to AWS-published
@@ -37,4 +39,4 @@
 # an exception until its updated there."
 # Removal: retire this entry when the pinned aws-cdk-lib bundles
 # minimatch >= 11.0.1.
-allow ids=GHSA-g3hv-75wg-m249 package=minimatch version=10.2.5 nodes=node_modules/aws-cdk-lib/node_modules/minimatch projects=ts,infra/apptheory-ssr-site,infra/apptheory-ssg-isr-site expires=2026-12-01
+allow ids=GHSA-g3hv-75wg-m249 package=minimatch version=10.2.6 nodes=node_modules/aws-cdk-lib/node_modules/minimatch projects=ts,infra/apptheory-ssr-site,infra/apptheory-ssg-isr-site expires=2026-12-01
