@@ -50,8 +50,10 @@ reach:
   v6.4.0 adoption resolved the six AppTheory runtime clients at `3.1156.0` and held the graph at that floor with
   `--before=2026-10-26T00:00:00.000Z`; the 2026-11-01 dependency refresh moves every `@aws-sdk/client-*` in `ts/` to
   `3.1161.0`, drops the previously nested duplicate copies, and resolves a single `@aws-sdk/core@3.979.1` and
-  `@smithy/core@3.38.1` for the whole graph. That refresh was regenerated with `--before=2026-11-01T00:00:00.000Z`, so
-  no release published on the refresh day entered the lock;
+  `@smithy/core@3.38.1` for the whole graph. The refresh also adopts the releases published that day: `parse5` 8.1.0
+  and `globals` 17.14.0. parse5 8.1.0 escapes `<` in attribute values as `&lt;` during fragment serialization, which
+  is additional escaping in the safe direction; the SPA destination-CSP screen still accepts both image data URLs, and
+  its snapshot assertion now compares the re-parsed attributes instead of serialization bytes;
 - the `v6.3` line's **required `RouteRefreshPolicy`** remains a startup-breaking change for consumers of AppTheory's
   framework-owned MCP front channel only (`mcpfacade.RegisterMCPFacade` / `registerMcpFacade` with `Provider` set).
   FaceTheory does not consume it (see above), so the new validation cannot fire.
@@ -138,9 +140,10 @@ That restore rule stops at the pinned runtime's own declared dependency floor. A
 their `v6.3.1` versions would make the lock violate the manifest it installs. This adoption resolved them at that
 declared floor (`@aws-sdk/core@3.978.5`, `@smithy/core@3.36.2`) with `--before=2026-10-26T00:00:00.000Z`, deliberately
 not floating to the `3.1157.0` line published 2026-10-26. The 2026-11-01 dependency refresh supersedes that hold by
-design: it refreshes the whole graph within the declared ranges, cut off at `--before=2026-11-01T00:00:00.000Z`, so
-every `@aws-sdk/client-*` now resolves at `3.1161.0` with a single `@aws-sdk/core@3.979.1` and `@smithy/core@3.38.1`.
-The restore rule above continues to apply to pin-only PRs that do not carry a dependency refresh.
+design: it refreshes the whole graph within the declared ranges, so every `@aws-sdk/client-*` now resolves at
+`3.1161.0` with a single `@aws-sdk/core@3.979.1` and `@smithy/core@3.38.1`. The same-day `parse5` 8.1.0 and `globals`
+17.14.0 releases are adopted with it. The restore rule above continues to apply to pin-only PRs that do not carry a
+dependency refresh.
 
 ## Install (npm)
 
