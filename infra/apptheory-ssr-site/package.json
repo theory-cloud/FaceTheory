@@ -16,7 +16,7 @@
     "@theory-cloud/apptheory-cdk": "https://github.com/theory-cloud/AppTheory/releases/download/v6.4.0/theory-cloud-apptheory-cdk-6.4.0.tgz",
     "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v6.1.1/theory-cloud-tabletheory-ts-6.1.1.tgz",
     "@types/node": "^26.6.5",
-    "aws-cdk-lib": "2.273.0",
+    "aws-cdk-lib": "2.275.0",
     "constructs": "10.8.1",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.13",
@@ -25,6 +25,9 @@
   "overrides": {
     "@theory-cloud/apptheory": {
       "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v6.1.1/theory-cloud-tabletheory-ts-6.1.1.tgz"
+    },
+    "@theory-cloud/apptheory-cdk": {
+      "aws-cdk-lib": "2.275.0"
     }
   }
 }
