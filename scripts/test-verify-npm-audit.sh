@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Purpose: prove the npm-audit security gate (a) retries only unusable registry
 # results, (b) stays bounded and fails closed when the registry never answers,
-# (c) still fails on a real, non-allowlisted finding without retrying, and
-# (d) honours a scoped, self-expiring allowlist exception ONLY for the exact
-# bundled package, version, node path, advisory set, and project it names.
+# (c) still fails on a real, non-allowlisted finding without retrying, (d)
+# honours a scoped, self-expiring allowlist exception ONLY for the exact
+# bundled package, version, node path, advisory set, and project it names, and
+# (e) lets a transitive-only parent entry inherit an allowance only when every
+# dependency it names is itself allowed and it carries no advisory of its own.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -76,6 +78,22 @@ case "${FAKE_NPM_MODE}" in
     ;;
   bundled-other-package)
     printf '%s\n' '{"vulnerabilities":{"minimatch":{"name":"minimatch","severity":"high","via":[{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"}],"nodes":["node_modules/aws-cdk-lib/node_modules/brace-expansion"]}}}'
+    exit 1
+    ;;
+  bundled-chain)
+    printf '%s\n' '{"vulnerabilities":{"brace-expansion":{"name":"brace-expansion","severity":"high","via":[{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"},{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-qhr7-859c-m2p7"},{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-6j4f-fj2g-mc7p"}],"nodes":["node_modules/aws-cdk-lib/node_modules/brace-expansion"]},"aws-cdk-lib":{"name":"aws-cdk-lib","severity":"high","via":["brace-expansion"],"nodes":["node_modules/aws-cdk-lib"]},"@theory-cloud/apptheory-cdk":{"name":"@theory-cloud/apptheory-cdk","severity":"high","via":["aws-cdk-lib"],"nodes":["node_modules/@theory-cloud/apptheory-cdk"]}}}'
+    exit 1
+    ;;
+  bundled-chain-own-advisory)
+    printf '%s\n' '{"vulnerabilities":{"brace-expansion":{"name":"brace-expansion","severity":"high","via":[{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"}],"nodes":["node_modules/aws-cdk-lib/node_modules/brace-expansion"]},"aws-cdk-lib":{"name":"aws-cdk-lib","severity":"high","via":[{"name":"aws-cdk-lib","url":"https://github.com/advisories/GHSA-9999-9999-9999"},"brace-expansion"],"nodes":["node_modules/aws-cdk-lib"]}}}'
+    exit 1
+    ;;
+  bundled-chain-unallowed)
+    printf '%s\n' '{"vulnerabilities":{"brace-expansion":{"name":"brace-expansion","severity":"high","via":[{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"}],"nodes":["node_modules/aws-cdk-lib/node_modules/brace-expansion"]},"evil-pkg":{"name":"evil-pkg","severity":"high","via":[{"name":"evil-pkg","url":"https://github.com/advisories/GHSA-9999-9999-9999"}],"nodes":["node_modules/evil-pkg"]},"aws-cdk-lib":{"name":"aws-cdk-lib","severity":"high","via":["evil-pkg"],"nodes":["node_modules/aws-cdk-lib"]}}}'
+    exit 1
+    ;;
+  bundled-chain-orphan)
+    printf '%s\n' '{"vulnerabilities":{"brace-expansion":{"name":"brace-expansion","severity":"high","via":[{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"}],"nodes":["node_modules/aws-cdk-lib/node_modules/brace-expansion"]},"aws-cdk-lib":{"name":"aws-cdk-lib","severity":"high","via":["not-reported"],"nodes":["node_modules/aws-cdk-lib"]}}}'
     exit 1
     ;;
   *)
@@ -192,5 +210,38 @@ status="$(run_gate bundled-expired)"
 [[ "${status}" != "0" ]] || fail "an expired scoped exception must fail the gate"
 grep -Fq 'npm-audit: FAIL (ts)' "${tmpdir}/bundled-expired.err" ||
   fail "expired exception did not fail the gate"
+
+# (k) A transitive-only parent entry inherits an already-allowed finding's
+# allowance, through a chain, and the report says why.
+write_allowlist "${scoped_prefix} projects=${all_projects} expires=2999-01-01"
+write_bundled_locks 5.0.9
+status="$(run_gate bundled-chain)"
+[[ "${status}" == "0" ]] || fail "a transitive-only chain of an allowed finding should pass, got status ${status}"
+grep -Fq 'npm-audit: ALLOW (ts) brace-expansion via' "${tmpdir}/bundled-chain.out" ||
+  fail "the allowed leaf finding was not reported"
+grep -Fq 'npm-audit: ALLOW (ts) aws-cdk-lib via brace-expansion [transitive of allowed finding]' "${tmpdir}/bundled-chain.out" ||
+  fail "the parent of the allowed finding was not allowed transitively"
+grep -Fq 'npm-audit: ALLOW (ts) @theory-cloud/apptheory-cdk via aws-cdk-lib [transitive of allowed finding]' "${tmpdir}/bundled-chain.out" ||
+  fail "the chained parent of the allowed finding was not allowed transitively"
+
+# (l) A parent entry carrying its own advisory is NOT covered by the chain.
+status="$(run_gate bundled-chain-own-advisory)"
+[[ "${status}" != "0" ]] || fail "a parent with its own advisory must fail the gate"
+grep -Fq 'aws-cdk-lib: severity=' "${tmpdir}/bundled-chain-own-advisory.err" ||
+  fail "the parent's own advisory was not reported as a failure"
+
+# (m) A parent entry whose dependency is not allowed is NOT covered.
+status="$(run_gate bundled-chain-unallowed)"
+[[ "${status}" != "0" ]] || fail "a parent of a non-allowed finding must fail the gate"
+grep -Fq 'evil-pkg: severity=' "${tmpdir}/bundled-chain-unallowed.err" ||
+  fail "the non-allowed dependency was not reported as a failure"
+grep -Fq 'aws-cdk-lib: severity=' "${tmpdir}/bundled-chain-unallowed.err" ||
+  fail "the parent of the non-allowed finding was not reported as a failure"
+
+# (n) A parent entry naming a dependency absent from the report is NOT covered.
+status="$(run_gate bundled-chain-orphan)"
+[[ "${status}" != "0" ]] || fail "a parent naming an unreported dependency must fail the gate"
+grep -Fq 'aws-cdk-lib: severity=' "${tmpdir}/bundled-chain-orphan.err" ||
+  fail "the parent of an unreported dependency was not reported as a failure"
 
 echo "test-verify-npm-audit: PASS"
