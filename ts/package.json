@@ -310,6 +310,8 @@
       "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v6.1.1/theory-cloud-tabletheory-ts-6.1.1.tgz"
     },
     "brace-expansion": "5.0.12",
+    "glob": "14.0.3",
+    "minimatch": "11.0.1",
     "postcss": "8.5.25"
   },
   "sideEffects": false
