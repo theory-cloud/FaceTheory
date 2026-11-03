@@ -315,15 +315,18 @@ go build -C ../AppTheory \
   ./cmd/apptheory-local
 ```
 
-Bundle the example's own entry (from `ts/`, with `ts/dist` already built):
+Bundle the example's own entry from `ts/` in a subshell, with `ts/dist` already
+built, so the shell stays at the repository root for the steps that follow:
 
 ```bash
-cd ts
-./node_modules/.bin/esbuild examples/lambda-url-streaming/handler.ts \
-  --bundle --platform=node --format=cjs --target=node24 \
-  --alias:@theory-cloud/facetheory=./dist/index.js \
-  --alias:@theory-cloud/facetheory/apptheory=./dist/apptheory/index.js \
-  --outfile=$HOME/.cache/facetheory-examples-local/ft2-hand/index.js
+(
+  cd ts
+  ./node_modules/.bin/esbuild examples/lambda-url-streaming/handler.ts \
+    --bundle --platform=node --format=cjs --target=node24 \
+    --alias:@theory-cloud/facetheory=./dist/index.js \
+    --alias:@theory-cloud/facetheory/apptheory=./dist/apptheory/index.js \
+    --outfile=$HOME/.cache/facetheory-examples-local/ft2-hand/index.js
+)
 ```
 
 Start the warm container and type one Function URL event per line:
