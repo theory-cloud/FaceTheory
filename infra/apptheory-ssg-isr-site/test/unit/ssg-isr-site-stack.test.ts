@@ -281,6 +281,34 @@ test('H3: SSG+ISR stack synth is snapshotted', async () => {
     'the sidecar deployment shares the assets bucket with other deployments and must not prune',
   );
 
+  // The manifest deployment writes the Vite manifest at the assets bucket root.
+  // CDK's prune runs `s3 sync --delete` over the destination prefix, so pruning
+  // at the root would delete the `assets/*` and `_facetheory/data/*` objects the
+  // other deployments placed. Only the prefix-scoped assets deployment may prune.
+  const immutableAssetsDeployment = findBucketDeployment(
+    template,
+    'AssetsDeploymentImmutableCustomResource',
+  );
+  const manifestDeployment = findBucketDeployment(
+    template,
+    'AssetsDeploymentManifestCustomResource',
+  );
+  assert.equal(
+    immutableAssetsDeployment.Prune,
+    true,
+    'the prefix-scoped assets deployment may prune stale assets',
+  );
+  assert.equal(
+    manifestDeployment.DestinationBucketKeyPrefix,
+    '',
+    'the manifest deployment writes at the assets bucket root',
+  );
+  assert.equal(
+    manifestDeployment.Prune,
+    false,
+    'a root-prefix deployment must not prune the shared assets bucket',
+  );
+
   // The sidecar deployment must be fed by the real hydration source files, not a
   // detached fixture: the actual keys the edge requests must exist on disk at the
   // source path the stack stages from.
