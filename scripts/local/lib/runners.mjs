@@ -519,6 +519,62 @@ export const RUNNERS = {
     }
   },
 
+  'apptheory-local-gateway': async ({ row, root, request }) => {
+    const page = await request('/', { headers: { 'x-request-id': 'ft2-gateway-check' } });
+    assertEqual(page.status, 200, 'SSR page status');
+    assertHeader(page.headers, 'content-type', /^text\/html; charset=utf-8$/);
+    assertHeader(page.headers, 'cache-control', 'private, no-store');
+    assertHeader(page.headers, 'x-request-id', 'ft2-gateway-check');
+    assertHeader(page.headers, 'x-frame-options', 'DENY');
+    assertHeader(page.headers, 'x-content-type-options', 'nosniff');
+    assertHeader(page.headers, 'referrer-policy', 'strict-origin-when-cross-origin');
+    assertMatch(page.headers['strict-transport-security'] ?? '', /^max-age=\d+/, 'SSR page HSTS policy');
+    assertIncludes(page.body, '<title>FaceTheory + AppTheorySsrSite</title>', 'SSR page title');
+    assertIncludes(page.body, '<h1>FaceTheory Infra Example</h1>', 'SSR page body');
+    assertIncludes(page.body, '<link href="/assets/entry.css" rel="stylesheet">', 'SSR page stylesheet tag');
+    assertIncludes(page.body, '<script type="module" src="/assets/entry.js"></script>', 'SSR page module script');
+
+    const css = await request('/assets/entry.css');
+    assertEqual(css.status, 200, 'asset status');
+    assertHeader(css.headers, 'content-type', 'text/css');
+    assertHeader(css.headers, 'cache-control', 'public,max-age=31536000,immutable');
+    assertHeader(css.headers, 'x-content-type-options', 'nosniff');
+    const cssSource = await readFile(path.join(root, 'infra/apptheory-ssr-site/deploy/assets/entry.css'), 'utf8');
+    assertEqual(css.body, cssSource, 'asset bytes match the deployed source');
+
+    const manifest = await request('/.vite/manifest.json');
+    assertEqual(manifest.status, 200, 'Vite manifest status');
+    assertHeader(manifest.headers, 'content-type', 'application/json');
+    assertHeader(manifest.headers, 'cache-control', 'public,max-age=0,must-revalidate');
+    assertIncludes(manifest.body, '"file": "assets/entry.js"', 'Vite manifest content');
+
+    const data = await request('/_facetheory/data/index.json');
+    assertEqual(data.status, 200, 'SSG data status');
+    assertHeader(data.headers, 'content-type', 'application/json');
+    assertHeader(data.headers, 'cache-control', 'public,max-age=0,s-maxage=600');
+    const dataSource = await readFile(
+      path.join(root, 'infra/apptheory-ssr-site/deploy/ssg/_facetheory/data/index.json'),
+      'utf8',
+    );
+    assertEqual(data.body, dataSource, 'SSG data bytes match the deployed source');
+
+    const missing = await request('/assets/missing.css');
+    assertEqual(missing.status, 403, 'missing asset status (OAC S3 origin)');
+    assertHeader(missing.headers, 'content-type', 'application/xml');
+    assertIncludes(missing.body, 'AccessDenied', 'missing asset refusal body');
+
+    const notFound = await request('/missing-route');
+    assertEqual(notFound.status, 404, 'missing SSR route status');
+    assertHeader(notFound.headers, 'content-type', /^text\/html; charset=utf-8$/);
+    assertIncludes(notFound.body, '<h1>Not Found</h1>', 'missing SSR route body');
+    assertIncludes(notFound.body, 'No FaceTheory reference route matched', 'missing SSR route message');
+
+    return {
+      detail:
+        'gateway served the real SSR handler through the AWS_IAM Function URL origin, the deployed CSS and Vite manifest from the S3 origin, the SSG data path, a 403 missing asset and the handler 404; CloudFront caching, the edge network/TLS, IAM policy evaluation and buffered streaming are the named gaps',
+    };
+  },
+
   'via-host': async ({ row, results }) => {
     const host = results.get(row.verifiedBy);
     if (!host || host.status !== 'passed') {
