@@ -18,13 +18,29 @@ import {
   waitForChildExit,
 } from './runtime.mjs';
 
-export const FT2_RUNNERS = new Set(['apptheory-local-handler', 'apptheory-local-gateway']);
+export const FT2_RUNNERS = new Set([
+  'apptheory-local-handler',
+  'apptheory-local-gateway',
+  'apptheory-local-gateway-isr',
+]);
 export const PROFILE_PATH = 'scripts/local/apptheory-local-profile.json';
 
 const RUNNER_CACHE = new Map();
 
 export function profilePath(root) {
   return path.join(root, PROFILE_PATH);
+}
+
+function producerName(value) {
+  const name = String(value)
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[-_.]+|[-_.]+$/g, '');
+  if (name === '') return 'function';
+  if (name.length > 40) {
+    return `${name.slice(0, 31)}-${createHash('sha256').update(name).digest('hex').slice(0, 8)}`;
+  }
+  return name;
 }
 
 export function dockerPrefixFor(row) {
@@ -34,7 +50,10 @@ export function dockerPrefixFor(row) {
     .replace(/^-+/, '')
     .replace(/-+$/, '')
     .slice(0, 48);
-  return `ft2-${slug}`;
+  // The producer sanitizes and truncates --name-prefix (names longer than 40
+  // characters become 31 characters plus a hash), so the harness must use the
+  // same effective prefix for container lookups and cleanup.
+  return producerName(`${row.containerPrefix ?? 'ft2'}-${slug}`);
 }
 
 export function ledgerRecordFor(ledger, rowId) {

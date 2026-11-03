@@ -42,15 +42,16 @@
     },
     {
       "row": "infra/apptheory-ssg-isr-site#local-run",
+      "kind": "record",
       "example": "infra/apptheory-ssg-isr-site",
-      "capability": "AppTheory A5b local gateway plus the FT3 real-storage seam and local S3/DynamoDB provisioning.",
+      "capability": "AppTheory A5b local gateway (S3 origin through the S3 emulator, Function URL origin through the A3 runner, generated CloudFront Functions) plus the runner's DynamoDB table provisioning from the CDK key schema.",
       "producer": {
         "repo": "theory-cloud/AppTheory",
         "checkout": "../AppTheory",
         "staging_sha": "3d48d40dadd0bb8c0255c14938c5707a625b4d37"
       },
-      "owner": "FaceTheory steward",
-      "resolution": "FT3 adds the store-injection seam and local provisioning; the post-wave release cycle moves the AppTheory pin, then this row is deleted."
+      "owner": "AppTheory steward",
+      "resolution": "The row now runs against the sibling ../AppTheory checkout at this SHA; the committed @theory-cloud/apptheory and apptheory-cdk pins stay unchanged, and no dependency override is committed. Post-wave release cycle: move both pins to the release containing A5b, run the row against the released pins, then delete this ledger row."
     }
   ]
 }

@@ -662,10 +662,17 @@
           "id": "infra/apptheory-ssg-isr-site#local-run",
           "entrypoints": ["src/stack.ts", "src/ssr-handler.ts"],
           "class": "L2",
-          "pending": "FT3",
-          "runner": "pending",
-          "gap": "AppTheory gateway and the FT3 real-storage seam; S3 and DynamoDB are emulated locally.",
-          "description": "End-to-end local ISR run with the S3 emulator and DynamoDB Local."
+          "runner": "apptheory-local-gateway-isr",
+          "unreleasedProducer": true,
+          "port": 8246,
+          "containerPrefix": "ft3",
+          "serve": {
+            "kind": "apptheory-local",
+            "app": "infra/apptheory-ssg-isr-site",
+            "backends": ["dynamodb", "s3proxy"]
+          },
+          "gap": "AppTheory's local gateway applies the generated CloudFront Functions, edge policies and the S3/DynamoDB emulators, with the local runner creating the ISR table from the CDK key schema. Named gaps: no CloudFront caching (every request is an origin miss), no edge network or TLS, no IAM policy evaluation (the AWS_IAM Function URL origin is signed locally), no S3 bucket policies or CORS, no viewer protocol enforcement, a buffered RESPONSE_STREAM body, and DynamoDB Local does not perform TTL deletion.",
+          "description": "End-to-end local SSG+ISR run through the AppTheory gateway: pre-rendered SSG HTML and assets from S3, an ISR miss/generation/hit observed in the S3 object and the DynamoDB metadata item, lease/TTL checks, refusals and the edge policy headers."
         }
       ]
     }

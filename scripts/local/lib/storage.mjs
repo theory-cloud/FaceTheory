@@ -566,6 +566,46 @@ export async function getObject({ endpoint, bucket, key }) {
   };
 }
 
+/**
+ * Read a host loopback port published by a producer-managed container. The
+ * container is selected by its exact name and the managed label is verified
+ * first, so this never inspects an unrelated container.
+ */
+export function publishedPort(container, containerPort) {
+  const managed = docker(
+    ['inspect', '--format', '{{index .Config.Labels "apptheory.local.managed"}}', container],
+    { allowFailure: true },
+  );
+  if (managed.status !== 0) {
+    throw new RunError(`producer container ${container} is not present`);
+  }
+  if (managed.stdout.trim() !== 'true') {
+    throw new RunError(`container ${container} is not producer-managed; refusing to inspect it`);
+  }
+  const result = docker(['port', container, `${containerPort}/tcp`], { allowFailure: true });
+  if (result.status !== 0) {
+    throw new RunError(`producer container ${container} publishes no port ${containerPort}`);
+  }
+  const match = /127\.0\.0\.1:(\d+)/.exec(result.stdout);
+  if (!match) {
+    throw new RunError(
+      `producer container ${container} port ${containerPort} is not loopback: ${result.stdout.trim()}`,
+    );
+  }
+  return `http://127.0.0.1:${match[1]}`;
+}
+
+/**
+ * The host endpoints of the dynamodb and s3proxy backends a producer run
+ * started for `prefix`.
+ */
+export function gatewayBackendEndpoints(prefix) {
+  return {
+    dynamodb: publishedPort(`${prefix}-dynamodb`, 8000),
+    s3: publishedPort(`${prefix}-s3proxy`, 80),
+  };
+}
+
 async function tableAdapter({ root, endpoint, tableName }) {
   const module = await import(
     pathToFileURL(path.join(root, 'ts/dist/tabletheory/index.js')).href
