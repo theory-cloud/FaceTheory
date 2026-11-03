@@ -42,12 +42,15 @@ That is intentionally narrower than `all`: only the URL dependencies
 declared by this package's `package.json` may be fetched.
 
 The same stack runs end to end on local backends through the sibling AppTheory
-local runner and gateway. The runner synthesizes this app with its own
-`node_modules/.bin/cdk`, starts DynamoDB Local and s3proxy, creates the cache
-table from the template's key schema and TTL, deploys the bucket sources, and
-serves the distribution on loopback:
+local runner and gateway. Build `apptheory-local` once from the sibling checkout
+as shown in `docs/examples/local-harness.md`, then run from the repository root:
+the runner synthesizes this app with its own `node_modules/.bin/cdk`, starts
+DynamoDB Local and s3proxy, creates the cache table from the template's key
+schema and TTL, deploys the bucket sources, and serves the distribution on
+loopback:
 
 ```bash
+cd ../..
 make ts-build
 ~/.cache/facetheory-examples-local/apptheory-local/$(git -C ../AppTheory rev-parse HEAD)/apptheory-local run \
   --app infra/apptheory-ssg-isr-site \
