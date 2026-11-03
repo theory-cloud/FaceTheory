@@ -4,13 +4,14 @@ title: Local examples harness
 
 # Local examples harness
 
-`make examples-local` builds every FaceTheory example, serves each one that has a
-runtime surface on its own port, and asserts the real HTTP response. Nothing
-reaches AWS: the harness removes inherited AWS and proxy variables, installs
-static dummy credentials, and points every AWS endpoint at an unused loopback
-port. The FT1 rows start no containers; the FT2 rows run real Lambda handlers
-and the SSR site in the official, digest-pinned Lambda runtime image through
-the sibling AppTheory local runner and gateway.
+`make examples-local` builds every FaceTheory example, serves each Node-runtime
+surface on its own port, invokes the handler-only examples in the Lambda runtime
+image, and asserts the real HTTP or Lambda response. Nothing reaches AWS: the
+harness removes inherited AWS and proxy variables, installs static dummy
+credentials, and points every AWS endpoint at an unused loopback port. The FT1
+rows start no containers; the FT2 rows run real Lambda handlers and the SSR
+site in the official, digest-pinned Lambda runtime image through the sibling
+AppTheory local runner and gateway.
 
 ```bash
 make examples-local          # build, serve and assert every classified row
