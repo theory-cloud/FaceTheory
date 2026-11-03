@@ -24,7 +24,9 @@ function git(cwd, args) {
 }
 
 async function createFixture() {
-  const root = await mkdtemp(path.join(os.homedir(), '.cache', 'facetheory-examples-local', 'selftest-'));
+  const base = path.join(os.homedir(), '.cache', 'facetheory-examples-local');
+  await mkdir(base, { recursive: true });
+  const root = await mkdtemp(path.join(base, 'selftest-'));
   fixtureRoots.push(root);
   await mkdir(path.join(root, 'ts/examples/alpha'), { recursive: true });
   await writeFile(path.join(root, 'ts/examples/alpha/one.ts'), 'export const one = 1;\n');
