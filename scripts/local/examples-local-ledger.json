@@ -3,27 +3,29 @@
   "rows": [
     {
       "row": "lambda-url-streaming#serve",
+      "kind": "record",
       "example": "ts/examples/lambda-url-streaming",
-      "capability": "AppTheory A3 local Lambda Function URL runner with response streaming; the real awslambda global comes from the runtime, not a shim.",
+      "capability": "AppTheory A3 local Lambda Function URL runner with response streaming; the real awslambda global comes from the runtime, not a shim. The row now runs against the sibling AppTheory checkout.",
       "producer": {
         "repo": "theory-cloud/AppTheory",
         "checkout": "../AppTheory",
         "staging_sha": "3d48d40dadd0bb8c0255c14938c5707a625b4d37"
       },
       "owner": "AppTheory steward",
-      "resolution": "Post-wave release cycle: move the @theory-cloud/apptheory pin to the first release containing A3/A5, run the FT2 row, then delete this ledger row. No dependency override is committed."
+      "resolution": "The row now runs against the sibling ../AppTheory checkout at this SHA; no dependency override is committed. Post-wave release cycle: move the @theory-cloud/apptheory pin to the first release containing A3/A5, switch the row to the released pin, then delete this ledger row."
     },
     {
       "row": "apptheory-lambda-url-streaming#serve",
+      "kind": "record",
       "example": "ts/examples/apptheory-lambda-url-streaming",
-      "capability": "AppTheory A3 local Lambda Function URL runner with response streaming and the real awslambda global; FaceTheory's AppTheory adapter must run through the producer runtime.",
+      "capability": "AppTheory A3 local Lambda Function URL runner with response streaming and the real awslambda global; FaceTheory's AppTheory adapter runs through the producer runtime. The row now runs against the sibling AppTheory checkout.",
       "producer": {
         "repo": "theory-cloud/AppTheory",
         "checkout": "../AppTheory",
         "staging_sha": "3d48d40dadd0bb8c0255c14938c5707a625b4d37"
       },
       "owner": "AppTheory steward",
-      "resolution": "Post-wave release cycle: move the @theory-cloud/apptheory pin to the first release containing A3/A5, run the FT2 row, then delete this ledger row. No dependency override is committed."
+      "resolution": "The row now runs against the sibling ../AppTheory checkout at this SHA; no dependency override is committed. Post-wave release cycle: move the @theory-cloud/apptheory pin to the first release containing A3/A5, switch the row to the released pin, then delete this ledger row."
     },
     {
       "row": "isr-blocking#real-storage",

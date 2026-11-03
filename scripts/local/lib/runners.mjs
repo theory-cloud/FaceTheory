@@ -11,6 +11,29 @@ import {
   assertNotIncludes,
   assertNotMatch,
 } from './runtime.mjs';
+import {
+  assertProxyResult,
+  functionUrlEvent,
+  lambdaHeader,
+  startInvokeSession,
+} from './apptheory.mjs';
+
+const HANDLER_PROFILES = {
+  facetheory: {
+    rootBody:
+      '<!doctype html><html lang="en"><head><title>FaceTheory</title></head><body><h1>hello (streaming)</h1></body></html>',
+    catchAllBody:
+      '<!doctype html><html lang="en"><head><title>Catch-all</title></head><body><pre>{\n  "path": "/anything",\n  "proxy": "anything"\n}</pre></body></html>',
+    refusal: 'none',
+  },
+  apptheory: {
+    rootBody:
+      '<!doctype html><html lang="en"><head><title>FaceTheory (AppTheory)</title></head><body><h1>hello (streaming)</h1></body></html>',
+    catchAllBody:
+      '<!doctype html><html lang="en"><head><title>Catch-all</title></head><body><pre>{\n  "path": "/anything",\n  "proxy": "anything"\n}</pre></body></html>',
+    refusal: '405',
+  },
+};
 
 function html(response) {
   return response.body;
@@ -442,6 +465,59 @@ export const RUNNERS = {
   'vite-strict-csp-react': async ({ request }) => runStrictCsp(request, 'React', 'strict-csp-react'),
   'vite-strict-csp-svelte': async ({ request }) => runStrictCsp(request, 'Svelte', 'strict-csp-svelte'),
   'vite-strict-csp-vue': async ({ request }) => runStrictCsp(request, 'Vue', 'strict-csp-vue'),
+
+  'apptheory-local-handler': async ({ row, root, apptheory, env }) => {
+    const profile = HANDLER_PROFILES[row.expect?.profile];
+    if (!profile) throw new RunError(`${row.id}: unknown handler profile ${String(row.expect?.profile)}`);
+    const session = await startInvokeSession({ root, row, runner: apptheory, env });
+    try {
+      const rootEvent = functionUrlEvent({ rowId: row.id });
+      const rootResult = await session.call(rootEvent);
+      assertProxyResult(rootResult, `${row.id} GET /`);
+      assertEqual(rootResult.statusCode, 200, `${row.id} GET / status`);
+      assertEqual(lambdaHeader(rootResult, 'content-type'), 'text/html; charset=utf-8', `${row.id} GET / content-type`);
+      assertEqual(rootResult.body, profile.rootBody, `${row.id} GET / body`);
+      if (row.expect?.echoRequestId === true) {
+        assertEqual(
+          lambdaHeader(rootResult, 'x-request-id'),
+          rootEvent.requestContext.requestId,
+          `${row.id} GET / echoes the Function URL request id`,
+        );
+      }
+
+      const catchEvent = functionUrlEvent({ rowId: row.id, path: '/anything' });
+      const catchResult = await session.call(catchEvent);
+      assertProxyResult(catchResult, `${row.id} GET /anything`);
+      assertEqual(catchResult.statusCode, 200, `${row.id} GET /anything status`);
+      assertEqual(lambdaHeader(catchResult, 'content-type'), 'text/html; charset=utf-8', `${row.id} GET /anything content-type`);
+      assertEqual(catchResult.body, profile.catchAllBody, `${row.id} GET /anything body`);
+
+      const postEvent = functionUrlEvent({ rowId: row.id, method: 'POST', body: 'hello' });
+      const postResult = await session.call(postEvent);
+      assertProxyResult(postResult, `${row.id} POST /`);
+      if (profile.refusal === '405') {
+        assertEqual(postResult.statusCode, 405, `${row.id} POST / status`);
+        assertEqual(lambdaHeader(postResult, 'allow'), 'GET, HEAD', `${row.id} POST / allow`);
+        assertIncludes(postResult.body, '"code":"app.method_not_allowed"', `${row.id} POST / refusal code`);
+      } else {
+        assertEqual(postResult.statusCode, 200, `${row.id} POST / status (this example has no refusal path)`);
+        assertEqual(postResult.body, profile.rootBody, `${row.id} POST / body (this example has no refusal path)`);
+      }
+
+      if (profile.refusal === '405') {
+        return {
+          detail:
+            'real handler in the official Lambda Node image via apptheory-local; complete buffered streaming bodies, catch-all proxy and the 405 method refusal; chunk timing is the named gap',
+        };
+      }
+      return {
+        detail:
+          'real handler in the official Lambda Node image via apptheory-local; complete buffered streaming bodies and catch-all proxy; this example has no refusal path (POST is method-agnostic); chunk timing is the named gap',
+      };
+    } finally {
+      await session.close();
+    }
+  },
 
   'via-host': async ({ row, results }) => {
     const host = results.get(row.verifiedBy);

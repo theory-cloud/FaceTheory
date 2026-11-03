@@ -22,10 +22,14 @@
           "id": "apptheory-lambda-url-streaming#serve",
           "entrypoints": ["handler.ts"],
           "class": "L3",
-          "pending": "FT2",
-          "runner": "pending",
-          "gap": "Managed Lambda Function URL streaming runtime and the real awslambda global; FT2 runs it through the AppTheory local runner and gateway.",
-          "description": "AppTheory streaming handler over a FaceTheory app; needs the FT2 runner and gateway."
+          "runner": "apptheory-local-handler",
+          "unreleasedProducer": true,
+          "bundle": { "entry": "handler.ts" },
+          "runtime": "nodejs24.x",
+          "handler": "index.handler",
+          "expect": { "profile": "apptheory" },
+          "gap": "The real handler and the pinned @theory-cloud/apptheory runtime run in the digest-pinned official Lambda Node image, but the Runtime Interface Emulator buffers RESPONSE_STREAM: status, headers, the 405 refusal and the complete framed body are asserted, never chunk timing or incremental delivery. The managed Function URL edge (TLS, auth, edge network) is not exercised.",
+          "description": "AppTheory streaming handler over a FaceTheory app, run through the AppTheory local runner; complete buffered body, catch-all and the 405 method refusal."
         }
       ]
     },
@@ -138,10 +142,14 @@
           "id": "lambda-url-streaming#serve",
           "entrypoints": ["handler.ts"],
           "class": "L3",
-          "pending": "FT2",
-          "runner": "pending",
-          "gap": "Managed Lambda Function URL streaming runtime and the real awslambda global; FT2 runs it through the AppTheory local runner and gateway.",
-          "description": "Direct FaceTheory Lambda URL streaming handler; needs the FT2 runner."
+          "runner": "apptheory-local-handler",
+          "unreleasedProducer": true,
+          "bundle": { "entry": "handler.ts" },
+          "runtime": "nodejs24.x",
+          "handler": "index.handler",
+          "expect": { "profile": "facetheory", "echoRequestId": true },
+          "gap": "The real handler runs in the digest-pinned official Lambda Node image, but the Runtime Interface Emulator buffers RESPONSE_STREAM: status, headers and the complete framed body are asserted, never chunk timing or incremental delivery. The managed Function URL edge (TLS, auth, edge network) is not exercised.",
+          "description": "Direct FaceTheory Lambda Function URL streaming handler run through the AppTheory local runner; complete buffered body, catch-all and the example's method behaviour."
         }
       ]
     },
