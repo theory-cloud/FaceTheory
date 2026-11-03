@@ -51,12 +51,12 @@ AWS credentials, or an operator-set endpoint variable.
 
 The harness reserves `8210-8259`:
 
-| Range                       | Use                                                                                                                   |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `8210-8249`                 | one deterministic port per serving example row                                                                        |
-| `8250-8259`                 | reserved for FT3's DynamoDB Local and S3 emulator                                                                     |
-| `8000`, `8123`, `8130-8199` | reserved away from this harness: the shared default, TableTheory's DynamoDB Local port, and AppTheory's harness range |
-| `8299`                      | the harness's dummy AWS endpoint; preflight fails if it is in use                                                     |
+| Range                       | Use                                                                                                                                                                                                   |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `8210-8249`                 | one deterministic port per serving example row                                                                                                                                                        |
+| `8250-8259`                 | reserved for FT3's DynamoDB Local and S3 emulator                                                                                                                                                     |
+| `8000`, `8123`, `8130-8199` | reserved away from this harness: the shared default, 8123 to match AppTheory's harness convention (TableTheory publishes DynamoDB Local on an ephemeral loopback port), and AppTheory's harness range |
+| `8299`                      | the harness's dummy AWS endpoint; preflight fails if it is in use                                                                                                                                     |
 
 The manifest validation fails when a row's port is outside `8210-8259`, collides
 with another row, or falls in a reserved range. The preflight also fails when a
