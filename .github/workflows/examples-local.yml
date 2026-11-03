@@ -14,6 +14,7 @@ jobs:
   examples-local:
     name: Local examples harness
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -22,10 +23,15 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
-      - name: Checkout AppTheory producer history
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Checkout AppTheory producer
         run: |
-          git clone --filter=blob:none --no-checkout --branch staging --single-branch \
+          git clone --filter=blob:none --branch staging --single-branch \
             https://github.com/theory-cloud/AppTheory.git ../AppTheory
+          git -C ../AppTheory rev-parse HEAD
       - name: Run harness self-tests
         run: make examples-local-selftest
       - name: Install dependencies
