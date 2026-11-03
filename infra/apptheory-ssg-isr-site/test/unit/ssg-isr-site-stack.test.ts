@@ -7,6 +7,10 @@ import { fileURLToPath } from 'node:url';
 
 import { App } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
+import {
+  defineFaceTheoryCacheLeaseModel,
+  defineFaceTheoryCacheMetadataModel,
+} from '@theory-cloud/tabletheory-ts/facetheory';
 
 import { FaceTheoryAppTheorySsgIsrSiteStack } from '../../src/stack.js';
 
@@ -140,6 +144,39 @@ function findBucketDeployment(
   return entry[1].Properties ?? {};
 }
 
+interface DynamoTableTemplate {
+  readonly AttributeDefinitions?: readonly {
+    readonly AttributeName?: string;
+    readonly AttributeType?: string;
+  }[];
+  readonly KeySchema?: readonly {
+    readonly AttributeName?: string;
+    readonly KeyType?: string;
+  }[];
+  readonly TimeToLiveSpecification?: {
+    readonly AttributeName?: string;
+    readonly Enabled?: boolean;
+  };
+}
+
+function findDynamoTable(
+  template: Record<string, unknown>,
+  logicalIdPrefix: string,
+): DynamoTableTemplate {
+  const resources = template.Resources as
+    | Record<string, { Type?: string; Properties?: DynamoTableTemplate }>
+    | undefined;
+  assert.ok(resources, 'template should include resources');
+
+  const entry = Object.entries(resources).find(
+    ([logicalId, resource]) =>
+      logicalId.startsWith(logicalIdPrefix) &&
+      resource.Type === 'AWS::DynamoDB::Table',
+  );
+  assert.ok(entry, `missing DynamoDB table with logical id prefix ${logicalIdPrefix}`);
+  return entry[1].Properties ?? {};
+}
+
 function buildFaceTheoryDist(): void {
   const repoRoot = path.resolve(__dirname, '../../../..');
   execFileSync('npm', ['--prefix', path.resolve(repoRoot, 'ts'), 'run', 'build'], {
@@ -157,6 +194,47 @@ test('H3: SSG+ISR stack synth is snapshotted', async () => {
 
   const template = Template.fromStack(stack).toJSON();
   assertOldInlineFunctionsDeleted(template);
+
+  // The ISR metadata table must match TableTheory's FaceTheory model exactly:
+  // the local provisioner and the stack cannot drift into different key or TTL
+  // shapes, and the metadata and lease models must share one table shape.
+  const cacheTable = findDynamoTable(template, 'CacheTable');
+  const metadataModel = defineFaceTheoryCacheMetadataModel('ft3-model-probe');
+  const leaseModel = defineFaceTheoryCacheLeaseModel('ft3-model-probe');
+  assert.ok(metadataModel.roles.ttl, 'the metadata model must define a TTL attribute');
+  assert.ok(leaseModel.roles.ttl, 'the lease model must define a TTL attribute');
+  assert.deepEqual(
+    { pk: leaseModel.roles.pk, sk: leaseModel.roles.sk, ttl: leaseModel.roles.ttl },
+    { pk: metadataModel.roles.pk, sk: metadataModel.roles.sk, ttl: metadataModel.roles.ttl },
+    'the metadata and lease models must share one key and TTL shape',
+  );
+  assert.deepEqual(
+    cacheTable.AttributeDefinitions,
+    [
+      {
+        AttributeName: metadataModel.schema.keys.partition.attribute,
+        AttributeType: metadataModel.schema.keys.partition.type,
+      },
+      {
+        AttributeName: metadataModel.schema.keys.sort?.attribute,
+        AttributeType: metadataModel.schema.keys.sort?.type,
+      },
+    ],
+    'the ISR table attribute definitions must come from TableTheory\u2019s FaceTheory model',
+  );
+  assert.deepEqual(
+    cacheTable.KeySchema,
+    [
+      { AttributeName: metadataModel.roles.pk, KeyType: 'HASH' },
+      { AttributeName: metadataModel.roles.sk, KeyType: 'RANGE' },
+    ],
+    'the ISR table key schema must come from TableTheory\u2019s FaceTheory model',
+  );
+  assert.deepEqual(
+    cacheTable.TimeToLiveSpecification,
+    { AttributeName: metadataModel.roles.ttl, Enabled: true },
+    'the ISR table TTL attribute must come from TableTheory\u2019s FaceTheory model',
+  );
 
   // The pre-rendered SSG HTML must land where the primary CloudFront HTML origin
   // points (the ISR html store bucket + prefix), otherwise S3-first SSG misses
@@ -201,6 +279,34 @@ test('H3: SSG+ISR stack synth is snapshotted', async () => {
     ssgSidecarDeployment.Prune,
     false,
     'the sidecar deployment shares the assets bucket with other deployments and must not prune',
+  );
+
+  // The manifest deployment writes the Vite manifest at the assets bucket root.
+  // CDK's prune runs `s3 sync --delete` over the destination prefix, so pruning
+  // at the root would delete the `assets/*` and `_facetheory/data/*` objects the
+  // other deployments placed. Only the prefix-scoped assets deployment may prune.
+  const immutableAssetsDeployment = findBucketDeployment(
+    template,
+    'AssetsDeploymentImmutableCustomResource',
+  );
+  const manifestDeployment = findBucketDeployment(
+    template,
+    'AssetsDeploymentManifestCustomResource',
+  );
+  assert.equal(
+    immutableAssetsDeployment.Prune,
+    true,
+    'the prefix-scoped assets deployment may prune stale assets',
+  );
+  assert.equal(
+    manifestDeployment.DestinationBucketKeyPrefix,
+    '',
+    'the manifest deployment writes at the assets bucket root',
+  );
+  assert.equal(
+    manifestDeployment.Prune,
+    false,
+    'a root-prefix deployment must not prune the shared assets bucket',
   );
 
   // The sidecar deployment must be fed by the real hydration source files, not a

@@ -979,7 +979,7 @@
         },
         "DestinationBucketKeyPrefix": "",
         "WaitForDistributionInvalidation": true,
-        "Prune": true,
+        "Prune": false,
         "SystemMetadata": {
           "cache-control": "public,max-age=0,must-revalidate"
         },

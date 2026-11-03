@@ -13,10 +13,29 @@ import {
 } from './runtime.mjs';
 import {
   assertProxyResult,
+  dockerPrefixFor,
   functionUrlEvent,
   lambdaHeader,
   startInvokeSession,
 } from './apptheory.mjs';
+import {
+  assertInvalidateUnsupported,
+  describeTtl,
+  gatewayBackendEndpoints,
+  getObject,
+  holdLease,
+  listObjects,
+  observeLease,
+  rowSlug,
+  scanTable,
+  valueOf,
+} from './storage.mjs';
+
+const STRICT_CSP_ROW_PROFILES = {
+  'vite-strict-csp-react': { label: 'React', marker: 'strict-csp-react' },
+  'vite-strict-csp-svelte': { label: 'Svelte', marker: 'strict-csp-svelte' },
+  'vite-strict-csp-vue': { label: 'Vue', marker: 'strict-csp-vue' },
+};
 
 const HANDLER_PROFILES = {
   facetheory: {
@@ -47,6 +66,10 @@ function expectOk(response, label) {
 
 function expectNotFound(response, label) {
   assertEqual(response.status, 404, `${label} status`);
+}
+
+function lambdaMarker(response) {
+  return response.headers['x-facetheory-ssr'];
 }
 
 function strictCsp(response) {
@@ -98,6 +121,9 @@ async function runStrictCsp(request, label, marker) {
   expectNotFound(await request('/missing-route'), `strict CSP ${label} missing route`);
   return {
     detail: `strict CSP header without unsafe sources, no inline script/style, external assets, sidecar served no-store; 404 refusal`,
+    sidecarPath,
+    sidecarBody: sidecar.body,
+    pageBody: body,
   };
 }
 
@@ -386,6 +412,175 @@ export const RUNNERS = {
     return { detail: 'in-memory ISR: first request miss and generation, second hit with identical bytes; route 404 refusal' };
   },
 
+  'isr-real-storage': async ({ row, root, request, storage }) => {
+    if (!storage) throw new RunError(`${row.id}: no local storage context`);
+    const first = await request('/news/home');
+    const firstBody = expectOk(first, `${row.id} first request`);
+    assertHeader(first.headers, 'x-facetheory-isr', 'miss');
+    assertIncludes(firstBody, '<h1>home</h1>', `${row.id} first body`);
+    assertIncludes(firstBody, 'revision 1', `${row.id} first revision`);
+
+    const second = await request('/news/home');
+    assertEqual(second.status, 200, `${row.id} second status`);
+    assertHeader(second.headers, 'x-facetheory-isr', 'hit');
+    assertEqual(second.body, first.body, `${row.id} hit bytes`);
+
+    const items = await scanTable({
+      endpoint: storage.endpoints.dynamodb,
+      tableName: storage.tableName,
+    });
+    const metadata = items.filter((item) => valueOf(item, 'sk') === 'META');
+    assertEqual(metadata.length, 1, `${row.id} metadata item count`);
+    const meta = metadata[0];
+    const expectedPk = 'CACHE#default::/news/{slug}?slug=home';
+    assertEqual(valueOf(meta, 'pk'), expectedPk, `${row.id} metadata pk`);
+    assertEqual(valueOf(meta, 'sk'), 'META', `${row.id} metadata sk`);
+    const pointer = valueOf(meta, 's3_key');
+    assert(typeof pointer === 'string' && pointer.length > 0, `${row.id} metadata s3_key is missing`);
+    const generatedAt = valueOf(meta, 'generated_at');
+    assert(Number.isFinite(generatedAt) && generatedAt > 0, `${row.id} metadata generated_at is missing`);
+    assertEqual(valueOf(meta, 'revalidate_seconds'), 30, `${row.id} metadata revalidate_seconds`);
+    const etag = valueOf(meta, 'etag');
+    assert(typeof etag === 'string' && etag.length > 0, `${row.id} metadata etag is missing`);
+
+    const key = storage.prefix ? `${storage.prefix}/${pointer}` : pointer;
+    const object = await getObject({
+      endpoint: storage.endpoints.s3,
+      bucket: storage.bucket,
+      key,
+    });
+    assertEqual(object.body.toString('utf8'), firstBody, `${row.id} stored HTML bytes`);
+    assertMatch(object.contentType ?? '', /^text\/html;\s?charset=utf-8$/, `${row.id} stored content type`);
+    assertEqual(object.metadata['facetheory-status'], '200', `${row.id} stored status metadata`);
+    assertEqual(
+      object.metadata['facetheory-content-type'],
+      'text/html; charset=utf-8',
+      `${row.id} stored content-type metadata`,
+    );
+    assertIncludes(object.cacheControl ?? '', 'must-revalidate', `${row.id} stored cache-control`);
+    assertEqual(object.etag, etag, `${row.id} metadata etag matches the S3 object`);
+
+    const ttl = await describeTtl({
+      endpoint: storage.endpoints.dynamodb,
+      tableName: storage.tableName,
+    });
+    assertEqual(ttl.TimeToLiveStatus, 'ENABLED', `${row.id} table TTL status`);
+    assertEqual(ttl.AttributeName, 'ttl', `${row.id} table TTL attribute`);
+    assert(
+      !items.some((item) => valueOf(item, 'sk') === 'LOCK'),
+      `${row.id} committed generation left a lease item behind`,
+    );
+
+    const lease = await observeLease({
+      root,
+      storage,
+      cacheKey: `ft3-lease-probe-${rowSlug(row.id)}`,
+    });
+    const invalidateMessage = await assertInvalidateUnsupported({
+      root,
+      storage,
+      cacheKey: `ft3-invalidate-probe-${rowSlug(row.id)}`,
+    });
+
+    const contentionParam = `lease-${rowSlug(row.id)}`;
+    const contentionKey = `default::/news/{slug}?slug=${contentionParam}`;
+    const held = await holdLease({ root, storage, cacheKey: contentionKey });
+    const blocked = await request(`/news/${contentionParam}`);
+    assertEqual(blocked.status, 500, `${row.id} lease contention status`);
+    assertHeader(blocked.headers, 'content-type', /^text\/html; charset=utf-8$/);
+    assertIncludes(blocked.body, 'Internal Server Error', `${row.id} lease contention body`);
+    await held.release();
+
+    const recovered = await request(`/news/${contentionParam}`);
+    assertEqual(recovered.status, 200, `${row.id} post-contention status`);
+    assertHeader(recovered.headers, 'x-facetheory-isr', 'miss');
+    assertIncludes(recovered.body, `revision`, `${row.id} post-contention revision`);
+    const recoveredHit = await request(`/news/${contentionParam}`);
+    assertHeader(recoveredHit.headers, 'x-facetheory-isr', 'hit');
+    assertEqual(recoveredHit.body, recovered.body, `${row.id} post-contention hit bytes`);
+
+    return {
+      detail: `real S3 HTML (${key}) and DynamoDB metadata (${expectedPk}) asserted; lease token/expires/ttl ${lease.token.slice(0, 8)}…/${lease.expiresAt}/${lease.ttl}; invalidate refused (IsrInvalidateUnsupportedError); held lease produced a 500, then recovery miss and hit`,
+    };
+  },
+
+  'strict-csp-real-storage': async ({ row, root, request, storage }) => {
+    if (!storage) throw new RunError(`${row.id}: no local storage context`);
+    const name = row.directory.split('/').pop();
+    const profile = STRICT_CSP_ROW_PROFILES[name];
+    if (!profile) throw new RunError(`${row.id}: unknown strict-CSP example ${name}`);
+    const first = await runStrictCsp(request, profile.label, profile.marker);
+
+    const secondPage = await request('/');
+    const secondBody = expectOk(secondPage, `${row.id} second page`);
+    const secondSidecarPath = extractFirst(
+      secondBody,
+      /\/_facetheory\/ssr-data\/[^"']+/,
+      `${row.id} second sidecar`,
+    );
+    const secondSidecar = await request(secondSidecarPath);
+    assertEqual(secondSidecar.status, 200, `${row.id} second sidecar status`);
+    assertEqual(
+      secondSidecar.body,
+      first.sidecarBody,
+      `${row.id} two renders wrote identical sidecar payloads`,
+    );
+    const reread = await request(first.sidecarPath);
+    assertEqual(reread.status, 200, `${row.id} sidecar reread status`);
+    assertEqual(reread.body, first.sidecarBody, `${row.id} stored sidecar reread bytes`);
+
+    const keys = await listObjects({
+      endpoint: storage.endpoints.s3,
+      bucket: storage.bucket,
+    });
+    assertEqual(keys.length, 2, `${row.id} sidecar object count`);
+    const bodies = [];
+    const bodyDigests = [];
+    for (const key of keys) {
+      const object = await getObject({
+        endpoint: storage.endpoints.s3,
+        bucket: storage.bucket,
+        key,
+      });
+      const body = object.body.toString('utf8');
+      bodies.push(body);
+      assertMatch(object.contentType ?? '', /^application\/json;\s?charset=utf-8$/, `${row.id} sidecar content type`);
+      assertEqual(object.cacheControl, 'no-store', `${row.id} sidecar cache-control`);
+      assertEqual(
+        object.metadata['facetheory-kind'],
+        'ssr-hydration-sidecar',
+        `${row.id} sidecar metadata kind`,
+      );
+      assertMatch(
+        object.metadata['facetheory-body'] ?? '',
+        /^[A-Za-z0-9_-]{43}$/,
+        `${row.id} sidecar body digest metadata`,
+      );
+      bodyDigests.push(object.metadata['facetheory-body']);
+      assert(
+        Number(object.metadata['facetheory-expires-at']) > Date.now(),
+        `${row.id} sidecar expiry metadata`,
+      );
+      assertIncludes(body, '"page":"home"', `${row.id} sidecar payload`);
+    }
+    assert(bodies.includes(first.sidecarBody), `${row.id} a stored sidecar is not the served payload`);
+    assertEqual(new Set(bodyDigests).size, 1, `${row.id} identical sidecars share one body digest`);
+    const items = await scanTable({
+      endpoint: storage.endpoints.dynamodb,
+      tableName: storage.tableName,
+    });
+    assertEqual(items.length, 0, `${row.id} SSR sidecars must not write ISR metadata`);
+    const invalidateMessage = await assertInvalidateUnsupported({
+      root,
+      storage,
+      cacheKey: `ft3-invalidate-probe-${rowSlug(row.id)}`,
+    });
+
+    return {
+      detail: `real S3 sidecars ${keys.join(', ')} asserted with metadata; two renders produced identical payload bytes; reread served the stored bytes; no ISR metadata item was written; invalidate refused (${invalidateMessage.slice(0, 40)}…)`,
+    };
+  },
+
   'react-isr': async ({ request }) => {
     const first = await request('/news/home');
     const firstBody = expectOk(first, 'react-isr first request');
@@ -572,6 +767,141 @@ export const RUNNERS = {
     return {
       detail:
         'gateway served the real SSR handler through the AWS_IAM Function URL origin, the deployed CSS and Vite manifest from the S3 origin, the SSG data path, a 403 missing asset and the handler 404; CloudFront caching, the edge network/TLS, IAM policy evaluation and buffered streaming are the named gaps',
+    };
+  },
+
+  'apptheory-local-gateway-isr': async ({ row, root, request, logPath }) => {
+    const prefix = dockerPrefixFor(row);
+    const endpoints = gatewayBackendEndpoints(prefix);
+    const log = await readFile(logPath, 'utf8').catch(() => '');
+    const tableName = /provisioned DynamoDB table (\S+) for CacheTable\w*/.exec(log)?.[1];
+    const isrBucket = /provisioned s3 bucket (\S+) for IsrBucket\w*/.exec(log)?.[1];
+    const assetsBucket = /provisioned s3 bucket (\S+) for AssetsBucket\w*/.exec(log)?.[1];
+    assert(tableName, 'the gateway run did not provision the CacheTable');
+    assert(isrBucket, 'the gateway run did not provision the IsrBucket');
+    assert(assetsBucket, 'the gateway run did not provision the AssetsBucket');
+
+    const page = await request('/', { headers: { 'x-request-id': 'ft3-gateway-check' } });
+    assertEqual(page.status, 200, 'SSG page status');
+    // SSG HTML is served from S3, where the local deployment emulation stores
+    // .html with the AWS CLI's extension-inferred "text/html" (no charset) and
+    // the origin passes that object header through; the Lambda-origin ISR
+    // responses below keep the strict framework "text/html; charset=utf-8".
+    assertHeader(page.headers, 'content-type', /^text\/html(?:; charset=utf-8)?$/);
+    assertHeader(page.headers, 'x-request-id', 'ft3-gateway-check');
+    assertHeader(page.headers, 'x-frame-options', 'DENY');
+    assertHeader(page.headers, 'x-content-type-options', 'nosniff');
+    assertHeader(page.headers, 'referrer-policy', 'strict-origin-when-cross-origin');
+    assertMatch(page.headers['strict-transport-security'] ?? '', /^max-age=\d+/, 'SSG page HSTS policy');
+    assert(lambdaMarker(page) === undefined, 'SSG HTML must come from S3, not the Lambda origin');
+    const indexSource = await readFile(
+      path.join(root, 'infra/apptheory-ssg-isr-site/deploy/ssg/index.html'),
+      'utf8',
+    );
+    assertEqual(page.body, indexSource, 'SSG HTML bytes match the deployed source');
+
+    const ssgDemo = await request('/ssg-demo');
+    assertEqual(ssgDemo.status, 200, 'SSG demo status');
+    assert(lambdaMarker(ssgDemo) === undefined, 'SSG demo must come from S3');
+    const ssgDemoSource = await readFile(
+      path.join(root, 'infra/apptheory-ssg-isr-site/deploy/ssg/ssg-demo/index.html'),
+      'utf8',
+    );
+    assertEqual(ssgDemo.body, ssgDemoSource, 'SSG demo bytes match the deployed source');
+
+    const css = await request('/assets/entry.css');
+    assertEqual(css.status, 200, 'asset status');
+    assertHeader(css.headers, 'content-type', 'text/css');
+    assertHeader(css.headers, 'cache-control', 'public,max-age=31536000,immutable');
+    const cssSource = await readFile(
+      path.join(root, 'infra/apptheory-ssg-isr-site/deploy/assets/entry.css'),
+      'utf8',
+    );
+    assertEqual(css.body, cssSource, 'asset bytes match the deployed source');
+
+    const manifest = await request('/.vite/manifest.json');
+    assertEqual(manifest.status, 200, 'Vite manifest status');
+    assertHeader(manifest.headers, 'content-type', 'application/json');
+    const manifestSource = await readFile(
+      path.join(root, 'infra/apptheory-ssg-isr-site/deploy/vite-manifest/.vite/manifest.json'),
+      'utf8',
+    );
+    assertEqual(manifest.body, manifestSource, 'Vite manifest bytes match the deployed source');
+
+    const data = await request('/_facetheory/data/index.json');
+    assertEqual(data.status, 200, 'SSG data status');
+    assertHeader(data.headers, 'content-type', 'application/json');
+    const dataSource = await readFile(
+      path.join(root, 'infra/apptheory-ssg-isr-site/deploy/ssg/_facetheory/data/index.json'),
+      'utf8',
+    );
+    assertEqual(data.body, dataSource, 'SSG data bytes match the deployed source');
+
+    const first = await request('/isr-demo');
+    assertEqual(first.status, 200, 'ISR page status');
+    assertHeader(first.headers, 'content-type', /^text\/html; charset=utf-8$/);
+    assertHeader(first.headers, 'x-facetheory-ssr', '1');
+    assertHeader(first.headers, 'x-facetheory-isr', 'miss');
+    assertIncludes(first.body, '<h1>ISR demo</h1>', 'ISR page body');
+    assertIncludes(first.body, 'Generated at:', 'ISR page generation');
+    const second = await request('/isr-demo');
+    assertEqual(second.status, 200, 'ISR hit status');
+    assertHeader(second.headers, 'x-facetheory-isr', 'hit');
+    assertEqual(second.body, first.body, 'ISR hit bytes');
+
+    const items = await scanTable({ endpoint: endpoints.dynamodb, tableName });
+    const metadata = items.filter((item) => valueOf(item, 'sk') === 'META');
+    assertEqual(metadata.length, 1, 'ISR metadata item count');
+    const meta = metadata[0];
+    assert(
+      String(valueOf(meta, 'pk')).startsWith('CACHE#default::/isr-demo?'),
+      `ISR metadata pk: ${String(valueOf(meta, 'pk'))}`,
+    );
+    const pointer = valueOf(meta, 's3_key');
+    assert(typeof pointer === 'string' && pointer.length > 0, 'ISR metadata s3_key is missing');
+    assertEqual(valueOf(meta, 'revalidate_seconds'), 5, 'ISR metadata revalidate_seconds');
+    assert(Number(valueOf(meta, 'generated_at')) > 0, 'ISR metadata generated_at is missing');
+    const etag = valueOf(meta, 'etag');
+    assert(typeof etag === 'string' && etag.length > 0, 'ISR metadata etag is missing');
+
+    const key = `isr/${pointer}`;
+    const object = await getObject({ endpoint: endpoints.s3, bucket: isrBucket, key });
+    assertEqual(object.body.toString('utf8'), first.body, 'stored ISR HTML bytes');
+    assertMatch(object.contentType ?? '', /^text\/html;\s?charset=utf-8$/, 'stored ISR content type');
+    assertEqual(object.metadata['facetheory-status'], '200', 'stored ISR status metadata');
+    assertEqual(object.etag, etag, 'ISR metadata etag matches the S3 object');
+
+    const ttl = await describeTtl({ endpoint: endpoints.dynamodb, tableName });
+    assertEqual(ttl.TimeToLiveStatus, 'ENABLED', 'ISR table TTL status');
+    assertEqual(ttl.AttributeName, 'ttl', 'ISR table TTL attribute');
+    assert(
+      !items.some((item) => valueOf(item, 'sk') === 'LOCK'),
+      'the committed ISR generation left a lease item behind',
+    );
+    const lease = await observeLease({
+      root,
+      storage: { endpoints, tableName },
+      cacheKey: `ft3-gateway-lease-probe-${rowSlug(row.id)}`,
+    });
+    const invalidateMessage = await assertInvalidateUnsupported({
+      root,
+      storage: { endpoints, tableName },
+      cacheKey: `ft3-gateway-invalidate-probe-${rowSlug(row.id)}`,
+    });
+
+    const missingAsset = await request('/assets/missing.css');
+    assertEqual(missingAsset.status, 403, 'missing asset status (OAC S3 origin)');
+    assertHeader(missingAsset.headers, 'content-type', 'application/xml');
+    assertIncludes(missingAsset.body, 'AccessDenied', 'missing asset refusal body');
+
+    const notFound = await request('/missing-route');
+    assertEqual(notFound.status, 404, 'missing SSR route status');
+    assertHeader(notFound.headers, 'content-type', /^text\/html; charset=utf-8$/);
+    assertIncludes(notFound.body, '<h1>Not Found</h1>', 'missing SSR route body');
+    assertIncludes(notFound.body, '&quot;path&quot;: &quot;/missing-route&quot;', 'missing SSR route context');
+
+    return {
+      detail: `gateway served SSG HTML and assets from the S3 origin, the ISR miss/generation/hit through the AWS_IAM Function URL origin with stored object ${key} and metadata ${String(valueOf(meta, 'pk'))}, lease ${lease.token.slice(0, 8)}…/${lease.expiresAt}/${lease.ttl}, invalidate refused, a 403 missing asset and the handler 404; CloudFront caching/edge/TLS, IAM policy evaluation, S3 policies/CORS, viewer protocol enforcement and buffered streaming remain the named gaps`,
     };
   },
 

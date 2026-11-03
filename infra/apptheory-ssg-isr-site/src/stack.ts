@@ -85,11 +85,15 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
     });
 
     const manifestDir = requireDir('vite manifest', '../deploy/vite-manifest');
+    // The manifest, asset, and SSG sidecar deployments share the assets bucket;
+    // a root-prefix deployment with prune enabled would delete every object the
+    // other deployments placed (`assets/*`, `_facetheory/data/*`). Only the
+    // prefix-scoped assets deployment may prune.
     new s3deploy.BucketDeployment(this, 'AssetsDeploymentManifest', {
       sources: [s3deploy.Source.asset(manifestDir)],
       destinationBucket: assetsBucket,
       destinationKeyPrefix: '',
-      prune: true,
+      prune: false,
       cacheControl: [s3deploy.CacheControl.fromString('public,max-age=0,must-revalidate')],
     });
 

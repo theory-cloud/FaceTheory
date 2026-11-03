@@ -193,6 +193,9 @@ export function cleanEnvironment() {
     if (['PORT', 'NODE_OPTIONS', 'DYNAMODB_ENDPOINT', 'DDB_ENDPOINT', 'S3_ENDPOINT', 'KMS_ENDPOINT', 'STS_ENDPOINT', 'SQS_ENDPOINT'].includes(upper)) {
       delete env[key];
     }
+    if (['FACETHEORY_ISR_BUCKET', 'FACETHEORY_ISR_PREFIX', 'FACETHEORY_CACHE_TABLE_NAME', 'APPTHEORY_CACHE_TABLE_NAME'].includes(upper)) {
+      delete env[key];
+    }
   }
   Object.assign(env, {
     AWS_REGION: 'us-east-1',

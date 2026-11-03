@@ -8,10 +8,12 @@ title: Local examples harness
 surface on its own port, invokes the handler-only examples in the Lambda runtime
 image, and asserts the real HTTP or Lambda response. Nothing reaches AWS: the
 harness removes inherited AWS and proxy variables, installs static dummy
-credentials, and points every AWS endpoint at an unused loopback port. The FT1
+credentials, and points every AWS endpoint at a loopback port it owns. The FT1
 rows start no containers; the FT2 rows run real Lambda handlers and the SSR
 site in the official, digest-pinned Lambda runtime image through the sibling
-AppTheory local runner and gateway.
+AppTheory local runner and gateway; the FT3 rows start digest-pinned DynamoDB
+Local and s3proxy, run the same examples with their real-storage stores, and
+read the stored S3 objects and DynamoDB items back directly.
 
 ```bash
 make examples-local                 # build, serve and assert every classified row
@@ -33,6 +35,8 @@ harness's `--only`, after those same build and install steps.
 | Discovery and validation    | `scripts/local/lib/tree.mjs`, `scripts/local/lib/manifest.mjs` |
 | HTTP runners and assertions | `scripts/local/lib/runners.mjs`                                |
 | AppTheory runner control    | `scripts/local/lib/apptheory.mjs`                              |
+| FT3 storage backends        | `scripts/local/lib/storage.mjs`                                |
+| FT3 by-hand helper          | `scripts/local/isr-storage.mjs`                                |
 | Process, state and cleanup  | `scripts/local/lib/runtime.mjs`                                |
 | Classification manifest     | `scripts/local/examples-local.json`                            |
 | Unreleased-producer ledger  | `scripts/local/examples-local-ledger.json`                     |
@@ -55,9 +59,14 @@ harness's `--only`, after those same build and install steps.
   `3d48d40dadd0bb8c0255c14938c5707a625b4d37` in its history. The harness builds
   the runner from that checkout; it never commits a `file:` dependency, an
   override, a vendored binary or a pin bump.
-- Docker (on macOS, colima) with the daemon running, for the FT2 rows only.
-  The runner starts one private network per row and publishes the Runtime
-  Interface Emulator port on `127.0.0.1` only.
+- Docker (on macOS, colima) with the daemon running, for the FT2 and FT3 rows.
+  The FT2 runner starts one private network per row and publishes the Runtime
+  Interface Emulator port on `127.0.0.1` only. The FT3 rows start this
+  checkout's `ft3-` prefixed DynamoDB Local and s3proxy containers on the
+  reserved `8250`/`8251` ports, and the SSG+ISR gateway row starts both
+  backends inside the producer's own private network. Every image is pinned by
+  digest in `scripts/local/examples-local.json` or
+  `scripts/local/apptheory-local-profile.json`.
 - The SSR stack's own CDK CLI is a dev dependency (`aws-cdk`), because the
   runner synthesizes `infra/apptheory-ssr-site` with the app's
   `node_modules/.bin/cdk`.
@@ -71,8 +80,9 @@ The harness reserves `8210-8259`:
 
 | Range                       | Use                                                                                                                                                                                                   |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `8210-8249`                 | one deterministic port per serving example row (the SSR gateway row uses `8240`)                                                                                                                      |
-| `8250-8259`                 | reserved for FT3's DynamoDB Local and S3 emulator                                                                                                                                                     |
+| `8210-8249`                 | one deterministic port per serving example row (the SSR gateway row uses `8240`, the SSG+ISR gateway row `8246`, the five real-storage rows `8241-8245`)                                              |
+| `8250-8251`                 | the FT3 example rows' DynamoDB Local and s3proxy host ports                                                                                                                                           |
+| `8252-8259`                 | reserved for FT3 storage backends; no row may use them                                                                                                                                                |
 | `8000`, `8123`, `8130-8199` | reserved away from this harness: the shared default, 8123 to match AppTheory's harness convention (TableTheory publishes DynamoDB Local on an ephemeral loopback port), and AppTheory's harness range |
 | `8299`                      | the harness's dummy AWS endpoint; preflight fails if it is in use                                                                                                                                     |
 
@@ -96,12 +106,13 @@ Every row declares one class:
 An L2, L3 or I row must name its gap or fidelity limit in the manifest. An L1 row
 must not declare one.
 
-Rows that need a later milestone are marked `pending` with `FT3`. They are
-listed in the report and counted separately; they are never counted as passing
-and they are never run. A pending row is non-failing only through the ledger
-rule below. The three FT2 rows no longer use `pending`: they execute against the
-sibling AppTheory checkout and keep a `record` ledger entry for that
-dependency.
+The manifest has no pending rows. The three FT2 rows execute against the sibling
+AppTheory checkout and keep a `record` ledger entry for that dependency; the
+five FT3 example rows run on the FT3 storage backends with no producer
+dependency and no ledger entry; the SSG+ISR gateway row runs through the sibling
+AppTheory runner and keeps its `record` entry. A `pending` row would still be
+listed and counted separately, never as passing, and only a ledger entry with a
+resolvable producer checkout could make it non-failing.
 
 ## Discovery and the manifest
 
@@ -146,13 +157,23 @@ HEAD. A missing ledger entry, a missing or dirty producer checkout, or a
 non-ancestor SHA fails the row with a named error; it is never a silent skip.
 Ancestor containment means later producer merges do not churn the ledger.
 
-The three FT2 rows (`lambda-url-streaming#serve`,
-`apptheory-lambda-url-streaming#serve` and
-`infra/apptheory-ssr-site#local-run`) are `record` entries: they run against the
-sibling AppTheory checkout at `3d48d40d`. The committed
-`@theory-cloud/apptheory` and `@theory-cloud/apptheory-cdk` pins stay unchanged;
-the post-wave release cycle moves them, re-runs the rows against the released
-pins, and deletes the ledger entries.
+The four rows that consume the unreleased AppTheory producer are `record`
+entries: `lambda-url-streaming#serve`,
+`apptheory-lambda-url-streaming#serve`,
+`infra/apptheory-ssr-site#local-run` and
+`infra/apptheory-ssg-isr-site#local-run`. They run against the sibling AppTheory
+checkout at `3d48d40d`. The committed `@theory-cloud/apptheory` and
+`@theory-cloud/apptheory-cdk` pins stay unchanged; the post-wave release cycle
+moves them, re-runs the rows against the released pins, and deletes the ledger
+entries.
+
+The five FT3 example rows (`isr-blocking#real-storage`,
+`react-isr#real-storage` and the three `vite-strict-csp-*#real-storage` rows)
+have no ledger entry. They run the example's own Node server against the FT3
+storage backends; they do not consume a producer capability. Their former
+`pending` entries were removed when FT3 made them runnable, which is the
+docs/123 resolution for a row that no longer depends on an unreleased
+producer.
 
 The local run resolves AppTheory from the sibling registered checkout
 (`../AppTheory`) and never commits a `file:` dependency, an override, or a pin
@@ -176,6 +197,10 @@ content type and body content. The assertions include:
   response;
 - ISR miss/hit headers and identical cached bytes for the in-memory
   `isr-blocking` and `react-isr` rows;
+- for the five real-storage rows, the same miss/generation/hit behaviour read
+  back from the emulated S3 bucket and DynamoDB table, including the model's
+  `ttl` attribute, a real lease, the `invalidate()` refusal and a lease held by
+  another writer;
 - an error or refusal path for every row that has one, usually a 404; the
   SSG row also asserts the generated `404.html` content and the missing-route
   status.
@@ -300,6 +325,85 @@ must not prune: a root prune would delete the other deployment's objects. The
 stack sets `prune: false` on those two deployments and the snapshot test pins
 it; the prefix-scoped assets deployment still prunes stale assets.
 
+## The FT3 rows: real local storage
+
+The five `#real-storage` example rows run the example's own Node server with the
+same environment names a deployed `AppTheorySsrSite` sets:
+
+| Variable                      | Use                                                   |
+| ----------------------------- | ----------------------------------------------------- |
+| `FACETHEORY_ISR_BUCKET`       | S3 bucket for rendered HTML and SSR sidecars          |
+| `FACETHEORY_ISR_PREFIX`       | optional S3 key prefix                                |
+| `FACETHEORY_CACHE_TABLE_NAME` | TableTheory ISR metadata and lease table              |
+| `APPTHEORY_CACHE_TABLE_NAME`  | alias for the cache table name                        |
+| `AWS_ENDPOINT_URL_S3`         | the standard SDK endpoint override for s3proxy        |
+| `AWS_ENDPOINT_URL_DYNAMODB`   | the standard SDK endpoint override for DynamoDB Local |
+
+The in-memory stores remain the default: with none of those names set, the
+example behaves exactly as its unit tests expect. Setting only the bucket or
+only the table fails closed instead of silently reverting to memory. The seam is
+`ts/examples/local-storage.ts`; nothing in `ts/src` changed.
+
+`scripts/local/examples-local.json`'s `profile.storage` pins the two backends by
+digest: `amazon/dynamodb-local@sha256:7ef4a2…` on `8250` and
+`andrewgaul/s3proxy@sha256:1f8915…` on `8251`. The harness starts one pair per
+checkout, named `ft3-<checkout-id>-dynamodb-local`, `ft3-<checkout-id>-s3proxy`
+and `ft3-<checkout-id>-net`, labelled with the checkout id. It creates one
+bucket (`ft3-<row-slug>`) and one table (`ft3-<row-slug>-facetheory-cache`) per
+row, so a row's assertions cannot see another row's objects.
+
+The table is not hand-written: the harness derives its key schema and TTL
+attribute from TableTheory's `defineFaceTheoryCacheMetadataModel` and
+`defineFaceTheoryCacheLeaseModel`. The SSG+ISR stack test compares the
+synthesized `CacheTable` against those same models, so the local provisioner and
+the deployed stack cannot drift. The table uses `pk` (string) and `sk` (string)
+as its keys and enables TTL on the model's `ttl` attribute.
+
+The two ISR rows (`isr-blocking#real-storage`, `react-isr#real-storage`) assert:
+
+- the first `/news/home` request is a miss that generates, and the second is a
+  hit with identical bytes;
+- the metadata item at `CACHE#default::/news/{slug}?slug=home` has `sk=META`,
+  an `s3_key` pointer, `generated_at`, `revalidate_seconds=30` and an `etag`;
+- the S3 object at `<prefix>/<s3_key>` holds the exact response bytes, the
+  `text/html` content type and the `facetheory-status` / `facetheory-content-type`
+  metadata; its ETag equals the metadata item's `etag`;
+- the table's TTL is enabled on `ttl`; a committed generation leaves no `LOCK`
+  item;
+- a real lease acquired through the TableTheory adapter stores `lease_token`,
+  `lease_expires_at` and a `ttl` at or after expiry, and releasing it removes the
+  item;
+- a lease held by another writer makes the next generation wait and return the
+  framework's 500 refusal; after release the route regenerates and hits again;
+- `invalidate()` still throws `IsrInvalidateUnsupportedError` and leaves storage
+  untouched.
+
+The three strict-CSP rows (`vite-strict-csp-{react,svelte,vue}#real-storage`)
+use the same S3 store for the SSR hydration sidecar. Each row asserts two page
+renders write two sidecar objects with identical payload bytes, the sidecar URL
+serves the stored bytes with `no-store`, and the S3 object carries the
+`ssr-hydration-sidecar` kind, body digest and expiry metadata. The sidecar store
+has no metadata or lease model, so these rows write no DynamoDB item and assert
+the shared table stays empty; the harness still constructs the TableTheory store
+from the same environment, and the ISR rows exercise it.
+
+The SSG+ISR row (`infra/apptheory-ssg-isr-site#local-run`) runs the stack
+through `apptheory-local` with `--backend dynamodb --backend s3proxy`. Through
+the gateway it asserts the pre-rendered `index.html` and `ssg-demo/index.html`
+bytes from S3 (no `x-facetheory-ssr` marker), the deployed CSS, Vite manifest
+and SSG data bytes with their cache-control metadata, the ISR miss → generation
+→ hit on `/isr-demo`, the stored ISR object under the `isr/` prefix and the
+metadata item in the runner-created table, the table's TTL, a real lease,
+`invalidate()`'s refusal, the 403 `AccessDenied` missing asset, the handler's
+404 page and the edge policy headers.
+
+The FT3 rows are L2. Named gaps: DynamoDB Local accepts and stores the `ttl`
+attribute but never deletes an expired item; s3proxy has no bucket policies,
+IAM, event notifications or full versioning/multipart/checksum fidelity; the
+SSG+ISR gateway has no CloudFront cache, edge network or TLS, does not evaluate
+IAM policies, bucket policies or CORS, does not enforce viewer protocol, and
+buffers a `RESPONSE_STREAM` body.
+
 ## Run one example by hand
 
 ### A handler row through the runtime image
@@ -361,6 +465,35 @@ curl -i http://127.0.0.1:8240/_facetheory/data/index.json
 
 `Ctrl-C` stops the gateway and removes its containers and network.
 
+### The SSG+ISR gateway
+
+The SSG+ISR stack adds DynamoDB to the same topology. Install its dependencies
+once, then run the gateway with both backends:
+
+```bash
+cd infra/apptheory-ssg-isr-site && npm ci
+cd ../..
+make ts-build
+~/.cache/facetheory-examples-local/apptheory-local/$HEAD/apptheory-local run \
+  --app infra/apptheory-ssg-isr-site \
+  --profile scripts/local/apptheory-local-profile.json \
+  --backend dynamodb --backend s3proxy \
+  --port-base 8246
+curl -i http://127.0.0.1:8246/
+curl -i http://127.0.0.1:8246/assets/entry.css
+curl -i http://127.0.0.1:8246/isr-demo
+curl -i http://127.0.0.1:8246/isr-demo
+curl -i http://127.0.0.1:8246/assets/missing.css
+```
+
+`/` and `/ssg-demo` are the pre-rendered S3 objects; `/assets/entry.css` is the
+deployed asset; the first `/isr-demo` response is the Lambda-generated miss and
+the second is the cached hit with identical bytes; `/assets/missing.css` is the
+403 `AccessDenied` page. The gateway log names the provisioned cache table and
+buckets, and `make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'`
+asserts the stored object and item directly. `Ctrl-C` stops the gateway and
+removes its containers and network.
+
 ### The Node-served examples
 
 Use the example's own serve file from `ts/`. The examples default to the ports in
@@ -398,6 +531,38 @@ curl -i http://127.0.0.1:8229/news/home   # miss, generation
 curl -i http://127.0.0.1:8229/news/home   # hit, identical bytes
 ```
 
+### One ISR example on real local storage
+
+Start the FT3 backends and provision the row's bucket and table. The command
+prints the bucket, table, endpoints and the exact serve command, and writes the
+row's runtime environment to a file:
+
+```bash
+node scripts/local/isr-storage.mjs up --row isr-blocking#real-storage
+```
+
+Serve the example with that environment. The subshell keeps the terminal at the
+repository root; stop the server with `Ctrl-C` when the curls below are done:
+
+```bash
+( cd ts && set -a && . "$(node ../scripts/local/isr-storage.mjs env --row isr-blocking#real-storage)" && set +a && PORT=8241 node --import tsx examples/isr-blocking/node-server.ts )
+```
+
+In another terminal, at the repository root, the first request generates and the
+second hits. The stored object and items are then readable directly:
+
+```bash
+curl -i http://127.0.0.1:8241/news/home
+curl -i http://127.0.0.1:8241/news/home
+node scripts/local/isr-storage.mjs inspect --row isr-blocking#real-storage
+node scripts/local/isr-storage.mjs down
+```
+
+`inspect` prints the DynamoDB items (the metadata item and any lease item while
+one is held) and every S3 object with its content type, cache-control, metadata
+and a body excerpt. `down` stops only this checkout's `ft3-` containers and
+network and removes the environment file.
+
 Run one classified row through the harness:
 
 ```bash
@@ -417,17 +582,24 @@ remaining recorded process on `SIGINT`/`SIGTERM`. A fully passing run removes it
 log directory. A failing run keeps the row logs under
 `~/.cache/facetheory-examples-local/logs-<checkout-id>/` for diagnosis.
 
-Each FT2 row uses a `ft2-` prefixed container and network name. The producer
-removes them on shutdown; the harness waits for that cleanup, removes any
-exact-name leftovers under the recorded prefix, and fails the row if anything
-remains.
+Each FT2 row and the SSG+ISR row use an `ft2-`/`ft3-` prefixed container and
+network name. The producer removes them on shutdown; the harness waits for that
+cleanup, removes any exact-name leftovers under the recorded prefix, and fails
+the row if anything remains.
+
+The FT3 example rows use `ft3-<checkout-id>-dynamodb-local`,
+`ft3-<checkout-id>-s3proxy` and `ft3-<checkout-id>-net`. The harness removes them
+at the end of a run and on `SIGINT`/`SIGTERM`. Removal checks the exact name and
+the `ft3.owner` label, so a container or network this checkout did not create is
+reported and left running.
 
 `make examples-local-down` stops only PIDs recorded by this checkout, after
 checking their recorded start time and command line; it never uses a
-label-wide process or container kill. It also removes the `ft2-` Docker
-resources recorded for those PIDs, plus the checkout's state and log
-directories. A PID that was reused or no longer matches is left running and
-reported.
+label-wide process or container kill. It also removes the `ft2-`/`ft3-` Docker
+resources recorded for those PIDs, the FT3 storage containers and network for
+this checkout, and the checkout's state and log directories. The by-hand
+helper's `down` removes its own environment file. A PID that was reused or no
+longer matches is left running and reported.
 
 ## CI
 
@@ -436,5 +608,7 @@ requests into `staging`, with Node 24, Go 1.27.3 (from `.go-version`) and no AWS
 secrets. It clones the public AppTheory staging working tree beside the checkout,
 so the ledger ancestry check and the `apptheory-local` build both run there. The
 job pulls only the digest-pinned images named by
-`scripts/local/apptheory-local-profile.json`, uses no service containers, and
-runs `make examples-local-down` on every outcome.
+`scripts/local/apptheory-local-profile.json` and
+`scripts/local/examples-local.json`, starts the FT3 storage backends on
+`8250`/`8251` itself, uses no service containers, and runs
+`make examples-local-down` on every outcome.

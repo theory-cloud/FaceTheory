@@ -13,7 +13,26 @@
       ]
     },
     "apptheoryCheckout": "../AppTheory",
-    "tabletheoryCheckout": "../TableTheory"
+    "tabletheoryCheckout": "../TableTheory",
+    "storage": {
+      "ports": { "dynamodb": 8250, "s3": 8251 },
+      "containers": {
+        "dynamodb-local": {
+          "image": "amazon/dynamodb-local@sha256:7ef4a2c45b58c2901e70a4f28e0953a422c2c631baaaf5e2c15e0805740c7752",
+          "containerPort": 8000,
+          "command": ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+        },
+        "s3proxy": {
+          "image": "andrewgaul/s3proxy@sha256:1f8915c2b4a8af22bf1fc191500f242974a458c457391b5788f9107544273dc3",
+          "containerPort": 80,
+          "environment": {
+            "S3PROXY_AUTHORIZATION": "aws-v2-or-v4",
+            "S3PROXY_IDENTITY": "dummy",
+            "S3PROXY_CREDENTIAL": "dummy"
+          }
+        }
+      }
+    }
   },
   "entries": {
     "ts/examples/apptheory-lambda-url-streaming": {
@@ -129,10 +148,16 @@
           "id": "isr-blocking#real-storage",
           "entrypoints": ["handler.ts", "node-server.ts"],
           "class": "L2",
-          "pending": "FT3",
-          "runner": "pending",
-          "gap": "Real S3 HTML storage and TableTheory metadata/leases on local emulators; the FT3 store-injection seam does not exist yet.",
-          "description": "Real-storage variant of the same ISR example."
+          "port": 8241,
+          "runner": "isr-real-storage",
+          "storage": { "kind": "isr" },
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/isr-blocking/node-server.ts"]
+          },
+          "gap": "S3 and DynamoDB are emulated by the digest-pinned s3proxy and DynamoDB Local. DynamoDB Local does not perform TTL deletion, so the stored ttl attribute never expires an item; s3proxy has no bucket policies, IAM or event notifications. No real AWS endpoint is reached. The TableTheory adapter's invalidate() stays unsupported.",
+          "description": "Blocking ISR on real local storage: S3HtmlStore on s3proxy plus the TableTheory metadata/lease store on DynamoDB Local, with the stored object and item asserted and the lease-held refusal exercised."
         }
       ]
     },
@@ -207,10 +232,16 @@
           "id": "react-isr#real-storage",
           "entrypoints": ["handler.ts", "node-server.ts"],
           "class": "L2",
-          "pending": "FT3",
-          "runner": "pending",
-          "gap": "Real S3 HTML storage and TableTheory metadata/leases on local emulators; the FT3 store-injection seam does not exist yet.",
-          "description": "Real-storage variant of the React ISR example."
+          "port": 8242,
+          "runner": "isr-real-storage",
+          "storage": { "kind": "isr" },
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/react-isr/node-server.ts"]
+          },
+          "gap": "S3 and DynamoDB are emulated by the digest-pinned s3proxy and DynamoDB Local. DynamoDB Local does not perform TTL deletion, so the stored ttl attribute never expires an item; s3proxy has no bucket policies, IAM or event notifications. No real AWS endpoint is reached. The TableTheory adapter's invalidate() stays unsupported.",
+          "description": "The real React tree through blocking ISR on real local storage: S3HtmlStore on s3proxy plus the TableTheory metadata/lease store on DynamoDB Local."
         }
       ]
     },
@@ -468,10 +499,17 @@
           "id": "vite-strict-csp-react#real-storage",
           "entrypoints": ["node-server.ts", "vite.config.ts"],
           "class": "L2",
-          "pending": "FT3",
-          "runner": "pending",
-          "gap": "Real S3 sidecar storage and TableTheory metadata on local emulators; the FT3 store-injection seam does not exist yet.",
-          "description": "Real-storage variant of the strict-CSP React sidecar."
+          "port": 8243,
+          "runner": "strict-csp-real-storage",
+          "storage": { "kind": "sidecar" },
+          "build": [{ "cwd": "ts", "script": "example:vite:react:strict-csp:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-strict-csp-react/node-server.ts"]
+          },
+          "gap": "The sidecar object store is the digest-pinned s3proxy S3 emulator. The SSR sidecar store has no metadata or lease model, so this row writes no DynamoDB item and asserts the shared ISR table stays empty; DynamoDB Local does not perform TTL deletion and s3proxy has no bucket policies, IAM or event notifications. No real AWS endpoint is reached. The TableTheory adapter's invalidate() stays unsupported.",
+          "description": "The strict-CSP React sidecar on real local storage: S3HtmlStore on s3proxy serves the stored sidecar JSON, with two renders asserted byte-identical and the S3 object metadata checked."
         }
       ]
     },
@@ -495,10 +533,17 @@
           "id": "vite-strict-csp-svelte#real-storage",
           "entrypoints": ["node-server.ts", "vite.config.ts"],
           "class": "L2",
-          "pending": "FT3",
-          "runner": "pending",
-          "gap": "Real S3 sidecar storage and TableTheory metadata on local emulators; the FT3 store-injection seam does not exist yet.",
-          "description": "Real-storage variant of the strict-CSP Svelte sidecar."
+          "port": 8244,
+          "runner": "strict-csp-real-storage",
+          "storage": { "kind": "sidecar" },
+          "build": [{ "cwd": "ts", "script": "example:vite:svelte:strict-csp:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-strict-csp-svelte/node-server.ts"]
+          },
+          "gap": "The sidecar object store is the digest-pinned s3proxy S3 emulator. The SSR sidecar store has no metadata or lease model, so this row writes no DynamoDB item and asserts the shared ISR table stays empty; DynamoDB Local does not perform TTL deletion and s3proxy has no bucket policies, IAM or event notifications. No real AWS endpoint is reached. The TableTheory adapter's invalidate() stays unsupported.",
+          "description": "The strict-CSP Svelte sidecar on real local storage: S3HtmlStore on s3proxy serves the stored sidecar JSON, with two renders asserted byte-identical and the S3 object metadata checked."
         }
       ]
     },
@@ -522,10 +567,17 @@
           "id": "vite-strict-csp-vue#real-storage",
           "entrypoints": ["node-server.ts", "vite.config.ts"],
           "class": "L2",
-          "pending": "FT3",
-          "runner": "pending",
-          "gap": "Real S3 sidecar storage and TableTheory metadata on local emulators; the FT3 store-injection seam does not exist yet.",
-          "description": "Real-storage variant of the strict-CSP Vue sidecar."
+          "port": 8245,
+          "runner": "strict-csp-real-storage",
+          "storage": { "kind": "sidecar" },
+          "build": [{ "cwd": "ts", "script": "example:vite:vue:strict-csp:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-strict-csp-vue/node-server.ts"]
+          },
+          "gap": "The sidecar object store is the digest-pinned s3proxy S3 emulator. The SSR sidecar store has no metadata or lease model, so this row writes no DynamoDB item and asserts the shared ISR table stays empty; DynamoDB Local does not perform TTL deletion and s3proxy has no bucket policies, IAM or event notifications. No real AWS endpoint is reached. The TableTheory adapter's invalidate() stays unsupported.",
+          "description": "The strict-CSP Vue sidecar on real local storage: S3HtmlStore on s3proxy serves the stored sidecar JSON, with two renders asserted byte-identical and the S3 object metadata checked."
         }
       ]
     },
@@ -610,10 +662,17 @@
           "id": "infra/apptheory-ssg-isr-site#local-run",
           "entrypoints": ["src/stack.ts", "src/ssr-handler.ts"],
           "class": "L2",
-          "pending": "FT3",
-          "runner": "pending",
-          "gap": "AppTheory gateway and the FT3 real-storage seam; S3 and DynamoDB are emulated locally.",
-          "description": "End-to-end local ISR run with the S3 emulator and DynamoDB Local."
+          "runner": "apptheory-local-gateway-isr",
+          "unreleasedProducer": true,
+          "port": 8246,
+          "containerPrefix": "ft3",
+          "serve": {
+            "kind": "apptheory-local",
+            "app": "infra/apptheory-ssg-isr-site",
+            "backends": ["dynamodb", "s3proxy"]
+          },
+          "gap": "AppTheory's local gateway applies the generated CloudFront Functions, edge policies and the S3/DynamoDB emulators, with the local runner creating the ISR table from the CDK key schema. Named gaps: no CloudFront caching (every request is an origin miss), no edge network or TLS, no IAM policy evaluation (the AWS_IAM Function URL origin is signed locally), no S3 bucket policies or CORS, no viewer protocol enforcement, a buffered RESPONSE_STREAM body, and DynamoDB Local does not perform TTL deletion.",
+          "description": "End-to-end local SSG+ISR run through the AppTheory gateway: pre-rendered SSG HTML and assets from S3, an ISR miss/generation/hit observed in the S3 object and the DynamoDB metadata item, lease/TTL checks, refusals and the edge policy headers."
         }
       ]
     }

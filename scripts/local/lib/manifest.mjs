@@ -7,6 +7,12 @@ export const PENDING_MILESTONES = ['FT2', 'FT3'];
 export const PRODUCER_REPOS = ['theory-cloud/AppTheory', 'theory-cloud/TableTheory'];
 export const ROW_ID_PATTERN = /^[a-z0-9/-]+#[a-z0-9-]+$/;
 export const SHA_PATTERN = /^[0-9a-f]{40}$/;
+export const STORAGE_KINDS = ['isr', 'sidecar'];
+export const STORAGE_RUNNERS = {
+  isr: 'isr-real-storage',
+  sidecar: 'strict-csp-real-storage',
+};
+const DIGEST_IMAGE_PATTERN = /@sha256:[0-9a-f]{64}$/;
 
 const REQUIRED_ROW_FIELDS = ['id', 'class', 'runner'];
 const GAP_REQUIRED_CLASSES = new Set(['L2', 'L3', 'I']);
@@ -70,6 +76,56 @@ export function validateManifest(root, manifest, tree) {
       'manifest.profile.ports.reserved entries must be [first, last] integer pairs', errors);
   }
 
+  const storagePorts = new Set();
+  const storage = profile.storage;
+  if (storage !== undefined) {
+    assert(isPlainObject(storage), 'manifest.profile.storage must be an object', errors);
+    const storagePortConfig = storage?.ports;
+    assert(isPlainObject(storagePortConfig),
+      'manifest.profile.storage.ports must be an object', errors);
+    if (isPlainObject(storagePortConfig)) {
+      for (const name of ['dynamodb', 's3']) {
+        const port = storagePortConfig[name];
+        assert(Number.isInteger(port),
+          `manifest.profile.storage.ports.${name} must be an integer`, errors);
+        if (Number.isInteger(port)) {
+          if (Number.isInteger(first) && Number.isInteger(last)) {
+            assert(port >= first && port <= last,
+              `manifest.profile.storage.ports.${name} ${port} is outside the documented ${first}-${last} range`, errors);
+          }
+          if (storagePorts.has(port)) {
+            errors.push(`manifest.profile.storage.ports.${name} ${port} collides with another storage port`);
+          }
+          storagePorts.add(port);
+        }
+      }
+    }
+    const containers = storage?.containers;
+    assert(isPlainObject(containers),
+      'manifest.profile.storage.containers must be an object', errors);
+    if (isPlainObject(containers)) {
+      for (const name of ['dynamodb-local', 's3proxy']) {
+        const container = containers[name];
+        assert(isPlainObject(container),
+          `manifest.profile.storage.containers.${name} is required`, errors);
+        if (!isPlainObject(container)) continue;
+        assert(typeof container.image === 'string' && DIGEST_IMAGE_PATTERN.test(container.image),
+          `manifest.profile.storage.containers.${name}.image must be pinned by digest`, errors);
+        assert(Number.isInteger(container.containerPort) && container.containerPort > 0,
+          `manifest.profile.storage.containers.${name}.containerPort must be a positive integer`, errors);
+        if (container.command !== undefined) {
+          assert(Array.isArray(container.command) && container.command.every((value) => typeof value === 'string'),
+            `manifest.profile.storage.containers.${name}.command must be an array of strings`, errors);
+        }
+        if (container.environment !== undefined) {
+          assert(isPlainObject(container.environment)
+            && Object.values(container.environment).every((value) => typeof value === 'string'),
+          `manifest.profile.storage.containers.${name}.environment must be an object of strings`, errors);
+        }
+      }
+    }
+  }
+
   const entries = manifest.entries ?? {};
   const treeExampleDirs = new Set(tree.examples.map((example) => example.directory));
   const treeInfraDirs = new Set(tree.infra.map((stack) => stack.directory));
@@ -130,6 +186,26 @@ export function validateManifest(root, manifest, tree) {
           `${rowLabel}: L1 rows must not declare a gap`, errors);
       }
 
+      if (row.storage !== undefined) {
+        assert(isPlainObject(row.storage), `${rowLabel}: storage must be an object`, errors);
+        const kind = row.storage?.kind;
+        assert(STORAGE_KINDS.includes(kind),
+          `${rowLabel}: storage.kind must be one of ${STORAGE_KINDS.join(', ')}`, errors);
+        assert(pending === undefined, `${rowLabel}: storage rows must not be pending`, errors);
+        assert(row.unreleasedProducer !== true,
+          `${rowLabel}: storage rows run the example itself and must not declare unreleasedProducer`, errors);
+        if (STORAGE_KINDS.includes(kind)) {
+          assert(row.runner === STORAGE_RUNNERS[kind],
+            `${rowLabel}: storage kind ${kind} must use runner ${STORAGE_RUNNERS[kind]}`, errors);
+        }
+      } else if (Object.values(STORAGE_RUNNERS).includes(row.runner)) {
+        errors.push(`${rowLabel}: runner ${row.runner} requires a storage section`);
+      }
+      if (row.containerPrefix !== undefined) {
+        assert(typeof row.containerPrefix === 'string' && /^[a-z0-9]{2,12}$/.test(row.containerPrefix),
+          `${rowLabel}: containerPrefix must be 2-12 lowercase alphanumeric characters`, errors);
+      }
+
       if (row.build !== undefined) {
         assert(Array.isArray(row.build), `${rowLabel}: build must be an array`, errors);
       }
@@ -177,6 +253,8 @@ export function validateManifest(root, manifest, tree) {
           assert(row.port < reservedFirst || row.port > reservedLast,
             `${rowLabel}: port ${row.port} collides with reserved range ${reservedFirst}-${reservedLast}`, errors);
         }
+        assert(!storagePorts.has(row.port),
+          `${rowLabel}: port ${row.port} collides with the FT3 storage backend ports`, errors);
         if (portOwners.has(row.port)) {
           errors.push(`${rowLabel}: port ${row.port} is already used by ${portOwners.get(row.port)}`);
         } else {
@@ -284,6 +362,12 @@ export function validateManifest(root, manifest, tree) {
   if (profile.tabletheoryCheckout !== undefined) {
     assert(typeof profile.tabletheoryCheckout === 'string',
       'manifest.profile.tabletheoryCheckout must be a string', errors);
+  }
+
+  const storageRows = [...rows.values()].filter((row) => row.storage !== undefined);
+  if (storageRows.length > 0) {
+    assert(storage !== undefined,
+      `rows ${storageRows.map((row) => row.id).join(', ')} declare storage but profile.storage is missing`, errors);
   }
 
   return { rows: [...rows.values()], errors, warnings };
