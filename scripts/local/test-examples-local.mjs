@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
+import http from 'node:http';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { discoverTree } from './lib/tree.mjs';
+import { rawHttpChunks } from './lib/runtime.mjs';
 import {
   checkProducerAncestor,
   validateLedger,
@@ -81,6 +83,25 @@ function messages(result) {
 test.after(async () => {
   for (const root of fixtureRoots) {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('the raw HTTP reader preserves streaming chunk boundaries', async () => {
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+    response.write('first');
+    response.write('second');
+    response.end('third');
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  try {
+    const result = await rawHttpChunks({ port: address.port, path: '/' });
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.chunks.map((chunk) => chunk.toString('utf8')), ['first', 'second', 'third']);
+    assert.equal(result.body, 'firstsecondthird');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 

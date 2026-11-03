@@ -21,6 +21,7 @@ import {
   clearProcess,
   httpRequest,
   isProcessAlive,
+  rawHttpChunks,
   logDirectory,
   readLog,
   runCommand,
@@ -380,6 +381,7 @@ async function main() {
           await waitForPort({ port: row.port, child, logPath });
           request = (requestPath, requestOptions) =>
             httpRequest({ port: row.port, path: requestPath, ...requestOptions });
+          request.rawChunks = (requestPath) => rawHttpChunks({ port: row.port, path: requestPath });
         }
         const outcome = await RUNNERS[row.runner]({
           row,

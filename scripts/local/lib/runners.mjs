@@ -80,7 +80,7 @@ async function runStrictCsp(request, label, marker) {
 
 export const RUNNERS = {
   'react-ssr-buffered': async ({ request }) => {
-    const response = await request('/');
+    const response = await request.rawChunks('/');
     const body = expectOk(response, 'buffered page');
     assertIncludes(body, '<title>Home</title>', 'buffered title');
     assertIncludes(body, '<h1>FaceTheory + React (buffered SSR)</h1>', 'buffered body');
@@ -93,7 +93,7 @@ export const RUNNERS = {
   },
 
   'react-ssr-streaming': async ({ request }) => {
-    const response = await request('/');
+    const response = await request.rawChunks('/');
     expectOk(response, 'streaming page');
     assertHeader(response.headers, 'transfer-encoding', 'chunked');
     assert(response.chunks.length >= 2, `streaming response must have multiple chunks, got ${response.chunks.length}`);
@@ -108,7 +108,7 @@ export const RUNNERS = {
   },
 
   'vue-ssr-streaming': async ({ request }) => {
-    const response = await request('/');
+    const response = await request.rawChunks('/');
     expectOk(response, 'Vue streaming page');
     assertHeader(response.headers, 'transfer-encoding', 'chunked');
     assert(response.chunks.length >= 2, `Vue streaming response must have multiple chunks, got ${response.chunks.length}`);

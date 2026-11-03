@@ -323,6 +323,93 @@ export async function waitForPort({ port, child, logPath, timeoutMs = 30_000 }) 
   throw new RunError(`server for port ${port} did not listen within ${timeoutMs}ms`, logTail(logPath));
 }
 
+
+function parseRawHttpResponse(raw) {
+  const headerEnd = raw.indexOf('\r\n\r\n');
+  if (headerEnd < 0) throw new RunError('raw HTTP response has no header terminator');
+  const head = raw.subarray(0, headerEnd).toString('utf8');
+  const lines = head.split('\r\n');
+  const statusLine = lines.shift() ?? '';
+  const statusMatch = /^HTTP\/1\.[01] (\d{3})/.exec(statusLine);
+  if (!statusMatch) throw new RunError(`raw HTTP response has an invalid status line: ${statusLine}`);
+  const headers = {};
+  for (const line of lines) {
+    const separator = line.indexOf(':');
+    if (separator < 0) continue;
+    const name = line.slice(0, separator).trim().toLowerCase();
+    const value = line.slice(separator + 1).trim();
+    headers[name] = headers[name] === undefined ? value : `${headers[name]}, ${value}`;
+  }
+  let offset = headerEnd + 4;
+  const chunks = [];
+  if ((headers['transfer-encoding'] ?? '').toLowerCase().includes('chunked')) {
+    while (offset < raw.length) {
+      const lineEnd = raw.indexOf('\r\n', offset);
+      if (lineEnd < 0) break;
+      const sizeText = raw.subarray(offset, lineEnd).toString('ascii').split(';')[0].trim();
+      const size = Number.parseInt(sizeText, 16);
+      if (!Number.isFinite(size) || size < 0) {
+        throw new RunError(`raw HTTP response has an invalid chunk size: ${sizeText}`);
+      }
+      offset = lineEnd + 2;
+      if (size === 0) break;
+      chunks.push(raw.subarray(offset, offset + size));
+      offset += size;
+      if (raw.subarray(offset, offset + 2).toString('ascii') === '\r\n') offset += 2;
+    }
+  } else {
+    const length = Number.parseInt(headers['content-length'] ?? '', 10);
+    if (Number.isFinite(length)) {
+      chunks.push(raw.subarray(offset, offset + length));
+    } else if (offset < raw.length) {
+      chunks.push(raw.subarray(offset));
+    }
+  }
+  return {
+    status: Number(statusMatch[1]),
+    headers,
+    chunks: chunks.map((chunk) => Buffer.from(chunk)),
+    body: Buffer.concat(chunks).toString('utf8'),
+  };
+}
+
+/**
+ * Read the HTTP/1.1 chunk framing directly from a loopback socket. A Node HTTP
+ * client may coalesce several writes into one data event; the wire framing is
+ * the stable evidence for a streaming response.
+ */
+export function rawHttpChunks({ port, path: requestPath = '/', timeoutMs = HTTP_TIMEOUT_MS }) {
+  return new Promise((resolve, reject) => {
+    const socket = net.connect({ port, host: '127.0.0.1' });
+    const received = [];
+    let settled = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      if (error) reject(error);
+      else resolve(value);
+    };
+    socket.setTimeout(timeoutMs, () => {
+      finish(new RunError(`raw HTTP request ${requestPath} timed out after ${timeoutMs}ms`));
+    });
+    socket.once('error', (error) => finish(error));
+    socket.once('connect', () => {
+      socket.write(
+        `GET ${requestPath} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: close\r\n\r\n`,
+      );
+    });
+    socket.on('data', (chunk) => received.push(chunk));
+    socket.once('end', () => {
+      try {
+        finish(null, parseRawHttpResponse(Buffer.concat(received)));
+      } catch (error) {
+        finish(error);
+      }
+    });
+  });
+}
+
 export function httpRequest({ port, path: requestPath, method = 'GET', headers = {}, timeoutMs = HTTP_TIMEOUT_MS }) {
   return new Promise((resolve, reject) => {
     const request = http.request(
