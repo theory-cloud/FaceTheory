@@ -59,12 +59,16 @@ export class FaceTheoryAppTheorySsrSiteStack extends Stack {
       cacheControl: [s3deploy.CacheControl.fromString('public,max-age=31536000,immutable')],
     });
 
+    // The manifest and SSG deployments share the assets bucket root with each
+    // other and with the `assets` prefix deployment. A pruning deployment at
+    // the bucket root would delete every object another deployment placed
+    // there, so only the prefix-scoped assets deployment may prune.
     const manifestDir = requireDir('vite manifest', '../deploy/vite-manifest');
     new s3deploy.BucketDeployment(this, 'AssetsDeploymentManifest', {
       sources: [s3deploy.Source.asset(manifestDir)],
       destinationBucket: assetsBucket,
       destinationKeyPrefix: '',
-      prune: true,
+      prune: false,
       cacheControl: [s3deploy.CacheControl.fromString('public,max-age=0,must-revalidate')],
     });
 
@@ -73,7 +77,7 @@ export class FaceTheoryAppTheorySsrSiteStack extends Stack {
       sources: [s3deploy.Source.asset(ssgDir)],
       destinationBucket: assetsBucket,
       destinationKeyPrefix: '',
-      prune: true,
+      prune: false,
       // Reasonable default for build output; tune per environment.
       cacheControl: [s3deploy.CacheControl.fromString('public,max-age=0,s-maxage=600')],
     });
