@@ -15,6 +15,7 @@ import {
   validateLedger,
   validateManifest,
 } from './lib/manifest.mjs';
+import { unreleasedProducerFor } from './lib/apptheory.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const fixtureRoots = [];
@@ -272,7 +273,7 @@ test('a pending row missing from the ledger fails', async () => {
   assert.match(result.errors.join('\n'), /pending row alpha#serve is missing from the ledger/);
 });
 
-test('a ledger row for a non-pending row fails', async () => {
+test('a ledger row for a non-pending row must be marked record', async () => {
   const root = await createFixture();
   const rows = [
     {
@@ -298,7 +299,165 @@ test('a ledger row for a non-pending row fails', async () => {
     },
     rows,
   );
-  assert.match(result.errors.join('\n'), /is not a pending manifest row/);
+  assert.match(
+    result.errors.join('\n'),
+    /is not a pending manifest row; mark the ledger row kind "record"/,
+  );
+});
+
+test('a record ledger row passes ancestor containment for a sibling-checkout row', async () => {
+  const root = await createFixture();
+  const { repo, first, head } = producerRepo(root);
+  const rows = [
+    {
+      id: 'alpha#serve',
+      directory: 'ts/examples/alpha',
+      class: 'L3',
+      runner: 'apptheory-local-handler',
+      unreleasedProducer: true,
+      gap: 'buffered streaming',
+    },
+  ];
+  const result = validateLedger(
+    root,
+    {
+      version: 1,
+      rows: [
+        {
+          row: 'alpha#serve',
+          kind: 'record',
+          capability: 'AppTheory local runner',
+          producer: { repo: 'theory-cloud/AppTheory', checkout: repo, staging_sha: first },
+          owner: 'AppTheory steward',
+          resolution: 'delete after the release-cycle pin bump',
+        },
+      ],
+    },
+    rows,
+  );
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.passes.length, 1);
+  assert.equal(result.passes[0].head, head);
+});
+
+test('a missing producer records a row-level ledger failure', async () => {
+  const root = await createFixture();
+  const result = validateLedger(
+    root,
+    ft2Ledger('./does-not-exist', 'a'.repeat(40)),
+    [ft2Row()],
+  );
+  assert.equal(result.failures.length, 1);
+  assert.equal(result.failures[0].row, 'alpha#serve');
+  assert.match(result.failures[0].message, /producer checkout missing/);
+});
+
+test('a record ledger row requires the manifest row to declare unreleasedProducer', async () => {
+  const root = await createFixture();
+  const rows = [
+    {
+      id: 'alpha#serve',
+      directory: 'ts/examples/alpha',
+      class: 'L1',
+      runner: 'alpha',
+    },
+  ];
+  const result = validateLedger(
+    root,
+    {
+      version: 1,
+      rows: [
+        {
+          row: 'alpha#serve',
+          kind: 'record',
+          capability: 'AppTheory local runner',
+          producer: { repo: 'theory-cloud/AppTheory', checkout: '.', staging_sha: 'a'.repeat(40) },
+          owner: 'AppTheory steward',
+          resolution: 'delete after the release-cycle pin bump',
+        },
+      ],
+    },
+    rows,
+  );
+  assert.match(result.errors.join('\n'), /is a record for a row that does not declare unreleasedProducer/);
+});
+
+test('a row that executes against the sibling checkout must not be pending', async () => {
+  const root = await createFixture();
+  const manifest = baseManifest();
+  const row = manifest.entries['ts/examples/alpha'].rows[0];
+  delete row.port;
+  delete row.serve;
+  row.class = 'L3';
+  row.gap = 'buffered streaming';
+  row.pending = 'FT2';
+  row.unreleasedProducer = true;
+  const result = validateManifest(root, manifest, await discoverTree(root));
+  assert.match(
+    messages(result),
+    /a row that executes against the sibling checkout must not be pending/,
+  );
+});
+
+function ft2Row() {
+  return {
+    id: 'alpha#serve',
+    directory: 'ts/examples/alpha',
+    class: 'L3',
+    runner: 'apptheory-local-handler',
+    unreleasedProducer: true,
+    gap: 'buffered streaming',
+  };
+}
+
+function ft2Ledger(repo, sha) {
+  return {
+    version: 1,
+    rows: [
+      {
+        row: 'alpha#serve',
+        kind: 'record',
+        capability: 'AppTheory local runner',
+        producer: { repo: 'theory-cloud/AppTheory', checkout: repo, staging_sha: sha },
+        owner: 'AppTheory steward',
+        resolution: 'delete after the release-cycle pin bump',
+      },
+    ],
+  };
+}
+
+test('a missing producer checkout fails the FT2 row by name', async () => {
+  const root = await createFixture();
+  assert.throws(
+    () => unreleasedProducerFor(root, ft2Row(), ft2Ledger('./does-not-exist', 'a'.repeat(40))),
+    /alpha#serve: unreleased AppTheory producer unavailable: producer checkout missing/,
+  );
+});
+
+test('a producer HEAD without the ledger SHA fails the FT2 row by name', async () => {
+  const root = await createFixture();
+  const { repo } = producerRepo(root);
+  const other = path.join(root, 'producer-other');
+  mkdirSync(other);
+  git(other, ['init', '-q']);
+  git(other, ['config', 'user.email', 'selftest@example.test']);
+  git(other, ['config', 'user.name', 'selftest']);
+  git(other, ['commit', '-q', '--allow-empty', '-m', 'other history']);
+  const absent = git(other, ['rev-parse', 'HEAD']);
+  assert.throws(
+    () => unreleasedProducerFor(root, ft2Row(), ft2Ledger(repo, absent)),
+    /alpha#serve: unreleased AppTheory producer unavailable: producer SHA .* is not present in/,
+  );
+});
+
+test('a dirty producer checkout fails the FT2 row by name', async () => {
+  const root = await createFixture();
+  const { repo, first } = producerRepo(root);
+  await writeFile(path.join(repo, 'dirty.txt'), 'uncommitted\n');
+  assert.throws(
+    () => unreleasedProducerFor(root, ft2Row(), ft2Ledger(repo, first)),
+    /alpha#serve: the AppTheory checkout .* is not clean/,
+  );
 });
 
 test('a ledger row passes only when its producer SHA is contained in the producer HEAD', async () => {

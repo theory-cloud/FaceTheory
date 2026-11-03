@@ -135,11 +135,13 @@ export async function stopProcess(child, { timeoutMs = 5000 } = {}) {
   await new Promise((resolve) => setTimeout(resolve, 100));
 }
 
-export function stopRecordedProcesses(root) {
+export async function stopRecordedProcesses(root) {
   const file = stateFile(root);
   const state = readJson(file, { checkout: path.resolve(root), processes: [] });
   const results = [];
+  const prefixes = new Set();
   for (const entry of state.processes ?? []) {
+    if (entry.dockerPrefix) prefixes.add(entry.dockerPrefix);
     if (!Number.isInteger(entry.pid) || !isProcessAlive(entry.pid)) {
       results.push({ pid: entry.pid, row: entry.row, stopped: false, reason: 'already exited' });
       continue;
@@ -150,7 +152,11 @@ export function stopRecordedProcesses(root) {
       continue;
     }
     const command = processCommand(entry.pid);
-    if (!command.includes('examples/') && !command.includes('src/dev-cli.ts')) {
+    const owned =
+      command.includes('examples/') ||
+      command.includes('src/dev-cli.ts') ||
+      (typeof entry.binary === 'string' && command.includes(entry.binary));
+    if (!owned) {
       results.push({ pid: entry.pid, row: entry.row, stopped: false, reason: 'command no longer matches' });
       continue;
     }
@@ -162,6 +168,18 @@ export function stopRecordedProcesses(root) {
   const lock = readJson(lockFile(root), null);
   if (lock === null || !Number.isInteger(lock.pid) || !isProcessAlive(lock.pid)) {
     rmSync(lockFile(root), { force: true });
+  }
+  for (const prefix of prefixes) {
+    try {
+      await cleanupDockerPrefix(prefix);
+    } catch (error) {
+      results.push({
+        pid: null,
+        row: null,
+        stopped: false,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
   return results;
 }
@@ -259,7 +277,7 @@ export async function runCommand({ command, args = [], cwd, env, timeoutMs = DEF
   });
 }
 
-export function startServer({ command, args = [], cwd, env, root, row, port }) {
+export function startServer({ command, args = [], cwd, env, root, row, port, binary, dockerPrefix }) {
   mkdirSync(logDirectory(root), { recursive: true });
   const safeRow = String(row).replaceAll(/[^a-z0-9-]+/gi, '-');
   const logPath = path.join(logDirectory(root), `${safeRow}.log`);
@@ -281,12 +299,150 @@ export function startServer({ command, args = [], cwd, env, root, row, port }) {
     logPath,
     startedAt: new Date().toISOString(),
     startTime: processStartTime(child.pid),
+    binary,
+    dockerPrefix,
   };
   recordProcess(root, entry);
   child.once('exit', () => {
     stream.end();
   });
   return { child, logPath };
+}
+
+/**
+ * Start a long-lived machine process whose stdout is a protocol channel. Only
+ * stderr goes to the row log; the caller owns stdout.
+ */
+export function startRecordedProcess({
+  command,
+  args = [],
+  cwd,
+  env,
+  root,
+  row,
+  binary,
+  dockerPrefix,
+  logPath: requestedLogPath,
+}) {
+  mkdirSync(logDirectory(root), { recursive: true });
+  const safeRow = String(row).replaceAll(/[^a-z0-9-]+/gi, '-');
+  const logPath = requestedLogPath ?? path.join(logDirectory(root), `${safeRow}.log`);
+  const stream = createWriteStream(logPath, { flags: 'w' });
+  const child = spawn(command, args, {
+    cwd,
+    env,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    detached: true,
+  });
+  child.stderr.pipe(stream);
+  recordProcess(root, {
+    pid: child.pid,
+    row,
+    command: `${command} ${args.join(' ')}`,
+    cwd,
+    logPath,
+    startedAt: new Date().toISOString(),
+    startTime: processStartTime(child.pid),
+    binary,
+    dockerPrefix,
+  });
+  child.once('exit', () => {
+    stream.end();
+  });
+  return { child, logPath };
+}
+
+export function waitForChildExit(child, timeoutMs) {
+  if (!child || child.exitCode !== null) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    child.once('exit', () => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
+}
+
+function dockerNames(args) {
+  const result = spawnSync('docker', args, { encoding: 'utf8' });
+  if (result.status !== 0) return null;
+  return (result.stdout ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+/**
+ * List the producer-managed Docker resources whose names belong to this
+ * harness's prefix. The label filter keeps unrelated containers out even when
+ * a name happens to match.
+ */
+export function dockerLeftovers(prefix) {
+  const containers = dockerNames([
+    'ps',
+    '-a',
+    '--filter',
+    'label=apptheory.local.managed=true',
+    '--format',
+    '{{.Names}}',
+  ]);
+  const networks = dockerNames([
+    'network',
+    'ls',
+    '--filter',
+    'label=apptheory.local.managed=true',
+    '--format',
+    '{{.Name}}',
+  ]);
+  return {
+    containers: (containers ?? []).filter((name) => name === prefix || name.startsWith(`${prefix}-`)),
+    networks: (networks ?? []).filter((name) => name === `${prefix}-net`),
+  };
+}
+
+/**
+ * Wait for the producer's own SIGTERM cleanup, then remove exact-name
+ * leftovers under this harness's prefix and verify none remain.
+ */
+export async function cleanupDockerPrefix(prefix, { timeoutMs = 20_000 } = {}) {
+  const started = Date.now();
+  let leftovers = dockerLeftovers(prefix);
+  while (
+    Date.now() - started < timeoutMs &&
+    (leftovers.containers.length > 0 || leftovers.networks.length > 0)
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    leftovers = dockerLeftovers(prefix);
+  }
+  const removed = [];
+  for (const name of leftovers.containers) {
+    spawnSync('docker', ['rm', '-f', name], { encoding: 'utf8' });
+    removed.push(name);
+  }
+  for (const name of leftovers.networks) {
+    spawnSync('docker', ['network', 'rm', name], { encoding: 'utf8' });
+    removed.push(name);
+  }
+  const remaining = dockerLeftovers(prefix);
+  if (remaining.containers.length > 0 || remaining.networks.length > 0) {
+    throw new RunError(
+      `cleanup left Docker resources for ${prefix}: ${[...remaining.containers, ...remaining.networks].join(', ')}`,
+    );
+  }
+  return removed;
+}
+
+export function assertDockerAvailable() {
+  const result = spawnSync('docker', ['version', '--format', '{{.Server.Version}}'], {
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) {
+    throw new RunError(
+      `Docker is required for the AppTheory local runner but its daemon is not reachable: ${
+        (result.stderr || result.stdout || '').trim() || 'docker version failed'
+      }`,
+    );
+  }
 }
 
 function logTail(logPath, maxBytes = 8000) {

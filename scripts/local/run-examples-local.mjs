@@ -16,8 +16,10 @@ import {
   DEFAULT_TIMEOUT_MS,
   RunError,
   acquireLock,
+  assertDockerAvailable,
   assertLocalAwsEndpoints,
   cleanEnvironment,
+  cleanupDockerPrefix,
   clearProcess,
   httpRequest,
   isProcessAlive,
@@ -32,6 +34,13 @@ import {
   waitForPort,
 } from './lib/runtime.mjs';
 import { RUNNERS } from './lib/runners.mjs';
+import {
+  FT2_RUNNERS,
+  dockerPrefixFor,
+  ensureApptheoryLocal,
+  profilePath,
+  unreleasedProducerFor,
+} from './lib/apptheory.mjs';
 
 const SCRIPT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MANIFEST_PATH = 'scripts/local/examples-local.json';
@@ -169,7 +178,7 @@ async function runBuilds({ root, row, env }) {
   }
 }
 
-function serveCommand({ root, row, port }) {
+function serveCommand({ root, row, port, apptheory }) {
   const serve = row.serve;
   if (!serve) return null;
   if (serve.kind === 'node') {
@@ -184,7 +193,58 @@ function serveCommand({ root, row, port }) {
     const args = ['--port', String(port), ...(serve.args ?? [])];
     return npmCommand({ cwd: serve.cwd, script: serve.script, args });
   }
+  if (serve.kind === 'apptheory-local') {
+    if (!apptheory) throw new RunError(`${row.id}: the apptheory-local serve recipe has no resolved runner`);
+    const app = path.resolve(root, serve.app);
+    const prefix = dockerPrefixFor(row);
+    const args = [
+      'run',
+      '--app',
+      app,
+      '--profile',
+      apptheory.profile,
+      '--name-prefix',
+      prefix,
+      '--port-base',
+      String(port),
+    ];
+    for (const backend of serve.backends ?? []) args.push('--backend', backend);
+    return {
+      command: apptheory.binary,
+      args,
+      cwd: root,
+      binary: apptheory.binary,
+      dockerPrefix: prefix,
+      stopTimeoutMs: 30_000,
+    };
+  }
   throw new RunError(`${row.id}: unknown serve.kind ${String(serve.kind)}`);
+}
+
+async function prepareApptheoryRow({ root, row, ledger }) {
+  if (!FT2_RUNNERS.has(row.runner)) return null;
+  try {
+    assertDockerAvailable();
+  } catch (error) {
+    throw new RunError(
+      `${row.id}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const profile = profilePath(root);
+  if (!existsSync(profile)) {
+    throw new RunError(`${row.id}: ${path.relative(root, profile)} is missing`);
+  }
+  const producer = unreleasedProducerFor(root, row, ledger);
+  return await ensureApptheoryLocal(root, producer);
+}
+
+async function stopRow({ child, root, dockerPrefix, timeoutMs }) {
+  if (child) {
+    await stopProcess(child, { timeoutMs: timeoutMs ?? 5000 });
+    clearProcess(root, child.pid);
+  }
+  if (dockerPrefix) return await cleanupDockerPrefix(dockerPrefix);
+  return [];
 }
 
 function statusLabel(status) {
@@ -252,7 +312,7 @@ async function main() {
   }
   const root = SCRIPT_ROOT;
   if (options.down) {
-    const results = stopRecordedProcesses(root);
+    const results = await stopRecordedProcesses(root);
     if (results.length === 0) {
       console.log('examples-local-down: no recorded processes for this checkout');
     } else {
@@ -300,9 +360,18 @@ async function main() {
   errors.push(...preflightErrors.map((message) => new RunError(message)));
 
   if (errors.length > 0) {
+    const failedRows = new Map(
+      ledgerCheck.failures.map((failure) => [failure.row, failure.message]),
+    );
+    const early = new Map();
+    for (const row of selected) {
+      if (failedRows.has(row.id)) {
+        early.set(row.id, { status: 'failed', detail: failedRows.get(row.id) });
+      }
+    }
     printReport({
       rows: selected,
-      results: new Map(),
+      results: early,
       errors,
       warnings: validation.warnings,
     });
@@ -322,8 +391,16 @@ async function main() {
 
   const shutdown = async () => {
     if (current) {
-      await stopProcess(current.child);
-      clearProcess(root, current.child.pid);
+      try {
+        await stopRow({
+          child: current.child,
+          root,
+          dockerPrefix: current.dockerPrefix,
+          timeoutMs: current.stopTimeoutMs,
+        });
+      } catch {
+        // The down command performs the same scoped cleanup from the state file.
+      }
       current = null;
     }
     for (const entry of results.values()) {
@@ -363,9 +440,11 @@ async function main() {
       console.log(`RUN ${row.id} (${row.class}${row.port ? ` :${row.port}` : ''})`);
       let child;
       let logPath;
+      let command;
       try {
+        const apptheory = await prepareApptheoryRow({ root, row, ledger });
         await runBuilds({ root, row, env });
-        const command = serveCommand({ root, row, port: row.port });
+        command = serveCommand({ root, row, port: row.port, apptheory });
         let request;
         if (command) {
           const started = startServer({
@@ -375,7 +454,11 @@ async function main() {
             row: row.id,
             port: row.port,
           });
-          current = started;
+          current = {
+            ...started,
+            dockerPrefix: command.dockerPrefix,
+            stopTimeoutMs: command.stopTimeoutMs,
+          };
           child = started.child;
           logPath = started.logPath;
           await waitForPort({ port: row.port, child, logPath });
@@ -389,7 +472,19 @@ async function main() {
           request,
           results,
           logPath,
+          apptheory,
+          env,
         });
+        if (child) {
+          await stopRow({
+            child,
+            root,
+            dockerPrefix: command?.dockerPrefix,
+            timeoutMs: command?.stopTimeoutMs,
+          });
+          child = null;
+          current = null;
+        }
         results.set(row.id, { status: 'passed', detail: outcome?.detail ?? '', library: outcome?.library === true });
         console.log(`PASS ${row.id}: ${outcome?.detail ?? 'ok'}`);
       } catch (error) {
@@ -406,8 +501,24 @@ async function main() {
         }
       } finally {
         if (child) {
-          await stopProcess(child);
-          clearProcess(root, child.pid);
+          try {
+            await stopRow({
+              child,
+              root,
+              dockerPrefix: command?.dockerPrefix,
+              timeoutMs: command?.stopTimeoutMs,
+            });
+          } catch (cleanupError) {
+            const failure =
+              cleanupError instanceof RunError
+                ? cleanupError
+                : new RunError(
+                    `${row.id}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+                  );
+            failures.push(failure);
+            results.set(row.id, { status: 'failed', detail: failure.message });
+            console.log(`FAIL ${row.id}: ${failure.message}`);
+          }
         }
         current = null;
       }
