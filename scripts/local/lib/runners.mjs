@@ -717,7 +717,7 @@ export const RUNNERS = {
   'apptheory-local-gateway': async ({ row, root, request }) => {
     const page = await request('/', { headers: { 'x-request-id': 'ft2-gateway-check' } });
     assertEqual(page.status, 200, 'SSR page status');
-    assertHeader(page.headers, 'content-type', /^text\/html(?:; charset=utf-8)?$/);
+    assertHeader(page.headers, 'content-type', /^text\/html; charset=utf-8$/);
     assertHeader(page.headers, 'cache-control', 'private, no-store');
     assertHeader(page.headers, 'x-request-id', 'ft2-gateway-check');
     assertHeader(page.headers, 'x-frame-options', 'DENY');
@@ -783,6 +783,10 @@ export const RUNNERS = {
 
     const page = await request('/', { headers: { 'x-request-id': 'ft3-gateway-check' } });
     assertEqual(page.status, 200, 'SSG page status');
+    // SSG HTML is served from S3, where the local deployment emulation stores
+    // .html with the AWS CLI's extension-inferred "text/html" (no charset) and
+    // the origin passes that object header through; the Lambda-origin ISR
+    // responses below keep the strict framework "text/html; charset=utf-8".
     assertHeader(page.headers, 'content-type', /^text\/html(?:; charset=utf-8)?$/);
     assertHeader(page.headers, 'x-request-id', 'ft3-gateway-check');
     assertHeader(page.headers, 'x-frame-options', 'DENY');
