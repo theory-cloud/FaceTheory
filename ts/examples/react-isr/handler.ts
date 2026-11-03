@@ -3,9 +3,11 @@
 // Replace the in-memory stores with `S3HtmlStore` + a TableTheory-backed ISR
 // metadata store (`FaceTheoryIsrMetaStore`) in production, wired from the Lambda
 // environment. A typical deployment reads:
-//   FACETHEORY_ISR_HTML_BUCKET   -> S3 bucket backing `new S3HtmlStore({ bucket })`
-//   FACETHEORY_ISR_TABLE         -> TableTheory table backing the ISR metadata
+//   FACETHEORY_ISR_BUCKET        -> S3 bucket backing `new S3HtmlStore({ client, bucket })`
+//   FACETHEORY_ISR_PREFIX        -> optional S3 key prefix for `S3HtmlStore`
+//   FACETHEORY_CACHE_TABLE_NAME  -> TableTheory table backing the ISR metadata
 //                                   store and its regeneration leases
+//                                   (`APPTHEORY_CACHE_TABLE_NAME` is the alias)
 // FaceTheory does not own that storage: cached HTML lives in S3, and the cache
 // metadata + regeneration leases live in TableTheory. See the README.
 //
