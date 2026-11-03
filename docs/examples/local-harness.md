@@ -597,8 +597,9 @@ reported and left running.
 checking their recorded start time and command line; it never uses a
 label-wide process or container kill. It also removes the `ft2-`/`ft3-` Docker
 resources recorded for those PIDs, the FT3 storage containers and network for
-this checkout, plus the checkout's state, log and by-hand environment files. A
-PID that was reused or no longer matches is left running and reported.
+this checkout, and the checkout's state and log directories. The by-hand
+helper's `down` removes its own environment file. A PID that was reused or no
+longer matches is left running and reported.
 
 ## CI
 
