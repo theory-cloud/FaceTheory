@@ -22,9 +22,10 @@ The handler accepts Lambda Function URL shaped events and defaults to `/news/hom
 when no path is supplied. In production, replace the in-memory stores with an
 `S3HtmlStore` for cached HTML and a TableTheory-backed ISR metadata store for cache
 metadata and regeneration leases, wired from the Lambda environment (for example
-`FACETHEORY_ISR_HTML_BUCKET` for the S3 bucket and `FACETHEORY_ISR_TABLE` for the
-TableTheory table). FaceTheory does not own that storage — HTML lives in S3, and
-cache metadata plus regeneration leases live in TableTheory.
+`FACETHEORY_ISR_BUCKET` and `FACETHEORY_ISR_PREFIX` for the S3 store, and
+`FACETHEORY_CACHE_TABLE_NAME` or `APPTHEORY_CACHE_TABLE_NAME` for the TableTheory
+table). FaceTheory does not own that storage — HTML lives in S3, and cache metadata
+plus regeneration leases live in TableTheory.
 
 ## Backs
 

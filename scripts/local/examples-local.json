@@ -1,0 +1,607 @@
+{
+  "version": 1,
+  "profile": {
+    "name": "facetheory-examples-local",
+    "ports": {
+      "first": 8210,
+      "last": 8259,
+      "reserved": [
+        [8000, 8000],
+        [8123, 8123],
+        [8130, 8199],
+        [8250, 8259]
+      ]
+    },
+    "apptheoryCheckout": "../AppTheory",
+    "tabletheoryCheckout": "../TableTheory"
+  },
+  "entries": {
+    "ts/examples/apptheory-lambda-url-streaming": {
+      "rows": [
+        {
+          "id": "apptheory-lambda-url-streaming#serve",
+          "entrypoints": ["handler.ts"],
+          "class": "L3",
+          "pending": "FT2",
+          "runner": "pending",
+          "gap": "Managed Lambda Function URL streaming runtime and the real awslambda global; FT2 runs it through the AppTheory local runner and gateway.",
+          "description": "AppTheory streaming handler over a FaceTheory app; needs the FT2 runner and gateway."
+        }
+      ]
+    },
+    "ts/examples/control-plane-host-owned-contracts": {
+      "rows": [
+        {
+          "id": "control-plane-host-owned-contracts#serve",
+          "entrypoints": ["handler.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8228,
+          "runner": "control-plane-host-owned-contracts",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/control-plane-host-owned-contracts/node-server.ts"]
+          },
+          "description": "Host-owned control-plane gate and bounded section read through a real Node server. The host auth and section-read functions are the stub the example demonstrates; FaceTheory never owns that auth."
+        }
+      ]
+    },
+    "ts/examples/control-plane-preset": {
+      "rows": [
+        {
+          "id": "control-plane-preset#relaxed-client-fill",
+          "entrypoints": ["render.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8224,
+          "runner": "control-plane-preset",
+          "expect": { "mode": "relaxed", "delivery": "client-fill" },
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/control-plane-preset/node-server.ts", "--mode=relaxed", "--delivery=client-fill"]
+          },
+          "description": "Relaxed CSP with client-filled sections: initial shell, section endpoint and bootstrap HEAD."
+        },
+        {
+          "id": "control-plane-preset#relaxed-streaming",
+          "entrypoints": ["render.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8225,
+          "runner": "control-plane-preset",
+          "expect": { "mode": "relaxed", "delivery": "streaming" },
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/control-plane-preset/node-server.ts", "--mode=relaxed", "--delivery=streaming"]
+          },
+          "description": "Relaxed CSP with streamed sections: section content arrives in the document."
+        },
+        {
+          "id": "control-plane-preset#strict-client-fill",
+          "entrypoints": ["render.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8226,
+          "runner": "control-plane-preset",
+          "expect": { "mode": "strict", "delivery": "client-fill" },
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/control-plane-preset/node-server.ts", "--mode=strict", "--delivery=client-fill"]
+          },
+          "description": "Strict CSP with client-filled sections: no inline sources, section endpoint and bootstrap HEAD."
+        },
+        {
+          "id": "control-plane-preset#strict-streaming",
+          "entrypoints": ["render.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8227,
+          "runner": "control-plane-preset",
+          "expect": { "mode": "strict", "delivery": "streaming" },
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/control-plane-preset/node-server.ts", "--mode=strict", "--delivery=streaming"]
+          },
+          "description": "Strict CSP with streamed sections: no inline sources, section content in the document."
+        }
+      ]
+    },
+    "ts/examples/isr-blocking": {
+      "rows": [
+        {
+          "id": "isr-blocking#serve",
+          "entrypoints": ["handler.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8229,
+          "runner": "isr-blocking",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/isr-blocking/node-server.ts"]
+          },
+          "description": "Blocking ISR with the example's in-memory stores: miss, generation, hit."
+        },
+        {
+          "id": "isr-blocking#real-storage",
+          "entrypoints": ["handler.ts", "node-server.ts"],
+          "class": "L2",
+          "pending": "FT3",
+          "runner": "pending",
+          "gap": "Real S3 HTML storage and TableTheory metadata/leases on local emulators; the FT3 store-injection seam does not exist yet.",
+          "description": "Real-storage variant of the same ISR example."
+        }
+      ]
+    },
+    "ts/examples/lambda-url-streaming": {
+      "rows": [
+        {
+          "id": "lambda-url-streaming#serve",
+          "entrypoints": ["handler.ts"],
+          "class": "L3",
+          "pending": "FT2",
+          "runner": "pending",
+          "gap": "Managed Lambda Function URL streaming runtime and the real awslambda global; FT2 runs it through the AppTheory local runner and gateway.",
+          "description": "Direct FaceTheory Lambda URL streaming handler; needs the FT2 runner."
+        }
+      ]
+    },
+    "ts/examples/navigation-pending": {
+      "rows": [
+        {
+          "id": "navigation-pending#serve",
+          "entrypoints": ["host-server.ts", "navigation-pending-entry.ts"],
+          "class": "L1",
+          "port": 8223,
+          "runner": "navigation-pending",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/navigation-pending/host-server.ts"]
+          },
+          "description": "Real host page serving the built navigation-pending helper and the bundled example entry over HTTP."
+        }
+      ]
+    },
+    "ts/examples/operator-visibility-react": {
+      "rows": [
+        {
+          "id": "operator-visibility-react#serve",
+          "entrypoints": ["build.ts", "handler.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8221,
+          "runner": "operator-visibility-react",
+          "build": [{ "cwd": "ts", "script": "example:operator-visibility:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/operator-visibility-react/node-server.ts"]
+          },
+          "description": "Deterministic operator dashboard built and served by the real React Face."
+        }
+      ]
+    },
+    "ts/examples/react-isr": {
+      "rows": [
+        {
+          "id": "react-isr#serve",
+          "entrypoints": ["handler.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8230,
+          "runner": "react-isr",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/react-isr/node-server.ts"]
+          },
+          "description": "Real React tree through blocking ISR with the example's in-memory stores: miss, generation, hit."
+        },
+        {
+          "id": "react-isr#real-storage",
+          "entrypoints": ["handler.ts", "node-server.ts"],
+          "class": "L2",
+          "pending": "FT3",
+          "runner": "pending",
+          "gap": "Real S3 HTML storage and TableTheory metadata/leases on local emulators; the FT3 store-injection seam does not exist yet.",
+          "description": "Real-storage variant of the React ISR example."
+        }
+      ]
+    },
+    "ts/examples/react-ssr-buffered": {
+      "rows": [
+        {
+          "id": "react-ssr-buffered#serve",
+          "entrypoints": ["handler.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8210,
+          "runner": "react-ssr-buffered",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/react-ssr-buffered/node-server.ts"]
+          },
+          "description": "Buffered React SSR document with hydration data and bootstrap module."
+        }
+      ]
+    },
+    "ts/examples/react-ssr-streaming": {
+      "rows": [
+        {
+          "id": "react-ssr-streaming#serve",
+          "entrypoints": ["handler.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8211,
+          "runner": "react-ssr-streaming",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/react-ssr-streaming/node-server.ts"]
+          },
+          "description": "React streaming SSR with a head-first, multi-chunk document body."
+        }
+      ]
+    },
+    "ts/examples/responsive-primitives-react": {
+      "rows": [
+        {
+          "id": "responsive-primitives-react#serve",
+          "entrypoints": ["render.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8232,
+          "runner": "responsive-primitives-react",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/responsive-primitives-react/node-server.ts"]
+          },
+          "description": "React responsive primitives rendered by the real adapter and served over HTTP."
+        }
+      ]
+    },
+    "ts/examples/responsive-primitives-svelte": {
+      "rows": [
+        {
+          "id": "responsive-primitives-svelte#serve",
+          "entrypoints": ["render.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8234,
+          "runner": "responsive-primitives-svelte",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/responsive-primitives-svelte/node-server.ts"]
+          },
+          "description": "Compiled Svelte responsive primitives served as real pages."
+        }
+      ]
+    },
+    "ts/examples/responsive-primitives-vue": {
+      "rows": [
+        {
+          "id": "responsive-primitives-vue#serve",
+          "entrypoints": ["render.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8233,
+          "runner": "responsive-primitives-vue",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/responsive-primitives-vue/node-server.ts"]
+          },
+          "description": "Vue responsive primitives rendered by the real adapter and served over HTTP."
+        }
+      ]
+    },
+    "ts/examples/spa-navigation": {
+      "rows": [
+        {
+          "id": "spa-navigation#serve",
+          "entrypoints": ["entry-client.ts", "faces.ts", "node-server.ts", "server.ts"],
+          "class": "L1",
+          "port": 8222,
+          "runner": "spa-navigation",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/spa-navigation/node-server.ts"]
+          },
+          "description": "Two SSR Faces, external hydration sidecars and the bundled client navigation entry."
+        }
+      ]
+    },
+    "ts/examples/ssg-basic": {
+      "rows": [
+        {
+          "id": "ssg-basic#serve",
+          "entrypoints": ["build.ts", "faces.ts", "serve-static.ts"],
+          "class": "L1",
+          "port": 8219,
+          "runner": "ssg-basic",
+          "build": [{ "cwd": "ts", "script": "example:ssg:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/ssg-basic/serve-static.ts"]
+          },
+          "description": "Built SSG pages, dynamic route output, 404 page and static manifest."
+        }
+      ]
+    },
+    "ts/examples/svelte-component-library": {
+      "rows": [
+        {
+          "id": "svelte-component-library#host",
+          "entrypoints": ["index.ts", "LibraryPanel.svelte"],
+          "class": "L1",
+          "runner": "via-host",
+          "verifiedBy": "vite-ssr-svelte-library#serve",
+          "description": "Packaged Svelte library verified through its documented host example."
+        }
+      ]
+    },
+    "ts/examples/vite-manifest-injection": {
+      "rows": [
+        {
+          "id": "vite-manifest-injection#serve",
+          "entrypoints": ["handler.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8231,
+          "runner": "vite-manifest-injection",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-manifest-injection/node-server.ts"]
+          },
+          "description": "Manifest-derived preload, stylesheet, module bootstrap and hydration tags."
+        }
+      ]
+    },
+    "ts/examples/vite-ssr-react": {
+      "rows": [
+        {
+          "id": "vite-ssr-react#serve",
+          "entrypoints": ["node-server.ts", "vite.config.ts"],
+          "class": "L1",
+          "port": 8213,
+          "runner": "vite-ssr-react",
+          "build": [{ "cwd": "ts", "script": "example:vite:ssr:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-ssr-react/node-server.ts"]
+          },
+          "description": "Built Vite React app with manifest assets, hydration and the served client entry."
+        },
+        {
+          "id": "vite-ssr-react#dev",
+          "entrypoints": ["src/entry-server.tsx"],
+          "class": "L1",
+          "port": 8214,
+          "runner": "vite-ssr-react#dev",
+          "serve": {
+            "kind": "npm",
+            "cwd": "ts/examples/vite-ssr-react",
+            "script": "dev"
+          },
+          "description": "In-example npm run dev served through the Vite middleware dev loop."
+        }
+      ]
+    },
+    "ts/examples/vite-ssr-svelte": {
+      "rows": [
+        {
+          "id": "vite-ssr-svelte#serve",
+          "entrypoints": ["node-server.ts", "vite.config.ts"],
+          "class": "L1",
+          "port": 8216,
+          "runner": "vite-ssr-svelte",
+          "build": [{ "cwd": "ts", "script": "example:vite:svelte:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-ssr-svelte/node-server.ts"]
+          },
+          "description": "Built Vite Svelte app with manifest assets and hydration."
+        }
+      ]
+    },
+    "ts/examples/vite-ssr-svelte-library": {
+      "rows": [
+        {
+          "id": "vite-ssr-svelte-library#serve",
+          "entrypoints": ["node-server.ts", "vite.config.ts"],
+          "class": "L1",
+          "port": 8217,
+          "runner": "vite-ssr-svelte-library",
+          "build": [{ "cwd": "ts", "script": "example:vite:svelte:library:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-ssr-svelte-library/node-server.ts"]
+          },
+          "description": "Host consuming the packaged Svelte library; verifies the library's markup, CSS and badge asset."
+        }
+      ]
+    },
+    "ts/examples/vite-ssr-vue": {
+      "rows": [
+        {
+          "id": "vite-ssr-vue#serve",
+          "entrypoints": ["node-server.ts", "vite.config.ts"],
+          "class": "L1",
+          "port": 8215,
+          "runner": "vite-ssr-vue",
+          "build": [{ "cwd": "ts", "script": "example:vite:vue:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-ssr-vue/node-server.ts"]
+          },
+          "description": "Built Vite Vue app with manifest assets and hydration."
+        }
+      ]
+    },
+    "ts/examples/vite-strict-csp-react": {
+      "rows": [
+        {
+          "id": "vite-strict-csp-react#serve",
+          "entrypoints": ["node-server.ts", "vite.config.ts"],
+          "class": "L1",
+          "port": 8235,
+          "runner": "vite-strict-csp-react",
+          "build": [{ "cwd": "ts", "script": "example:vite:react:strict-csp:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-strict-csp-react/node-server.ts"]
+          },
+          "description": "Strict no-inline CSP with external CSS/module assets and the SSR hydration sidecar."
+        },
+        {
+          "id": "vite-strict-csp-react#real-storage",
+          "entrypoints": ["node-server.ts", "vite.config.ts"],
+          "class": "L2",
+          "pending": "FT3",
+          "runner": "pending",
+          "gap": "Real S3 sidecar storage and TableTheory metadata on local emulators; the FT3 store-injection seam does not exist yet.",
+          "description": "Real-storage variant of the strict-CSP React sidecar."
+        }
+      ]
+    },
+    "ts/examples/vite-strict-csp-svelte": {
+      "rows": [
+        {
+          "id": "vite-strict-csp-svelte#serve",
+          "entrypoints": ["node-server.ts", "vite.config.ts"],
+          "class": "L1",
+          "port": 8236,
+          "runner": "vite-strict-csp-svelte",
+          "build": [{ "cwd": "ts", "script": "example:vite:svelte:strict-csp:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-strict-csp-svelte/node-server.ts"]
+          },
+          "description": "Strict no-inline CSP with external CSS/module assets and the SSR hydration sidecar."
+        },
+        {
+          "id": "vite-strict-csp-svelte#real-storage",
+          "entrypoints": ["node-server.ts", "vite.config.ts"],
+          "class": "L2",
+          "pending": "FT3",
+          "runner": "pending",
+          "gap": "Real S3 sidecar storage and TableTheory metadata on local emulators; the FT3 store-injection seam does not exist yet.",
+          "description": "Real-storage variant of the strict-CSP Svelte sidecar."
+        }
+      ]
+    },
+    "ts/examples/vite-strict-csp-vue": {
+      "rows": [
+        {
+          "id": "vite-strict-csp-vue#serve",
+          "entrypoints": ["node-server.ts", "vite.config.ts"],
+          "class": "L1",
+          "port": 8237,
+          "runner": "vite-strict-csp-vue",
+          "build": [{ "cwd": "ts", "script": "example:vite:vue:strict-csp:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vite-strict-csp-vue/node-server.ts"]
+          },
+          "description": "Strict no-inline CSP with external CSS/module assets and the SSR hydration sidecar."
+        },
+        {
+          "id": "vite-strict-csp-vue#real-storage",
+          "entrypoints": ["node-server.ts", "vite.config.ts"],
+          "class": "L2",
+          "pending": "FT3",
+          "runner": "pending",
+          "gap": "Real S3 sidecar storage and TableTheory metadata on local emulators; the FT3 store-injection seam does not exist yet.",
+          "description": "Real-storage variant of the strict-CSP Vue sidecar."
+        }
+      ]
+    },
+    "ts/examples/vue-ssg": {
+      "rows": [
+        {
+          "id": "vue-ssg#serve",
+          "entrypoints": ["build.ts", "serve-static.ts", "vite.config.ts"],
+          "class": "L1",
+          "port": 8220,
+          "runner": "vue-ssg",
+          "build": [{ "cwd": "ts", "script": "example:vue:ssg:build" }],
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vue-ssg/serve-static.ts"]
+          },
+          "description": "Vue SSG catalog and dynamic product pages built from a real Vue tree."
+        }
+      ]
+    },
+    "ts/examples/vue-ssr-streaming": {
+      "rows": [
+        {
+          "id": "vue-ssr-streaming#serve",
+          "entrypoints": ["handler.ts", "node-server.ts"],
+          "class": "L1",
+          "port": 8212,
+          "runner": "vue-ssr-streaming",
+          "serve": {
+            "kind": "node",
+            "cwd": "ts",
+            "args": ["examples/vue-ssr-streaming/node-server.ts"]
+          },
+          "description": "Vue streaming SSR with a head-first, multi-chunk document body."
+        }
+      ]
+    },
+    "infra/apptheory-ssr-site": {
+      "rows": [
+        {
+          "id": "infra/apptheory-ssr-site#synth",
+          "entrypoints": ["src/stack.ts", "src/handler.ts"],
+          "class": "I",
+          "runner": "infra-synth",
+          "snapshot": "infra/apptheory-ssr-site/test/__snapshots__/ssr-site-stack.template.json",
+          "build": [{ "cwd": "infra/apptheory-ssr-site", "script": "test" }],
+          "gap": "No runtime code in this stack row; verified by CDK synth plus snapshot assertions.",
+          "description": "CloudFront, S3 and Lambda Function URL stack synth and snapshot."
+        },
+        {
+          "id": "infra/apptheory-ssr-site#local-run",
+          "entrypoints": ["src/stack.ts", "src/handler.ts"],
+          "class": "L2",
+          "pending": "FT2",
+          "runner": "pending",
+          "gap": "AppTheory local gateway and runner (FT2); CloudFront caching, IAM policy evaluation and the edge network are not emulated.",
+          "description": "End-to-end local run of the SSR site through the AppTheory gateway."
+        }
+      ]
+    },
+    "infra/apptheory-ssg-isr-site": {
+      "rows": [
+        {
+          "id": "infra/apptheory-ssg-isr-site#synth",
+          "entrypoints": ["src/stack.ts", "src/ssr-handler.ts"],
+          "class": "I",
+          "runner": "infra-synth",
+          "stack": "ssg-isr",
+          "snapshot": "infra/apptheory-ssg-isr-site/test/__snapshots__/ssg-isr-site-stack.template.json",
+          "build": [{ "cwd": "infra/apptheory-ssg-isr-site", "script": "test" }],
+          "gap": "No runtime code in this stack row; verified by CDK synth plus snapshot assertions.",
+          "description": "CloudFront, S3, DynamoDB and Lambda ISR stack synth and snapshot."
+        },
+        {
+          "id": "infra/apptheory-ssg-isr-site#local-run",
+          "entrypoints": ["src/stack.ts", "src/ssr-handler.ts"],
+          "class": "L2",
+          "pending": "FT3",
+          "runner": "pending",
+          "gap": "AppTheory gateway and the FT3 real-storage seam; S3 and DynamoDB are emulated locally.",
+          "description": "End-to-end local ISR run with the S3 emulator and DynamoDB Local."
+        }
+      ]
+    }
+  }
+}
