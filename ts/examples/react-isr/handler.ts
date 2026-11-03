@@ -1,15 +1,17 @@
 // Example: blocking ISR rendering a real React tree.
 //
-// Replace the in-memory stores with `S3HtmlStore` + a TableTheory-backed ISR
-// metadata store (`FaceTheoryIsrMetaStore`) in production, wired from the Lambda
-// environment. A typical deployment reads:
+// The example defaults to the in-memory stores its unit tests use. When the
+// stack environment is present, `../local-storage` selects `S3HtmlStore` and
+// the TableTheory-backed ISR metadata/lease store instead. A typical deployment
+// reads:
 //   FACETHEORY_ISR_BUCKET        -> S3 bucket backing `new S3HtmlStore({ client, bucket })`
 //   FACETHEORY_ISR_PREFIX        -> optional S3 key prefix for `S3HtmlStore`
 //   FACETHEORY_CACHE_TABLE_NAME  -> TableTheory table backing the ISR metadata
 //                                   store and its regeneration leases
 //                                   (`APPTHEORY_CACHE_TABLE_NAME` is the alias)
-// FaceTheory does not own that storage: cached HTML lives in S3, and the cache
-// metadata + regeneration leases live in TableTheory. See the README.
+// The local harness sets the same names against its emulators. FaceTheory does
+// not own that storage: cached HTML lives in S3, and the cache metadata +
+// regeneration leases live in TableTheory. See the README.
 //
 // This example is intentionally tenant-invariant: it does not read tenant headers,
 // auth headers, or cookies while rendering cached HTML. Tenant-varying ISR must
@@ -29,8 +31,11 @@ import {
 } from '@theory-cloud/facetheory';
 import { createReactFace } from '@theory-cloud/facetheory/react';
 
-const htmlStore = new InMemoryHtmlStore();
-const metaStore = new InMemoryIsrMetaStore();
+import { createExampleIsrStores } from '../local-storage.js';
+
+const exampleStores = createExampleIsrStores();
+const htmlStore = exampleStores?.htmlStore ?? new InMemoryHtmlStore();
+const metaStore = exampleStores?.metaStore ?? new InMemoryIsrMetaStore();
 
 // Deterministic regeneration counter so a cache MISS regenerates and the next
 // request serves the identical cached bytes on a HIT.
@@ -68,6 +73,9 @@ export const faceApp = createFaceApp({
   isr: {
     htmlStore,
     metaStore,
+    ...(exampleStores
+      ? { htmlPointerPrefix: exampleStores.htmlPointerPrefix }
+      : {}),
   },
 });
 
