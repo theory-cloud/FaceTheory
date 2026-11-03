@@ -41,8 +41,37 @@ AppTheory/TableTheory release-tarball dependencies with EALLOWREMOTE).
 That is intentionally narrower than `all`: only the URL dependencies
 declared by this package's `package.json` may be fetched.
 
+The same stack runs end to end on local backends through the sibling AppTheory
+local runner and gateway. The runner synthesizes this app with its own
+`node_modules/.bin/cdk`, starts DynamoDB Local and s3proxy, creates the cache
+table from the template's key schema and TTL, deploys the bucket sources, and
+serves the distribution on loopback:
+
+```bash
+make ts-build
+~/.cache/facetheory-examples-local/apptheory-local/$(git -C ../AppTheory rev-parse HEAD)/apptheory-local run \
+  --app infra/apptheory-ssg-isr-site \
+  --profile scripts/local/apptheory-local-profile.json \
+  --backend dynamodb --backend s3proxy \
+  --port-base 8246
+```
+
+`make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'` runs the same
+gateway and asserts the SSG HTML and assets from S3, the ISR miss/generation/hit
+through the Function URL origin, the stored S3 object and DynamoDB metadata item,
+the lease and TTL, the 403/404 refusals and the edge policy headers. Named gaps:
+no CloudFront cache, edge network or TLS, no IAM/bucket policy evaluation, no
+CORS, no viewer protocol enforcement, and a buffered streaming body.
+
 ## Deployment Notes
 
+- The cache table's `pk`/`sk` keys and its `ttl` attribute come from
+  TableTheory's FaceTheory ISR metadata and lease models; the stack test compares
+  the synthesized table against those models so they cannot drift.
+- The manifest deployment writes the Vite manifest at the assets bucket root.
+  Root-prefix deployments must not prune: CDK's prune deletes every object the
+  other deployments placed (`assets/*`, `_facetheory/data/*`). Only the
+  prefix-scoped assets deployment sets `prune: true`.
 - Use the canonical AWS deployment and operations docs for routing, cache, and smoke-test expectations.
 - Keep SSG strict-CSP sidecars (`/_facetheory/data/*`) on S3/static behaviors.
 - Route SSR runtime hydration sidecars (`/_facetheory/ssr-data/*`) directly to the same Lambda/FaceApp handler that
