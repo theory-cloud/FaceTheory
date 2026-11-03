@@ -399,6 +399,68 @@ test('a row that executes against the sibling checkout must not be pending', asy
   );
 });
 
+function storageProfileFixture() {
+  return {
+    ports: { dynamodb: 8250, s3: 8251 },
+    containers: {
+      'dynamodb-local': {
+        image: `amazon/dynamodb-local@sha256:${'a'.repeat(64)}`,
+        containerPort: 8000,
+        command: ['-jar', 'DynamoDBLocal.jar', '-sharedDb', '-inMemory'],
+      },
+      s3proxy: {
+        image: `andrewgaul/s3proxy@sha256:${'b'.repeat(64)}`,
+        containerPort: 80,
+        environment: { S3PROXY_IDENTITY: 'dummy', S3PROXY_CREDENTIAL: 'dummy' },
+      },
+    },
+  };
+}
+
+test('the checked-in FT3 storage profile pins both backend images by digest', async () => {
+  const manifest = JSON.parse(
+    await readFile(path.join(ROOT, 'scripts/local/examples-local.json'), 'utf8'),
+  );
+  const storage = manifest.profile.storage;
+  assert.ok(storage, 'profile.storage is required');
+  assert.deepEqual(Object.keys(storage.containers).sort(), ['dynamodb-local', 's3proxy']);
+  for (const container of Object.values(storage.containers)) {
+    assert.match(container.image, /@sha256:[0-9a-f]{64}$/);
+  }
+  assert.deepEqual(storage.ports, { dynamodb: 8250, s3: 8251 });
+});
+
+test('a storage row requires profile.storage', async () => {
+  const root = await createFixture();
+  const manifest = baseManifest();
+  manifest.entries['ts/examples/alpha'].rows[0].storage = { kind: 'isr' };
+  manifest.entries['ts/examples/alpha'].rows[0].runner = 'isr-real-storage';
+  const result = validateManifest(root, manifest, await discoverTree(root));
+  assert.match(messages(result), /declare storage but profile\.storage is missing/);
+});
+
+test('a tag-only storage image fails validation', async () => {
+  const root = await createFixture();
+  const manifest = baseManifest();
+  manifest.profile.storage = storageProfileFixture();
+  manifest.profile.storage.containers.s3proxy.image = 'andrewgaul/s3proxy:latest';
+  manifest.entries['ts/examples/alpha'].rows[0].storage = { kind: 'isr' };
+  manifest.entries['ts/examples/alpha'].rows[0].runner = 'isr-real-storage';
+  const result = validateManifest(root, manifest, await discoverTree(root));
+  assert.match(messages(result), /s3proxy\.image must be pinned by digest/);
+});
+
+test('a storage row must use the runner for its kind', async () => {
+  const root = await createFixture();
+  const manifest = baseManifest();
+  manifest.profile.storage = storageProfileFixture();
+  const row = manifest.entries['ts/examples/alpha'].rows[0];
+  row.storage = { kind: 'sidecar' };
+  row.runner = 'isr-real-storage';
+  const result = validateManifest(root, manifest, await discoverTree(root));
+  assert.match(messages(result), /storage kind sidecar must use runner strict-csp-real-storage/);
+});
+
 function ft2Row() {
   return {
     id: 'alpha#serve',
