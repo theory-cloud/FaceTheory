@@ -87,11 +87,13 @@ test.after(async () => {
 });
 
 test('the raw HTTP reader preserves streaming chunk boundaries', async () => {
-  const server = http.createServer((_request, response) => {
+  const server = http.createServer(async (_request, response) => {
     response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
-    response.write('first');
-    response.write('second');
-    response.end('third');
+    for (const value of ['first', 'second', 'third']) {
+      response.write(value);
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    response.end();
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
