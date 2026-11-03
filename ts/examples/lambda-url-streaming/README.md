@@ -12,7 +12,7 @@ Node image through the AppTheory local runner. It bundles this example's own
 buffered streaming body and the catch-all route:
 
 ```bash
-make examples-local --only lambda-url-streaming#serve
+make examples-local ONLY=lambda-url-streaming#serve
 ```
 
 The row is class L3: the Runtime Interface Emulator buffers `RESPONSE_STREAM`,

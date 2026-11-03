@@ -38,7 +38,7 @@ npm run synth
 
 ## Local Run
 
-`make examples-local --only infra/apptheory-ssr-site#local-run` synthesizes this
+`make examples-local ONLY=infra/apptheory-ssr-site#local-run` synthesizes this
 stack with its own CDK CLI (`aws-cdk`, installed by `npm ci`), runs the SSR
 function in the digest-pinned official Lambda Node image and serves the
 synthesized CloudFront distribution through the AppTheory local gateway on

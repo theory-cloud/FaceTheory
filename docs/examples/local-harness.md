@@ -14,14 +14,16 @@ site in the official, digest-pinned Lambda runtime image through the sibling
 AppTheory local runner and gateway.
 
 ```bash
-make examples-local          # build, serve and assert every classified row
-make examples-local-down     # stop processes this checkout's harness started
-make examples-local-selftest # prove the manifest, discovery and ledger rules
+make examples-local                 # build, serve and assert every classified row
+make examples-local ONLY=<row-id>   # build and assert one classified row
+make examples-local-down            # stop processes this checkout's harness started
+make examples-local-selftest        # prove the manifest, discovery and ledger rules
 ```
 
 `make examples-local` runs `make ts-build`, so `ts/dist` matches the
 checked-in sources, installs any missing `infra/*` dependencies, and then runs
-the harness serially, row by row.
+the harness serially, row by row. Setting `ONLY` forwards the row id to the
+harness's `--only`, after those same build and install steps.
 
 ## What the harness owns
 
@@ -396,7 +398,7 @@ curl -i http://127.0.0.1:8229/news/home   # hit, identical bytes
 Run one classified row through the harness:
 
 ```bash
-node scripts/local/run-examples-local.mjs --only ssg-basic#serve
+make examples-local ONLY=ssg-basic#serve
 ```
 
 List the rows and ports without starting anything:

@@ -13,7 +13,7 @@ sends Function URL payload 2.0 events, and asserts the complete buffered
 streaming body, the catch-all route and the example's 405 method refusal:
 
 ```bash
-make examples-local --only apptheory-lambda-url-streaming#serve
+make examples-local ONLY=apptheory-lambda-url-streaming#serve
 ```
 
 The row is class L3: the Runtime Interface Emulator buffers `RESPONSE_STREAM`,
