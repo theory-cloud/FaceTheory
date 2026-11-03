@@ -35,6 +35,11 @@ import {
 } from './lib/runtime.mjs';
 import { RUNNERS } from './lib/runners.mjs';
 import {
+  prepareRowStorage,
+  stopStorageBackends,
+  storageProfile,
+} from './lib/storage.mjs';
+import {
   FT2_RUNNERS,
   dockerPrefixFor,
   ensureApptheoryLocal,
@@ -115,7 +120,9 @@ async function preflight({ root, manifest, rows }) {
   if (!(await portIsFree(8299))) {
     errors.push('reserved AWS endpoint port 8299 is already in use');
   }
-  for (const name of ['node', 'npm', 'git']) {
+  const requirements = ['node', 'npm', 'git'];
+  if (storageProfile(manifest)) requirements.push('docker');
+  for (const name of requirements) {
     const probe = await runCommand({ command: 'sh', args: ['-c', `command -v ${name}`], cwd: root, env: process.env, timeoutMs: 10_000 }).catch(() => null);
     if (!probe) errors.push(`${name} is not on PATH`);
   }
@@ -146,6 +153,17 @@ async function preflight({ root, manifest, rows }) {
     if (!Number.isInteger(row.port)) continue;
     if (!(await portIsFree(row.port))) {
       errors.push(`port ${row.port} for ${row.id} is already in use`);
+    }
+  }
+
+  const storage = storageProfile(manifest);
+  if (storage && serving.some((row) => row.storage !== undefined)) {
+    for (const [name, port] of Object.entries(storage.ports ?? {})) {
+      if (!(await portIsFree(port))) {
+        errors.push(
+          `FT3 storage port ${port} (${name}) is already in use; run make examples-local-down`,
+        );
+      }
     }
   }
 
@@ -311,6 +329,7 @@ async function main() {
     return;
   }
   const root = SCRIPT_ROOT;
+  const manifest = await readJson(path.join(root, MANIFEST_PATH));
   if (options.down) {
     const results = await stopRecordedProcesses(root);
     if (results.length === 0) {
@@ -326,10 +345,19 @@ async function main() {
         console.log(`examples-local-down: ${leftovers.length} process(es) were not ours and were left running`);
       }
     }
+    const storageResults = await stopStorageBackends({ root, manifest });
+    if (storageResults.length === 0) {
+      console.log('examples-local-down: no FT3 storage backends for this checkout');
+    } else {
+      for (const result of storageResults) {
+        console.log(
+          `examples-local-down: ${result.stopped ? 'removed' : 'left'} ${result.name}: ${result.reason}`,
+        );
+      }
+    }
     return;
   }
 
-  const manifest = await readJson(path.join(root, MANIFEST_PATH));
   const ledger = await readJson(path.join(root, LEDGER_PATH));
   const tree = await discoverTree(root);
   const validation = validateManifest(root, manifest, tree);
@@ -409,6 +437,7 @@ async function main() {
         clearProcess(root, entry.child.pid);
       }
     }
+    await stopStorageBackends({ root, manifest }).catch(() => {});
   };
   process.once('SIGINT', () => {
     void shutdown().finally(() => {
@@ -441,15 +470,21 @@ async function main() {
       let child;
       let logPath;
       let command;
+      let storage;
+      let rowEnv = env;
       try {
         const apptheory = await prepareApptheoryRow({ root, row, ledger });
         await runBuilds({ root, row, env });
         command = serveCommand({ root, row, port: row.port, apptheory });
+        if (row.storage !== undefined) {
+          storage = await prepareRowStorage({ root, manifest, row });
+          rowEnv = { ...env, ...storage.env };
+        }
         let request;
         if (command) {
           const started = startServer({
             ...command,
-            env,
+            env: rowEnv,
             root,
             row: row.id,
             port: row.port,
@@ -473,7 +508,8 @@ async function main() {
           results,
           logPath,
           apptheory,
-          env,
+          env: rowEnv,
+          storage,
         });
         if (child) {
           await stopRow({
@@ -524,6 +560,22 @@ async function main() {
       }
     }
   } finally {
+    try {
+      const cleanup = await stopStorageBackends({ root, manifest });
+      for (const result of cleanup) {
+        if (!result.stopped) {
+          failures.push(
+            new RunError(`storage cleanup left ${result.name}: ${result.reason}`),
+          );
+        }
+      }
+    } catch (error) {
+      failures.push(
+        new RunError(
+          `storage cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+    }
     releaseLock();
   }
 

@@ -606,10 +606,10 @@ export async function assertInvalidateUnsupported({ root, storage, cacheKey }) {
 }
 
 /**
- * Acquire and release a real lease through the TableTheory adapter so the
- * model's lease fields and TTL attribute are observed in DynamoDB Local.
+ * Acquire a real lease through the TableTheory adapter and return the stored
+ * item. The caller owns the release.
  */
-export async function observeLease({ root, storage, cacheKey, leaseOwner = 'ft3-harness' }) {
+export async function holdLease({ root, storage, cacheKey, leaseOwner = 'ft3-harness' }) {
   const { store } = await tableAdapter({
     root,
     endpoint: storage.endpoints.dynamodb,
@@ -636,19 +636,36 @@ export async function observeLease({ root, storage, cacheKey, leaseOwner = 'ft3-
   assert(Number.isFinite(expiresAt) && expiresAt > 0, 'lease_expires_at is missing');
   assert(Number.isFinite(ttl) && ttl >= expiresAt, 'the lease ttl is missing or before expiry');
 
-  await store.releaseLease({
-    cacheKey,
+  return {
+    store,
     leaseOwner,
     leaseToken: acquired.leaseToken,
-  });
+    token,
+    expiresAt,
+    ttl,
+    release: () =>
+      store.releaseLease({
+        cacheKey,
+        leaseOwner,
+        leaseToken: acquired.leaseToken,
+      }),
+  };
+}
+
+/**
+ * Acquire and release a real lease through the TableTheory adapter so the
+ * model's lease fields and TTL attribute are observed in DynamoDB Local.
+ */
+export async function observeLease({ root, storage, cacheKey, leaseOwner = 'ft3-harness' }) {
+  const lease = await holdLease({ root, storage, cacheKey, leaseOwner });
+  await lease.release();
   const after = await getDynamoItem({
     endpoint: storage.endpoints.dynamodb,
     tableName: storage.tableName,
     key: { pk: `CACHE#${cacheKey}`, sk: 'LOCK' },
   });
   assert(!after, 'the released lease item is still present');
-
-  return { token, expiresAt, ttl };
+  return { token: lease.token, expiresAt: lease.expiresAt, ttl: lease.ttl };
 }
 
 export function valueOf(item, name) {
