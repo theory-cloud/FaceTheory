@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "profile": {
+    "name": "facetheory-examples-local",
+    "containers": {
+      "s3proxy": {
+        "image": "andrewgaul/s3proxy@sha256:1f8915c2b4a8af22bf1fc191500f242974a458c457391b5788f9107544273dc3",
+        "containerPort": 80,
+        "environment": {
+          "S3PROXY_AUTHORIZATION": "aws-v2-or-v4",
+          "S3PROXY_IDENTITY": "dummy",
+          "S3PROXY_CREDENTIAL": "dummy"
+        }
+      }
+    },
+    "lambda": {
+      "images": {
+        "node": {
+          "tag": "public.ecr.aws/lambda/nodejs:24",
+          "digest": "sha256:8466f17dcfbec19afcfefff53964fac7bc3f7975fa132d5fd74dce53004827d0",
+          "pinned": "2026-11-01"
+        },
+        "python": {
+          "tag": "public.ecr.aws/lambda/python:3.14",
+          "digest": "sha256:51985f11b2fb1949619bda27d121f38ef7d4db64423ca6189ab1d7e632527d27",
+          "pinned": "2026-11-01"
+        }
+      }
+    },
+    "endpoints": {
+      "s3": {
+        "container": "s3proxy",
+        "env": ["AWS_ENDPOINT_URL_S3", "S3_ENDPOINT"]
+      }
+    }
+  }
+}

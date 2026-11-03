@@ -11,6 +11,29 @@ import {
   assertNotIncludes,
   assertNotMatch,
 } from './runtime.mjs';
+import {
+  assertProxyResult,
+  functionUrlEvent,
+  lambdaHeader,
+  startInvokeSession,
+} from './apptheory.mjs';
+
+const HANDLER_PROFILES = {
+  facetheory: {
+    rootBody:
+      '<!doctype html><html lang="en"><head><title>FaceTheory</title></head><body><h1>hello (streaming)</h1></body></html>',
+    catchAllBody:
+      '<!doctype html><html lang="en"><head><title>Catch-all</title></head><body><pre>{\n  "path": "/anything",\n  "proxy": "anything"\n}</pre></body></html>',
+    refusal: 'none',
+  },
+  apptheory: {
+    rootBody:
+      '<!doctype html><html lang="en"><head><title>FaceTheory (AppTheory)</title></head><body><h1>hello (streaming)</h1></body></html>',
+    catchAllBody:
+      '<!doctype html><html lang="en"><head><title>Catch-all</title></head><body><pre>{\n  "path": "/anything",\n  "proxy": "anything"\n}</pre></body></html>',
+    refusal: '405',
+  },
+};
 
 function html(response) {
   return response.body;
@@ -442,6 +465,115 @@ export const RUNNERS = {
   'vite-strict-csp-react': async ({ request }) => runStrictCsp(request, 'React', 'strict-csp-react'),
   'vite-strict-csp-svelte': async ({ request }) => runStrictCsp(request, 'Svelte', 'strict-csp-svelte'),
   'vite-strict-csp-vue': async ({ request }) => runStrictCsp(request, 'Vue', 'strict-csp-vue'),
+
+  'apptheory-local-handler': async ({ row, root, apptheory, env }) => {
+    const profile = HANDLER_PROFILES[row.expect?.profile];
+    if (!profile) throw new RunError(`${row.id}: unknown handler profile ${String(row.expect?.profile)}`);
+    const session = await startInvokeSession({ root, row, runner: apptheory, env });
+    try {
+      const rootEvent = functionUrlEvent({ rowId: row.id });
+      const rootResult = await session.call(rootEvent);
+      assertProxyResult(rootResult, `${row.id} GET /`);
+      assertEqual(rootResult.statusCode, 200, `${row.id} GET / status`);
+      assertEqual(lambdaHeader(rootResult, 'content-type'), 'text/html; charset=utf-8', `${row.id} GET / content-type`);
+      assertEqual(rootResult.body, profile.rootBody, `${row.id} GET / body`);
+      if (row.expect?.echoRequestId === true) {
+        assertEqual(
+          lambdaHeader(rootResult, 'x-request-id'),
+          rootEvent.requestContext.requestId,
+          `${row.id} GET / echoes the Function URL request id`,
+        );
+      }
+
+      const catchEvent = functionUrlEvent({ rowId: row.id, path: '/anything' });
+      const catchResult = await session.call(catchEvent);
+      assertProxyResult(catchResult, `${row.id} GET /anything`);
+      assertEqual(catchResult.statusCode, 200, `${row.id} GET /anything status`);
+      assertEqual(lambdaHeader(catchResult, 'content-type'), 'text/html; charset=utf-8', `${row.id} GET /anything content-type`);
+      assertEqual(catchResult.body, profile.catchAllBody, `${row.id} GET /anything body`);
+
+      const postEvent = functionUrlEvent({ rowId: row.id, method: 'POST', body: 'hello' });
+      const postResult = await session.call(postEvent);
+      assertProxyResult(postResult, `${row.id} POST /`);
+      if (profile.refusal === '405') {
+        assertEqual(postResult.statusCode, 405, `${row.id} POST / status`);
+        assertEqual(lambdaHeader(postResult, 'allow'), 'GET, HEAD', `${row.id} POST / allow`);
+        assertIncludes(postResult.body, '"code":"app.method_not_allowed"', `${row.id} POST / refusal code`);
+      } else {
+        assertEqual(postResult.statusCode, 200, `${row.id} POST / status (this example has no refusal path)`);
+        assertEqual(postResult.body, profile.rootBody, `${row.id} POST / body (this example has no refusal path)`);
+      }
+
+      if (profile.refusal === '405') {
+        return {
+          detail:
+            'real handler in the official Lambda Node image via apptheory-local; complete buffered streaming bodies, catch-all proxy and the 405 method refusal; chunk timing is the named gap',
+        };
+      }
+      return {
+        detail:
+          'real handler in the official Lambda Node image via apptheory-local; complete buffered streaming bodies and catch-all proxy; this example has no refusal path (POST is method-agnostic); chunk timing is the named gap',
+      };
+    } finally {
+      await session.close();
+    }
+  },
+
+  'apptheory-local-gateway': async ({ row, root, request }) => {
+    const page = await request('/', { headers: { 'x-request-id': 'ft2-gateway-check' } });
+    assertEqual(page.status, 200, 'SSR page status');
+    assertHeader(page.headers, 'content-type', /^text\/html; charset=utf-8$/);
+    assertHeader(page.headers, 'cache-control', 'private, no-store');
+    assertHeader(page.headers, 'x-request-id', 'ft2-gateway-check');
+    assertHeader(page.headers, 'x-frame-options', 'DENY');
+    assertHeader(page.headers, 'x-content-type-options', 'nosniff');
+    assertHeader(page.headers, 'referrer-policy', 'strict-origin-when-cross-origin');
+    assertMatch(page.headers['strict-transport-security'] ?? '', /^max-age=\d+/, 'SSR page HSTS policy');
+    assertIncludes(page.body, '<title>FaceTheory + AppTheorySsrSite</title>', 'SSR page title');
+    assertIncludes(page.body, '<h1>FaceTheory Infra Example</h1>', 'SSR page body');
+    assertIncludes(page.body, '<link href="/assets/entry.css" rel="stylesheet">', 'SSR page stylesheet tag');
+    assertIncludes(page.body, '<script type="module" src="/assets/entry.js"></script>', 'SSR page module script');
+
+    const css = await request('/assets/entry.css');
+    assertEqual(css.status, 200, 'asset status');
+    assertHeader(css.headers, 'content-type', 'text/css');
+    assertHeader(css.headers, 'cache-control', 'public,max-age=31536000,immutable');
+    assertHeader(css.headers, 'x-content-type-options', 'nosniff');
+    const cssSource = await readFile(path.join(root, 'infra/apptheory-ssr-site/deploy/assets/entry.css'), 'utf8');
+    assertEqual(css.body, cssSource, 'asset bytes match the deployed source');
+
+    const manifest = await request('/.vite/manifest.json');
+    assertEqual(manifest.status, 200, 'Vite manifest status');
+    assertHeader(manifest.headers, 'content-type', 'application/json');
+    assertHeader(manifest.headers, 'cache-control', 'public,max-age=0,must-revalidate');
+    assertIncludes(manifest.body, '"file": "assets/entry.js"', 'Vite manifest content');
+
+    const data = await request('/_facetheory/data/index.json');
+    assertEqual(data.status, 200, 'SSG data status');
+    assertHeader(data.headers, 'content-type', 'application/json');
+    assertHeader(data.headers, 'cache-control', 'public,max-age=0,s-maxage=600');
+    const dataSource = await readFile(
+      path.join(root, 'infra/apptheory-ssr-site/deploy/ssg/_facetheory/data/index.json'),
+      'utf8',
+    );
+    assertEqual(data.body, dataSource, 'SSG data bytes match the deployed source');
+
+    const missing = await request('/assets/missing.css');
+    assertEqual(missing.status, 403, 'missing asset status (OAC S3 origin)');
+    assertHeader(missing.headers, 'content-type', 'application/xml');
+    assertIncludes(missing.body, 'AccessDenied', 'missing asset refusal body');
+
+    const notFound = await request('/missing-route');
+    assertEqual(notFound.status, 404, 'missing SSR route status');
+    assertHeader(notFound.headers, 'content-type', /^text\/html; charset=utf-8$/);
+    assertIncludes(notFound.body, '<h1>Not Found</h1>', 'missing SSR route body');
+    assertIncludes(notFound.body, 'No FaceTheory reference route matched', 'missing SSR route message');
+
+    return {
+      detail:
+        'gateway served the real SSR handler through the AWS_IAM Function URL origin, the deployed CSS and Vite manifest from the S3 origin, the SSG data path, a 403 missing asset and the handler 404; CloudFront caching, the edge network/TLS, IAM policy evaluation and buffered streaming are the named gaps',
+    };
+  },
 
   'via-host': async ({ row, results }) => {
     const host = results.get(row.verifiedBy);

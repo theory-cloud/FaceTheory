@@ -36,6 +36,24 @@ Synthesize:
 npm run synth
 ```
 
+## Local Run
+
+`make examples-local ONLY=infra/apptheory-ssr-site#local-run` synthesizes this
+stack with its own CDK CLI (`aws-cdk`, installed by `npm ci`), runs the SSR
+function in the digest-pinned official Lambda Node image and serves the
+synthesized CloudFront distribution through the AppTheory local gateway on
+`http://127.0.0.1:8240`. The row asserts the SSR HTML from the Function URL
+origin, `/assets/*` and the Vite manifest from the S3 origin, the SSG data path,
+a 403 missing asset and the handler's 404. It is class L2; CloudFront caching,
+the edge network/TLS, IAM policy evaluation and buffered streaming are the named
+gaps.
+
+The manifest, Vite manifest and SSG data deployments share the assets bucket
+root with the prefix-scoped assets deployment. A root prune would delete the
+other deployments' objects, so the two root deployments set `prune: false` and
+the snapshot test pins that. The assets deployment still prunes stale objects
+under `assets/`.
+
 ## Deployment Notes
 
 - Deploy and smoke-test instructions should follow the canonical AWS docs first.

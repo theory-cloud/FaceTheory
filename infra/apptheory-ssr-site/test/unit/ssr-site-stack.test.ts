@@ -57,6 +57,26 @@ function findBehavior(distribution: DistributionTemplate, pathPattern: string): 
   return behavior;
 }
 
+interface BucketDeploymentTemplate {
+  readonly Properties?: { readonly Prune?: boolean };
+}
+
+function findBucketDeployment(
+  template: Record<string, unknown>,
+  logicalIdPrefix: string,
+): BucketDeploymentTemplate {
+  const resources = template.Resources as
+    | Record<string, { Type?: string; Properties?: { Prune?: boolean } }>
+    | undefined;
+  assert.ok(resources, 'template should include resources');
+  const entry = Object.entries(resources).find(
+    ([logicalId, resource]) =>
+      logicalId.startsWith(logicalIdPrefix) && resource.Type === 'Custom::CDKBucketDeployment',
+  );
+  assert.ok(entry, `missing bucket deployment ${logicalIdPrefix}`);
+  return entry[1];
+}
+
 function findOrigin(distribution: DistributionTemplate, behavior: CacheBehaviorTemplate): OriginTemplate {
   const origin = distribution.Origins?.find((candidate) => candidate.Id === behavior.TargetOriginId);
   assert.ok(origin, `missing CloudFront origin for ${behavior.PathPattern}`);
@@ -114,6 +134,24 @@ test('H2: AppTheorySsrSite stack synth is snapshotted', async () => {
   assert.ok(
     ssrSidecarOrigin.CustomOriginConfig,
     'SSR hydration sidecars must route to the Lambda Function URL origin',
+  );
+
+  const manifestDeployment = findBucketDeployment(template, 'AssetsDeploymentManifest');
+  const ssgDataDeployment = findBucketDeployment(template, 'AssetsDeploymentSsgData');
+  assert.equal(
+    findBucketDeployment(template, 'AssetsDeploymentImmutable').Properties?.Prune,
+    true,
+    'the prefix-scoped assets deployment may prune stale assets',
+  );
+  assert.equal(
+    manifestDeployment.Properties?.Prune,
+    false,
+    'the manifest deployment shares the bucket root and must not prune other deployments',
+  );
+  assert.equal(
+    ssgDataDeployment.Properties?.Prune,
+    false,
+    'the SSG data deployment shares the bucket root and must not prune other deployments',
   );
 
   const actual = `${JSON.stringify(template, null, 2)}\n`;

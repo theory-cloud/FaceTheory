@@ -25,7 +25,7 @@ ts-examples-readmes:
 	cd ts && npm run verify:examples:readmes
 
 examples-local: ts-build examples-local-infra-deps
-	node scripts/local/run-examples-local.mjs
+	node scripts/local/run-examples-local.mjs $(if $(strip $(ONLY)),--only '$(ONLY)')
 
 examples-local-infra-deps:
 	@for dir in infra/apptheory-ssr-site infra/apptheory-ssg-isr-site; do \
