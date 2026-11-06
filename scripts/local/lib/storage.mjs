@@ -8,8 +8,8 @@ import { RunError, assert, checkoutId } from './runtime.mjs';
 const requireFromTs = createRequire(
   new URL('../../../ts/package.json', import.meta.url),
 );
-const OWNER_LABEL = 'ft3.owner';
-const MANAGED_LABEL = 'ft3.managed';
+const OWNER_LABEL = 'ad3.owner';
+const MANAGED_LABEL = 'ad3.managed';
 
 let activeBackends = null;
 
@@ -33,9 +33,9 @@ export function storageNames(root) {
   const id = checkoutId(root);
   return {
     id,
-    network: `ft3-${id}-net`,
-    dynamodb: `ft3-${id}-dynamodb-local`,
-    s3: `ft3-${id}-s3proxy`,
+    network: `ad3-${id}-net`,
+    dynamodb: `ad3-${id}-dynamodb-local`,
+    s3: `ad3-${id}-s3proxy`,
   };
 }
 
@@ -51,8 +51,8 @@ export function storageNamesForRow(row) {
   const slug = rowSlug(row.id);
   return {
     slug,
-    bucket: `ft3-${slug}`,
-    tableName: `ft3-${slug}-facetheory-cache`,
+    bucket: `ad3-${slug}`,
+    tableName: `ad3-${slug}-facetheory-cache`,
     prefix: row.storage?.kind === 'isr' ? 'isr' : '',
   };
 }

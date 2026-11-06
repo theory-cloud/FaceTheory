@@ -1,6 +1,6 @@
 import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
 
-import { createFaceApp, type FaceRenderResult } from '../../../ts/dist/index.js';
+import { createFaceApp, type FaceRenderResult, utf8 } from '../../../ts/dist/index.js';
 import { createAppTheoryFaceHandler } from '../../../ts/dist/apptheory/index.js';
 
 function cleanAssetPrefix(value: string | undefined): string {
@@ -38,19 +38,31 @@ function page(body: string, title = 'FaceTheory + AppTheorySsrSite'): FaceRender
   };
 }
 
-const faceApp = createFaceApp({
-  faces: [
-    {
-      route: '/',
-      mode: 'ssr',
-      render: () =>
-        page(`
+// The reference page streams in two parts with a controlled pause, so a local
+// run can observe a document chunk at the viewer before the handler completes.
+// A buffered transport can only deliver the complete document.
+// https://docs.aws.amazon.com/lambda/latest/dg/configuration-response-streaming.html
+async function* streamedHomeBody() {
+  yield utf8(`
 <main>
   <h1>FaceTheory Infra Example</h1>
   <p>This page is rendered by a real FaceTheory Face through AppTheorySsrSite.</p>
   <p>The CloudFront distribution serves <code>/assets</code> from S3 and routes this SSR document to Lambda.</p>
 </main>
-        `.trim()),
+        `.trim());
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  yield utf8(`\n<script type="module" src="${assetPath('entry.js')}"></script>`);
+}
+
+const faceApp = createFaceApp({
+  faces: [
+    {
+      route: '/',
+      mode: 'ssr',
+      render: () => ({
+        ...page(''),
+        html: streamedHomeBody(),
+      }),
     },
     {
       route: '/{proxy+}',

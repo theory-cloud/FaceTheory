@@ -44,7 +44,6 @@ import {
   dockerPrefixFor,
   ensureApptheoryLocal,
   profilePath,
-  unreleasedProducerFor,
 } from './lib/apptheory.mjs';
 
 const SCRIPT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -61,17 +60,19 @@ Options:
   --only <row-id>   run one classified row (its build and serve steps included)
   --list            list classified rows and exit
   --down            stop every process this checkout's harness started
+  --install-runner  install the released apptheory-local pinned in the manifest
   --help            show this help
 `);
 }
 
 function parseArgs(argv) {
-  const options = { only: undefined, list: false, down: false, help: false };
+  const options = { only: undefined, list: false, down: false, installRunner: false, help: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--help' || arg === '-h') options.help = true;
     else if (arg === '--list') options.list = true;
     else if (arg === '--down') options.down = true;
+    else if (arg === '--install-runner') options.installRunner = true;
     else if (arg === '--only') {
       const value = argv[index + 1];
       if (value === undefined || value.startsWith('--')) throw new RunError('--only requires a row id');
@@ -120,8 +121,11 @@ async function preflight({ root, manifest, rows }) {
   if (!(await portIsFree(8299))) {
     errors.push('reserved AWS endpoint port 8299 is already in use');
   }
-  const requirements = ['node', 'npm', 'git'];
-  if (storageProfile(manifest)) requirements.push('docker');
+  const requirements = ['node', 'npm'];
+  const serving = rows.filter((row) => row.serve !== undefined && row.pending === undefined);
+  const needsRunner = rows.some((row) => FT2_RUNNERS.has(row.runner));
+  if (needsRunner) requirements.push('go');
+  if (storageProfile(manifest) || needsRunner) requirements.push('docker');
   for (const name of requirements) {
     const probe = await runCommand({ command: 'sh', args: ['-c', `command -v ${name}`], cwd: root, env: process.env, timeoutMs: 10_000 }).catch(() => null);
     if (!probe) errors.push(`${name} is not on PATH`);
@@ -148,7 +152,6 @@ async function preflight({ root, manifest, rows }) {
     }
   }
 
-  const serving = rows.filter((row) => row.serve !== undefined && row.pending === undefined);
   for (const row of serving) {
     if (!Number.isInteger(row.port)) continue;
     if (!(await portIsFree(row.port))) {
@@ -239,7 +242,7 @@ function serveCommand({ root, row, port, apptheory }) {
   throw new RunError(`${row.id}: unknown serve.kind ${String(serve.kind)}`);
 }
 
-async function prepareApptheoryRow({ root, row, ledger }) {
+async function prepareApptheoryRow({ root, row, manifest }) {
   if (!FT2_RUNNERS.has(row.runner)) return null;
   try {
     assertDockerAvailable();
@@ -252,8 +255,7 @@ async function prepareApptheoryRow({ root, row, ledger }) {
   if (!existsSync(profile)) {
     throw new RunError(`${row.id}: ${path.relative(root, profile)} is missing`);
   }
-  const producer = unreleasedProducerFor(root, row, ledger);
-  return await ensureApptheoryLocal(root, producer);
+  return await ensureApptheoryLocal(root, manifest);
 }
 
 async function stopRow({ child, root, dockerPrefix, timeoutMs }) {
@@ -330,6 +332,11 @@ async function main() {
   }
   const root = SCRIPT_ROOT;
   const manifest = await readJson(path.join(root, MANIFEST_PATH));
+  if (options.installRunner) {
+    const runner = await ensureApptheoryLocal(root, manifest);
+    console.log(`apptheory-local ${runner.version} verified at ${runner.binary}`);
+    return;
+  }
   if (options.down) {
     const results = await stopRecordedProcesses(root);
     if (results.length === 0) {
@@ -382,7 +389,7 @@ async function main() {
     if (selected.length === 0) throw new RunError(`--only row not found: ${options.only}`);
   }
 
-  const ledgerCheck = validateLedger(root, ledger, rows);
+  const ledgerCheck = validateLedger(ledger, rows);
   const errors = [...validation.errors.map((message) => new RunError(message)), ...ledgerCheck.errors.map((message) => new RunError(message))];
   const preflightErrors = await preflight({ root, manifest, rows: selected });
   errors.push(...preflightErrors.map((message) => new RunError(message)));
@@ -405,10 +412,6 @@ async function main() {
     });
     process.exitCode = 1;
     return;
-  }
-
-  for (const pass of ledgerCheck.passes) {
-    console.log(`ledger: ${pass.row} producer ${pass.sha} is an ancestor of ${pass.checkout} HEAD ${pass.head}`);
   }
 
   const releaseLock = acquireLock(root);
@@ -473,7 +476,7 @@ async function main() {
       let storage;
       let rowEnv = env;
       try {
-        const apptheory = await prepareApptheoryRow({ root, row, ledger });
+        const apptheory = await prepareApptheoryRow({ root, row, manifest });
         await runBuilds({ root, row, env });
         command = serveCommand({ root, row, port: row.port, apptheory });
         if (row.storage !== undefined) {

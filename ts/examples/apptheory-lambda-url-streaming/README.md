@@ -7,19 +7,23 @@ This example wires a FaceTheory SSR app through AppTheory's Lambda Function URL 
 ## Run
 
 `make examples-local` runs this handler in the digest-pinned official Lambda
-Node image through the AppTheory local runner, with the pinned
-`@theory-cloud/apptheory` runtime. It bundles this example's own `handler.ts`,
-sends Function URL payload 2.0 events, and asserts the complete buffered
-streaming body, the catch-all route and the example's 405 method refusal:
+Node image through the released `apptheory-local` v7.0.0 (pinned in
+`scripts/local/examples-local.json`; no AppTheory checkout), with the pinned
+`@theory-cloud/apptheory` v7.0.0 runtime. It bundles this example's own
+`handler.ts`, sends Function URL payload 2.0 events, and asserts incremental
+chunk delivery, the catch-all route and the example's 405 method refusal:
 
 ```bash
 make examples-local ONLY=apptheory-lambda-url-streaming#serve
 ```
 
-The row is class L3: the Runtime Interface Emulator buffers `RESPONSE_STREAM`,
-so the complete framed bytes are asserted but chunk timing and incremental
-delivery are the named cloud gap. The row keeps a `kind: "record"` ledger entry
-while it executes against the sibling AppTheory checkout.
+The row is class L2. The warm session uses `--stream-chunks`, so the harness
+observes a first chunk carrying the document start while the handler is still
+running and the document end only in a later chunk; a fully buffered response
+fails the assertion, and the harness self-test proves that negative control. The
+managed Function URL edge (TLS, auth, edge network) is a docs/125 true limit and
+the only named gap. The row runs against the released `apptheory-local` v7.0.0
+pinned in the harness manifest.
 
 From `ts/`, run the smoke-covered handler with the unit suite:
 

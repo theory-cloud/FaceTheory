@@ -310,7 +310,7 @@ test('facetheory create emits Vue and Svelte starters that typecheck and build',
     const sveltePackageJson = await readGeneratedJson<{
       devDependencies: Record<string, string>;
     }>(path.resolve(tempRoot, 'svelte-app'), 'package.json');
-    assert.equal(sveltePackageJson.devDependencies.rollup, '4.65.0');
+    assert.equal(sveltePackageJson.devDependencies.rollup, '4.67.2');
     assert.equal(
       sveltePackageJson.devDependencies['rollup-plugin-svelte'],
       '7.2.3',

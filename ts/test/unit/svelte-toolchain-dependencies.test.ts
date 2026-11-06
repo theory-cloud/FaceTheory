@@ -16,7 +16,7 @@ const packageRoot = path.resolve(
 
 const OLD_PLUGIN = '@sveltejs/vite-plugin-svelte';
 const SELECTED_VERSIONS = {
-  rollup: '4.65.0',
+  rollup: '4.67.2',
   'rollup-plugin-svelte': '7.2.3',
 } as const;
 const SVELTE_VITE_CONFIGS = [
@@ -157,11 +157,11 @@ function svelteTemplateContext(): CreateTemplateContext {
     facetheoryTarball:
       'https://github.com/theory-cloud/FaceTheory/releases/download/v5.0.3/theory-cloud-facetheory-5.0.3.tgz',
     appTheoryTarball:
-      'https://github.com/theory-cloud/AppTheory/releases/download/v6.4.0/theory-cloud-apptheory-6.4.0.tgz',
+      'https://github.com/theory-cloud/AppTheory/releases/download/v7.0.0/theory-cloud-apptheory-7.0.0.tgz',
     appTheoryCdkTarball:
-      'https://github.com/theory-cloud/AppTheory/releases/download/v6.4.0/theory-cloud-apptheory-cdk-6.4.0.tgz',
+      'https://github.com/theory-cloud/AppTheory/releases/download/v7.0.0/theory-cloud-apptheory-cdk-7.0.0.tgz',
     tableTheoryTarball:
-      'https://github.com/theory-cloud/TableTheory/releases/download/v6.1.1/theory-cloud-tabletheory-ts-6.1.1.tgz',
+      'https://github.com/theory-cloud/TableTheory/releases/download/v6.3.0/theory-cloud-tabletheory-ts-6.3.0.tgz',
     dependencyVersions: {},
   };
 }

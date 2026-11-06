@@ -10,8 +10,8 @@ image, and asserts the real HTTP or Lambda response. Nothing reaches AWS: the
 harness removes inherited AWS and proxy variables, installs static dummy
 credentials, and points every AWS endpoint at a loopback port it owns. The FT1
 rows start no containers; the FT2 rows run real Lambda handlers and the SSR
-site in the official, digest-pinned Lambda runtime image through the sibling
-AppTheory local runner and gateway; the FT3 rows start digest-pinned DynamoDB
+site in the official, digest-pinned Lambda runtime image through the released
+`apptheory-local` v7.0.0 and gateway; the FT3 rows start digest-pinned DynamoDB
 Local and s3proxy, run the same examples with their real-storage stores, and
 read the stored S3 objects and DynamoDB items back directly.
 
@@ -39,7 +39,7 @@ harness's `--only`, after those same build and install steps.
 | FT3 by-hand helper          | `scripts/local/isr-storage.mjs`                                |
 | Process, state and cleanup  | `scripts/local/lib/runtime.mjs`                                |
 | Classification manifest     | `scripts/local/examples-local.json`                            |
-| Unreleased-producer ledger  | `scripts/local/examples-local-ledger.json`                     |
+| Pending-producer ledger     | `scripts/local/examples-local-ledger.json`                     |
 | Runner image/backend pins   | `scripts/local/apptheory-local-profile.json`                   |
 | Self-tests                  | `scripts/local/test-examples-local.mjs`                        |
 | CI job                      | `.github/workflows/examples-local.yml`                         |
@@ -47,24 +47,26 @@ harness's `--only`, after those same build and install steps.
 ## Requirements
 
 - Node.js 24 or newer and npm.
-- `git`, for the ledger's producer-ancestry check.
 - `cd ts && npm ci` once per checkout, to install the example dependencies.
 - The two `infra/*` stacks need their own dependencies. `make examples-local`
   installs them with `npm ci --ignore-scripts` when `node_modules` is absent; a
   direct harness invocation fails with a named prerequisite error instead.
-- Go 1.27.3 or newer, to build `apptheory-local` from the sibling AppTheory
-  checkout for the FT2 rows. `../AppTheory/go.mod` and this repository's
-  `.go-version` both require 1.27.3.
-- The sibling AppTheory checkout at `../AppTheory`, clean, with the ledger SHA
-  `3d48d40dadd0bb8c0255c14938c5707a625b4d37` in its history. The harness builds
-  the runner from that checkout; it never commits a `file:` dependency, an
-  override, a vendored binary or a pin bump.
+- Go 1.27.3 or newer, to install the released `apptheory-local` for the FT2
+  rows. The version is pinned in `scripts/local/examples-local.json`
+  (`profile.apptheoryRunner`) as `v7.0.0`, and the repository's `.go-version`
+  supplies the toolchain.
+- No AppTheory or TableTheory checkout. The harness runs
+  `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0`
+  with `GOBIN` pointed at its own cache, verifies the installed command with
+  `go version -m`, and fails closed unless it reports the pinned module and
+  version. The install path and flags are the ones AppTheory documents in
+  `docs/examples/local-runner.md` ("Install the command").
 - Docker (on macOS, colima) with the daemon running, for the FT2 and FT3 rows.
-  The FT2 runner starts one private network per row and publishes the Runtime
-  Interface Emulator port on `127.0.0.1` only. The FT3 rows start this
-  checkout's `ft3-` prefixed DynamoDB Local and s3proxy containers on the
+  The FT2 runner starts one private network per row and serves the Function URL
+  and CloudFront listeners on `127.0.0.1` only. The FT3 rows start this
+  checkout's `ad3-` prefixed DynamoDB Local and s3proxy containers on the
   reserved `8250`/`8251` ports, and the SSG+ISR gateway row starts both
-  backends inside the producer's own private network. Every image is pinned by
+  backends inside the runner's own private network. Every image is pinned by
   digest in `scripts/local/examples-local.json` or
   `scripts/local/apptheory-local-profile.json`.
 - The SSR stack's own CDK CLI is a dev dependency (`aws-cdk`), because the
@@ -104,15 +106,17 @@ Every row declares one class:
   asserted; there is no runtime row.
 
 An L2, L3 or I row must name its gap or fidelity limit in the manifest. An L1 row
-must not declare one.
+must not declare one. There are no L3 rows: the two former L3 Lambda Function
+URL streaming rows moved to L2 when the released runner began forwarding each
+streamed chunk, leaving only the managed Function URL edge, a docs/125 true
+limit.
 
-The manifest has no pending rows. The three FT2 rows execute against the sibling
-AppTheory checkout and keep a `record` ledger entry for that dependency; the
-five FT3 example rows run on the FT3 storage backends with no producer
-dependency and no ledger entry; the SSG+ISR gateway row runs through the sibling
-AppTheory runner and keeps its `record` entry. A `pending` row would still be
-listed and counted separately, never as passing, and only a ledger entry with a
-resolvable producer checkout could make it non-failing.
+The manifest has no pending rows. The three FT2 rows and the SSG+ISR gateway row
+run through the released `apptheory-local` v7.0.0 pinned in the manifest; the
+five FT3 example rows run on the FT3 storage backends. No row executes against a
+sibling checkout, and the ledger is empty. A `pending` row would still be listed
+and counted separately, never as passing, and only a ledger entry for that
+pending row could make it non-failing.
 
 ## Discovery and the manifest
 
@@ -131,54 +135,26 @@ a pending row without a gap fails the run. The self-tests build throwaway trees
 and pin these rules. `src/` files are the example's application code compiled by
 its own build command, not separate harness entrypoints.
 
-## The unreleased-producer ledger
+## The pending-producer ledger
 
-`scripts/local/examples-local-ledger.json` is the record of every row that
-depends on an unreleased producer. Each entry names the example row, the
-required producer capability, the producer repo, the producer checkout path,
-the producer staging SHA, an owner, and the release-cycle resolution. An entry
-is either:
+`scripts/local/examples-local-ledger.json` records rows that cannot run because
+they need an unreleased producer. It is empty: the AppTheory v7.0.0 release
+contains every capability the former `record` entries named, so the four rows
+(`lambda-url-streaming#serve`, `apptheory-lambda-url-streaming#serve`,
+`infra/apptheory-ssr-site#local-run` and `infra/apptheory-ssg-isr-site#local-run`)
+now run against the released pin and their entries are deleted.
 
-- **`pending`** — the row cannot run yet. It is listed and counted as pending,
-  never as passing and never executed.
-- **`record`** — the row now runs against the sibling checkout. It is executed
-  like any other row; the entry records the unreleased dependency until the
-  release cycle moves the committed pins.
-
-For every ledger entry the harness runs:
-
-```bash
-git -C <producer-checkout> merge-base --is-ancestor <ledger-sha> HEAD
-```
-
-A row is non-failing only when its ledger entry exists, the producer checkout
-resolves, the checkout is clean, and the ledger SHA is contained in the producer
-HEAD. A missing ledger entry, a missing or dirty producer checkout, or a
-non-ancestor SHA fails the row with a named error; it is never a silent skip.
-Ancestor containment means later producer merges do not churn the ledger.
-
-The four rows that consume the unreleased AppTheory producer are `record`
-entries: `lambda-url-streaming#serve`,
-`apptheory-lambda-url-streaming#serve`,
-`infra/apptheory-ssr-site#local-run` and
-`infra/apptheory-ssg-isr-site#local-run`. They run against the sibling AppTheory
-checkout at `3d48d40d`. The committed `@theory-cloud/apptheory` and
-`@theory-cloud/apptheory-cdk` pins stay unchanged; the post-wave release cycle
-moves them, re-runs the rows against the released pins, and deletes the ledger
-entries.
+A `pending` row would still have to be named here with its capability, owner and
+release-cycle resolution; an unmatched pending row or a stale entry fails with a
+named error. The harness has no producer-ancestry check and no git dependency:
+the released-version gate in `lib/apptheory.mjs` is the replacement, and it
+fails closed unless `go version -m` reports the exact pinned module and release
+tag.
 
 The five FT3 example rows (`isr-blocking#real-storage`,
 `react-isr#real-storage` and the three `vite-strict-csp-*#real-storage` rows)
 have no ledger entry. They run the example's own Node server against the FT3
-storage backends; they do not consume a producer capability. Their former
-`pending` entries were removed when FT3 made them runnable, which is the
-docs/123 resolution for a row that no longer depends on an unreleased
-producer.
-
-The local run resolves AppTheory from the sibling registered checkout
-(`../AppTheory`) and never commits a `file:` dependency, an override, or a pin
-bump. CI clones the public AppTheory staging history beside the checkout so the
-same ancestry rule runs there.
+storage backends; they do not consume a producer capability.
 
 ## What the rows verify
 
@@ -190,6 +166,23 @@ content type and body content. The assertions include:
 - actual chunk boundaries for the React and Vue streaming examples: the document
   head arrives before the body, and the buffered React example arrives as one
   complete body;
+- incremental delivery for the two Lambda Function URL rows and the SSR gateway
+  row: a first chunk carries the document start while the handler is still
+  running, the document end appears only in a later chunk, and a fully buffered
+  response fails the same assertion (the harness self-test is the negative
+  control). Lambda streams a response "as your function generates it" once the
+  runtime sends a chunked body
+  ([response streaming](https://docs.aws.amazon.com/lambda/latest/dg/configuration-response-streaming.html));
+- CloudFront caching for the two infra rows: a cacheable object misses then hits
+  with `x-cache: Hit from cloudfront` and an `age`, a `CACHING_DISABLED` or
+  `s-maxage=0` path reaches the origin every time, and an invalidation through
+  the local CloudFront API turns a hit back into a miss. CloudFront documents the
+  `x-cache`/`age` signal on
+  [response headers](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/response-headers.html),
+  the cache-policy TTL rules on
+  [Expiration](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Expiration.html)
+  and the API on
+  [CreateInvalidation](https://docs.aws.amazon.com/CloudFront/latest/APIReference/API_CreateInvalidation.html);
 - the strict-CSP header without `unsafe-inline` or `unsafe-eval`, no inline
   `<script>` or `<style>`, external assets, and the `no-store` hydration sidecar;
 - the control-plane preset's four relaxed/strict and client-fill/streaming
@@ -223,22 +216,29 @@ CloudFront gateway with its real generated CloudFront Functions.
 ## The FT2 rows: real Lambda handlers and the local gateway
 
 The three FT2 rows do not start a Node server. They run the examples' real
-handlers in the official AWS Lambda Node runtime image through
-`apptheory-local`, built from the sibling AppTheory checkout.
+handlers in the official AWS Lambda Node runtime image through the released
+`apptheory-local` v7.0.0.
 
-### Resolving and building the producer
+### Installing and verifying the released runner
 
-For a row whose manifest entry sets `unreleasedProducer: true`, the harness:
+For a row whose runner is in `FT2_RUNNERS`, the harness:
 
-1. reads the row's `record` ledger entry and resolves `../AppTheory`;
-2. proves the checkout is clean and its HEAD contains the ledger SHA;
-3. builds `apptheory-local` with `go build -C ../AppTheory` into
-   `~/.cache/facetheory-examples-local/apptheory-local/<head>/apptheory-local`.
+1. reads `profile.apptheoryRunner` from the committed manifest
+   (`github.com/theory-cloud/apptheory/v7/cmd/apptheory-local` at `v7.0.0`);
+2. installs it with
+   `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0`
+   and `GOBIN=~/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin`;
+3. runs `go version -m` on the installed binary and fails closed unless the
+   `path` is the pinned command and the `mod` line is the pinned module at the
+   pinned version.
 
 The binary and the example bundles live under the harness cache, never in git.
-Nothing is installed into `ts/`, and no `file:` dependency, override or pin bump
-is committed. A missing checkout, a dirty checkout or a HEAD without the ledger
-SHA fails the row by name instead of skipping it.
+Nothing is installed into `ts/`, and no `file:` dependency, override, vendored
+binary or floating ref is committed. `node scripts/local/run-examples-local.mjs
+--install-runner` performs the same install and verification without starting a
+row; CI uses it, and `make examples-local` re-verifies before each FT2 row. A
+missing Go toolchain, a failed install or a version mismatch fails the row by
+name instead of skipping it. No AppTheory checkout is read.
 
 Runtime images come from `scripts/local/apptheory-local-profile.json`, which
 pins the official images by digest:
@@ -259,7 +259,7 @@ example's Node self-reference does. It then starts one warm container:
 ```bash
 apptheory-local invoke --handler-dir <bundle> --runtime nodejs24.x \
   --handler index.handler --profile scripts/local/apptheory-local-profile.json \
-  --name-prefix ft2-<row> --stdio
+  --name-prefix ad3-<row> --stdio --stream-chunks
 ```
 
 and sends Function URL payload 2.0 events with the producer's Function URL shape
@@ -272,11 +272,18 @@ echoes the event's request id, and the AppTheory row asserts the example's 405
 refusal for a `POST` (with `allow: GET, HEAD`). The direct example has no
 refusal path — its catch-all answers the `POST` too — and the row reports that.
 
-**Streaming is buffered.** The Runtime Interface Emulator buffers
-`RESPONSE_STREAM` responses: the harness receives the metadata framing and the
-complete body (`"streamed": true`) but never the chunk timing. Both streaming
-rows are class L3, and incremental delivery plus the managed Function URL edge
-are the named gaps. The harness never claims incremental delivery.
+**Streaming is incremental.** The warm session starts with `--stream-chunks`, so
+the runner writes one `{"event":"chunk",…}` line per streamed response chunk
+before the result line. Both rows prove that a first chunk carrying the document
+start was observed while the handler was still running, that the document end
+appears only in a later chunk, and that the first chunk arrived before the
+result line. A buffered response produces no chunk event and fails the
+assertion; the harness self-test uses exactly that buffered shape as its
+negative control. Both rows are class L2. The managed Function URL edge (TLS,
+auth, the edge network) is a docs/125 true limit and is the only named gap.
+Lambda streams "as your function generates it" once the runtime sends a chunked
+body
+([response streaming](https://docs.aws.amazon.com/lambda/latest/dg/configuration-response-streaming.html)).
 
 ### The SSR site through the gateway
 
@@ -304,7 +311,7 @@ Through the gateway the row asserts:
   (`x-frame-options`, `x-content-type-options`, `referrer-policy`,
   `strict-transport-security`);
 - the viewer-request function's `x-request-id` passthrough (a request header is
-  echoed on the response);
+  echoed on the response, on a cache miss and on a hit);
 - `/assets/entry.css` from the S3 origin with `content-type: text/css`, the
   immutable cache-control metadata and bytes equal to the deployed source;
 - the Vite manifest at `/.vite/manifest.json` and the SSG data path at
@@ -312,13 +319,23 @@ Through the gateway the row asserts:
   metadata and deployed bytes;
 - a missing asset (`/assets/missing.css`) as the 403 `AccessDenied` the OAC S3
   origin produces when it has no `s3:ListBucket`, and a missing SSR route as the
-  handler's 404 page.
+  handler's 404 page;
+- real CloudFront caching: `/assets/entry.css` is a miss on its first request,
+  a `x-cache: Hit from cloudfront` with an `age` on the second, a miss again
+  after an invalidation through the local CloudFront API, and a hit when it is
+  fetched again. The `/` behavior is `CACHING_DISABLED`, so every request is a
+  miss and reaches the origin; two requests carry distinct request ids and each
+  is echoed, which only the origin can produce;
+- incremental streaming through the gateway: a raw HTTP request shows
+  `transfer-encoding: chunked`, the first chunk carries the document start and
+  not `</html>`, and the complete body carries the document end.
 
-The row is class L2. Named gaps: CloudFront caching (every request reaches the
-origin as a miss), the edge network and TLS, IAM policy evaluation (the
-`AWS_IAM` Function URL request is signed locally but its policy is not
-evaluated), S3 bucket policies and CORS, viewer protocol enforcement, and a
-buffered `RESPONSE_STREAM` body.
+The row is class L2. Named gaps: the edge network and TLS (a docs/125 true
+limit), IAM policy evaluation (the `AWS_IAM` Function URL request is signed
+locally but its policy is not evaluated), S3 bucket policies and CORS, and
+viewer protocol enforcement. The stack configures no `CustomErrorResponses`, so
+there is no custom error page to assert; the origin 403 and the handler 404 are
+the behaviours the distribution exposes.
 
 Both the manifest and the SSG data deployments write at the bucket root, so they
 must not prune: a root prune would delete the other deployment's objects. The
@@ -347,9 +364,9 @@ only the table fails closed instead of silently reverting to memory. The seam is
 `scripts/local/examples-local.json`'s `profile.storage` pins the two backends by
 digest: `amazon/dynamodb-local@sha256:7ef4a2…` on `8250` and
 `andrewgaul/s3proxy@sha256:1f8915…` on `8251`. The harness starts one pair per
-checkout, named `ft3-<checkout-id>-dynamodb-local`, `ft3-<checkout-id>-s3proxy`
-and `ft3-<checkout-id>-net`, labelled with the checkout id. It creates one
-bucket (`ft3-<row-slug>`) and one table (`ft3-<row-slug>-facetheory-cache`) per
+checkout, named `ad3-<checkout-id>-dynamodb-local`, `ad3-<checkout-id>-s3proxy`
+and `ad3-<checkout-id>-net`, labelled with the checkout id. It creates one
+bucket (`ad3-<row-slug>`) and one table (`ad3-<row-slug>-facetheory-cache`) per
 row, so a row's assertions cannot see another row's objects.
 
 The table is not hand-written: the harness derives its key schema and TTL
@@ -397,27 +414,37 @@ metadata item in the runner-created table, the table's TTL, a real lease,
 `invalidate()`'s refusal, the 403 `AccessDenied` missing asset, the handler's
 404 page and the edge policy headers.
 
-The FT3 rows are L2. Named gaps: DynamoDB Local accepts and stores the `ttl`
-attribute but never deletes an expired item; s3proxy has no bucket policies,
-IAM, event notifications or full versioning/multipart/checksum fidelity; the
-SSG+ISR gateway has no CloudFront cache, edge network or TLS, does not evaluate
-IAM policies, bucket policies or CORS, does not enforce viewer protocol, and
-buffers a `RESPONSE_STREAM` body.
+Its CloudFront caching assertions are: the SSG HTML (served from S3 with
+`public,max-age=0,s-maxage=600`) misses then hits with an `age`, the static
+asset misses, hits, and misses again after an invalidation through the local
+CloudFront API; the `/isr-demo` response carries `s-maxage=0`, so every request
+is a CloudFront miss that reaches the Lambda origin while FaceTheory's own ISR
+store answers the second request as a hit, and each request's own id is echoed.
+The stack configures no `CustomErrorResponses`.
+
+The FT3 rows are L2. Their cloud gaps are docs/125 true limits: the edge network
+and TLS, IAM policy evaluation (including S3 bucket policies and CORS), and
+viewer protocol enforcement (the local URL is plain HTTP). Emulator deviations,
+not cloud gaps: DynamoDB Local stores the `ttl` attribute but never deletes an
+expired item, and s3proxy has no event notifications or full
+versioning/multipart/checksum fidelity.
 
 ## Run one example by hand
 
 ### A handler row through the runtime image
 
-Build `apptheory-local` from the sibling checkout once (the same path the
-harness uses):
+Install the released runner once (the same path the harness uses; the version
+is pinned in `scripts/local/examples-local.json`):
 
 ```bash
-HEAD=$(git -C ../AppTheory rev-parse HEAD)
-mkdir -p ~/.cache/facetheory-examples-local/apptheory-local/$HEAD
-go build -C ../AppTheory \
-  -o ~/.cache/facetheory-examples-local/apptheory-local/$HEAD/apptheory-local \
-  ./cmd/apptheory-local
+GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin" \
+  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0
+APPTHEORY_LOCAL="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin/apptheory-local"
+go version -m "$APPTHEORY_LOCAL"   # path .../cmd/apptheory-local; mod .../v7 v7.0.0
 ```
+
+The install command and profile rules are AppTheory's
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.0.0/docs/examples/local-runner.md#install-the-command).
 
 Bundle the example's own entry from `ts/` in a subshell, with `ts/dist` already
 built, so the shell stays at the repository root for the steps that follow:
@@ -436,7 +463,7 @@ built, so the shell stays at the repository root for the steps that follow:
 Start the warm container and type one Function URL event per line:
 
 ```bash
-~/.cache/facetheory-examples-local/apptheory-local/$HEAD/apptheory-local invoke \
+"$APPTHEORY_LOCAL" invoke \
   --handler-dir ~/.cache/facetheory-examples-local/ft2-hand \
   --runtime nodejs24.x --handler index.handler \
   --profile scripts/local/apptheory-local-profile.json --stdio
@@ -454,7 +481,7 @@ The stack's CDK CLI is installed by `npm ci`, and `ts/dist` must exist:
 cd infra/apptheory-ssr-site && npm ci
 cd ../..
 make ts-build
-~/.cache/facetheory-examples-local/apptheory-local/$HEAD/apptheory-local run \
+"$APPTHEORY_LOCAL" run \
   --app infra/apptheory-ssr-site \
   --profile scripts/local/apptheory-local-profile.json --backend s3proxy \
   --port-base 8240
@@ -474,7 +501,7 @@ once, then run the gateway with both backends:
 cd infra/apptheory-ssg-isr-site && npm ci
 cd ../..
 make ts-build
-~/.cache/facetheory-examples-local/apptheory-local/$HEAD/apptheory-local run \
+"$APPTHEORY_LOCAL" run \
   --app infra/apptheory-ssg-isr-site \
   --profile scripts/local/apptheory-local-profile.json \
   --backend dynamodb --backend s3proxy \
@@ -560,7 +587,7 @@ node scripts/local/isr-storage.mjs down
 
 `inspect` prints the DynamoDB items (the metadata item and any lease item while
 one is held) and every S3 object with its content type, cache-control, metadata
-and a body excerpt. `down` stops only this checkout's `ft3-` containers and
+and a body excerpt. `down` stops only this checkout's `ad3-` containers and
 network and removes the environment file.
 
 Run one classified row through the harness:
@@ -582,20 +609,20 @@ remaining recorded process on `SIGINT`/`SIGTERM`. A fully passing run removes it
 log directory. A failing run keeps the row logs under
 `~/.cache/facetheory-examples-local/logs-<checkout-id>/` for diagnosis.
 
-Each FT2 row and the SSG+ISR row use an `ft2-`/`ft3-` prefixed container and
-network name. The producer removes them on shutdown; the harness waits for that
+Each FT2 row and the SSG+ISR row use an `ad3-` prefixed container and network
+name. The runner removes them on shutdown; the harness waits for that
 cleanup, removes any exact-name leftovers under the recorded prefix, and fails
 the row if anything remains.
 
-The FT3 example rows use `ft3-<checkout-id>-dynamodb-local`,
-`ft3-<checkout-id>-s3proxy` and `ft3-<checkout-id>-net`. The harness removes them
+The FT3 example rows use `ad3-<checkout-id>-dynamodb-local`,
+`ad3-<checkout-id>-s3proxy` and `ad3-<checkout-id>-net`. The harness removes them
 at the end of a run and on `SIGINT`/`SIGTERM`. Removal checks the exact name and
-the `ft3.owner` label, so a container or network this checkout did not create is
+the `ad3.owner` label, so a container or network this checkout did not create is
 reported and left running.
 
 `make examples-local-down` stops only PIDs recorded by this checkout, after
 checking their recorded start time and command line; it never uses a
-label-wide process or container kill. It also removes the `ft2-`/`ft3-` Docker
+label-wide process or container kill. It also removes the `ad3-` Docker
 resources recorded for those PIDs, the FT3 storage containers and network for
 this checkout, and the checkout's state and log directories. The by-hand
 helper's `down` removes its own environment file. A PID that was reused or no
@@ -605,10 +632,10 @@ longer matches is left running and reported.
 
 `.github/workflows/examples-local.yml` runs `make examples-local` on pull
 requests into `staging`, with Node 24, Go 1.27.3 (from `.go-version`) and no AWS
-secrets. It clones the public AppTheory staging working tree beside the checkout,
-so the ledger ancestry check and the `apptheory-local` build both run there. The
-job pulls only the digest-pinned images named by
-`scripts/local/apptheory-local-profile.json` and
+secrets. The job installs the pinned released runner with
+`node scripts/local/run-examples-local.mjs --install-runner` — the same code path
+the local harness uses — and never clones AppTheory. The job pulls only the
+digest-pinned images named by `scripts/local/apptheory-local-profile.json` and
 `scripts/local/examples-local.json`, starts the FT3 storage backends on
 `8250`/`8251` itself, uses no service containers, and runs
 `make examples-local-down` on every outcome.

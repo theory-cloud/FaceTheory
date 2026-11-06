@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { mkdirSync } from 'node:fs';
 import http from 'node:http';
-import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -10,21 +8,16 @@ import { fileURLToPath } from 'node:url';
 
 import { discoverTree } from './lib/tree.mjs';
 import { rawHttpChunks } from './lib/runtime.mjs';
+import { validateLedger, validateManifest } from './lib/manifest.mjs';
 import {
-  checkProducerAncestor,
-  validateLedger,
-  validateManifest,
-} from './lib/manifest.mjs';
-import { unreleasedProducerFor } from './lib/apptheory.mjs';
+  assertIncrementalStream,
+  assertRunnerVersion,
+  parseGoVersionM,
+  runnerSpec,
+} from './lib/apptheory.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const fixtureRoots = [];
-
-function git(cwd, args) {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
-  if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${result.stderr}`);
-  return result.stdout.trim();
-}
 
 async function createFixture() {
   const base = path.join(os.homedir(), '.cache', 'facetheory-examples-local');
@@ -46,6 +39,11 @@ function baseManifest() {
     profile: {
       name: 'selftest',
       ports: { first: 8210, last: 8249, reserved: [[8123, 8123], [8130, 8199]] },
+      apptheoryRunner: {
+        module: 'github.com/theory-cloud/apptheory/v7',
+        package: 'github.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
+        version: 'v7.0.0',
+      },
     },
     entries: {
       'ts/examples/alpha': {
@@ -215,45 +213,154 @@ test('stale coveredBy and via-host without verifiedBy fail', async () => {
   assert.match(messages(unverified), /via-host rows must set verifiedBy/);
 });
 
-function producerRepo(root) {
-  const repo = path.join(root, 'producer');
-  mkdirSync(repo);
-  git(repo, ['init', '-q']);
-  git(repo, ['config', 'user.email', 'selftest@example.test']);
-  git(repo, ['config', 'user.name', 'selftest']);
-  git(repo, ['commit', '-q', '--allow-empty', '-m', 'first']);
-  const first = git(repo, ['rev-parse', 'HEAD']);
-  git(repo, ['commit', '-q', '--allow-empty', '-m', 'second']);
-  return { repo, first, head: git(repo, ['rev-parse', 'HEAD']) };
-}
+test('the checked-in manifest pins the released runner and no sibling checkout', async () => {
+  const manifest = JSON.parse(
+    await readFile(path.join(ROOT, 'scripts/local/examples-local.json'), 'utf8'),
+  );
+  assert.deepEqual(runnerSpec(manifest), {
+    module: 'github.com/theory-cloud/apptheory/v7',
+    package: 'github.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
+    version: 'v7.0.0',
+  });
+  assert.equal(manifest.profile.apptheoryCheckout, undefined);
+  assert.equal(manifest.profile.tabletheoryCheckout, undefined);
+  assert.deepEqual(JSON.parse(await readFile(path.join(ROOT, 'scripts/local/examples-local-ledger.json'), 'utf8')), {
+    version: 1,
+    rows: [],
+  });
+});
 
-test('ledger ancestor containment passes for an ancestor and fails for a non-ancestor', async () => {
+test('a profile without an exact released runner pin fails validation', async () => {
   const root = await createFixture();
-  const { repo, first, head } = producerRepo(root);
-  const pass = checkProducerAncestor(root, { checkout: repo, sha: first });
-  assert.equal(pass.head, head);
+  const missing = baseManifest();
+  delete missing.profile.apptheoryRunner;
+  assert.match(
+    messages(validateManifest(root, missing, await discoverTree(root))),
+    /apptheoryRunner is required/,
+  );
 
-  const detached = path.join(root, 'producer-detached');
-  mkdirSync(detached);
-  git(detached, ['init', '-q']);
-  git(detached, ['config', 'user.email', 'selftest@example.test']);
-  git(detached, ['config', 'user.name', 'selftest']);
-  git(detached, ['commit', '-q', '--allow-empty', '-m', 'first']);
-  const isolated = git(detached, ['rev-parse', 'HEAD']);
-  git(detached, ['commit', '-q', '--allow-empty', '-m', 'second']);
-  const second = git(detached, ['rev-parse', 'HEAD']);
-  git(detached, ['checkout', '-q', '--detach', isolated]);
-  assert.throws(
-    () => checkProducerAncestor(root, { checkout: detached, sha: second }),
-    /is not an ancestor/,
+  const floating = baseManifest();
+  floating.profile.apptheoryRunner.version = 'latest';
+  assert.match(
+    messages(validateManifest(root, floating, await discoverTree(root))),
+    /exact release tag/,
+  );
+
+  const checkout = baseManifest();
+  checkout.profile.apptheoryCheckout = '../AppTheory';
+  assert.match(
+    messages(validateManifest(root, checkout, await discoverTree(root))),
+    /apptheoryCheckout is retired/,
   );
 });
 
-test('a missing producer checkout fails with a named error', async () => {
-  const root = await createFixture();
+const RUNNER_VERSION_OUTPUT = [
+  '/root/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin/apptheory-local: go1.27.3',
+  '\tpath\tgithub.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
+  '\tmod\tgithub.com/theory-cloud/apptheory/v7\tv7.0.0\th1:abc=',
+  '\tdep\tgithub.com/aws/aws-sdk-go-v2\tv1.40.0\th1:def=',
+  '\tbuild\t-buildmode=exe',
+  '',
+].join('\n');
+
+function fakeGoVersionM(output, status = 0) {
+  return () => ({ status, stdout: output, stderr: status === 0 ? '' : 'go: not a binary' });
+}
+
+const RUNNER_SPEC = {
+  module: 'github.com/theory-cloud/apptheory/v7',
+  package: 'github.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
+  version: 'v7.0.0',
+};
+
+test('go version -m parsing reads the command, module and release tag', () => {
+  assert.deepEqual(parseGoVersionM(RUNNER_VERSION_OUTPUT), {
+    path: 'github.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
+    module: 'github.com/theory-cloud/apptheory/v7',
+    version: 'v7.0.0',
+  });
+});
+
+test('the installed runner must be the exact command and release the manifest pins', () => {
+  const accepted = assertRunnerVersion('/cache/apptheory-local', RUNNER_SPEC, {
+    run: fakeGoVersionM(RUNNER_VERSION_OUTPUT),
+  });
+  assert.equal(accepted.version, 'v7.0.0');
+
   assert.throws(
-    () => checkProducerAncestor(root, { checkout: './does-not-exist', sha: 'a'.repeat(40) }),
-    /producer checkout missing/,
+    () =>
+      assertRunnerVersion('/cache/apptheory-local', RUNNER_SPEC, {
+        run: fakeGoVersionM(
+          RUNNER_VERSION_OUTPUT.replace(
+            'mod\tgithub.com/theory-cloud/apptheory/v7\tv7.0.0',
+            'mod\tgithub.com/theory-cloud/apptheory/v7\tv6.4.0',
+          ),
+        ),
+      }),
+    /reports github\.com\/theory-cloud\/apptheory\/v7 v6\.4\.0; the manifest pins github\.com\/theory-cloud\/apptheory\/v7 v7\.0\.0/,
+  );
+
+  assert.throws(
+    () =>
+      assertRunnerVersion('/cache/apptheory-local', RUNNER_SPEC, {
+        run: fakeGoVersionM(
+          RUNNER_VERSION_OUTPUT.replace(
+            'path\tgithub.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
+            'path\tgithub.com/theory-cloud/apptheory/v6/cmd/apptheory-local',
+          ),
+        ),
+      }),
+    /reports command github\.com\/theory-cloud\/apptheory\/v6\/cmd\/apptheory-local; the manifest pins github\.com\/theory-cloud\/apptheory\/v7\/cmd\/apptheory-local/,
+  );
+
+  assert.throws(
+    () =>
+      assertRunnerVersion('/cache/apptheory-local', RUNNER_SPEC, {
+        run: fakeGoVersionM('', 1),
+      }),
+    /cannot verify the installed apptheory-local/,
+  );
+});
+
+function streamChunk(text) {
+  return { data: Buffer.from(text, 'utf8') };
+}
+
+function preludeChunk(payload = '') {
+  const metadata = JSON.stringify({ statusCode: 200, headers: { 'content-type': ['text/html; charset=utf-8'] } });
+  return streamChunk(`${metadata}${'\u0000'.repeat(8)}${payload}`);
+}
+
+test('incremental streaming passes only when a first chunk precedes the document end', () => {
+  const headFirst = assertIncrementalStream({
+    chunks: [
+      preludeChunk(),
+      streamChunk('<!doctype html><html><head><title>Home</title></head>'),
+      streamChunk('<body><h1>Hello</h1><!-- streamed:tail --></body></html>'),
+    ],
+    label: 'self-test head-first stream',
+    laterMarker: '<!-- streamed:tail -->',
+  });
+  assert.equal(headFirst.metadata.statusCode, 200);
+  assert.equal(headFirst.chunks, 3);
+  assert.match(headFirst.body, /<\/html>$/);
+
+  // A buffered response arrives as one payload chunk that already carries the
+  // document end. This is the negative control: the same assertion a real row
+  // uses must fail closed, so a future runner regression to buffering cannot
+  // pass the row.
+  assert.throws(
+    () =>
+      assertIncrementalStream({
+        chunks: [preludeChunk('<!doctype html><html><body>Hello</body></html>')],
+        label: 'self-test buffered stream',
+      }),
+    /the first payload chunk already contains <\/html>; the response was fully buffered/,
+  );
+
+  assert.throws(
+    () => assertIncrementalStream({ chunks: [], label: 'self-test no-chunk stream' }),
+    /no chunk event crossed the runner before the result; the response was buffered/,
   );
 });
 
@@ -269,12 +376,11 @@ test('a pending row missing from the ledger fails', async () => {
       runner: 'pending',
     },
   ];
-  const result = validateLedger(root, { version: 1, rows: [] }, rows);
+  const result = validateLedger({ version: 1, rows: [] }, rows);
   assert.match(result.errors.join('\n'), /pending row alpha#serve is missing from the ledger/);
 });
 
-test('a ledger row for a non-pending row must be marked record', async () => {
-  const root = await createFixture();
+test('a ledger row for a non-pending row is stale and fails', async () => {
   const rows = [
     {
       id: 'alpha#serve',
@@ -284,14 +390,12 @@ test('a ledger row for a non-pending row must be marked record', async () => {
     },
   ];
   const result = validateLedger(
-    root,
     {
       version: 1,
       rows: [
         {
           row: 'alpha#serve',
           capability: 'not needed',
-          producer: { repo: 'theory-cloud/AppTheory', checkout: '.', staging_sha: 'a'.repeat(40) },
           owner: 'nobody',
           resolution: 'none',
         },
@@ -301,59 +405,11 @@ test('a ledger row for a non-pending row must be marked record', async () => {
   );
   assert.match(
     result.errors.join('\n'),
-    /is not a pending manifest row; mark the ledger row kind "record"/,
+    /is not a pending manifest row; delete it/,
   );
 });
 
-test('a record ledger row passes ancestor containment for a sibling-checkout row', async () => {
-  const root = await createFixture();
-  const { repo, first, head } = producerRepo(root);
-  const rows = [
-    {
-      id: 'alpha#serve',
-      directory: 'ts/examples/alpha',
-      class: 'L3',
-      runner: 'apptheory-local-handler',
-      unreleasedProducer: true,
-      gap: 'buffered streaming',
-    },
-  ];
-  const result = validateLedger(
-    root,
-    {
-      version: 1,
-      rows: [
-        {
-          row: 'alpha#serve',
-          kind: 'record',
-          capability: 'AppTheory local runner',
-          producer: { repo: 'theory-cloud/AppTheory', checkout: repo, staging_sha: first },
-          owner: 'AppTheory steward',
-          resolution: 'delete after the release-cycle pin bump',
-        },
-      ],
-    },
-    rows,
-  );
-  assert.deepEqual(result.errors, []);
-  assert.equal(result.passes.length, 1);
-  assert.equal(result.passes[0].head, head);
-});
-
-test('a missing producer records a row-level ledger failure', async () => {
-  const root = await createFixture();
-  const result = validateLedger(
-    root,
-    ft2Ledger('./does-not-exist', 'a'.repeat(40)),
-    [ft2Row()],
-  );
-  assert.equal(result.failures.length, 1);
-  assert.equal(result.failures[0].row, 'alpha#serve');
-  assert.match(result.failures[0].message, /producer checkout missing/);
-});
-
-test('a record ledger row requires the manifest row to declare unreleasedProducer', async () => {
-  const root = await createFixture();
+test('a record ledger row is retired and fails by name', async () => {
   const rows = [
     {
       id: 'alpha#serve',
@@ -363,40 +419,25 @@ test('a record ledger row requires the manifest row to declare unreleasedProduce
     },
   ];
   const result = validateLedger(
-    root,
     {
       version: 1,
-      rows: [
-        {
-          row: 'alpha#serve',
-          kind: 'record',
-          capability: 'AppTheory local runner',
-          producer: { repo: 'theory-cloud/AppTheory', checkout: '.', staging_sha: 'a'.repeat(40) },
-          owner: 'AppTheory steward',
-          resolution: 'delete after the release-cycle pin bump',
-        },
-      ],
+      rows: [{ row: 'alpha#serve', kind: 'record', capability: 'released runner' }],
     },
     rows,
   );
-  assert.match(result.errors.join('\n'), /is a record for a row that does not declare unreleasedProducer/);
+  assert.match(
+    result.errors.join('\n'),
+    /is a record; record entries are retired with the released runner and must be deleted/,
+  );
 });
 
-test('a row that executes against the sibling checkout must not be pending', async () => {
+test('a row that still declares unreleasedProducer fails as retired', async () => {
   const root = await createFixture();
   const manifest = baseManifest();
   const row = manifest.entries['ts/examples/alpha'].rows[0];
-  delete row.port;
-  delete row.serve;
-  row.class = 'L3';
-  row.gap = 'buffered streaming';
-  row.pending = 'FT2';
   row.unreleasedProducer = true;
   const result = validateManifest(root, manifest, await discoverTree(root));
-  assert.match(
-    messages(result),
-    /a row that executes against the sibling checkout must not be pending/,
-  );
+  assert.match(messages(result), /unreleasedProducer is retired/);
 });
 
 function storageProfileFixture() {
@@ -459,95 +500,4 @@ test('a storage row must use the runner for its kind', async () => {
   row.runner = 'isr-real-storage';
   const result = validateManifest(root, manifest, await discoverTree(root));
   assert.match(messages(result), /storage kind sidecar must use runner strict-csp-real-storage/);
-});
-
-function ft2Row() {
-  return {
-    id: 'alpha#serve',
-    directory: 'ts/examples/alpha',
-    class: 'L3',
-    runner: 'apptheory-local-handler',
-    unreleasedProducer: true,
-    gap: 'buffered streaming',
-  };
-}
-
-function ft2Ledger(repo, sha) {
-  return {
-    version: 1,
-    rows: [
-      {
-        row: 'alpha#serve',
-        kind: 'record',
-        capability: 'AppTheory local runner',
-        producer: { repo: 'theory-cloud/AppTheory', checkout: repo, staging_sha: sha },
-        owner: 'AppTheory steward',
-        resolution: 'delete after the release-cycle pin bump',
-      },
-    ],
-  };
-}
-
-test('a missing producer checkout fails the FT2 row by name', async () => {
-  const root = await createFixture();
-  assert.throws(
-    () => unreleasedProducerFor(root, ft2Row(), ft2Ledger('./does-not-exist', 'a'.repeat(40))),
-    /alpha#serve: unreleased AppTheory producer unavailable: producer checkout missing/,
-  );
-});
-
-test('a producer HEAD without the ledger SHA fails the FT2 row by name', async () => {
-  const root = await createFixture();
-  const { repo } = producerRepo(root);
-  const other = path.join(root, 'producer-other');
-  mkdirSync(other);
-  git(other, ['init', '-q']);
-  git(other, ['config', 'user.email', 'selftest@example.test']);
-  git(other, ['config', 'user.name', 'selftest']);
-  git(other, ['commit', '-q', '--allow-empty', '-m', 'other history']);
-  const absent = git(other, ['rev-parse', 'HEAD']);
-  assert.throws(
-    () => unreleasedProducerFor(root, ft2Row(), ft2Ledger(repo, absent)),
-    /alpha#serve: unreleased AppTheory producer unavailable: producer SHA .* is not present in/,
-  );
-});
-
-test('a dirty producer checkout fails the FT2 row by name', async () => {
-  const root = await createFixture();
-  const { repo, first } = producerRepo(root);
-  await writeFile(path.join(repo, 'dirty.txt'), 'uncommitted\n');
-  assert.throws(
-    () => unreleasedProducerFor(root, ft2Row(), ft2Ledger(repo, first)),
-    /alpha#serve: the AppTheory checkout .* is not clean/,
-  );
-});
-
-test('a ledger row passes only when its producer SHA is contained in the producer HEAD', async () => {
-  const root = await createFixture();
-  const { repo, first } = producerRepo(root);
-  const rows = [
-    {
-      id: 'alpha#serve',
-      directory: 'ts/examples/alpha',
-      pending: 'FT2',
-      gap: 'missing capability',
-      class: 'L3',
-      runner: 'pending',
-    },
-  ];
-  const ledger = {
-    version: 1,
-    rows: [
-      {
-        row: 'alpha#serve',
-        capability: 'AppTheory local runner',
-        producer: { repo: 'theory-cloud/AppTheory', checkout: repo, staging_sha: first },
-        owner: 'AppTheory steward',
-        resolution: 'release cycle',
-      },
-    ],
-  };
-  const result = validateLedger(root, ledger, rows);
-  assert.deepEqual(result.errors, []);
-  assert.equal(result.passes.length, 1);
 });

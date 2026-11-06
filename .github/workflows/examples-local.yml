@@ -27,11 +27,8 @@ jobs:
         with:
           go-version-file: .go-version
           cache: false
-      - name: Checkout AppTheory producer
-        run: |
-          git clone --filter=blob:none --branch staging --single-branch \
-            https://github.com/theory-cloud/AppTheory.git ../AppTheory
-          git -C ../AppTheory rev-parse HEAD
+      - name: Install the pinned local runner
+        run: node scripts/local/run-examples-local.mjs --install-runner
       - name: Run harness self-tests
         run: make examples-local-selftest
       - name: Install dependencies

@@ -569,7 +569,7 @@ export function rawHttpChunks({ port, path: requestPath = '/', timeoutMs = HTTP_
   });
 }
 
-export function httpRequest({ port, path: requestPath, method = 'GET', headers = {}, timeoutMs = HTTP_TIMEOUT_MS }) {
+export function httpRequest({ port, path: requestPath, method = 'GET', headers = {}, body, timeoutMs = HTTP_TIMEOUT_MS }) {
   return new Promise((resolve, reject) => {
     const request = http.request(
       { host: '127.0.0.1', port, path: requestPath, method, headers },
@@ -590,7 +590,7 @@ export function httpRequest({ port, path: requestPath, method = 'GET', headers =
       request.destroy(new Error(`HTTP request ${method} ${requestPath} timed out`));
     });
     request.once('error', reject);
-    request.end();
+    request.end(body);
   });
 }
 

@@ -79,7 +79,7 @@ deploy/
 
 The FaceTheory reference stacks keep explicit `BucketDeployment` resources for immutable assets, the Vite manifest, and
 SSG HTML. This preserves cache-control differences while `AppTheorySsrSite` owns the CloudFront distribution. AppTheory
-v6.4.0 does not yet expose per-deployment `distributionPaths` invalidation controls for those uploads; invalidate changed
+v7.0.0 does not yet expose per-deployment `distributionPaths` invalidation controls for those uploads; invalidate changed
 HTML and hydration JSON paths in your deployment pipeline until that AppTheory gap is closed.
 
 Local reference validation before any deploy:
@@ -92,6 +92,17 @@ npm test
 cd ../apptheory-ssg-isr-site
 npm ci
 npm test
+```
+
+The end-to-end local run of both stacks uses the released `apptheory-local`
+v7.0.0 runner, installed from the pin in `scripts/local/examples-local.json`
+(no AppTheory checkout):
+
+```bash
+GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin" \
+  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0
+make examples-local ONLY='infra/apptheory-ssr-site#local-run'
+make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'
 ```
 
 ## 3. Wrap with `AppTheorySsrSite`
