@@ -25,9 +25,9 @@
 # Operator ruling 2026-10-03: "if a vulnerable dependency is bundled in AWS we
 # make an exception until its updated there."
 #
-# minimatch 10.2.6 is bundled inside aws-cdk-lib 2.275.0, the pin this repo
-# carries ahead of the exact peer (@theory-cloud/apptheory-cdk v6.4.0 still
-# declares aws-cdk-lib 2.273.0; the ts/ and infra overrides reconcile the two).
+# minimatch 10.2.6 is bundled inside aws-cdk-lib 2.275.0, the version this repo
+# pins and the exact aws-cdk-lib peer declared by @theory-cloud/apptheory-cdk
+# v7.0.0 (pin and peer agree, so there is no mismatch to reconcile).
 # The copy at node_modules/aws-cdk-lib/node_modules/minimatch is published
 # inside the AWS tarball and cannot be upgraded from this repository; 2.275.0
 # is the newest published aws-cdk-lib and it still declares minimatch ^10.2.6,
