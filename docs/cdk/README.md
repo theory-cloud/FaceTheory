@@ -94,6 +94,17 @@ npm ci
 npm test
 ```
 
+The end-to-end local run of both stacks uses the released `apptheory-local`
+v7.0.0 runner, installed from the pin in `scripts/local/examples-local.json`
+(no AppTheory checkout):
+
+```bash
+GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin" \
+  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0
+make examples-local ONLY='infra/apptheory-ssr-site#local-run'
+make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'
+```
+
 ## 3. Wrap with `AppTheorySsrSite`
 
 ### SSR-only hello world

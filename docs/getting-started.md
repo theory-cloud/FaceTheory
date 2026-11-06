@@ -664,6 +664,19 @@ make ts-typecheck
 make ts-test
 ```
 
+The local examples harness needs no AWS credentials and no AppTheory checkout.
+It installs the released runner pinned in `scripts/local/examples-local.json`;
+the same install can be run on its own:
+
+```bash
+GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin" \
+  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0
+make examples-local
+```
+
+See [the local examples harness](./examples/local-harness.md) for the row
+classes, ports and cleanup.
+
 ## Next Steps
 
 - Read [API Reference](./api-reference.md) for package exports, route contracts, CLI flags, and deployment-facing configuration.

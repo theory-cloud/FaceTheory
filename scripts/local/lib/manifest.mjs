@@ -1,12 +1,10 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 export const CLASSES = ['L1', 'L2', 'L3', 'I'];
 export const PENDING_MILESTONES = ['FT2', 'FT3'];
-export const PRODUCER_REPOS = ['theory-cloud/AppTheory', 'theory-cloud/TableTheory'];
 export const ROW_ID_PATTERN = /^[a-z0-9/-]+#[a-z0-9-]+$/;
-export const SHA_PATTERN = /^[0-9a-f]{40}$/;
+export const RUNNER_VERSION_PATTERN = /^v\d+\.\d+\.\d+$/;
 export const STORAGE_KINDS = ['isr', 'sidecar'];
 export const STORAGE_RUNNERS = {
   isr: 'isr-real-storage',
@@ -192,8 +190,6 @@ export function validateManifest(root, manifest, tree) {
         assert(STORAGE_KINDS.includes(kind),
           `${rowLabel}: storage.kind must be one of ${STORAGE_KINDS.join(', ')}`, errors);
         assert(pending === undefined, `${rowLabel}: storage rows must not be pending`, errors);
-        assert(row.unreleasedProducer !== true,
-          `${rowLabel}: storage rows run the example itself and must not declare unreleasedProducer`, errors);
         if (STORAGE_KINDS.includes(kind)) {
           assert(row.runner === STORAGE_RUNNERS[kind],
             `${rowLabel}: storage kind ${kind} must use runner ${STORAGE_RUNNERS[kind]}`, errors);
@@ -233,12 +229,9 @@ export function validateManifest(root, manifest, tree) {
         }
       }
       if (row.unreleasedProducer !== undefined) {
-        assert(typeof row.unreleasedProducer === 'boolean',
-          `${rowLabel}: unreleasedProducer must be a boolean`, errors);
-        if (row.unreleasedProducer === true) {
-          assert(pending === undefined,
-            `${rowLabel}: a row that executes against the sibling checkout must not be pending`, errors);
-        }
+        errors.push(
+          `${rowLabel}: unreleasedProducer is retired; every row runs against the released runner pinned in profile.apptheoryRunner`,
+        );
       }
       if (row.port !== undefined) {
         assert(pending === undefined,
@@ -355,13 +348,26 @@ export function validateManifest(root, manifest, tree) {
     }
   }
 
-  if (profile.apptheoryCheckout !== undefined) {
-    assert(typeof profile.apptheoryCheckout === 'string',
-      'manifest.profile.apptheoryCheckout must be a string', errors);
+  for (const retired of ['apptheoryCheckout', 'tabletheoryCheckout']) {
+    if (profile[retired] !== undefined) {
+      errors.push(
+        `manifest.profile.${retired} is retired; the harness installs the released AppTheory runner pinned in profile.apptheoryRunner and consumes the released TableTheory package`,
+      );
+    }
   }
-  if (profile.tabletheoryCheckout !== undefined) {
-    assert(typeof profile.tabletheoryCheckout === 'string',
-      'manifest.profile.tabletheoryCheckout must be a string', errors);
+  const runner = profile.apptheoryRunner;
+  assert(isPlainObject(runner), 'manifest.profile.apptheoryRunner is required', errors);
+  if (isPlainObject(runner)) {
+    assert(typeof runner.module === 'string' && runner.module.startsWith('github.com/theory-cloud/apptheory/'),
+      'manifest.profile.apptheoryRunner.module must name the AppTheory module', errors);
+    assert(typeof runner.package === 'string' && runner.package.endsWith('/cmd/apptheory-local'),
+      'manifest.profile.apptheoryRunner.package must name the apptheory-local command', errors);
+    assert(typeof runner.version === 'string' && RUNNER_VERSION_PATTERN.test(runner.version),
+      'manifest.profile.apptheoryRunner.version must be an exact release tag such as v7.0.0', errors);
+    if (typeof runner.module === 'string' && typeof runner.package === 'string') {
+      assert(runner.package.startsWith(`${runner.module}/`),
+        'manifest.profile.apptheoryRunner.package must belong to the declared module', errors);
+    }
   }
 
   const storageRows = [...rows.values()].filter((row) => row.storage !== undefined);
@@ -373,75 +379,26 @@ export function validateManifest(root, manifest, tree) {
   return { rows: [...rows.values()], errors, warnings };
 }
 
-function runGit(args) {
-  return spawnSync('git', args, { encoding: 'utf8' });
-}
-
-export function resolveProducerHead(root, checkout) {
-  const directory = path.resolve(root, checkout);
-  if (!existsSync(directory)) {
-    throw new ManifestError(`producer checkout missing: ${checkout} (resolved to ${directory})`);
-  }
-  try {
-    if (!statSync(directory).isDirectory()) throw new Error('not a directory');
-  } catch {
-    throw new ManifestError(`producer checkout missing: ${checkout} (resolved to ${directory})`);
-  }
-  const head = runGit(['-C', directory, 'rev-parse', 'HEAD']);
-  if (head.status !== 0) {
-    throw new ManifestError(
-      `producer checkout missing a resolvable HEAD: ${checkout} (${head.stderr.trim() || 'git rev-parse failed'})`,
-    );
-  }
-  return { directory, head: head.stdout.trim() };
-}
-
-export function checkProducerAncestor(root, { checkout, sha }) {
-  if (typeof sha !== 'string' || !SHA_PATTERN.test(sha)) {
-    throw new ManifestError(`producer staging SHA must be a full 40-character lowercase hex SHA: ${String(sha)}`);
-  }
-  const { directory, head } = resolveProducerHead(root, checkout);
-  const verify = runGit(['-C', directory, 'rev-parse', '--verify', `${sha}^{commit}`]);
-  if (verify.status !== 0) {
-    throw new ManifestError(
-      `producer SHA ${sha} is not present in ${checkout}; fetch the producer history before running`,
-    );
-  }
-  const ancestor = runGit(['-C', directory, 'merge-base', '--is-ancestor', sha, 'HEAD']);
-  if (ancestor.status === 1) {
-    throw new ManifestError(
-      `producer SHA ${sha} is not an ancestor of ${checkout} HEAD ${head}`,
-    );
-  }
-  if (ancestor.status !== 0) {
-    throw new ManifestError(
-      `producer ancestry check failed for ${checkout}: ${ancestor.stderr.trim() || 'git merge-base failed'}`,
-    );
-  }
-  return { checkout, sha, head, directory };
-}
-
 /**
- * A pending row is non-failing only when the checked-in ledger names it and
- * the ledger's producer SHA is contained in the locally resolved producer
- * HEAD. A row that now executes against the sibling checkout keeps a `record`
- * ledger entry for the same dependency; the entry still has to pass the
- * ancestor check. Every unmatched pending row fails with a named error.
+ * The ledger records pending rows that cannot run yet because they need an
+ * unreleased producer. It is empty now that every row runs against the released
+ * runner pinned in profile.apptheoryRunner. A pending row is still non-failing
+ * only when the ledger names it; every other entry fails by name, so a stale
+ * record left behind after a release cannot pass silently.
  */
-export function validateLedger(root, ledger, rows) {
+export function validateLedger(ledger, rows) {
   const errors = [];
-  const passes = [];
   const failures = [];
   const fail = (row, message) => {
     errors.push(message);
     failures.push({ row, message });
   };
   if (!isPlainObject(ledger)) {
-    return { errors: ['ledger must be a JSON object'], passes, failures };
+    return { errors: ['ledger must be a JSON object'], failures };
   }
   if (ledger.version !== 1) errors.push('ledger.version must be 1');
   if (!Array.isArray(ledger.rows)) errors.push('ledger.rows must be an array');
-  if (!Array.isArray(ledger.rows)) return { errors, passes, failures };
+  if (!Array.isArray(ledger.rows)) return { errors, failures };
 
   const rowsById = new Map(rows.map((row) => [row.id, row]));
   const ledgerByRow = new Map();
@@ -460,43 +417,22 @@ export function validateLedger(root, ledger, rows) {
       continue;
     }
     const manifestRow = rowsById.get(entry.row);
-    const kind = entry.kind ?? 'pending';
-    if (!['pending', 'record'].includes(kind)) {
-      fail(entry.row, `ledger row ${entry.row}: kind must be pending or record`);
+    if (entry.kind === 'record') {
+      fail(
+        entry.row,
+        `ledger row ${entry.row} is a record; record entries are retired with the released runner and must be deleted`,
+      );
       continue;
     }
     if (manifestRow.pending === undefined) {
-      if (kind !== 'record') {
-        fail(
-          entry.row,
-          `ledger row ${entry.row} is not a pending manifest row; mark the ledger row kind "record"`,
-        );
-        continue;
-      }
-      if (manifestRow.unreleasedProducer !== true) {
-        fail(
-          entry.row,
-          `ledger row ${entry.row} is a record for a row that does not declare unreleasedProducer`,
-        );
-        continue;
-      }
-    } else if (kind === 'record') {
-      fail(entry.row, `ledger row ${entry.row} is a pending manifest row and must not be marked record`);
+      fail(
+        entry.row,
+        `ledger row ${entry.row} is not a pending manifest row; delete it`,
+      );
       continue;
     }
     if (typeof entry.capability !== 'string' || entry.capability.length === 0) {
       fail(entry.row, `ledger row ${entry.row} must name the required producer capability`);
-    }
-    if (!isPlainObject(entry.producer)) {
-      fail(entry.row, `ledger row ${entry.row} must name a producer`);
-      continue;
-    }
-    const { repo, checkout, staging_sha: stagingSha } = entry.producer;
-    if (typeof repo !== 'string' || repo.length === 0) {
-      fail(entry.row, `ledger row ${entry.row} must name a producer repo`);
-    }
-    if (typeof checkout !== 'string' || checkout.length === 0) {
-      fail(entry.row, `ledger row ${entry.row} must name a producer checkout`);
     }
     if (typeof entry.owner !== 'string' || entry.owner.length === 0) {
       fail(entry.row, `ledger row ${entry.row} must name an owner`);
@@ -504,27 +440,15 @@ export function validateLedger(root, ledger, rows) {
     if (typeof entry.resolution !== 'string' || entry.resolution.length === 0) {
       fail(entry.row, `ledger row ${entry.row} must state its release-cycle resolution`);
     }
-    try {
-      const pass = checkProducerAncestor(root, { checkout, sha: stagingSha });
-      passes.push({ row: entry.row, ...pass });
-    } catch (error) {
-      fail(entry.row, `ledger row ${entry.row}: ${error.message}`);
-    }
   }
 
   for (const row of rows) {
     if (row.pending !== undefined && !ledgerByRow.has(row.id)) {
       fail(row.id, `pending row ${row.id} is missing from the ledger; a skip is a failure`);
     }
-    if (row.pending === undefined && row.unreleasedProducer === true && !ledgerByRow.has(row.id)) {
-      fail(
-        row.id,
-        `row ${row.id} executes against the unreleased AppTheory producer but has no ledger record`,
-      );
-    }
   }
 
-  return { errors, passes, failures };
+  return { errors, failures };
 }
 
 export function loadRows(manifest) {

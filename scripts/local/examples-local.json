@@ -12,8 +12,11 @@
         [8250, 8259]
       ]
     },
-    "apptheoryCheckout": "../AppTheory",
-    "tabletheoryCheckout": "../TableTheory",
+    "apptheoryRunner": {
+      "module": "github.com/theory-cloud/apptheory/v7",
+      "package": "github.com/theory-cloud/apptheory/v7/cmd/apptheory-local",
+      "version": "v7.0.0"
+    },
     "storage": {
       "ports": { "dynamodb": 8250, "s3": 8251 },
       "containers": {
@@ -42,7 +45,6 @@
           "entrypoints": ["handler.ts"],
           "class": "L3",
           "runner": "apptheory-local-handler",
-          "unreleasedProducer": true,
           "bundle": { "entry": "handler.ts" },
           "runtime": "nodejs24.x",
           "handler": "index.handler",
@@ -168,7 +170,6 @@
           "entrypoints": ["handler.ts"],
           "class": "L3",
           "runner": "apptheory-local-handler",
-          "unreleasedProducer": true,
           "bundle": { "entry": "handler.ts" },
           "runtime": "nodejs24.x",
           "handler": "index.handler",
@@ -633,7 +634,6 @@
           "entrypoints": ["src/stack.ts", "src/handler.ts"],
           "class": "L2",
           "runner": "apptheory-local-gateway",
-          "unreleasedProducer": true,
           "port": 8240,
           "serve": {
             "kind": "apptheory-local",
@@ -663,7 +663,6 @@
           "entrypoints": ["src/stack.ts", "src/ssr-handler.ts"],
           "class": "L2",
           "runner": "apptheory-local-gateway-isr",
-          "unreleasedProducer": true,
           "port": 8246,
           "containerPrefix": "ft3",
           "serve": {

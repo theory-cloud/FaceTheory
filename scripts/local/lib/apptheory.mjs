@@ -4,7 +4,6 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { checkProducerAncestor } from './manifest.mjs';
 import {
   DEFAULT_TIMEOUT_MS,
   RunError,
@@ -56,102 +55,115 @@ export function dockerPrefixFor(row) {
   return producerName(`${row.containerPrefix ?? 'ft2'}-${slug}`);
 }
 
-export function ledgerRecordFor(ledger, rowId) {
-  return (ledger?.rows ?? []).find((entry) => entry.row === rowId);
+export function runnerSpec(manifest) {
+  const spec = manifest?.profile?.apptheoryRunner;
+  if (
+    !spec ||
+    typeof spec.module !== 'string' ||
+    typeof spec.package !== 'string' ||
+    typeof spec.version !== 'string'
+  ) {
+    throw new RunError(
+      'manifest.profile.apptheoryRunner must pin the released runner module, package and version',
+    );
+  }
+  return spec;
+}
+
+export function runnerCacheDir(spec) {
+  return path.join(cacheRoot(), 'apptheory-local', spec.version);
 }
 
 /**
- * Resolve the sibling AppTheory checkout named by the row's ledger record and
- * prove the ledger SHA is contained in its HEAD. A missing checkout, a dirty
- * checkout or a HEAD without the SHA fails this row by name.
+ * Read the module line `go version -m` prints for an installed command. A
+ * binary built with `go install <package>@<version>` reports `path` as the
+ * package and `mod`/`mod version` as the module and its release tag.
  */
-export function unreleasedProducerFor(root, row, ledger) {
-  const record = ledgerRecordFor(ledger, row.id);
-  if (!record) {
-    throw new RunError(
-      `${row.id}: consumes the unreleased AppTheory producer but the ledger has no record for it`,
-    );
+export function parseGoVersionM(output) {
+  const info = { path: undefined, module: undefined, version: undefined };
+  for (const line of String(output).split('\n')) {
+    const fields = line.trim().split('\t');
+    if (fields[0] === 'path' && info.path === undefined) info.path = fields[1];
+    if (fields[0] === 'mod' && info.module === undefined) {
+      info.module = fields[1];
+      info.version = fields[2];
+    }
   }
-  if (record.kind !== 'record') {
-    throw new RunError(
-      `${row.id}: the ledger record must set kind "record" for a row that executes against the sibling checkout`,
-    );
-  }
-  const producer = record.producer ?? {};
-  let resolved;
-  try {
-    resolved = checkProducerAncestor(root, {
-      checkout: producer.checkout,
-      sha: producer.staging_sha,
-    });
-  } catch (error) {
-    throw new RunError(
-      `${row.id}: unreleased AppTheory producer unavailable: ${
-        error instanceof Error ? error.message : String(error)
-      }. This row needs the sibling checkout ${String(
-        producer.checkout,
-      )} with ${String(producer.staging_sha)} in its history; a skip is a failure.`,
-    );
-  }
-  const status = spawnSync('git', ['-C', resolved.directory, 'status', '--porcelain'], {
-    encoding: 'utf8',
-  });
-  if (status.status !== 0) {
-    throw new RunError(
-      `${row.id}: cannot inspect the AppTheory checkout ${producer.checkout}: ${status.stderr.trim()}`,
-    );
-  }
-  if (status.stdout.trim() !== '') {
-    throw new RunError(
-      `${row.id}: the AppTheory checkout ${producer.checkout} is not clean; the row must run against the ledger SHA ${producer.staging_sha}`,
-    );
-  }
-  return {
-    directory: resolved.directory,
-    head: resolved.head,
-    sha: producer.staging_sha,
-    checkout: producer.checkout,
-  };
+  return info;
 }
 
 /**
- * Build apptheory-local from the sibling checkout into the harness cache. No
- * file: dependency, override, vendored binary or pin change is committed.
+ * Fail closed unless the binary is the exact released command the manifest
+ * pins. The check runs before any row starts, so a stale or tampered cache
+ * cannot serve a different runner under the pinned version's name.
  */
-export async function ensureApptheoryLocal(root, producer) {
-  const key = `${producer.directory}@${producer.head}`;
+export function assertRunnerVersion(binary, spec, { run = spawnSync } = {}) {
+  const result = run('go', ['version', '-m', binary], { encoding: 'utf8' });
+  if (result.error || result.status !== 0) {
+    throw new RunError(
+      `cannot verify the installed apptheory-local at ${binary}: ${
+        (result.stderr || result.stdout || (result.error && result.error.message) || 'go version -m failed').trim()
+      }`,
+    );
+  }
+  const info = parseGoVersionM(result.stdout);
+  if (info.path !== spec.package) {
+    throw new RunError(
+      `apptheory-local at ${binary} reports command ${String(info.path)}; the manifest pins ${spec.package}`,
+    );
+  }
+  if (info.module !== spec.module || info.version !== spec.version) {
+    throw new RunError(
+      `apptheory-local at ${binary} reports ${String(info.module)} ${String(info.version)}; the manifest pins ${spec.module} ${spec.version}`,
+    );
+  }
+  return info;
+}
+
+/**
+ * Install the released runner at the version pinned in the committed manifest.
+ * GOBIN is the harness-owned cache, never PATH and never /tmp; no file:
+ * dependency, override, vendored binary or floating ref is committed.
+ */
+export async function ensureApptheoryLocal(root, manifest) {
+  const spec = runnerSpec(manifest);
+  const key = `${spec.package}@${spec.version}`;
   if (RUNNER_CACHE.has(key)) return RUNNER_CACHE.get(key);
 
   const go = spawnSync('go', ['version'], { encoding: 'utf8' });
   if (go.status !== 0) {
     throw new RunError(
-      `building apptheory-local needs the Go toolchain on PATH: ${
+      `installing apptheory-local needs the Go toolchain on PATH: ${
         (go.stderr || go.stdout || '').trim() || 'go version failed'
       }`,
     );
   }
 
-  const buildDir = path.join(cacheRoot(), 'apptheory-local', producer.head);
-  const binary = path.join(buildDir, 'apptheory-local');
-  if (!existsSync(binary)) {
-    mkdirSync(buildDir, { recursive: true });
+  const binDir = path.join(runnerCacheDir(spec), 'bin');
+  const binary = path.join(binDir, 'apptheory-local');
+  if (existsSync(binary)) {
+    assertRunnerVersion(binary, spec);
+  } else {
+    mkdirSync(binDir, { recursive: true });
     await runCommand({
       command: 'go',
-      args: ['build', '-C', producer.directory, '-o', binary, './cmd/apptheory-local'],
+      args: ['install', `${spec.package}@${spec.version}`],
       cwd: root,
-      env: process.env,
+      env: { ...process.env, GOBIN: binDir },
       timeoutMs: DEFAULT_TIMEOUT_MS,
-      label: `build apptheory-local from ${producer.checkout} ${producer.head.slice(0, 12)}`,
+      label: `go install ${spec.package}@${spec.version}`,
     });
+    if (!existsSync(binary)) {
+      throw new RunError(`go install ${spec.package}@${spec.version} produced no binary at ${binary}`);
+    }
+    assertRunnerVersion(binary, spec);
   }
-  if (!existsSync(binary)) {
-    throw new RunError(`apptheory-local build produced no binary at ${binary}`);
-  }
+
   const runner = {
     binary,
-    head: producer.head,
-    sha: producer.sha,
-    checkout: producer.directory,
+    version: spec.version,
+    module: spec.module,
+    package: spec.package,
     profile: profilePath(root),
   };
   RUNNER_CACHE.set(key, runner);

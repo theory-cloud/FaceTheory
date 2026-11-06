@@ -41,23 +41,28 @@ AppTheory/TableTheory release-tarball dependencies with EALLOWREMOTE).
 That is intentionally narrower than `all`: only the URL dependencies
 declared by this package's `package.json` may be fetched.
 
-The same stack runs end to end on local backends through the sibling AppTheory
-local runner and gateway. Build `apptheory-local` once from the sibling checkout
-as shown in `docs/examples/local-harness.md`, then run from the repository root:
-the runner synthesizes this app with its own `node_modules/.bin/cdk`, starts
-DynamoDB Local and s3proxy, creates the cache table from the template's key
-schema and TTL, deploys the bucket sources, and serves the distribution on
-loopback:
+The same stack runs end to end on local backends through the released AppTheory
+local runner and gateway. Install `apptheory-local` v7.0.0 from the release
+(the version is pinned in `scripts/local/examples-local.json`), then run from
+the repository root: the runner synthesizes this app with its own
+`node_modules/.bin/cdk`, starts DynamoDB Local and s3proxy, creates the cache
+table from the template's key schema and TTL, deploys the bucket sources, and
+serves the distribution on loopback:
 
 ```bash
 cd ../..
 make ts-build
-~/.cache/facetheory-examples-local/apptheory-local/$(git -C ../AppTheory rev-parse HEAD)/apptheory-local run \
+GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin" \
+  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0
+"$HOME/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin/apptheory-local" run \
   --app infra/apptheory-ssg-isr-site \
   --profile scripts/local/apptheory-local-profile.json \
   --backend dynamodb --backend s3proxy \
   --port-base 8246
 ```
+
+The install command and the profile rules are AppTheory's
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.0.0/docs/examples/local-runner.md#install-the-command).
 
 `make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'` runs the same
 gateway and asserts the SSG HTML and assets from S3, the ISR miss/generation/hit
