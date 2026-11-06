@@ -617,7 +617,7 @@ the row if anything remains.
 The FT3 example rows use `ad3-<checkout-id>-dynamodb-local`,
 `ad3-<checkout-id>-s3proxy` and `ad3-<checkout-id>-net`. The harness removes them
 at the end of a run and on `SIGINT`/`SIGTERM`. Removal checks the exact name and
-the `ft3.owner` label, so a container or network this checkout did not create is
+the `ad3.owner` label, so a container or network this checkout did not create is
 reported and left running.
 
 `make examples-local-down` stops only PIDs recorded by this checkout, after

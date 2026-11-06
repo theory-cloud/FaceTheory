@@ -771,8 +771,9 @@ export const RUNNERS = {
     assertIncludes(page.body, '<link href="/assets/entry.css" rel="stylesheet">', 'SSR page stylesheet tag');
     assertIncludes(page.body, '<script type="module" src="/assets/entry.js"></script>', 'SSR page module script');
     // The default behavior for an SSR site uses CACHING_DISABLED, so every
-    // request must reach the Function URL origin. Each request carries its own
-    // id, which the viewer-response function echoes only when the origin ran.
+    // request must reach the Function URL origin. The origin proof is the
+    // asserted `x-cache: Miss`; the viewer-response function re-echoes the
+    // request id on a hit too, so the echo alone does not prove the origin ran.
     expectCacheMiss(page, 'SSR page (CACHING_DISABLED)');
     const secondPage = await request('/', { headers: { 'x-request-id': 'ft2-gateway-second' } });
     assertEqual(secondPage.status, 200, 'SSR page second status');

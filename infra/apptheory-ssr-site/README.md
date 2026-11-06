@@ -51,7 +51,9 @@ a 403 missing asset and the handler's 404. It also proves CloudFront caching:
 `/assets/entry.css` misses then hits with `x-cache: Hit from cloudfront` and an
 `age`, an invalidation removes it, and the `CACHING_DISABLED` SSR behavior
 reaches the origin on every request; the SSR stream reaches the viewer chunk by
-chunk. The row is class L2; the edge network/TLS (a docs/125 true limit), IAM
+chunk. The reference `/` page paces its two parts 200 ms apart so incremental
+delivery is observable through the local gateway; deployers may remove that
+pause. The row is class L2; the edge network/TLS (a docs/125 true limit), IAM
 policy evaluation, S3 bucket policies/CORS and viewer protocol enforcement are
 the named gaps. The stack configures no custom error responses.
 
