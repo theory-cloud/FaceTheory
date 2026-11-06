@@ -16,7 +16,7 @@ const packageRoot = path.resolve(
 
 const OLD_PLUGIN = '@sveltejs/vite-plugin-svelte';
 const SELECTED_VERSIONS = {
-  rollup: '4.65.0',
+  rollup: '4.67.2',
   'rollup-plugin-svelte': '7.2.3',
 } as const;
 const SVELTE_VITE_CONFIGS = [
