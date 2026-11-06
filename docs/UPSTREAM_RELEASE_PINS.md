@@ -52,8 +52,9 @@ TableTheory `v6.3.0` changes no `@theory-cloud/tabletheory-ts/facetheory` source
 an optional item-image redaction setting, tighten the number-mode typing, and extend schema and release state.
 FaceTheory's ISR metadata store compiles and its unit tests pass unchanged.
 
-The two infra snapshots move by exactly one `Code.S3Key` each. The bundled handler contains the AppTheory runtime, so
-the v7 runtime changes the esbuild asset hash; no synthesized resource, property or route changes. The pin move is a
+The two infra snapshots move by exactly one `Code.S3Key` each. The bundled handler contains the AppTheory runtime and,
+in the SSR site, the streamed reference page, so the v7 runtime and the streaming change alter the esbuild asset hash;
+no synthesized resource, property or route changes. The pin move is a
 `fix(deps)` compatibility update, not a breaking change for FaceTheory consumers. A consumer installing
 `@theory-cloud/facetheory` is unaffected: `@theory-cloud/apptheory` is a FaceTheory devDependency, and the adapter
 subpath continues to require the consumer's own AppTheory install. Newly generated starters pick up the `v7.0.0`

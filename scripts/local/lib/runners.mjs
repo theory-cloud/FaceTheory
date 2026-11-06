@@ -12,7 +12,10 @@ import {
   assertNotMatch,
 } from './runtime.mjs';
 import {
+  assertIncrementalStream,
   assertProxyResult,
+  cloudFrontControls,
+  createInvalidation,
   dockerPrefixFor,
   functionUrlEvent,
   lambdaHeader,
@@ -40,14 +43,14 @@ const STRICT_CSP_ROW_PROFILES = {
 const HANDLER_PROFILES = {
   facetheory: {
     rootBody:
-      '<!doctype html><html lang="en"><head><title>FaceTheory</title></head><body><h1>hello (streaming)</h1></body></html>',
+      '<!doctype html><html lang="en"><head><title>FaceTheory</title></head><body><h1>hello (streaming)</h1><!-- streamed:tail --></body></html>',
     catchAllBody:
       '<!doctype html><html lang="en"><head><title>Catch-all</title></head><body><pre>{\n  "path": "/anything",\n  "proxy": "anything"\n}</pre></body></html>',
     refusal: 'none',
   },
   apptheory: {
     rootBody:
-      '<!doctype html><html lang="en"><head><title>FaceTheory (AppTheory)</title></head><body><h1>hello (streaming)</h1></body></html>',
+      '<!doctype html><html lang="en"><head><title>FaceTheory (AppTheory)</title></head><body><h1>hello (streaming)</h1><!-- streamed:tail --></body></html>',
     catchAllBody:
       '<!doctype html><html lang="en"><head><title>Catch-all</title></head><body><pre>{\n  "path": "/anything",\n  "proxy": "anything"\n}</pre></body></html>',
     refusal: '405',
@@ -66,6 +69,23 @@ function expectOk(response, label) {
 
 function expectNotFound(response, label) {
   assertEqual(response.status, 404, `${label} status`);
+}
+
+/**
+ * The local gateway answers CloudFront's documented cache signal: a hit is
+ * `x-cache: Hit from cloudfront` with an `age` in seconds; a miss is
+ * `x-cache: Miss from cloudfront`.
+ *
+ * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/response-headers.html
+ * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/working-with-cache-policies.html
+ */
+function expectCacheMiss(response, label) {
+  assertHeader(response.headers, 'x-cache', 'Miss from cloudfront');
+}
+
+function expectCacheHit(response, label) {
+  assertHeader(response.headers, 'x-cache', 'Hit from cloudfront');
+  assertMatch(String(response.headers.age ?? ''), /^\d+$/, `${label} age`);
 }
 
 function lambdaMarker(response) {
@@ -664,14 +684,38 @@ export const RUNNERS = {
   'apptheory-local-handler': async ({ row, root, apptheory, env }) => {
     const profile = HANDLER_PROFILES[row.expect?.profile];
     if (!profile) throw new RunError(`${row.id}: unknown handler profile ${String(row.expect?.profile)}`);
+    const incremental = row.expect?.incremental === true;
     const session = await startInvokeSession({ root, row, runner: apptheory, env });
+    const invoke = async (event) =>
+      incremental
+        ? await session.callStreaming(event)
+        : { result: await session.call(event), chunks: [] };
     try {
       const rootEvent = functionUrlEvent({ rowId: row.id });
-      const rootResult = await session.call(rootEvent);
+      const rootCall = await invoke(rootEvent);
+      const rootResult = rootCall.result;
       assertProxyResult(rootResult, `${row.id} GET /`);
       assertEqual(rootResult.statusCode, 200, `${row.id} GET / status`);
       assertEqual(lambdaHeader(rootResult, 'content-type'), 'text/html; charset=utf-8', `${row.id} GET / content-type`);
       assertEqual(rootResult.body, profile.rootBody, `${row.id} GET / body`);
+      let streamDetail = '';
+      if (incremental) {
+        const stream = assertIncrementalStream({
+          chunks: rootCall.chunks,
+          label: `${row.id} GET /`,
+          laterMarker: '<!-- streamed:tail -->',
+        });
+        assertEqual(stream.metadata.statusCode, 200, `${row.id} GET / prelude status`);
+        assert(
+          stream.firstChunkMs < rootCall.resultAtMs,
+          `${row.id} GET /: the first chunk arrived after the handler completed`,
+        );
+        assert(
+          stream.chunks >= 2,
+          `${row.id} GET /: only ${stream.chunks} chunk event(s); a complete document needs a head and a body chunk`,
+        );
+        streamDetail = `; ${stream.chunks} chunk events, first at ${stream.firstChunkMs.toFixed(2)}ms and the result at ${rootCall.resultAtMs.toFixed(2)}ms, with the document end only in a later chunk`;
+      }
       if (row.expect?.echoRequestId === true) {
         assertEqual(
           lambdaHeader(rootResult, 'x-request-id'),
@@ -681,14 +725,14 @@ export const RUNNERS = {
       }
 
       const catchEvent = functionUrlEvent({ rowId: row.id, path: '/anything' });
-      const catchResult = await session.call(catchEvent);
+      const catchResult = (await invoke(catchEvent)).result;
       assertProxyResult(catchResult, `${row.id} GET /anything`);
       assertEqual(catchResult.statusCode, 200, `${row.id} GET /anything status`);
       assertEqual(lambdaHeader(catchResult, 'content-type'), 'text/html; charset=utf-8', `${row.id} GET /anything content-type`);
       assertEqual(catchResult.body, profile.catchAllBody, `${row.id} GET /anything body`);
 
       const postEvent = functionUrlEvent({ rowId: row.id, method: 'POST', body: 'hello' });
-      const postResult = await session.call(postEvent);
+      const postResult = (await invoke(postEvent)).result;
       assertProxyResult(postResult, `${row.id} POST /`);
       if (profile.refusal === '405') {
         assertEqual(postResult.statusCode, 405, `${row.id} POST / status`);
@@ -701,20 +745,18 @@ export const RUNNERS = {
 
       if (profile.refusal === '405') {
         return {
-          detail:
-            'real handler in the official Lambda Node image via apptheory-local; complete buffered streaming bodies, catch-all proxy and the 405 method refusal; chunk timing is the named gap',
+          detail: `real handler in the official Lambda Node image via apptheory-local; incremental streaming body${streamDetail}, catch-all proxy and the 405 method refusal`,
         };
       }
       return {
-        detail:
-          'real handler in the official Lambda Node image via apptheory-local; complete buffered streaming bodies and catch-all proxy; this example has no refusal path (POST is method-agnostic); chunk timing is the named gap',
+        detail: `real handler in the official Lambda Node image via apptheory-local; incremental streaming body${streamDetail} and catch-all proxy; this example has no refusal path (POST is method-agnostic)`,
       };
     } finally {
       await session.close();
     }
   },
 
-  'apptheory-local-gateway': async ({ row, root, request }) => {
+  'apptheory-local-gateway': async ({ row, root, request, logPath }) => {
     const page = await request('/', { headers: { 'x-request-id': 'ft2-gateway-check' } });
     assertEqual(page.status, 200, 'SSR page status');
     assertHeader(page.headers, 'content-type', /^text\/html; charset=utf-8$/);
@@ -728,14 +770,61 @@ export const RUNNERS = {
     assertIncludes(page.body, '<h1>FaceTheory Infra Example</h1>', 'SSR page body');
     assertIncludes(page.body, '<link href="/assets/entry.css" rel="stylesheet">', 'SSR page stylesheet tag');
     assertIncludes(page.body, '<script type="module" src="/assets/entry.js"></script>', 'SSR page module script');
+    // The default behavior for an SSR site uses CACHING_DISABLED, so every
+    // request must reach the Function URL origin. Each request carries its own
+    // id, which the viewer-response function echoes only when the origin ran.
+    expectCacheMiss(page, 'SSR page (CACHING_DISABLED)');
+    const secondPage = await request('/', { headers: { 'x-request-id': 'ft2-gateway-second' } });
+    assertEqual(secondPage.status, 200, 'SSR page second status');
+    assertHeader(secondPage.headers, 'x-request-id', 'ft2-gateway-second');
+    expectCacheMiss(secondPage, 'SSR page second request (CACHING_DISABLED)');
+
+    // CloudFront returns a chunked object to the viewer as it is received and
+    // caches it only after the stream completes. The document end is absent
+    // from the first chunk, so the client observed a boundary before the
+    // handler finished.
+    // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/RequestAndResponseBehaviorCustomOrigin.html
+    // https://docs.aws.amazon.com/lambda/latest/dg/configuration-response-streaming.html
+    const streamed = await request.rawChunks('/');
+    assertEqual(streamed.status, 200, 'streamed SSR page status');
+    assertHeader(streamed.headers, 'transfer-encoding', 'chunked');
+    assert(streamed.chunks.length >= 2, `streamed SSR page must have multiple chunks, got ${streamed.chunks.length}`);
+    const streamFirst = streamed.chunks[0].toString('utf8');
+    assertIncludes(streamFirst, '<!doctype html>', 'streamed SSR page first chunk head');
+    assertIncludes(streamFirst, '<title>FaceTheory + AppTheorySsrSite</title>', 'streamed SSR page first chunk title');
+    assertNotIncludes(streamFirst, '</html>', 'streamed SSR page end must not be in the first chunk');
+    assertIncludes(streamed.body, '<h1>FaceTheory Infra Example</h1>', 'streamed SSR page body');
+    assertIncludes(streamed.body, '</html>', 'streamed SSR page document close');
+    expectCacheMiss(streamed, 'streamed SSR page');
 
     const css = await request('/assets/entry.css');
     assertEqual(css.status, 200, 'asset status');
     assertHeader(css.headers, 'content-type', 'text/css');
     assertHeader(css.headers, 'cache-control', 'public,max-age=31536000,immutable');
     assertHeader(css.headers, 'x-content-type-options', 'nosniff');
+    expectCacheMiss(css, 'asset first request');
     const cssSource = await readFile(path.join(root, 'infra/apptheory-ssr-site/deploy/assets/entry.css'), 'utf8');
     assertEqual(css.body, cssSource, 'asset bytes match the deployed source');
+
+    // The static-assets behavior caches for a day. The second request is a hit
+    // with an age; an invalidation removes the object, so the next request is a
+    // miss that re-caches.
+    // https://docs.aws.amazon.com/CloudFront/latest/APIReference/API_CreateInvalidation.html
+    const cssHit = await request('/assets/entry.css');
+    assertEqual(cssHit.status, 200, 'asset hit status');
+    expectCacheHit(cssHit, 'asset second request');
+    assertEqual(cssHit.body, cssSource, 'asset hit bytes match the deployed source');
+    const controls = cloudFrontControls(logPath);
+    await createInvalidation({
+      controls,
+      path: '/assets/entry.css',
+      callerReference: `ft2-${rowSlug(row.id)}-asset`,
+    });
+    const cssInvalidated = await request('/assets/entry.css');
+    assertEqual(cssInvalidated.status, 200, 'asset after invalidation status');
+    expectCacheMiss(cssInvalidated, 'asset after invalidation');
+    const cssRehit = await request('/assets/entry.css');
+    expectCacheHit(cssRehit, 'asset after invalidation second request');
 
     const manifest = await request('/.vite/manifest.json');
     assertEqual(manifest.status, 200, 'Vite manifest status');
@@ -758,6 +847,10 @@ export const RUNNERS = {
     assertHeader(missing.headers, 'content-type', 'application/xml');
     assertIncludes(missing.body, 'AccessDenied', 'missing asset refusal body');
 
+    // This stack configures no CustomErrorResponses, so there is no custom
+    // error page to assert; the origin 403 and the handler 404 are the real
+    // paths the distribution exposes.
+    // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/GeneratingCustomErrorResponses.html
     const notFound = await request('/missing-route');
     assertEqual(notFound.status, 404, 'missing SSR route status');
     assertHeader(notFound.headers, 'content-type', /^text\/html; charset=utf-8$/);
@@ -766,7 +859,7 @@ export const RUNNERS = {
 
     return {
       detail:
-        'gateway served the real SSR handler through the AWS_IAM Function URL origin, the deployed CSS and Vite manifest from the S3 origin, the SSG data path, a 403 missing asset and the handler 404; CloudFront caching, the edge network/TLS, IAM policy evaluation and buffered streaming are the named gaps',
+        'gateway served the real SSR handler through the AWS_IAM Function URL origin with CloudFront caching: the static-assets behavior missed, hit with age and was invalidated back to a miss, the CACHING_DISABLED SSR behavior never cached, and the SSR stream reached the viewer as chunked bytes with the document end only in a later chunk; the stack configures no custom error responses; the edge network/TLS and IAM policy evaluation remain the named gaps',
     };
   },
 
@@ -799,6 +892,16 @@ export const RUNNERS = {
       'utf8',
     );
     assertEqual(page.body, indexSource, 'SSG HTML bytes match the deployed source');
+    // The SSG objects carry `public,max-age=0,s-maxage=600`; the html cache
+    // policy has a zero default TTL and bounds the origin's s-maxage, so the
+    // first request is a miss and the second a hit with an age.
+    // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Expiration.html
+    expectCacheMiss(page, 'SSG HTML first request');
+    const secondPage = await request('/', { headers: { 'x-request-id': 'ft3-gateway-second' } });
+    assertEqual(secondPage.status, 200, 'SSG page hit status');
+    assertHeader(secondPage.headers, 'x-request-id', 'ft3-gateway-second');
+    expectCacheHit(secondPage, 'SSG HTML second request');
+    assertEqual(secondPage.body, indexSource, 'SSG HTML hit bytes match the deployed source');
 
     const ssgDemo = await request('/ssg-demo');
     assertEqual(ssgDemo.status, 200, 'SSG demo status');
@@ -818,6 +921,22 @@ export const RUNNERS = {
       'utf8',
     );
     assertEqual(css.body, cssSource, 'asset bytes match the deployed source');
+    expectCacheMiss(css, 'asset first request');
+    const cssHit = await request('/assets/entry.css');
+    assertEqual(cssHit.status, 200, 'asset hit status');
+    expectCacheHit(cssHit, 'asset second request');
+    assertEqual(cssHit.body, cssSource, 'asset hit bytes match the deployed source');
+    const controls = cloudFrontControls(logPath);
+    await createInvalidation({
+      controls,
+      path: '/assets/entry.css',
+      callerReference: `ft3-${rowSlug(row.id)}-asset`,
+    });
+    const cssInvalidated = await request('/assets/entry.css');
+    assertEqual(cssInvalidated.status, 200, 'asset after invalidation status');
+    expectCacheMiss(cssInvalidated, 'asset after invalidation');
+    const cssRehit = await request('/assets/entry.css');
+    expectCacheHit(cssRehit, 'asset after invalidation second request');
 
     const manifest = await request('/.vite/manifest.json');
     assertEqual(manifest.status, 200, 'Vite manifest status');
@@ -837,16 +956,25 @@ export const RUNNERS = {
     );
     assertEqual(data.body, dataSource, 'SSG data bytes match the deployed source');
 
-    const first = await request('/isr-demo');
+    // The default ISR response sets `s-maxage=0`, so the html cache policy
+    // gives it a zero TTL: every request reaches the Lambda origin, while
+    // FaceTheory's own ISR store answers the second request as a hit. Each
+    // request carries its own id to prove the origin ran both times.
+    // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Expiration.html
+    const first = await request('/isr-demo', { headers: { 'x-request-id': 'ft3-isr-first' } });
     assertEqual(first.status, 200, 'ISR page status');
     assertHeader(first.headers, 'content-type', /^text\/html; charset=utf-8$/);
+    assertHeader(first.headers, 'x-request-id', 'ft3-isr-first');
     assertHeader(first.headers, 'x-facetheory-ssr', '1');
     assertHeader(first.headers, 'x-facetheory-isr', 'miss');
+    expectCacheMiss(first, 'ISR first request (s-maxage=0)');
     assertIncludes(first.body, '<h1>ISR demo</h1>', 'ISR page body');
     assertIncludes(first.body, 'Generated at:', 'ISR page generation');
-    const second = await request('/isr-demo');
+    const second = await request('/isr-demo', { headers: { 'x-request-id': 'ft3-isr-second' } });
     assertEqual(second.status, 200, 'ISR hit status');
+    assertHeader(second.headers, 'x-request-id', 'ft3-isr-second');
     assertHeader(second.headers, 'x-facetheory-isr', 'hit');
+    expectCacheMiss(second, 'ISR second request (s-maxage=0)');
     assertEqual(second.body, first.body, 'ISR hit bytes');
 
     const items = await scanTable({ endpoint: endpoints.dynamodb, tableName });
@@ -901,7 +1029,7 @@ export const RUNNERS = {
     assertIncludes(notFound.body, '&quot;path&quot;: &quot;/missing-route&quot;', 'missing SSR route context');
 
     return {
-      detail: `gateway served SSG HTML and assets from the S3 origin, the ISR miss/generation/hit through the AWS_IAM Function URL origin with stored object ${key} and metadata ${String(valueOf(meta, 'pk'))}, lease ${lease.token.slice(0, 8)}…/${lease.expiresAt}/${lease.ttl}, invalidate refused, a 403 missing asset and the handler 404; CloudFront caching/edge/TLS, IAM policy evaluation, S3 policies/CORS, viewer protocol enforcement and buffered streaming remain the named gaps`,
+      detail: `gateway served SSG HTML and assets from the S3 origin with CloudFront caching (SSG HTML and assets missed then hit with age, an invalidation removed the asset; the s-maxage=0 ISR response reached the Lambda origin on every request), the ISR miss/generation/hit through the AWS_IAM Function URL origin with stored object ${key} and metadata ${String(valueOf(meta, 'pk'))}, lease ${lease.token.slice(0, 8)}…/${lease.expiresAt}/${lease.ttl}, invalidate refused, a 403 missing asset and the handler 404; the edge network/TLS, IAM policy evaluation, S3 policies/CORS, viewer protocol enforcement and DynamoDB Local's missing TTL deletion remain the named gaps`,
     };
   },
 

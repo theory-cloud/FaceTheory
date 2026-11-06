@@ -10,16 +10,19 @@ This example wires FaceTheory directly to AWS Lambda Function URL streaming thro
 Node image through the released `apptheory-local` v7.0.0 (pinned in
 `scripts/local/examples-local.json`; no AppTheory checkout). It bundles this
 example's own `handler.ts`, sends Function URL payload 2.0 events, and asserts
-the complete buffered streaming body and the catch-all route:
+incremental chunk delivery and the catch-all route:
 
 ```bash
 make examples-local ONLY=lambda-url-streaming#serve
 ```
 
-The row is class L3: the Runtime Interface Emulator buffers `RESPONSE_STREAM`,
-so the complete framed bytes are asserted but chunk timing and incremental
-delivery are the named cloud gap. It runs against the released `apptheory-local`
-v7.0.0 pinned in the harness manifest.
+The row is class L2. The warm session uses `--stream-chunks`, so the harness
+observes a first chunk carrying the document start while the handler is still
+running and the document end only in a later chunk; a fully buffered response
+fails the assertion, and the harness self-test proves that negative control. The
+managed Function URL edge (TLS, auth, edge network) is a docs/125 true limit and
+the only named gap. The row runs against the released `apptheory-local` v7.0.0
+pinned in the harness manifest.
 
 From `ts/`, typecheck it with the standard example compilation gate:
 

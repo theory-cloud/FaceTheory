@@ -10,6 +10,7 @@ import {
   cacheRoot,
   cleanupDockerPrefix,
   clearProcess,
+  httpRequest,
   readLog,
   runCommand,
   startRecordedProcess,
@@ -52,7 +53,7 @@ export function dockerPrefixFor(row) {
   // The producer sanitizes and truncates --name-prefix (names longer than 40
   // characters become 31 characters plus a hash), so the harness must use the
   // same effective prefix for container lookups and cleanup.
-  return producerName(`${row.containerPrefix ?? 'ft2'}-${slug}`);
+  return producerName(`${row.containerPrefix ?? 'ad3'}-${slug}`);
 }
 
 export function runnerSpec(manifest) {
@@ -351,6 +352,7 @@ async function waitForRunnerReady({ child, logPath, timeoutMs }) {
 export async function startInvokeSession({ root, row, runner, env }) {
   const bundle = await bundleHandler(root, row);
   const prefix = dockerPrefixFor(row);
+  const incremental = row.expect?.incremental === true;
   const { child, logPath } = startRecordedProcess({
     command: runner.binary,
     args: [
@@ -366,6 +368,7 @@ export async function startInvokeSession({ root, row, runner, env }) {
       '--name-prefix',
       prefix,
       '--stdio',
+      ...(incremental ? ['--stream-chunks'] : []),
     ],
     cwd: root,
     env,
@@ -384,7 +387,7 @@ export async function startInvokeSession({ root, row, runner, env }) {
     throw error;
   }
 
-  const call = async (event, timeoutMs = 180_000) => {
+  const writeEvent = (event) => {
     if (child.exitCode !== null) {
       throw new RunError(
         `apptheory-local exited with code ${child.exitCode} before answering`,
@@ -399,16 +402,60 @@ export async function startInvokeSession({ root, row, runner, env }) {
         readLog(logPath),
       );
     }
+  };
+
+  const readLine = async (timeoutMs) => {
     const line = await reader.next(timeoutMs).catch((error) => {
-      throw new RunError(
-        `${error.message}`,
-        readLog(logPath),
-      );
+      throw new RunError(`${error.message}`, readLog(logPath));
     });
     try {
       return JSON.parse(line);
     } catch {
       throw new RunError(`apptheory-local returned non-JSON: ${line.slice(0, 500)}`, readLog(logPath));
+    }
+  };
+
+  const call = async (event, timeoutMs = 180_000) => {
+    writeEvent(event);
+    return await readLine(timeoutMs);
+  };
+
+  /**
+   * Read one invocation that carries chunk events before its result line. The
+   * runner writes each streamed chunk as it arrives and the result line only
+   * after the invocation completes, so a chunk received here is a chunk the
+   * client observed while the handler was still running. A buffered response
+   * writes no chunk event and fails the incremental assertion.
+   *
+   * https://docs.aws.amazon.com/lambda/latest/dg/configuration-response-streaming.html
+   * https://docs.aws.amazon.com/lambda/latest/dg/runtimes-api.html
+   */
+  const callStreaming = async (event, timeoutMs = 180_000) => {
+    if (!incremental) {
+      throw new RunError(
+        'the warm invoke session did not start with --stream-chunks; set expect.incremental on the row',
+      );
+    }
+    writeEvent(event);
+    const chunks = [];
+    for (;;) {
+      const parsed = await readLine(timeoutMs);
+      if (parsed.event === 'chunk') {
+        chunks.push({
+          index: parsed.index,
+          contentType: parsed.contentType,
+          data: Buffer.from(String(parsed.data ?? ''), 'base64'),
+          atMs: performance.now(),
+        });
+        continue;
+      }
+      if (parsed.event === 'result') {
+        return { result: parsed, chunks, resultAtMs: performance.now() };
+      }
+      throw new RunError(
+        `apptheory-local returned an unknown stream event: ${JSON.stringify(parsed).slice(0, 500)}`,
+        readLog(logPath),
+      );
     }
   };
 
@@ -427,7 +474,7 @@ export async function startInvokeSession({ root, row, runner, env }) {
     return removed;
   };
 
-  return { call, close, prefix, logPath };
+  return { call, callStreaming, close, prefix, logPath };
 }
 
 export function lambdaHeader(result, name) {
@@ -443,4 +490,139 @@ export function assertProxyResult(result, label) {
   if (result.streamed !== true) {
     throw new RunError(`${label}: the response was not the RIE's framed streaming response`);
   }
+}
+
+const FUNCTION_URL_DELIMITER = Buffer.alloc(8);
+
+/**
+ * Split a Function URL streaming prelude from its payload. The documented
+ * format is `{statusCode, headers, cookies}` followed by eight null bytes;
+ * API Gateway requires the same delimiter within the first 16 KB.
+ *
+ * https://docs.aws.amazon.com/lambda/latest/dg/urls-invocation.html
+ */
+export function parseStreamPrelude(data, label) {
+  const index = data.indexOf(FUNCTION_URL_DELIMITER);
+  if (index < 0) {
+    throw new RunError(
+      `${label}: the first streamed chunk carries no Function URL metadata prelude delimiter`,
+    );
+  }
+  let metadata;
+  try {
+    metadata = JSON.parse(data.subarray(0, index).toString('utf8'));
+  } catch {
+    throw new RunError(`${label}: the streamed metadata prelude is not JSON`);
+  }
+  return { metadata, payload: data.subarray(index + FUNCTION_URL_DELIMITER.length) };
+}
+
+/**
+ * Prove incremental delivery from the runner's chunk events. The document
+ * start marker must be in the first payload chunk and the end marker must be
+ * absent from it, so the client observed a chunk boundary before the handler
+ * finished writing. A buffered response fails: it either carries no chunk
+ * event or puts the whole document, end marker included, in the first chunk.
+ *
+ * https://docs.aws.amazon.com/lambda/latest/dg/configuration-response-streaming.html
+ */
+export function assertIncrementalStream({
+  chunks,
+  label,
+  startMarker = '<!doctype html>',
+  endMarker = '</html>',
+  laterMarker,
+}) {
+  if (!Array.isArray(chunks) || chunks.length === 0) {
+    throw new RunError(
+      `${label}: no chunk event crossed the runner before the result; the response was buffered`,
+    );
+  }
+  const { metadata, payload } = parseStreamPrelude(chunks[0].data, label);
+  const payloads = [];
+  if (payload.length > 0) payloads.push(payload);
+  for (const chunk of chunks.slice(1)) payloads.push(chunk.data);
+  if (payloads.length === 0) {
+    throw new RunError(`${label}: the streamed response carried no payload chunk`);
+  }
+  const firstPayload = payloads[0].toString('utf8');
+  if (startMarker && !firstPayload.includes(startMarker)) {
+    throw new RunError(`${label}: the first payload chunk does not start the document`);
+  }
+  if (endMarker && firstPayload.includes(endMarker)) {
+    throw new RunError(
+      `${label}: the first payload chunk already contains ${endMarker}; the response was fully buffered`,
+    );
+  }
+  const body = Buffer.concat(payloads).toString('utf8');
+  if (endMarker && !body.includes(endMarker)) {
+    throw new RunError(`${label}: the complete streamed body does not contain ${endMarker}`);
+  }
+  if (laterMarker) {
+    if (firstPayload.includes(laterMarker)) {
+      throw new RunError(
+        `${label}: the first payload chunk already contains ${laterMarker}; the response was fully buffered`,
+      );
+    }
+    if (!body.includes(laterMarker)) {
+      throw new RunError(`${label}: the complete streamed body does not contain ${laterMarker}`);
+    }
+  }
+  return {
+    metadata,
+    body,
+    chunks: chunks.length,
+    firstChunkMs: chunks[0].atMs,
+  };
+}
+
+/**
+ * Resolve the local CloudFront control endpoint and distribution from the
+ * runner log. The local distribution id is a placeholder derived from the
+ * logical id; AppTheory documents the derivation and the invalidation API.
+ *
+ * https://docs.aws.amazon.com/CloudFront/latest/APIReference/API_CreateInvalidation.html
+ */
+export function cloudFrontControls(logPath) {
+  const log = readLog(logPath) ?? '';
+  const api = /cloudfront API at (http:\/\/127\.0\.0\.1:\d+)/.exec(log)?.[1];
+  const serving = /serving cloudfront (\S+) at (http:\/\/127\.0\.0\.1:\d+)/.exec(log);
+  if (!api) {
+    throw new RunError('the runner log does not report its CloudFront invalidation endpoint');
+  }
+  if (!serving) {
+    throw new RunError('the runner log does not report a served CloudFront distribution');
+  }
+  const logicalId = serving[1];
+  const distributionId = `E${createHash('sha256')
+    .update(`cloudfront/${logicalId}`)
+    .digest('hex')
+    .slice(0, 10)
+    .toUpperCase()}`;
+  return { api, gateway: serving[2], logicalId, distributionId };
+}
+
+export async function createInvalidation({ controls, path: invalidationPath, callerReference }) {
+  const port = Number(new URL(controls.api).port);
+  const body = [
+    '<InvalidationBatch xmlns="http://cloudfront.amazonaws.com/doc/2020-05-31/">',
+    '<Paths><Quantity>1</Quantity><Items>',
+    `<Path>${invalidationPath}</Path>`,
+    '</Items></Paths>',
+    `<CallerReference>${callerReference}</CallerReference>`,
+    '</InvalidationBatch>',
+  ].join('');
+  const response = await httpRequest({
+    port,
+    path: `/2020-05-31/distribution/${controls.distributionId}/invalidation`,
+    method: 'POST',
+    headers: { 'content-type': 'text/xml' },
+    body,
+  });
+  if (response.status !== 201) {
+    throw new RunError(
+      `CreateInvalidation for ${invalidationPath} answered ${response.status}: ${response.body.slice(0, 500)}`,
+    );
+  }
+  return response;
 }

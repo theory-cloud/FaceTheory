@@ -43,14 +43,14 @@
         {
           "id": "apptheory-lambda-url-streaming#serve",
           "entrypoints": ["handler.ts"],
-          "class": "L3",
+          "class": "L2",
           "runner": "apptheory-local-handler",
           "bundle": { "entry": "handler.ts" },
           "runtime": "nodejs24.x",
           "handler": "index.handler",
-          "expect": { "profile": "apptheory" },
-          "gap": "The real handler and the pinned @theory-cloud/apptheory runtime run in the digest-pinned official Lambda Node image, but the Runtime Interface Emulator buffers RESPONSE_STREAM: status, headers, the 405 refusal and the complete framed body are asserted, never chunk timing or incremental delivery. The managed Function URL edge (TLS, auth, edge network) is not exercised.",
-          "description": "AppTheory streaming handler over a FaceTheory app, run through the AppTheory local runner; complete buffered body, catch-all and the 405 method refusal."
+          "expect": { "profile": "apptheory", "incremental": true },
+          "gap": "The real handler and the pinned @theory-cloud/apptheory v7.0.0 runtime run in the digest-pinned official Lambda Node image. The runner's warm invoke protocol forwards each streamed chunk before the result line, so the row proves a first chunk and the document end in a later chunk. The managed Function URL edge (TLS, auth, edge network) is a docs/125 true limit and is not exercised.",
+          "description": "AppTheory streaming handler over a FaceTheory app, run through the released apptheory-local v7.0.0; incremental chunk delivery, catch-all and the 405 method refusal."
         }
       ]
     },
@@ -168,14 +168,14 @@
         {
           "id": "lambda-url-streaming#serve",
           "entrypoints": ["handler.ts"],
-          "class": "L3",
+          "class": "L2",
           "runner": "apptheory-local-handler",
           "bundle": { "entry": "handler.ts" },
           "runtime": "nodejs24.x",
           "handler": "index.handler",
-          "expect": { "profile": "facetheory", "echoRequestId": true },
-          "gap": "The real handler runs in the digest-pinned official Lambda Node image, but the Runtime Interface Emulator buffers RESPONSE_STREAM: status, headers and the complete framed body are asserted, never chunk timing or incremental delivery. The managed Function URL edge (TLS, auth, edge network) is not exercised.",
-          "description": "Direct FaceTheory Lambda Function URL streaming handler run through the AppTheory local runner; complete buffered body, catch-all and the example's method behaviour."
+          "expect": { "profile": "facetheory", "echoRequestId": true, "incremental": true },
+          "gap": "The real handler runs in the digest-pinned official Lambda Node image. The runner's warm invoke protocol forwards each streamed chunk before the result line, so the row proves a first chunk and the document end in a later chunk. The managed Function URL edge (TLS, auth, edge network) is a docs/125 true limit and is not exercised.",
+          "description": "Direct FaceTheory Lambda Function URL streaming handler run through the released apptheory-local v7.0.0; incremental chunk delivery, catch-all and the example's method behaviour."
         }
       ]
     },
@@ -640,8 +640,8 @@
             "app": "infra/apptheory-ssr-site",
             "backends": ["s3proxy"]
           },
-          "gap": "AppTheory local gateway with the s3proxy S3 emulator and the exact generated CloudFront Functions. Named gaps: no CloudFront caching (every request is an origin miss), no edge network or TLS, no IAM policy evaluation (the AWS_IAM Function URL origin is signed locally), no S3 bucket policies or CORS, no viewer protocol enforcement, and a RESPONSE_STREAM body is buffered.",
-          "description": "End-to-end local run of the SSR site through the AppTheory gateway: SSR HTML from the Function URL origin, assets and SSG data from the S3 origin, refusals and the edge policy headers."
+          "gap": "AppTheory local gateway with the s3proxy S3 emulator and the exact generated CloudFront Functions. CloudFront caching is served: the static-assets behavior misses then hits with x-cache/age, the CACHING_DISABLED SSR behavior reaches the origin every time, invalidation removes a cached asset, and the SSR stream reaches the viewer chunk by chunk. Named gaps: the edge network and TLS (a docs/125 true limit), IAM policy evaluation (the AWS_IAM Function URL origin is signed locally), S3 bucket policies and CORS, and viewer protocol enforcement. This stack configures no CustomErrorResponses.",
+          "description": "End-to-end local run of the SSR site through the AppTheory gateway: incremental SSR HTML from the Function URL origin, assets and SSG data from the S3 origin with real cache hits and invalidation, refusals and the edge policy headers."
         }
       ]
     },
@@ -664,14 +664,14 @@
           "class": "L2",
           "runner": "apptheory-local-gateway-isr",
           "port": 8246,
-          "containerPrefix": "ft3",
+          "containerPrefix": "ad3",
           "serve": {
             "kind": "apptheory-local",
             "app": "infra/apptheory-ssg-isr-site",
             "backends": ["dynamodb", "s3proxy"]
           },
-          "gap": "AppTheory's local gateway applies the generated CloudFront Functions, edge policies and the S3/DynamoDB emulators, with the local runner creating the ISR table from the CDK key schema. Named gaps: no CloudFront caching (every request is an origin miss), no edge network or TLS, no IAM policy evaluation (the AWS_IAM Function URL origin is signed locally), no S3 bucket policies or CORS, no viewer protocol enforcement, a buffered RESPONSE_STREAM body, and DynamoDB Local does not perform TTL deletion.",
-          "description": "End-to-end local SSG+ISR run through the AppTheory gateway: pre-rendered SSG HTML and assets from S3, an ISR miss/generation/hit observed in the S3 object and the DynamoDB metadata item, lease/TTL checks, refusals and the edge policy headers."
+          "gap": "AppTheory's local gateway applies the generated CloudFront Functions, edge policies and the S3/DynamoDB emulators, with the local runner creating the ISR table from the CDK key schema. CloudFront caching is served: the SSG HTML and static assets miss then hit with x-cache/age, invalidation removes a cached asset, and the s-maxage=0 ISR response reaches the Lambda origin on every request. Named gaps: the edge network and TLS (a docs/125 true limit), IAM policy evaluation (the AWS_IAM Function URL origin is signed locally), S3 bucket policies and CORS (IAM policy evaluation), and viewer protocol enforcement (the local URL is plain HTTP). This stack configures no CustomErrorResponses.",
+          "description": "End-to-end local SSG+ISR run through the AppTheory gateway: pre-rendered SSG HTML and assets from S3 with real cache hits and invalidation, an ISR miss/generation/hit observed in the S3 object and the DynamoDB metadata item, lease/TTL checks, refusals and the edge policy headers. Emulator deviation: DynamoDB Local stores the ttl attribute but does not delete an expired item."
         }
       ]
     }

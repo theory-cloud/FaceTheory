@@ -10,6 +10,7 @@ import { discoverTree } from './lib/tree.mjs';
 import { rawHttpChunks } from './lib/runtime.mjs';
 import { validateLedger, validateManifest } from './lib/manifest.mjs';
 import {
+  assertIncrementalStream,
   assertRunnerVersion,
   parseGoVersionM,
   runnerSpec,
@@ -318,6 +319,48 @@ test('the installed runner must be the exact command and release the manifest pi
         run: fakeGoVersionM('', 1),
       }),
     /cannot verify the installed apptheory-local/,
+  );
+});
+
+function streamChunk(text) {
+  return { data: Buffer.from(text, 'utf8') };
+}
+
+function preludeChunk(payload = '') {
+  const metadata = JSON.stringify({ statusCode: 200, headers: { 'content-type': ['text/html; charset=utf-8'] } });
+  return streamChunk(`${metadata}${'\u0000'.repeat(8)}${payload}`);
+}
+
+test('incremental streaming passes only when a first chunk precedes the document end', () => {
+  const headFirst = assertIncrementalStream({
+    chunks: [
+      preludeChunk(),
+      streamChunk('<!doctype html><html><head><title>Home</title></head>'),
+      streamChunk('<body><h1>Hello</h1><!-- streamed:tail --></body></html>'),
+    ],
+    label: 'self-test head-first stream',
+    laterMarker: '<!-- streamed:tail -->',
+  });
+  assert.equal(headFirst.metadata.statusCode, 200);
+  assert.equal(headFirst.chunks, 3);
+  assert.match(headFirst.body, /<\/html>$/);
+
+  // A buffered response arrives as one payload chunk that already carries the
+  // document end. This is the negative control: the same assertion a real row
+  // uses must fail closed, so a future runner regression to buffering cannot
+  // pass the row.
+  assert.throws(
+    () =>
+      assertIncrementalStream({
+        chunks: [preludeChunk('<!doctype html><html><body>Hello</body></html>')],
+        label: 'self-test buffered stream',
+      }),
+    /the first payload chunk already contains <\/html>; the response was fully buffered/,
+  );
+
+  assert.throws(
+    () => assertIncrementalStream({ chunks: [], label: 'self-test no-chunk stream' }),
+    /no chunk event crossed the runner before the result; the response was buffered/,
   );
 });
 

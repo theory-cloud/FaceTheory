@@ -47,9 +47,13 @@ synthesized CloudFront distribution through the released AppTheory local gateway
 `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0`) on
 `http://127.0.0.1:8240`. The row asserts the SSR HTML from the Function URL
 origin, `/assets/*` and the Vite manifest from the S3 origin, the SSG data path,
-a 403 missing asset and the handler's 404. It is class L2; CloudFront caching,
-the edge network/TLS, IAM policy evaluation and buffered streaming are the named
-gaps.
+a 403 missing asset and the handler's 404. It also proves CloudFront caching:
+`/assets/entry.css` misses then hits with `x-cache: Hit from cloudfront` and an
+`age`, an invalidation removes it, and the `CACHING_DISABLED` SSR behavior
+reaches the origin on every request; the SSR stream reaches the viewer chunk by
+chunk. The row is class L2; the edge network/TLS (a docs/125 true limit), IAM
+policy evaluation, S3 bucket policies/CORS and viewer protocol enforcement are
+the named gaps. The stack configures no custom error responses.
 
 The manifest, Vite manifest and SSG data deployments share the assets bucket
 root with the prefix-scoped assets deployment. A root prune would delete the

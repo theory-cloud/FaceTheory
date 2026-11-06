@@ -65,11 +65,15 @@ The install command and the profile rules are AppTheory's
 [`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.0.0/docs/examples/local-runner.md#install-the-command).
 
 `make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'` runs the same
-gateway and asserts the SSG HTML and assets from S3, the ISR miss/generation/hit
-through the Function URL origin, the stored S3 object and DynamoDB metadata item,
-the lease and TTL, the 403/404 refusals and the edge policy headers. Named gaps:
-no CloudFront cache, edge network or TLS, no IAM/bucket policy evaluation, no
-CORS, no viewer protocol enforcement, and a buffered streaming body.
+gateway and asserts the SSG HTML and assets from S3 with real CloudFront caching
+(the objects miss then hit with `x-cache: Hit from cloudfront` and an `age`, and
+an invalidation removes a cached asset), the ISR miss/generation/hit through the
+Function URL origin, the stored S3 object and DynamoDB metadata item, the lease
+and TTL, the 403/404 refusals and the edge policy headers. The `s-maxage=0` ISR
+response reaches the Lambda origin on every request. Named gaps: the edge
+network and TLS (a docs/125 true limit), IAM/bucket policy evaluation, CORS,
+viewer protocol enforcement, and DynamoDB Local's missing TTL deletion. The
+stack configures no custom error responses.
 
 ## Deployment Notes
 

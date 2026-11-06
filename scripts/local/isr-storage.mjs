@@ -3,7 +3,7 @@
 // DynamoDB Local and s3proxy the harness uses, provisions one row's bucket and
 // TableTheory-model table, and writes the row's runtime environment to a file
 // the documentation's commands source. It never touches another checkout's
-// containers: every resource is named ft3-<checkout>-... and carries an owner
+// containers: every resource is named ad3-<checkout>-... and carries an owner
 // label.
 
 import {
