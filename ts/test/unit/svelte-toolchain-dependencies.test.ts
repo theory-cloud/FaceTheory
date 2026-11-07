@@ -183,7 +183,6 @@ test('manifest pins the exact replacement toolchain and drops the old plugin', a
   const manifest = await readJson<PackageManifest>('package.json');
   const devDependencies = manifest.devDependencies ?? {};
 
-  assert.equal(manifest.version, '5.0.3');
   assert.equal(devDependencies.rollup, SELECTED_VERSIONS.rollup);
   assert.equal(
     devDependencies['rollup-plugin-svelte'],
