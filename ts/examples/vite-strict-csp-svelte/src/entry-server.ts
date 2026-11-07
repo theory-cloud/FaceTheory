@@ -2,7 +2,7 @@ import { createFaceApp } from '@theory-cloud/facetheory';
 import { InMemoryHtmlStore } from '@theory-cloud/facetheory';
 import { buildStrictCspHeader } from '@theory-cloud/facetheory';
 import { createSvelteFace } from '@theory-cloud/facetheory/svelte';
-import type { ViteManifest } from '@theory-cloud/facetheory';
+import type { HtmlStore, ViteManifest } from '@theory-cloud/facetheory';
 import {
   viteAssetsForEntry,
   viteHydrationForEntry,
@@ -48,10 +48,22 @@ export function strictCspSvelteDataForPath(
   };
 }
 
-export function createViteStrictCspSvelteExampleApp(manifest: ViteManifest) {
+export interface StrictCspSvelteExampleOptions {
+  /**
+   * Sidecar object store. The example defaults to the in-memory store its unit
+   * tests use; `../local-storage` selects `S3HtmlStore` when the stack
+   * environment is configured.
+   */
+  htmlStore?: HtmlStore;
+}
+
+export function createViteStrictCspSvelteExampleApp(
+  manifest: ViteManifest,
+  options: StrictCspSvelteExampleOptions = {},
+) {
   return createFaceApp({
     ssrHydrationSidecars: {
-      htmlStore: new InMemoryHtmlStore(),
+      htmlStore: options.htmlStore ?? new InMemoryHtmlStore(),
       signingSecret:
         'vite-strict-csp-svelte-example-local-ssr-sidecar-signing-secret',
     },

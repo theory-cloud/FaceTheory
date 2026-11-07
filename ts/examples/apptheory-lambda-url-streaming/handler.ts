@@ -4,8 +4,18 @@
 import { createApp, createLambdaFunctionURLStreamingHandler } from '@theory-cloud/apptheory';
 
 import { createFaceApp } from '@theory-cloud/facetheory';
-import { streamFromString } from '@theory-cloud/facetheory';
+import { utf8 } from '@theory-cloud/facetheory';
 import { createAppTheoryFaceHandler } from '@theory-cloud/facetheory/apptheory';
+
+// The body arrives in two parts with a controlled pause between them. A
+// streaming transport lets the client read the first part while the handler is
+// still running; a buffered transport can only deliver the complete document.
+// https://docs.aws.amazon.com/lambda/latest/dg/configuration-response-streaming.html
+async function* streamedBody() {
+  yield utf8('<h1>hello (streaming)</h1>');
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  yield utf8('<!-- streamed:tail -->');
+}
 
 export const faceApp = createFaceApp({
   faces: [
@@ -14,7 +24,7 @@ export const faceApp = createFaceApp({
       mode: 'ssr',
       render: () => ({
         head: { title: 'FaceTheory (AppTheory)' },
-        html: streamFromString('<h1>hello (streaming)</h1>'),
+        html: streamedBody(),
       }),
     },
     {

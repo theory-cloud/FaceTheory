@@ -6,6 +6,7 @@ import {
   InMemoryHtmlStore,
   viteAssetsForEntry,
   viteHydrationForEntry,
+  type HtmlStore,
   type ViteManifest,
 } from '@theory-cloud/facetheory';
 import { createReactFace } from '@theory-cloud/facetheory/react';
@@ -46,10 +47,22 @@ export function strictCspReactDataForPath(
   };
 }
 
-export function createViteStrictCspReactExampleApp(manifest: ViteManifest) {
+export interface StrictCspReactExampleOptions {
+  /**
+   * Sidecar object store. The example defaults to the in-memory store its unit
+   * tests use; `../local-storage` selects `S3HtmlStore` when the stack
+   * environment is configured.
+   */
+  htmlStore?: HtmlStore;
+}
+
+export function createViteStrictCspReactExampleApp(
+  manifest: ViteManifest,
+  options: StrictCspReactExampleOptions = {},
+) {
   return createFaceApp({
     ssrHydrationSidecars: {
-      htmlStore: new InMemoryHtmlStore(),
+      htmlStore: options.htmlStore ?? new InMemoryHtmlStore(),
       signingSecret:
         'vite-strict-csp-react-example-local-ssr-sidecar-signing-secret',
     },

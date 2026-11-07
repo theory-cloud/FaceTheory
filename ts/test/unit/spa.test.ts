@@ -1187,10 +1187,25 @@ test('spa helpers: destination CSP refuses script-capable data URLs but keeps im
       loadExternalHydration: false,
     });
 
-    assert.equal(
-      snapshot.viewHtml?.trim(),
-      '<img src="data:image/png;base64,iVBORw0KGgo=" alt="dot"><img src="data:image/svg+xml,<svg></svg>" alt="icon">',
+    assert.ok(snapshot.viewHtml);
+    const injected = new dom.window.DOMParser().parseFromString(
+      snapshot.viewHtml,
+      'text/html',
     );
+    const images = Array.from(injected.body.querySelectorAll('img'));
+    assert.deepEqual(
+      images.map((img) => ({
+        src: img.getAttribute('src'),
+        alt: img.getAttribute('alt'),
+      })),
+      [
+        { src: 'data:image/png;base64,iVBORw0KGgo=', alt: 'dot' },
+        { src: 'data:image/svg+xml,<svg></svg>', alt: 'icon' },
+      ],
+    );
+    for (const img of images) {
+      assert.deepEqual([...img.getAttributeNames()].sort(), ['alt', 'src']);
+    }
   } finally {
     dom.window.close();
   }

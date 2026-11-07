@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import type { FaceApp, ViteManifest } from '@theory-cloud/facetheory';
+import type { FaceApp, HtmlStore, ViteManifest } from '@theory-cloud/facetheory';
+
+import { createExampleIsrStores } from '../local-storage.js';
 
 async function loadManifest(): Promise<ViteManifest> {
   const manifestPath = path.resolve(
@@ -80,10 +82,17 @@ async function main() {
     'examples/vite-strict-csp-react/dist/server/entry-server.js',
   );
   const serverMod = (await import(pathToFileURL(serverEntryPath).href)) as {
-    createViteStrictCspReactExampleApp: (manifest: ViteManifest) => FaceApp;
+    createViteStrictCspReactExampleApp: (
+      manifest: ViteManifest,
+      options?: { htmlStore?: HtmlStore },
+    ) => FaceApp;
   };
 
-  const app = serverMod.createViteStrictCspReactExampleApp(manifest);
+  const exampleStores = createExampleIsrStores();
+  const app = serverMod.createViteStrictCspReactExampleApp(
+    manifest,
+    exampleStores ? { htmlStore: exampleStores.htmlStore } : {},
+  );
 
   const server = http.createServer(async (req, res) => {
     if (!req.url) {

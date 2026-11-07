@@ -587,7 +587,7 @@
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "S3Key": "dd3d856a45f8ea970be97c84673b2a56cc42d6b07fdbd7ad97d19598d50e6d82.zip"
+          "S3Key": "27ce0089576c1a035ea4faccc2136a760cf4f120a7315c165b86024f8f7301d5.zip"
         },
         "Environment": {
           "Variables": {
@@ -979,7 +979,7 @@
         },
         "DestinationBucketKeyPrefix": "",
         "WaitForDistributionInvalidation": true,
-        "Prune": true,
+        "Prune": false,
         "SystemMetadata": {
           "cache-control": "public,max-age=0,must-revalidate"
         },

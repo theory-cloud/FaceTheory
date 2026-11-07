@@ -551,5 +551,174 @@ if (cd "${no_base_dir}" && bash "${no_base_script}" base HEAD release >"${no_bas
 fi
 assert_contains "$(cat "${no_base_out}")" 'release-readiness: FAIL' "lockfile case unrelated history"
 
+# A prerelease promotion into an in-flight release is a follow-up, not the
+# release itself: the RC pull request already open against `premain` carries the
+# user-facing commits, and the promotion adds the test, CI, or gate repair that
+# RC needs. In that context only, a range with no feat:/fix:/perf: subject of its
+# own clears the gate when the newest stable release tag reachable from the base
+# still has user-facing commits between it and the base. Every other context and
+# every base without such a tag keeps the strict failure.
+
+seed_release_tag_repo() {
+  local work_dir="$1"
+  local tag_name="$2"
+
+  git init -b main "${work_dir}" >/dev/null
+  git -C "${work_dir}" config user.name "FaceTheory Test"
+  git -C "${work_dir}" config user.email "facetheory-test@example.com"
+  printf '%s\n' seed > "${work_dir}/README.md"
+  commit_file "${work_dir}" "chore: seed" README.md
+  if [[ -n "${tag_name}" ]]; then
+    git -C "${work_dir}" -c tag.gpgSign=false tag "${tag_name}"
+  fi
+}
+
+add_follow_up_commit() {
+  local work_dir="$1"
+
+  mkdir -p "${work_dir}/ts/test/unit"
+  printf '%s\n' 'export const followUp = true;' > "${work_dir}/ts/test/unit/follow-up.ts"
+  commit_file "${work_dir}" "test(ts): follow up the pending release" ts/test/unit/follow-up.ts
+}
+
+assert_not_contains() {
+  local haystack="$1"
+  local needle="$2"
+  local label="$3"
+
+  if [[ "${haystack}" == *"${needle}"* ]]; then
+    fail "${label} unexpectedly contains ${needle}; output was: ${haystack}"
+  fi
+}
+
+# A test-only promotion on top of a base that already carries user-facing
+# commits since the last stable tag passes, and the listing names both the tag
+# and every commit it counted.
+follow_up_dir="${tmpdir}/prerelease-follow-up"
+current_case="setup prerelease follow-up to a pending release"
+seed_release_tag_repo "${follow_up_dir}" v4.0.0
+commit_empty "${follow_up_dir}" "feat(ts): queue the pending release content"
+commit_empty "${follow_up_dir}" "fix(isr): queue the pending release repair"
+git -C "${follow_up_dir}" branch pending
+add_follow_up_commit "${follow_up_dir}"
+follow_up_script="$(copy_script "${follow_up_dir}")"
+current_case="prerelease follow-up to a pending release passes"
+follow_up_out="$(cd "${follow_up_dir}" && bash "${follow_up_script}" pending HEAD prerelease)"
+assert_contains "${follow_up_out}" \
+  'prerelease-readiness: OK (follow-up to the pending release since v4.0.0: 2 user-facing commits already on pending)' \
+  "prerelease follow-up"
+assert_contains "${follow_up_out}" 'feat(ts): queue the pending release content' "prerelease follow-up listing"
+assert_contains "${follow_up_out}" 'fix(isr): queue the pending release repair' "prerelease follow-up listing"
+
+# A range that carries its own release commit still takes the ordinary fast
+# path; the follow-up rule must not pre-empt it.
+self_signal_dir="${tmpdir}/prerelease-self-signal"
+current_case="setup prerelease range with its own release commit"
+seed_release_tag_repo "${self_signal_dir}" v4.0.0
+commit_empty "${self_signal_dir}" "feat(ts): queue the pending release content"
+git -C "${self_signal_dir}" branch pending
+add_follow_up_commit "${self_signal_dir}"
+commit_empty "${self_signal_dir}" "feat(release): carry the promotion change itself"
+self_signal_script="$(copy_script "${self_signal_dir}")"
+current_case="prerelease range with its own release commit keeps the plain OK"
+self_signal_out="$(cd "${self_signal_dir}" && bash "${self_signal_script}" pending HEAD prerelease)"
+assert_contains "${self_signal_out}" 'prerelease-readiness: OK' "prerelease self signal"
+assert_not_contains "${self_signal_out}" 'follow-up to the pending release' "prerelease self signal"
+
+# A base exactly at the stable tag has nothing pending: the follow-up rule
+# cannot apply, and the failure text stays byte-identical to today's.
+at_tag_dir="${tmpdir}/prerelease-at-tag"
+current_case="setup prerelease base at the stable tag"
+seed_release_tag_repo "${at_tag_dir}" v4.0.0
+git -C "${at_tag_dir}" branch stable
+add_follow_up_commit "${at_tag_dir}"
+at_tag_script="$(copy_script "${at_tag_dir}")"
+at_tag_out="${tmpdir}/readiness-prerelease-at-tag.out"
+current_case="prerelease base at the stable tag fails"
+if (cd "${at_tag_dir}" && bash "${at_tag_script}" stable HEAD prerelease >"${at_tag_out}" 2>&1); then
+  fail "a prerelease range with nothing pending since the stable tag unexpectedly passed"
+fi
+assert_contains "$(cat "${at_tag_out}")" 'prerelease-readiness: FAIL' "prerelease base at stable tag"
+assert_contains "$(cat "${at_tag_out}")" \
+  'No user-facing conventional commits (feat:/fix:/perf:) found in stable..HEAD.' \
+  "prerelease base at stable tag"
+assert_contains "$(cat "${at_tag_out}")" \
+  'release-please will skip, so no new release PR will be cut.' \
+  "prerelease base at stable tag"
+
+# A base that advanced past the tag with bookkeeping commits only is likewise
+# not a pending release.
+quiet_dir="${tmpdir}/prerelease-quiet-base"
+current_case="setup prerelease base with no user-facing commit since the tag"
+seed_release_tag_repo "${quiet_dir}" v4.0.0
+commit_empty "${quiet_dir}" "chore(deps): absorb a Dependabot bump"
+git -C "${quiet_dir}" branch pending
+add_follow_up_commit "${quiet_dir}"
+quiet_script="$(copy_script "${quiet_dir}")"
+quiet_out="${tmpdir}/readiness-prerelease-quiet-base.out"
+current_case="prerelease base with no user-facing commit since the tag fails"
+if (cd "${quiet_dir}" && bash "${quiet_script}" pending HEAD prerelease >"${quiet_out}" 2>&1); then
+  fail "a prerelease range over a bookkeeping-only base unexpectedly passed"
+fi
+assert_contains "$(cat "${quiet_out}")" 'prerelease-readiness: FAIL' "prerelease quiet base"
+
+# Prerelease tags do not count as stable releases, and a repository with no tag
+# at all has no pending release to follow up.
+rc_tag_dir="${tmpdir}/prerelease-rc-tag-only"
+current_case="setup prerelease with only an rc tag"
+seed_release_tag_repo "${rc_tag_dir}" v4.1.0-rc
+commit_empty "${rc_tag_dir}" "feat(ts): queue the pending release content"
+git -C "${rc_tag_dir}" branch pending
+add_follow_up_commit "${rc_tag_dir}"
+rc_tag_script="$(copy_script "${rc_tag_dir}")"
+rc_tag_out="${tmpdir}/readiness-prerelease-rc-tag.out"
+current_case="prerelease with only an rc tag fails"
+if (cd "${rc_tag_dir}" && bash "${rc_tag_script}" pending HEAD prerelease >"${rc_tag_out}" 2>&1); then
+  fail "a prerelease range with only an rc tag unexpectedly passed"
+fi
+assert_contains "$(cat "${rc_tag_out}")" 'prerelease-readiness: FAIL' "prerelease rc tag only"
+
+untagged_dir="${tmpdir}/prerelease-untagged"
+current_case="setup prerelease with no tag"
+seed_release_tag_repo "${untagged_dir}" ""
+commit_empty "${untagged_dir}" "feat(ts): queue the pending release content"
+git -C "${untagged_dir}" branch pending
+add_follow_up_commit "${untagged_dir}"
+untagged_script="$(copy_script "${untagged_dir}")"
+untagged_out="${tmpdir}/readiness-prerelease-untagged.out"
+current_case="prerelease with no tag fails"
+if (cd "${untagged_dir}" && bash "${untagged_script}" pending HEAD prerelease >"${untagged_out}" 2>&1); then
+  fail "a prerelease range with no tag unexpectedly passed"
+fi
+assert_contains "$(cat "${untagged_out}")" 'prerelease-readiness: FAIL' "prerelease untagged"
+
+# The same test-only range over the same pending base still fails the release
+# and staging contexts: the follow-up rule is prerelease-only.
+release_context_out="${tmpdir}/readiness-followup-release.out"
+current_case="release context ignores the prerelease follow-up rule"
+if (cd "${follow_up_dir}" && bash "${follow_up_script}" pending HEAD release >"${release_context_out}" 2>&1); then
+  fail "a test-only range passed the release context through the prerelease follow-up rule"
+fi
+assert_contains "$(cat "${release_context_out}")" 'release-readiness: FAIL' "release context follow-up"
+assert_contains "$(cat "${release_context_out}")" \
+  'No user-facing conventional commits (feat:/fix:/perf:) found in pending..HEAD.' \
+  "release context follow-up"
+
+staging_context_out="${tmpdir}/readiness-followup-staging.out"
+current_case="staging context ignores the prerelease follow-up rule"
+if (cd "${follow_up_dir}" && bash "${follow_up_script}" pending HEAD staging >"${staging_context_out}" 2>&1); then
+  fail "a test-only range passed the staging context through the prerelease follow-up rule"
+fi
+assert_contains "$(cat "${staging_context_out}")" 'staging-readiness: FAIL' "staging context follow-up"
+
+# An empty range carries nothing to promote, so a pending base must not turn it
+# into a pass; the follow-up rule needs at least one commit of its own.
+empty_range_out="${tmpdir}/readiness-followup-empty-range.out"
+current_case="prerelease empty range is not a follow-up"
+if (cd "${follow_up_dir}" && bash "${follow_up_script}" pending pending prerelease >"${empty_range_out}" 2>&1); then
+  fail "an empty prerelease range passed through the prerelease follow-up rule"
+fi
+assert_contains "$(cat "${empty_range_out}")" 'prerelease-readiness: FAIL' "prerelease empty range"
+
 trap - ERR
 echo "test-verify-release-readiness: PASS"
