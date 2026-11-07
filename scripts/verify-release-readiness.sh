@@ -321,6 +321,40 @@ if [[ "${#changed_files[@]}" -gt 0 ]]; then
   fi
 fi
 
+# A staging -> premain promotion is not always the release itself. When an RC
+# pull request is already open against premain, the promotion carries the test,
+# CI, or gate repair that RC needs, and the user-facing content sits on premain
+# behind the range. The gate's question is then whether the release being
+# prepared has that content, so the prerelease context accepts a range with no
+# release commit of its own when the newest stable release tag reachable from
+# the base still has a release commit between it and the base. The range must
+# carry commits of its own: an empty range is not a promotion. The release and
+# staging contexts keep requiring the range to carry the release commit, and a
+# base with no stable tag or no user-facing commit since the tag fails exactly
+# as before.
+if [[ "${context_label}" == "prerelease" && "${#commit_subjects[@]}" -gt 0 ]]; then
+  pending_release_tag=""
+  if pending_release_tag="$(
+    git describe --tags --abbrev=0 \
+      --match 'v[0-9]*.[0-9]*.[0-9]*' \
+      --exclude '*-*' \
+      "${base_ref}" 2>/dev/null
+  )"; then
+    mapfile -t pending_subjects < <(git log --format=%s "${pending_release_tag}..${base_ref}")
+    pending_release_subjects=()
+    for subject in "${pending_subjects[@]}"; do
+      if [[ "${subject}" =~ ${release_commit_subject_regex} ]]; then
+        pending_release_subjects+=("${subject}")
+      fi
+    done
+    if [[ "${#pending_release_subjects[@]}" -gt 0 ]]; then
+      echo "${context_label}-readiness: OK (follow-up to the pending release since ${pending_release_tag}: ${#pending_release_subjects[@]} user-facing commits already on ${base_ref})"
+      printf '%s\n' "${pending_release_subjects[@]}"
+      exit 0
+    fi
+  fi
+fi
+
 echo "${context_label}-readiness: FAIL"
 echo "No user-facing conventional commits (feat:/fix:/perf:) found in ${range}."
 echo "release-please will skip, so no new release PR will be cut."
