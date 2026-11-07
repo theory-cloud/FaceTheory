@@ -1,7 +1,11 @@
-// Example: blocking ISR with in-memory stores.
+// Example: blocking ISR.
 //
-// Replace the in-memory stores with `S3HtmlStore` + a TableTheory-backed `IsrMetaStore`
-// (for DynamoDB use TableTheory `FaceTheoryIsrMetaStore`) in production.
+// The example defaults to the in-memory stores its unit tests use. When the
+// stack environment is present (`FACETHEORY_ISR_BUCKET`,
+// `FACETHEORY_ISR_PREFIX`, `FACETHEORY_CACHE_TABLE_NAME` or
+// `APPTHEORY_CACHE_TABLE_NAME`), `../local-storage` selects `S3HtmlStore` and
+// the TableTheory-backed ISR metadata/lease store instead. The local harness
+// points those names at its emulators; a deployed stack sets the same names.
 //
 // This example is intentionally tenant-invariant: it does not read tenant headers,
 // auth headers, or cookies while rendering cached HTML. Tenant-varying ISR must
@@ -18,8 +22,11 @@ import {
   type LambdaUrlResult,
 } from '@theory-cloud/facetheory';
 
-const htmlStore = new InMemoryHtmlStore();
-const metaStore = new InMemoryIsrMetaStore();
+import { createExampleIsrStores } from '../local-storage.js';
+
+const exampleStores = createExampleIsrStores();
+const htmlStore = exampleStores?.htmlStore ?? new InMemoryHtmlStore();
+const metaStore = exampleStores?.metaStore ?? new InMemoryIsrMetaStore();
 
 let revision = 0;
 
@@ -44,6 +51,9 @@ export const faceApp = createFaceApp({
   isr: {
     htmlStore,
     metaStore,
+    ...(exampleStores
+      ? { htmlPointerPrefix: exampleStores.htmlPointerPrefix }
+      : {}),
   },
 });
 

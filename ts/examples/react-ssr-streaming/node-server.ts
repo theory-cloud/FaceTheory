@@ -40,6 +40,9 @@ async function main() {
 
     for await (const chunk of response.body) {
       res.write(chunk);
+      // Give the socket a turn so Node emits each framework chunk as its own
+      // HTTP chunk instead of coalescing synchronous writes.
+      await new Promise<void>((resolve) => setImmediate(resolve));
     }
     res.end();
   });

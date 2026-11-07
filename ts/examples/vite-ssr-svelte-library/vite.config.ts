@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { svelte } from '@sveltejs/vite-plugin-svelte';
+import svelte from 'rollup-plugin-svelte';
 import { defineConfig } from 'vite';
 
 export default defineConfig(({ isSsrBuild }) => {
@@ -14,7 +14,12 @@ export default defineConfig(({ isSsrBuild }) => {
   return {
     root,
     appType: 'custom',
-    plugins: [svelte()],
+    plugins: [
+      svelte({
+        emitCss: true,
+        compilerOptions: { generate: ssr ? 'server' : 'client' },
+      }),
+    ],
     resolve: {
       alias: {
         '@theory-cloud/facetheory-svelte-library-example': path.resolve(

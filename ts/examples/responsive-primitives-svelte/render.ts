@@ -10,6 +10,11 @@ import { createFaceApp } from '@theory-cloud/facetheory';
 import { createSvelteFace } from '@theory-cloud/facetheory/svelte';
 import { RESPONSIVE_PRIMITIVES_CSS } from '@theory-cloud/facetheory/responsive-primitives';
 
+export interface RenderedPrimitivePage {
+  name: string;
+  html: string;
+}
+
 async function compileComponent(name: string): Promise<unknown> {
   const componentPath = path.resolve(
     'src/svelte/responsive-primitives',
@@ -36,112 +41,157 @@ async function compileComponent(name: string): Promise<unknown> {
   return mod.default as unknown;
 }
 
-const [Spinner, Skeleton, LoadingState, AsyncStateBoundary, Button, Link] =
-  await Promise.all([
-    compileComponent('Spinner'),
-    compileComponent('Skeleton'),
-    compileComponent('LoadingState'),
-    compileComponent('AsyncStateBoundary'),
-    compileComponent('Button'),
-    compileComponent('Link'),
-  ]);
+async function decodeBody(body: unknown): Promise<string> {
+  if (body instanceof Uint8Array) return new TextDecoder().decode(body);
+  const decoder = new TextDecoder();
+  let html = '';
+  for await (const chunk of body as AsyncIterable<Uint8Array>) {
+    html += decoder.decode(chunk, { stream: true });
+  }
+  return html + decoder.decode();
+}
 
-try {
-  const app = createFaceApp({
-    faces: [
-      createSvelteFace({
-        route: '/',
-        mode: 'ssr',
-        render: () => ({
-          component: {
-            render: () => ({
-              html: '',
-            }),
+export async function renderResponsivePrimitivesSveltePages(): Promise<RenderedPrimitivePage[]> {
+  const [Spinner, Skeleton, LoadingState, AsyncStateBoundary, Button, Link] =
+    await Promise.all([
+      compileComponent('Spinner'),
+      compileComponent('Skeleton'),
+      compileComponent('LoadingState'),
+      compileComponent('AsyncStateBoundary'),
+      compileComponent('Button'),
+      compileComponent('Link'),
+    ]);
+
+  try {
+    const shellApp = createFaceApp({
+      faces: [
+        createSvelteFace({
+          route: '/',
+          mode: 'ssr',
+          render: () => ({
+            component: {
+              render: () => ({
+                html: '',
+              }),
+            },
+          }),
+          renderOptions: {
+            styleTags: [{ cssText: RESPONSIVE_PRIMITIVES_CSS }],
           },
         }),
-        renderOptions: {
-          styleTags: [{ cssText: RESPONSIVE_PRIMITIVES_CSS }],
-        },
-      }),
-    ],
-  });
+      ],
+    });
 
-  const rendered = await Promise.all([
-    createFaceApp({
-      faces: [
-        createSvelteFace({
-          route: '/',
-          mode: 'ssr',
-          render: () => ({
-            component: Spinner,
-            props: { label: 'Loading control plane data', size: 'sm' },
-          }),
+    const pages = [
+      {
+        name: 'spinner',
+        app: createFaceApp({
+          faces: [
+            createSvelteFace({
+              route: '/',
+              mode: 'ssr',
+              render: () => ({
+                component: Spinner,
+                props: { label: 'Loading control plane data', size: 'sm' },
+              }),
+            }),
+          ],
         }),
-      ],
-    }).handle({ method: 'GET', path: '/' }),
-    createFaceApp({
-      faces: [
-        createSvelteFace({
-          route: '/',
-          mode: 'ssr',
-          render: () => ({
-            component: Skeleton,
-            props: { width: 'two-thirds', height: 'lg' },
-          }),
+      },
+      {
+        name: 'skeleton',
+        app: createFaceApp({
+          faces: [
+            createSvelteFace({
+              route: '/',
+              mode: 'ssr',
+              render: () => ({
+                component: Skeleton,
+                props: { width: 'two-thirds', height: 'lg' },
+              }),
+            }),
+          ],
         }),
-      ],
-    }).handle({ method: 'GET', path: '/' }),
-    createFaceApp({
-      faces: [
-        createSvelteFace({
-          route: '/',
-          mode: 'ssr',
-          render: () => ({
-            component: LoadingState,
-            props: { message: 'Loading tenants' },
-          }),
+      },
+      {
+        name: 'loading',
+        app: createFaceApp({
+          faces: [
+            createSvelteFace({
+              route: '/',
+              mode: 'ssr',
+              render: () => ({
+                component: LoadingState,
+                props: { message: 'Loading tenants' },
+              }),
+            }),
+          ],
         }),
-      ],
-    }).handle({ method: 'GET', path: '/' }),
-    createFaceApp({
-      faces: [
-        createSvelteFace({
-          route: '/',
-          mode: 'ssr',
-          render: () => ({
-            component: AsyncStateBoundary,
-            props: { state: 'loading', loadingMessage: 'Loading tenants' },
-          }),
+      },
+      {
+        name: 'async',
+        app: createFaceApp({
+          faces: [
+            createSvelteFace({
+              route: '/',
+              mode: 'ssr',
+              render: () => ({
+                component: AsyncStateBoundary,
+                props: { state: 'loading', loadingMessage: 'Loading tenants' },
+              }),
+            }),
+          ],
         }),
-      ],
-    }).handle({ method: 'GET', path: '/' }),
-    createFaceApp({
-      faces: [
-        createSvelteFace({
-          route: '/',
-          mode: 'ssr',
-          render: () => ({
-            component: Button,
-            props: { loading: true, loadingPlacement: 'replace-prefix' },
-          }),
+      },
+      {
+        name: 'button',
+        app: createFaceApp({
+          faces: [
+            createSvelteFace({
+              route: '/',
+              mode: 'ssr',
+              render: () => ({
+                component: Button,
+                props: { loading: true, loadingPlacement: 'replace-prefix' },
+              }),
+            }),
+          ],
         }),
-      ],
-    }).handle({ method: 'GET', path: '/' }),
-    createFaceApp({
-      faces: [
-        createSvelteFace({
-          route: '/',
-          mode: 'ssr',
-          render: () => ({ component: Link, props: { href: '/tenants' } }),
+      },
+      {
+        name: 'link',
+        app: createFaceApp({
+          faces: [
+            createSvelteFace({
+              route: '/',
+              mode: 'ssr',
+              render: () => ({ component: Link, props: { href: '/tenants' } }),
+            }),
+          ],
         }),
-      ],
-    }).handle({ method: 'GET', path: '/' }),
-    app.handle({ method: 'GET', path: '/' }),
-  ]);
+      },
+      { name: 'shell', app: shellApp },
+    ];
 
-  const html = rendered
-    .map((response) => new TextDecoder().decode(response.body as Uint8Array))
-    .join('\n');
+    const rendered = await Promise.all(
+      pages.map(async (page) => ({
+        name: page.name,
+        html: await decodeBody((await page.app.handle({ method: 'GET', path: '/' })).body),
+      })),
+    );
+
+    return rendered;
+  } finally {
+    await rm(path.resolve('examples/responsive-primitives-svelte/.tmp'), {
+      recursive: true,
+      force: true,
+    });
+  }
+}
+
+async function runCli(): Promise<void> {
+  const pages = await renderResponsivePrimitivesSveltePages();
+  const html = pages.map((page) => page.html).join('\n');
 
   assert.match(html, /facetheory-rcp-spinner/);
   assert.match(html, /facetheory-rcp-skeleton--width-two-thirds/);
@@ -152,9 +202,8 @@ try {
 
   console.log('responsive primitives Svelte example rendered');
   console.log(`bytes=${html.length}`);
-} finally {
-  await rm(path.resolve('examples/responsive-primitives-svelte/.tmp'), {
-    recursive: true,
-    force: true,
-  });
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await runCli();
 }

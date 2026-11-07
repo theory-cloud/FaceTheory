@@ -1,4 +1,4 @@
-.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test ts-coverage ts-examples-readmes infra-snapshot-test docs-export-map verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin verify-ci-rubric-enforced verify-ci-install-hardening verify-ci-trigger-parity verify-deterministic-builds build-release-assets ensure-release-branches test-ensure-release-branches test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation test-verify-ci-install-hardening test-verify-ci-trigger-parity stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl verify-theorycloud-publish-install test-verify-theorycloud-publish-install verify-release-python-isolation test-verify-release-python-isolation test-verify-pages-deploy-tag verify-pages-workflow-order test-verify-pages-workflow-order verify-release-publish-binding test-verify-release-publish-binding test-pack-dev-archive test-build-release-assets test-verify-theorycloud-facetheory-subtree test-theorycloud-subtree-destination rubric
+.PHONY: ts-build ts-typecheck ts-lint ts-format ts-format-check ts-test ts-coverage ts-examples-readmes examples-local examples-local-down examples-local-selftest examples-local-infra-deps infra-snapshot-test docs-export-map verify-control-plane-guardrails verify-version-alignment verify-ts-pack verify-npm-audit verify-go-version-pin verify-ci-rubric-enforced verify-ci-install-hardening verify-ci-trigger-parity verify-deterministic-builds build-release-assets ensure-release-branches test-ensure-release-branches test-verify-release-draft-target test-check-release-baseline-ready test-resolve-release-source-ref test-publish-draft-release-assets test-verify-release-readiness test-release-workflow-changelog-preservation test-verify-ci-install-hardening test-verify-ci-trigger-parity stage-theorycloud-facetheory-subtree verify-theorycloud-facetheory-subtree sync-theorycloud-facetheory-subtree trigger-theorycloud-publish test-theorycloud-targets test-trigger-theorycloud-publish-awscurl verify-theorycloud-publish-install test-verify-theorycloud-publish-install verify-release-python-isolation test-verify-release-python-isolation test-verify-pages-deploy-tag verify-pages-workflow-order test-verify-pages-workflow-order verify-release-publish-binding test-verify-release-publish-binding test-pack-dev-archive test-build-release-assets test-verify-theorycloud-facetheory-subtree test-theorycloud-subtree-destination rubric
 
 ts-build:
 	cd ts && npm run build
@@ -23,6 +23,23 @@ ts-coverage:
 
 ts-examples-readmes:
 	cd ts && npm run verify:examples:readmes
+
+examples-local: ts-build examples-local-infra-deps
+	node scripts/local/run-examples-local.mjs $(if $(strip $(ONLY)),--only '$(ONLY)')
+
+examples-local-infra-deps:
+	@for dir in infra/apptheory-ssr-site infra/apptheory-ssg-isr-site; do \
+		if [ ! -d "$$dir/node_modules" ]; then \
+			echo "installing $$dir dependencies"; \
+			(cd "$$dir" && npm ci --ignore-scripts) || exit 1; \
+		fi; \
+	done
+
+examples-local-down:
+	node scripts/local/run-examples-local.mjs --down
+
+examples-local-selftest:
+	node --test scripts/local/test-examples-local.mjs
 
 infra-snapshot-test: ts-build
 	cd infra/apptheory-ssr-site && npm ci --ignore-scripts && npm test

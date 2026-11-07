@@ -195,6 +195,12 @@ groups:
           url: /development-guidelines/,
           icon: check-square,
         }
+      - {
+          id: local-harness,
+          title: Local Examples Harness,
+          url: /examples/local-harness/,
+          icon: check-square,
+        }
       - { id: operations, title: Operations, url: /operations/, icon: clock }
 
   - label: Reference
@@ -247,6 +253,7 @@ order:
   - migration-guide
   - deprecation-policy
   - development-guidelines
+  - local-harness
   - operations
   - ref-face-module
   - ref-render-modes
@@ -287,6 +294,7 @@ url_to_id:
   /migration-guide/: migration-guide
   /deprecation-policy/: deprecation-policy
   /development-guidelines/: development-guidelines
+  /examples/local-harness/: local-harness
   /operations/: operations
   /reference/face-module/: ref-face-module
   /reference/render-modes/: ref-render-modes

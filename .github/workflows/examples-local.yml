@@ -1,0 +1,40 @@
+name: Examples local
+
+on:
+  pull_request:
+    branches:
+      - staging
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  examples-local:
+    name: Local examples harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Install the pinned local runner
+        run: node scripts/local/run-examples-local.mjs --install-runner
+      - name: Run harness self-tests
+        run: make examples-local-selftest
+      - name: Install dependencies
+        run: cd ts && npm ci --ignore-scripts
+      - name: Run local examples harness
+        run: make examples-local
+      - name: Stop harness processes
+        if: always()
+        run: make examples-local-down

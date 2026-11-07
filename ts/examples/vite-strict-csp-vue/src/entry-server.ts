@@ -4,6 +4,7 @@ import {
   InMemoryHtmlStore,
   viteAssetsForEntry,
   viteHydrationForEntry,
+  type HtmlStore,
   type ViteManifest,
 } from '@theory-cloud/facetheory';
 import { createVueFace, h } from '@theory-cloud/facetheory/vue';
@@ -44,10 +45,22 @@ export function strictCspVueDataForPath(
   };
 }
 
-export function createViteStrictCspVueExampleApp(manifest: ViteManifest) {
+export interface StrictCspVueExampleOptions {
+  /**
+   * Sidecar object store. The example defaults to the in-memory store its unit
+   * tests use; `../local-storage` selects `S3HtmlStore` when the stack
+   * environment is configured.
+   */
+  htmlStore?: HtmlStore;
+}
+
+export function createViteStrictCspVueExampleApp(
+  manifest: ViteManifest,
+  options: StrictCspVueExampleOptions = {},
+) {
   return createFaceApp({
     ssrHydrationSidecars: {
-      htmlStore: new InMemoryHtmlStore(),
+      htmlStore: options.htmlStore ?? new InMemoryHtmlStore(),
       signingSecret:
         'vite-strict-csp-vue-example-local-ssr-sidecar-signing-secret',
     },

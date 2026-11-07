@@ -8,7 +8,7 @@ FaceTheory uses TableTheory for blocking ISR's cache metadata, regeneration leas
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v6.1.1/theory-cloud-tabletheory-ts-6.1.1.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v6.3.0/theory-cloud-tabletheory-ts-6.3.0.tgz
 ```
 
 ## The TableTheory entry point
@@ -33,15 +33,23 @@ The TableTheory-modeled ISR cache record lives on the TableTheory documentation 
 ## Wiring in production
 
 ```typescript
-import { createFaceApp } from '@theory-cloud/facetheory';
+import { createFaceApp, S3HtmlStore } from '@theory-cloud/facetheory';
+// createTableTheoryIsrMetaStore is exported by the tabletheory entry point.
 import { /* createTableTheoryIsrMetaStore */ } from '@theory-cloud/facetheory/tabletheory';
-// import the S3HtmlStore from the AWS S3 entry point for HTML payload storage:
-import { /* S3HtmlStore */ } from '@theory-cloud/facetheory/aws-s3';
+// The AWS SDK v3 client adapter lives in the aws-s3 entry point; S3HtmlStore
+// itself is a core export and takes that client plus the bucket.
+import { createAwsSdkS3HtmlStoreClient } from '@theory-cloud/facetheory/aws-s3';
+
+const htmlStore = new S3HtmlStore({
+  client: createAwsSdkS3HtmlStoreClient({ s3 }),
+  bucket: /* FACETHEORY_ISR_BUCKET */,
+  keyPrefix: /* FACETHEORY_ISR_PREFIX */,
+});
 
 export const app = createFaceApp({
   faces,
   isr: {
-    htmlStore: /* S3HtmlStore instance */,
+    htmlStore,
     metaStore: /* TableTheory-backed IsrMetaStore */,
   },
 });

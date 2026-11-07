@@ -23,7 +23,7 @@ Optional:
 Use the CLI from the pinned GitHub Release tarball to create an adapter-specific starter before hand-writing any hydration code:
 
 ```bash
-export FACETHEORY_VERSION=5.0.3-rc # x-release-please-version
+export FACETHEORY_VERSION=5.0.3 # x-release-please-version
 npx --package \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz" \
   facetheory create my-app --adapter react
@@ -55,7 +55,7 @@ Use the exact GitHub release asset so your application stays pinned to the publi
 ### Step 1: Install FaceTheory
 
 ```bash
-export FACETHEORY_VERSION=5.0.3-rc # x-release-please-version
+export FACETHEORY_VERSION=5.0.3 # x-release-please-version
 npm install --save-exact \
   "https://github.com/theory-cloud/FaceTheory/releases/download/v${FACETHEORY_VERSION}/theory-cloud-facetheory-${FACETHEORY_VERSION}.tgz"
 ```
@@ -81,10 +81,10 @@ These are only required if your application uses the corresponding integration s
 
 ```bash
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v6.4.0/theory-cloud-apptheory-6.4.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v7.0.0/theory-cloud-apptheory-7.0.0.tgz
 
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v6.1.1/theory-cloud-tabletheory-ts-6.1.1.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v6.3.0/theory-cloud-tabletheory-ts-6.3.0.tgz
 ```
 
 Use AppTheory when you want its Lambda Function URL runtime as the AWS entrypoint. Use TableTheory when you want the documented production ISR metadata store adapter.
@@ -638,7 +638,7 @@ Important ISR default:
 
 ## Reference Bundle
 
-The `v5.0.3-rc` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
+The `v5.0.3` GitHub release includes the matching `facetheory-reference-${FACETHEORY_VERSION}.tar.gz` bundle. It contains: <!-- x-release-please-version -->
 
 - `docs/` canonical consumer and operator docs
 - `ts/examples/` runnable React, Vue, Svelte, and SSG examples
@@ -663,6 +663,19 @@ Equivalent root-level wrappers after install:
 make ts-typecheck
 make ts-test
 ```
+
+The local examples harness needs no AWS credentials and no AppTheory checkout.
+It installs the released runner pinned in `scripts/local/examples-local.json`;
+the same install can be run on its own:
+
+```bash
+GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin" \
+  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0
+make examples-local
+```
+
+See [the local examples harness](./examples/local-harness.md) for the row
+classes, ports and cleanup.
 
 ## Next Steps
 
