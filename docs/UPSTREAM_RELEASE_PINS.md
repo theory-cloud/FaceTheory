@@ -74,6 +74,18 @@ origin/staging prerelease` must fail rather than silently letting Release Please
 manual tags, manual GitHub Releases, or `Release-As` footers; land a small, truthful compatibility change on `staging`
 and keep the single release lane intact.
 
+The one exception is a follow-up promotion into a release that is already pending. When the promotion range itself
+carries no `feat:`, `fix:`, or `perf:` commit — typically a test, CI, or gate repair that the open RC pull request
+needs — the verifier asks whether the release being prepared has user-facing content, not whether this range does. It
+resolves the newest stable release tag reachable from `origin/premain` (`vX.Y.Z`; prerelease tags such as `vX.Y.Z-rc`
+are excluded) and inspects `<tag>..origin/premain`. If that range holds at least one release-please-eligible commit,
+the promotion passes with `prerelease-readiness: OK (follow-up to the pending release since <tag>: <n> user-facing
+commits already on origin/premain)` and lists the commits it counted; the RC pull request already open is what ships.
+Anything else keeps the strict failure and its message unchanged: no reachable stable tag, no user-facing commit
+between the tag and `origin/premain`, or an empty range. The rule is `prerelease`-only: the `release`
+(`origin/main..HEAD`) and `staging` (`origin/staging..HEAD`) contexts still require the range itself to carry the
+release commit, and the release-sync fast path is unaffected.
+
 ## Release Asset SHA-256
 
 Each hash below is the SHA-256 of the downloaded GitHub Release asset, cross-checked against the release's published
