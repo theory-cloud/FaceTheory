@@ -1,5 +1,49 @@
 # Changelog
 
+## [5.1.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.0.3...v5.1.0-rc) (2026-11-07)
+
+
+### Features
+
+* **examples:** add the local example execution harness ([e10bf6f](https://github.com/theory-cloud/FaceTheory/commit/e10bf6fd5f4898d4cad5bac687684ffbb596f318))
+* **examples:** add the local examples harness ([53846f8](https://github.com/theory-cloud/FaceTheory/commit/53846f8aca67f22f905fa4c77ea19053ae7913a0))
+* **examples:** inject real ISR storage from the stack environment ([af67151](https://github.com/theory-cloud/FaceTheory/commit/af671519dcd2cf444a1767f452f5931bde467bf6))
+* **examples:** prove incremental streaming and CloudFront caching (AD3) ([e3d8a85](https://github.com/theory-cloud/FaceTheory/commit/e3d8a852bd59f286921b97c71cc30384a250c4ad))
+* **examples:** run the FT2 rows through the local Lambda runner and gateway ([435f1d5](https://github.com/theory-cloud/FaceTheory/commit/435f1d5940ae3849a6e4a8f8b3426db0b3a686a8))
+* **examples:** run the ISR and SSR sidecar examples on local storage ([4cce010](https://github.com/theory-cloud/FaceTheory/commit/4cce0104238cc3dae97cebf0813ff0e5930918f2))
+* **examples:** run the SSR example through the local CloudFront gateway ([efa5828](https://github.com/theory-cloud/FaceTheory/commit/efa58280693e61d6c5e18aa73bcb90c945854724))
+* **examples:** run the streaming handlers in the local Lambda runtime ([c61f112](https://github.com/theory-cloud/FaceTheory/commit/c61f1126382caf64cc96164af48a34e67350bde0))
+* **examples:** wire the AppTheory local runner into the harness ([159a6af](https://github.com/theory-cloud/FaceTheory/commit/159a6af3b00639055d8ce48487886836d30730bd))
+* **harness:** provision local ISR storage from the TableTheory model ([6e4b6b4](https://github.com/theory-cloud/FaceTheory/commit/6e4b6b4d848146385666922a14ffefe07866cd32))
+* **harness:** run the ISR and sidecar rows on local storage ([4834338](https://github.com/theory-cloud/FaceTheory/commit/4834338fa9940ad464f706c006f830cea2d84694))
+* **harness:** run the SSG-ISR site through the local gateway ([b950c26](https://github.com/theory-cloud/FaceTheory/commit/b950c2696dbd3aa8f2181b0b8122e89c121d6582))
+
+
+### Bug Fixes
+
+* **deps:** adopt AppTheory v7.0.0 / TableTheory v6.3.0 and the AD3 runner, streaming and caching ([58beb6a](https://github.com/theory-cloud/FaceTheory/commit/58beb6a42489d1606d7bdf4d4cb6ab98e45a543b))
+* **deps:** adopt parse5 8.1.0 and globals 17.14.0 ([c209f12](https://github.com/theory-cloud/FaceTheory/commit/c209f1267679beede0a74808e005672157c603ac))
+* **deps:** adopt the AppTheory v7.0.0 and TableTheory v6.3.0 releases ([9f24ed4](https://github.com/theory-cloud/FaceTheory/commit/9f24ed43925e0414146982d16cecf97269827205))
+* **deps:** align aws-cdk-lib 2.275.0 and refresh ts/infra lockfiles ([a319820](https://github.com/theory-cloud/FaceTheory/commit/a3198204870d9588d439ab573fc00f76341a65f5))
+* **deps:** clear GHSA-g3hv-75wg-m249 and GHSA-3g3m-2fjr-6pw4 from the audit gate ([3558efa](https://github.com/theory-cloud/FaceTheory/commit/3558efa254295889bd14cd219f68be380aa9bb09))
+* **deps:** force minimatch 11.0.1 and glob 14.0.3 ([7c7541d](https://github.com/theory-cloud/FaceTheory/commit/7c7541d659f89fe41d0cd56b4da79c9eacd7183b))
+* **deps:** migrate Svelte builds off vulnerable deepmerge ([ec10fa2](https://github.com/theory-cloud/FaceTheory/commit/ec10fa2b448e1ce4ef8883adc584ed0225370d36))
+* **deps:** migrate Svelte builds off vulnerable deepmerge ([a4d86e0](https://github.com/theory-cloud/FaceTheory/commit/a4d86e06e54f75fb81e65cfbf3ffd517453cee6a))
+* **deps:** refresh dependencies and align aws-cdk-lib 2.275.0 ([881e54a](https://github.com/theory-cloud/FaceTheory/commit/881e54ad51ceb35a3475fcc615e5b48628d56d3a))
+* **examples:** assert streaming boundaries from HTTP chunk framing ([322ded3](https://github.com/theory-cloud/FaceTheory/commit/322ded3f55d794189d2a8e6857dfebfd956fec79))
+* **examples:** create the harness self-test scratch directory ([d22f8b9](https://github.com/theory-cloud/FaceTheory/commit/d22f8b9d3708b3512bd19d47a07b46766872aa25))
+* **examples:** flush streaming writes between framework chunks ([2d9d543](https://github.com/theory-cloud/FaceTheory/commit/2d9d5435275219d735d693cc33c2d27a582040eb))
+* **examples:** forward ONLY to the harness --only flag ([d31771a](https://github.com/theory-cloud/FaceTheory/commit/d31771af5c9d831822948fef4ed16918e33e656c))
+* **examples:** resolve facetheory-dev for in-example npm run dev ([8a2e8bd](https://github.com/theory-cloud/FaceTheory/commit/8a2e8bdf40ab9f44a5faabb47c8321305f53c556))
+* **examples:** restore the strict SSR content-type assertion ([6d377d5](https://github.com/theory-cloud/FaceTheory/commit/6d377d562ebd6424a3623e3947d93361d3f5ee8d))
+* **gov-infra:** allow transitive-only audit entries of an allowed finding ([5413d8c](https://github.com/theory-cloud/FaceTheory/commit/5413d8c4b301ab051dc2cde02fbd90c3a443838f))
+* **gov-infra:** grant the AWS-bundled minimatch exception ([21ed069](https://github.com/theory-cloud/FaceTheory/commit/21ed0696288243e27ba504a0afa7a7a47557d667))
+* **infra:** stop the SSG-ISR manifest deployment from pruning shared objects ([f4dd554](https://github.com/theory-cloud/FaceTheory/commit/f4dd55485a40cde4b57015366d13552d3e4d8ebe))
+* **infra:** stop the SSR example's S3 deployments pruning each other ([45c8044](https://github.com/theory-cloud/FaceTheory/commit/45c804403478c8b65445059f1549e9d3007d0872))
+* **release:** pass a prerelease promotion that follows up a pending release ([1fef5ac](https://github.com/theory-cloud/FaceTheory/commit/1fef5ac590e0b4fffc331230f7ba0285bccef567))
+* **release:** pass a prerelease promotion that follows up a pending release ([4ea7be5](https://github.com/theory-cloud/FaceTheory/commit/4ea7be5df913a0b1012eaae0392c48ab0013c716))
+* **scripts:** make subtree cleanup test UID-independent ([ccd0963](https://github.com/theory-cloud/FaceTheory/commit/ccd09634e615844b722e6a9adaaa46a9c11e485b))
+
 ## [5.0.3-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.0.2...v5.0.3-rc) (2026-10-27)
 
 
