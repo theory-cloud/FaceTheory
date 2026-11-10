@@ -63,6 +63,11 @@ GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.1.0/bin" \
 
 The install command and the profile rules are AppTheory's
 [`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.1.0/docs/examples/local-runner.md#install-the-command).
+The runner reports both listeners: `8246` is the `AWS_IAM` Function URL, which
+refuses unsigned requests, and the CloudFront distribution is the next port
+(`8247`) — the order AppTheory's
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.1.0/docs/examples/local-runner.md#declared-ports)
+defines.
 
 `make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'` runs the same
 gateway and asserts the SSG HTML and assets from S3 with real CloudFront caching

@@ -305,10 +305,15 @@ apptheory-local run --app infra/apptheory-ssr-site \
 The runner synthesizes the stack with the app's `node_modules/.bin/cdk`, starts
 the SSR function in the Node image, provisions the stack's buckets and bucket
 deployments in s3proxy, and serves the synthesized CloudFront distribution on
-`http://127.0.0.1:8240`. The gateway selects the cache behavior, runs the exact
-generated viewer-request and viewer-response CloudFront Functions, applies the
-origin request and response headers policies, and invokes the `AWS_IAM`
-Function URL origin through the runner's signed local path.
+`http://127.0.0.1:8241`, the `serving cloudfront …` listener it reports.
+AppTheory's
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.1.0/docs/examples/local-runner.md#declared-ports)
+fixes that order — a run binds its public surfaces from `--port-base + index`,
+Function URLs before CloudFront distributions — so the `AWS_IAM` Function URL
+takes `8240` and CloudFront the next port. The gateway selects the cache
+behavior, runs the exact generated viewer-request and viewer-response CloudFront
+Functions, applies the origin request and response headers policies, and invokes
+the `AWS_IAM` Function URL origin through the runner's signed local path.
 
 Through the gateway the row asserts:
 
@@ -492,12 +497,18 @@ make ts-build
   --app infra/apptheory-ssr-site \
   --profile scripts/local/apptheory-local-profile.json --backend s3proxy \
   --port-base 8240
-curl -i http://127.0.0.1:8240/
-curl -i http://127.0.0.1:8240/assets/entry.css
-curl -i http://127.0.0.1:8240/_facetheory/data/index.json
+curl -i http://127.0.0.1:8240/                        # 403: the AWS_IAM Function URL refuses unsigned requests
+curl -i http://127.0.0.1:8241/                        # CloudFront, the next port after --port-base
+curl -i http://127.0.0.1:8241/assets/entry.css
+curl -i http://127.0.0.1:8241/_facetheory/data/index.json
 ```
 
-`Ctrl-C` stops the gateway and removes its containers and network.
+`Ctrl-C` stops the gateway and removes its containers and network. The runner
+prints both listeners: `8240` is the `AWS_IAM` Function URL, which refuses
+unsigned requests, and the CloudFront distribution is the next port (`8241`),
+the order AppTheory's
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.1.0/docs/examples/local-runner.md#declared-ports)
+defines.
 
 ### The SSG+ISR gateway
 
@@ -513,11 +524,12 @@ make ts-build
   --profile scripts/local/apptheory-local-profile.json \
   --backend dynamodb --backend s3proxy \
   --port-base 8246
-curl -i http://127.0.0.1:8246/
-curl -i http://127.0.0.1:8246/assets/entry.css
-curl -i http://127.0.0.1:8246/isr-demo
-curl -i http://127.0.0.1:8246/isr-demo
-curl -i http://127.0.0.1:8246/assets/missing.css
+curl -i http://127.0.0.1:8246/                        # 403: the AWS_IAM Function URL refuses unsigned requests
+curl -i http://127.0.0.1:8247/                        # CloudFront, the next port after --port-base
+curl -i http://127.0.0.1:8247/assets/entry.css
+curl -i http://127.0.0.1:8247/isr-demo
+curl -i http://127.0.0.1:8247/isr-demo
+curl -i http://127.0.0.1:8247/assets/missing.css
 ```
 
 `/` and `/ssg-demo` are the pre-rendered S3 objects; `/assets/entry.css` is the
@@ -526,7 +538,10 @@ the second is the cached hit with identical bytes; `/assets/missing.css` is the
 403 `AccessDenied` page. The gateway log names the provisioned cache table and
 buckets, and `make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'`
 asserts the stored object and item directly. `Ctrl-C` stops the gateway and
-removes its containers and network.
+removes its containers and network. `8246` is the `AWS_IAM` Function URL and
+CloudFront is the next port (`8247`), as above and per the
+[`Declared ports`](https://github.com/theory-cloud/AppTheory/blob/v7.1.0/docs/examples/local-runner.md#declared-ports)
+order.
 
 ### The Node-served examples
 

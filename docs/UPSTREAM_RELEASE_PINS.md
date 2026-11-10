@@ -58,9 +58,10 @@ byte-identical. Every change is additive:
 FaceTheory imports none of the changed names. `createApp`, `createLambdaFunctionURLStreamingHandler`, the four
 adapter types and the two test helpers are unchanged in `v7.1.0`.
 
-The CDK package's type surface is unchanged: every `.d.ts` file is byte-identical between `v7.0.0` and `v7.1.0`. All
-51 `lib/*.js` files differ only in the jsii `JSII_RTTI_SYMBOL` version string, and `.jsii` differs only in `version` and
-`fingerprint`. `@theory-cloud/apptheory-cdk` `v7.1.0` declares the same exact `aws-cdk-lib@2.275.0` peer (with
+The CDK package's type surface is unchanged: every `.d.ts` file is byte-identical between `v7.0.0` and `v7.1.0`. The
+published CDK tarball contains 57 `lib/*.js` files: the 46 that carry the jsii `JSII_RTTI_SYMBOL` differ only in that
+version string, and the other 11 are byte-identical; `.jsii` differs only in `version` and `fingerprint`.
+`@theory-cloud/apptheory-cdk` `v7.1.0` declares the same exact `aws-cdk-lib@2.275.0` peer (with
 `constructs ^10.8.1`) that the manifests already pin, and the three CDK symbols FaceTheory constructs are unchanged.
 
 The Go `apptheory-local` runner is not part of the TypeScript declarations and moved on the same tag: it added TLS,
