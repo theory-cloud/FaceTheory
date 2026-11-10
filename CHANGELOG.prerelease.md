@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.1.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.1.0...v5.1.1-rc) (2026-11-10)
+
+
+### Bug Fixes
+
+* **deps:** move the AppTheory pins to v7.1.0 ([3f67eb3](https://github.com/theory-cloud/FaceTheory/commit/3f67eb3e081757cfe2e687559d2c7f0cf7a5a760))
+* **deps:** move the AppTheory pins to v7.1.0 ([88a306f](https://github.com/theory-cloud/FaceTheory/commit/88a306f64817458d32898a0cb05ccc614a145059))
+
 ## [5.1.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.0.3...v5.1.0-rc) (2026-11-07)
 
 
