@@ -42,11 +42,16 @@ npm run synth
 stack with its own CDK CLI (`aws-cdk`, installed by `npm ci`), runs the SSR
 function in the digest-pinned official Lambda Node image and serves the
 synthesized CloudFront distribution through the released AppTheory local gateway
-(`apptheory-local` v7.0.0, installed from the pin in
+(`apptheory-local` v7.1.0, installed from the pin in
 `scripts/local/examples-local.json` with
-`go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0`) on
-`http://127.0.0.1:8240`. The row asserts the SSR HTML from the Function URL
-origin, `/assets/*` and the Vite manifest from the S3 origin, the SSG data path,
+`go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.1.0`) on
+`http://127.0.0.1:8241`, the CloudFront listener one port above the row's
+`--port-base 8240`. AppTheory's
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.1.0/docs/examples/local-runner.md#declared-ports)
+fixes that order: a run binds its public surfaces from `--port-base + index`,
+Function URLs before CloudFront distributions, so the `AWS_IAM` Function URL
+takes `8240` and refuses unsigned viewer requests. The row asserts the SSR HTML
+from the Function URL origin, `/assets/*` and the Vite manifest from the S3 origin, the SSG data path,
 a 403 missing asset and the handler's 404. It also proves CloudFront caching:
 `/assets/entry.css` misses then hits with `x-cache: Hit from cloudfront` and an
 `age`, an invalidation removes it, and the `CACHING_DISABLED` SSR behavior

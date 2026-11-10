@@ -7,7 +7,7 @@ This example wires FaceTheory directly to AWS Lambda Function URL streaming thro
 ## Run
 
 `make examples-local` runs this handler in the digest-pinned official Lambda
-Node image through the released `apptheory-local` v7.0.0 (pinned in
+Node image through the released `apptheory-local` v7.1.0 (pinned in
 `scripts/local/examples-local.json`; no AppTheory checkout). It bundles this
 example's own `handler.ts`, sends Function URL payload 2.0 events, and asserts
 incremental chunk delivery and the catch-all route:
@@ -21,7 +21,7 @@ observes a first chunk carrying the document start while the handler is still
 running and the document end only in a later chunk; a fully buffered response
 fails the assertion, and the harness self-test proves that negative control. The
 managed Function URL edge (TLS, auth, edge network) is a docs/125 true limit and
-the only named gap. The row runs against the released `apptheory-local` v7.0.0
+the only named gap. The row runs against the released `apptheory-local` v7.1.0
 pinned in the harness manifest.
 
 From `ts/`, typecheck it with the standard example compilation gate:

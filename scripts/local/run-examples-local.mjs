@@ -41,6 +41,7 @@ import {
 } from './lib/storage.mjs';
 import {
   FT2_RUNNERS,
+  cloudFrontControls,
   dockerPrefixFor,
   ensureApptheoryLocal,
   profilePath,
@@ -240,6 +241,26 @@ function serveCommand({ root, row, port, apptheory }) {
     };
   }
   throw new RunError(`${row.id}: unknown serve.kind ${String(serve.kind)}`);
+}
+
+/**
+ * The runner assigns each public surface its own port. Since v7.1.0 the
+ * Function URL takes the port base and CloudFront follows, and the AWS_IAM
+ * Function URL refuses unsigned viewer requests, so a gateway row must talk to
+ * the listener the runner reports rather than assume the row port is CloudFront.
+ */
+async function publicSurfacePort({ row, logPath }) {
+  if (row.serve?.publicSurface !== 'cloudfront') return row.port;
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    try {
+      return Number(new URL(cloudFrontControls(logPath).gateway).port);
+    } catch (error) {
+      if (!(error instanceof RunError)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  throw new RunError(`${row.id}: the runner log does not report a served CloudFront distribution`);
 }
 
 async function prepareApptheoryRow({ root, row, manifest }) {
@@ -500,9 +521,10 @@ async function main() {
           child = started.child;
           logPath = started.logPath;
           await waitForPort({ port: row.port, child, logPath });
+          const requestPort = await publicSurfacePort({ row, logPath });
           request = (requestPath, requestOptions) =>
-            httpRequest({ port: row.port, path: requestPath, ...requestOptions });
-          request.rawChunks = (requestPath) => rawHttpChunks({ port: row.port, path: requestPath });
+            httpRequest({ port: requestPort, path: requestPath, ...requestOptions });
+          request.rawChunks = (requestPath) => rawHttpChunks({ port: requestPort, path: requestPath });
         }
         const outcome = await RUNNERS[row.runner]({
           row,
