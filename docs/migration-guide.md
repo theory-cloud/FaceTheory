@@ -152,6 +152,10 @@ Use this cleanup when dependency installation drift is the main risk and runtime
 2. Keep `ts/package.json` pins and overrides synchronized.
 3. Update docs when pins change.
 
+FaceTheory 5.1.1 moves the AppTheory pins to `v7.1.0`. That is a minor on the v7 line: the only commit its
+changelog marks breaking is the `mcpfacade` refresh-reuse change, which FaceTheory does not use. There is no FaceTheory
+API change. TableTheory stays at `v6.3.0` and `aws-cdk-lib` stays at `2.275.0`.
+
 Validation:
 
 ```bash

@@ -215,6 +215,10 @@ export function validateManifest(root, manifest, tree) {
           assert(Array.isArray(row.serve.backends)
             && row.serve.backends.every((backend) => typeof backend === 'string'),
             `${rowLabel}: apptheory-local serve.backends must be an array of strings`, errors);
+          if (row.serve.publicSurface !== undefined) {
+            assert(row.serve.publicSurface === 'cloudfront',
+              `${rowLabel}: serve.publicSurface must be cloudfront`, errors);
+          }
         }
         assert(pending === undefined, `${rowLabel}: pending rows must not serve`, errors);
         assert(Number.isInteger(row.port), `${rowLabel}: a serve row must reserve a port`, errors);
@@ -363,7 +367,7 @@ export function validateManifest(root, manifest, tree) {
     assert(typeof runner.package === 'string' && runner.package.endsWith('/cmd/apptheory-local'),
       'manifest.profile.apptheoryRunner.package must name the apptheory-local command', errors);
     assert(typeof runner.version === 'string' && RUNNER_VERSION_PATTERN.test(runner.version),
-      'manifest.profile.apptheoryRunner.version must be an exact release tag such as v7.0.0', errors);
+      'manifest.profile.apptheoryRunner.version must be an exact release tag such as v7.1.0', errors);
     if (typeof runner.module === 'string' && typeof runner.package === 'string') {
       assert(runner.package.startsWith(`${runner.module}/`),
         'manifest.profile.apptheoryRunner.package must belong to the declared module', errors);
