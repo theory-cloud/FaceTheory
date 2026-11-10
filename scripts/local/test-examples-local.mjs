@@ -42,7 +42,7 @@ function baseManifest() {
       apptheoryRunner: {
         module: 'github.com/theory-cloud/apptheory/v7',
         package: 'github.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
-        version: 'v7.0.0',
+        version: 'v7.1.0',
       },
     },
     entries: {
@@ -213,6 +213,27 @@ test('stale coveredBy and via-host without verifiedBy fail', async () => {
   assert.match(messages(unverified), /via-host rows must set verifiedBy/);
 });
 
+test('apptheory-local serve rows accept only the runner-reported cloudfront surface', async () => {
+  const root = await createFixture();
+  const manifest = baseManifest();
+  manifest.entries['infra/stack'].rows.push({
+    id: 'infra/stack#local-run',
+    entrypoints: ['stack.ts'],
+    class: 'L2',
+    port: 8240,
+    runner: 'apptheory-local-gateway',
+    gap: 'fixture',
+    serve: {
+      kind: 'apptheory-local',
+      app: 'infra/stack',
+      backends: ['s3proxy'],
+      publicSurface: 'gateway',
+    },
+  });
+  const invalid = validateManifest(root, manifest, await discoverTree(root));
+  assert.match(messages(invalid), /serve\.publicSurface must be cloudfront/);
+});
+
 test('the checked-in manifest pins the released runner and no sibling checkout', async () => {
   const manifest = JSON.parse(
     await readFile(path.join(ROOT, 'scripts/local/examples-local.json'), 'utf8'),
@@ -220,7 +241,7 @@ test('the checked-in manifest pins the released runner and no sibling checkout',
   assert.deepEqual(runnerSpec(manifest), {
     module: 'github.com/theory-cloud/apptheory/v7',
     package: 'github.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
-    version: 'v7.0.0',
+    version: 'v7.1.0',
   });
   assert.equal(manifest.profile.apptheoryCheckout, undefined);
   assert.equal(manifest.profile.tabletheoryCheckout, undefined);
@@ -255,9 +276,9 @@ test('a profile without an exact released runner pin fails validation', async ()
 });
 
 const RUNNER_VERSION_OUTPUT = [
-  '/root/.cache/facetheory-examples-local/apptheory-local/v7.0.0/bin/apptheory-local: go1.27.3',
+  '/root/.cache/facetheory-examples-local/apptheory-local/v7.1.0/bin/apptheory-local: go1.27.3',
   '\tpath\tgithub.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
-  '\tmod\tgithub.com/theory-cloud/apptheory/v7\tv7.0.0\th1:abc=',
+  '\tmod\tgithub.com/theory-cloud/apptheory/v7\tv7.1.0\th1:abc=',
   '\tdep\tgithub.com/aws/aws-sdk-go-v2\tv1.40.0\th1:def=',
   '\tbuild\t-buildmode=exe',
   '',
@@ -270,14 +291,14 @@ function fakeGoVersionM(output, status = 0) {
 const RUNNER_SPEC = {
   module: 'github.com/theory-cloud/apptheory/v7',
   package: 'github.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
-  version: 'v7.0.0',
+  version: 'v7.1.0',
 };
 
 test('go version -m parsing reads the command, module and release tag', () => {
   assert.deepEqual(parseGoVersionM(RUNNER_VERSION_OUTPUT), {
     path: 'github.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
     module: 'github.com/theory-cloud/apptheory/v7',
-    version: 'v7.0.0',
+    version: 'v7.1.0',
   });
 });
 
@@ -285,19 +306,19 @@ test('the installed runner must be the exact command and release the manifest pi
   const accepted = assertRunnerVersion('/cache/apptheory-local', RUNNER_SPEC, {
     run: fakeGoVersionM(RUNNER_VERSION_OUTPUT),
   });
-  assert.equal(accepted.version, 'v7.0.0');
+  assert.equal(accepted.version, 'v7.1.0');
 
   assert.throws(
     () =>
       assertRunnerVersion('/cache/apptheory-local', RUNNER_SPEC, {
         run: fakeGoVersionM(
           RUNNER_VERSION_OUTPUT.replace(
-            'mod\tgithub.com/theory-cloud/apptheory/v7\tv7.0.0',
+            'mod\tgithub.com/theory-cloud/apptheory/v7\tv7.1.0',
             'mod\tgithub.com/theory-cloud/apptheory/v7\tv6.4.0',
           ),
         ),
       }),
-    /reports github\.com\/theory-cloud\/apptheory\/v7 v6\.4\.0; the manifest pins github\.com\/theory-cloud\/apptheory\/v7 v7\.0\.0/,
+    /reports github\.com\/theory-cloud\/apptheory\/v7 v6\.4\.0; the manifest pins github\.com\/theory-cloud\/apptheory\/v7 v7\.1\.0/,
   );
 
   assert.throws(

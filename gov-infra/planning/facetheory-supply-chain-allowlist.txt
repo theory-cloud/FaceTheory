@@ -27,7 +27,7 @@
 #
 # minimatch 10.2.6 is bundled inside aws-cdk-lib 2.275.0, the version this repo
 # pins and the exact aws-cdk-lib peer declared by @theory-cloud/apptheory-cdk
-# v7.0.0 (pin and peer agree, so there is no mismatch to reconcile).
+# v7.1.0 (pin and peer agree, so there is no mismatch to reconcile).
 # The copy at node_modules/aws-cdk-lib/node_modules/minimatch is published
 # inside the AWS tarball and cannot be upgraded from this repository; 2.275.0
 # is the newest published aws-cdk-lib and it still declares minimatch ^10.2.6,

@@ -42,9 +42,9 @@ npm run synth
 stack with its own CDK CLI (`aws-cdk`, installed by `npm ci`), runs the SSR
 function in the digest-pinned official Lambda Node image and serves the
 synthesized CloudFront distribution through the released AppTheory local gateway
-(`apptheory-local` v7.0.0, installed from the pin in
+(`apptheory-local` v7.1.0, installed from the pin in
 `scripts/local/examples-local.json` with
-`go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.0.0`) on
+`go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.1.0`) on
 `http://127.0.0.1:8240`. The row asserts the SSR HTML from the Function URL
 origin, `/assets/*` and the Vite manifest from the S3 origin, the SSG data path,
 a 403 missing asset and the handler's 404. It also proves CloudFront caching:
