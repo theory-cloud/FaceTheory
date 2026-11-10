@@ -157,9 +157,9 @@ function svelteTemplateContext(): CreateTemplateContext {
     facetheoryTarball:
       'https://github.com/theory-cloud/FaceTheory/releases/download/v5.0.3/theory-cloud-facetheory-5.0.3.tgz',
     appTheoryTarball:
-      'https://github.com/theory-cloud/AppTheory/releases/download/v7.0.0/theory-cloud-apptheory-7.0.0.tgz',
+      'https://github.com/theory-cloud/AppTheory/releases/download/v7.1.0/theory-cloud-apptheory-7.1.0.tgz',
     appTheoryCdkTarball:
-      'https://github.com/theory-cloud/AppTheory/releases/download/v7.0.0/theory-cloud-apptheory-cdk-7.0.0.tgz',
+      'https://github.com/theory-cloud/AppTheory/releases/download/v7.1.0/theory-cloud-apptheory-cdk-7.1.0.tgz',
     tableTheoryTarball:
       'https://github.com/theory-cloud/TableTheory/releases/download/v6.3.0/theory-cloud-tabletheory-ts-6.3.0.tgz',
     dependencyVersions: {},
