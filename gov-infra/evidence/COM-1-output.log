@@ -1,7 +1,0 @@
-Verifier: gov_check_completeness
-Repository: /Users/theorycloud/AgentSpace/factory/products/frameworks/FaceTheory
-Rubric ID: COM-1
-
-profile-descriptor: PASS
-no-recursion: PASS
-scaffold-inventory: PASS

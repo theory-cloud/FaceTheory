@@ -1,0 +1,66 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-ts-pack.sh"
+      ],
+      "durationSeconds": 8.225,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-16T04:00:26Z",
+      "id": "ts-pack",
+      "inputsDigest": "sha256:c55748422ccede961da4b34a583f4c76cbbc7835a48a0216f1f2aa8e41eda469",
+      "logDigest": "sha256:5fec1376f940a17a1644b5f241b7a81147976a0a9dbf093119fe52f583ad90ad",
+      "logRef": "gov-infra/evidence/local/ts-pack-ts-pack-20261116T040018Z-18.log",
+      "reused": false,
+      "startedAt": "2026-11-16T04:00:18Z"
+    }
+  ],
+  "consumed": [],
+  "description": "npm pack of the TypeScript package at the repository version on Linux x64, inspected and installed from the tarball, under each supported Node major",
+  "environment": {
+    "go": "",
+    "node": "v24.22.3",
+    "platform": {
+      "arch": "aarch64",
+      "os": "linux"
+    },
+    "python": "3.11.2"
+  },
+  "gate": "ts-pack",
+  "kind": "source",
+  "producer": {
+    "registry": "validation-gates.json",
+    "tool": "scripts/evidence/validation_evidence.py"
+  },
+  "profile": "floor-node24",
+  "reason": "",
+  "recordedAt": "2026-11-16T04:00:26Z",
+  "releaseOnly": {
+    "digest": "sha256:e03bb91a5a43f48e835ab40d0ad1f1deb58a0ac78eed0633b515ca697f3f8842",
+    "fileCount": 11,
+    "normalizedDigest": "sha256:8799c1a5654606b252254a89c0771c9f3bf24cdcf4378a0dd121820a1fe97c19",
+    "version": "5.1.1"
+  },
+  "reviews": [],
+  "schemaVersion": 1,
+  "scope": {
+    "digest": "sha256:43eea009c5e329e1169f9ad0a28c8c5a90758ea65242ac069eabfa92eb3aaeae",
+    "fileCount": 533,
+    "paths": [
+      "ts/",
+      "VERSION",
+      "Makefile",
+      "scripts/verify-ts-pack.sh",
+      "scripts/read-version.sh",
+      "scripts/pack-dev-archive.sh"
+    ],
+    "version": 1
+  },
+  "source": {
+    "digest": "sha256:2396d2e45fca5edd036b4be52173852592418456f36dc0b9dffefb41bc1ee710",
+    "fileCount": 782
+  },
+  "verdict": "PASS"
+}

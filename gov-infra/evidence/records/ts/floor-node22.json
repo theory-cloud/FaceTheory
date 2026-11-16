@@ -1,0 +1,78 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-ts-suite.sh"
+      ],
+      "durationSeconds": 198.597,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-16T03:57:00Z",
+      "id": "ts-suite",
+      "inputsDigest": "sha256:dc874750addce21836ebbf5e7b1c10089624eaf6465bb86621f615f2e97b5bdf",
+      "logDigest": "sha256:71d0eac11da0a40d34a6eb803bb646695a033f06f7faec0c3c8040cfd6c58500",
+      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261116T035341Z-18.log",
+      "reused": false,
+      "startedAt": "2026-11-16T03:53:41Z"
+    }
+  ],
+  "consumed": [],
+  "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, under each supported Node major on Linux x64",
+  "environment": {
+    "go": "",
+    "node": "v22.23.5",
+    "platform": {
+      "arch": "aarch64",
+      "os": "linux"
+    },
+    "python": "3.11.2"
+  },
+  "gate": "ts",
+  "kind": "source",
+  "producer": {
+    "registry": "validation-gates.json",
+    "tool": "scripts/evidence/validation_evidence.py"
+  },
+  "profile": "floor-node22",
+  "reason": "",
+  "recordedAt": "2026-11-16T03:57:00Z",
+  "releaseOnly": {
+    "digest": "sha256:e03bb91a5a43f48e835ab40d0ad1f1deb58a0ac78eed0633b515ca697f3f8842",
+    "fileCount": 11,
+    "normalizedDigest": "sha256:8799c1a5654606b252254a89c0771c9f3bf24cdcf4378a0dd121820a1fe97c19",
+    "version": "5.1.1"
+  },
+  "reviews": [],
+  "schemaVersion": 1,
+  "scope": {
+    "digest": "sha256:7230bad3757d1eeb4a6590da6e67fc552cd3528138a7194b65d88223e95abd90",
+    "fileCount": 643,
+    "paths": [
+      "ts/",
+      "docs/",
+      ".github/workflows/",
+      "README.md",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "AGENTS.md",
+      "Makefile",
+      "scripts/verify-ts-suite.sh",
+      "scripts/verify-docs-export-map.sh",
+      "scripts/verify-node-engines-floor.sh",
+      "scripts/check-node-engines-floor.mjs",
+      "scripts/verify-lambda-runtime-deprecations.sh",
+      "scripts/check-lambda-runtime-deprecations.mjs",
+      "infra/apptheory-ssr-site/package-lock.json",
+      "infra/apptheory-ssg-isr-site/package-lock.json",
+      "infra/apptheory-ssr-site/src/stack.ts",
+      "infra/apptheory-ssg-isr-site/src/stack.ts"
+    ],
+    "version": 1
+  },
+  "source": {
+    "digest": "sha256:2396d2e45fca5edd036b4be52173852592418456f36dc0b9dffefb41bc1ee710",
+    "fileCount": 782
+  },
+  "verdict": "PASS"
+}

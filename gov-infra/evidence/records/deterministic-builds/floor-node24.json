@@ -1,0 +1,75 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-deterministic-builds.sh"
+      ],
+      "durationSeconds": 15.629,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-16T04:08:05Z",
+      "id": "deterministic-builds",
+      "inputsDigest": "sha256:41b98f8810978df55e2ad5d25b68563957a835706b05e745048d4aeba4a031aa",
+      "logDigest": "sha256:8180a497eed9ece91da5f7c860d891f69c79abb40eb578b785c3fbae8707d697",
+      "logRef": "gov-infra/evidence/local/deterministic-builds-deterministic-builds-20261116T040750Z-18.log",
+      "reused": false,
+      "startedAt": "2026-11-16T04:07:50Z"
+    }
+  ],
+  "consumed": [],
+  "description": "Release asset builds produced twice and compared byte-for-byte at a pinned SOURCE_DATE_EPOCH on Linux x64, which is the environment the assets ship from",
+  "environment": {
+    "go": "",
+    "node": "v24.22.3",
+    "platform": {
+      "arch": "aarch64",
+      "os": "linux"
+    },
+    "python": "3.11.2"
+  },
+  "gate": "deterministic-builds",
+  "kind": "source",
+  "producer": {
+    "registry": "validation-gates.json",
+    "tool": "scripts/evidence/validation_evidence.py"
+  },
+  "profile": "floor-node24",
+  "reason": "",
+  "recordedAt": "2026-11-16T04:08:05Z",
+  "releaseOnly": {
+    "digest": "sha256:e03bb91a5a43f48e835ab40d0ad1f1deb58a0ac78eed0633b515ca697f3f8842",
+    "fileCount": 11,
+    "normalizedDigest": "sha256:8799c1a5654606b252254a89c0771c9f3bf24cdcf4378a0dd121820a1fe97c19",
+    "version": "5.1.1"
+  },
+  "reviews": [],
+  "schemaVersion": 1,
+  "scope": {
+    "digest": "sha256:621d9b652d93f1e8b10802e95f0bfede70db09d19522ab45c9f0c6717da1cbd4",
+    "fileCount": 633,
+    "paths": [
+      "VERSION",
+      "README.md",
+      "LICENSE",
+      "CHANGELOG.md",
+      "CHANGELOG.prerelease.md",
+      "docs/",
+      "ts/",
+      "Makefile",
+      "scripts/build-release-assets.sh",
+      "scripts/generate-checksums.sh",
+      "scripts/pack-dev-archive.sh",
+      "scripts/read-version.sh",
+      "scripts/render-release-notes.sh",
+      "scripts/generate-docs-version-override.rb",
+      "scripts/verify-deterministic-builds.sh"
+    ],
+    "version": 1
+  },
+  "source": {
+    "digest": "sha256:3d15513cb2900d30bffbb944e3d3d9fd4f28701eb8d2df7c90fd80d38f75f1b3",
+    "fileCount": 782
+  },
+  "verdict": "PASS"
+}

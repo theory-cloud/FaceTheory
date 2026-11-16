@@ -1,0 +1,66 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-examples-local.sh"
+      ],
+      "durationSeconds": 231.909,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-16T04:17:02Z",
+      "id": "examples-local-harness",
+      "inputsDigest": "sha256:a62f083070b383f4c0f2298545f0ad14ce0acb62ab24e3c97c300d534b2f3733",
+      "logDigest": "sha256:6c05951aa105f94f36ee35bb88c7cdacb5dacfd6b54e1f1d9fa007f30df5bbe5",
+      "logRef": "gov-infra/evidence/local/examples-local-examples-local-harness-20261116T041310Z-80083.log",
+      "reused": false,
+      "startedAt": "2026-11-16T04:13:10Z"
+    }
+  ],
+  "consumed": [],
+  "description": "Local examples harness: the harness self-test, every configured example and infra row through the released AppTheory local runner whose tag scripts/local/examples-local.json pins, and the teardown",
+  "environment": {
+    "go": "go1.27.4",
+    "node": "v24.21.0",
+    "platform": {
+      "arch": "arm64",
+      "os": "darwin"
+    },
+    "python": "3.15.2"
+  },
+  "gate": "examples-local",
+  "kind": "source",
+  "producer": {
+    "registry": "validation-gates.json",
+    "tool": "scripts/evidence/validation_evidence.py"
+  },
+  "profile": "default",
+  "reason": "",
+  "recordedAt": "2026-11-16T04:17:02Z",
+  "releaseOnly": {
+    "digest": "sha256:e03bb91a5a43f48e835ab40d0ad1f1deb58a0ac78eed0633b515ca697f3f8842",
+    "fileCount": 11,
+    "normalizedDigest": "sha256:8799c1a5654606b252254a89c0771c9f3bf24cdcf4378a0dd121820a1fe97c19",
+    "version": "5.1.1"
+  },
+  "reviews": [],
+  "schemaVersion": 1,
+  "scope": {
+    "digest": "sha256:344d48a0d38726b07723e76f899119524896cb7a36399ed4934f7523a8dad4bc",
+    "fileCount": 579,
+    "paths": [
+      ".go-version",
+      "Makefile",
+      "ts/",
+      "infra/",
+      "scripts/local/",
+      "scripts/verify-examples-local.sh"
+    ],
+    "version": 1
+  },
+  "source": {
+    "digest": "sha256:2f5b8aac0c494caa2197d1816758455131476b819d680399bacab0379b37335f",
+    "fileCount": 791
+  },
+  "verdict": "PASS"
+}
