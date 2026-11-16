@@ -238,7 +238,16 @@ expect_fail "the head check stopped reporting on main"
 
 # --- the catch-all scope --------------------------------------------------
 reset
-replace_line scripts/evidence/validation-gates.json '      "paths": ["**"],' '      "paths": ["docs/"],'
+python3 - "${root}/scripts/evidence/validation-gates.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+registry = json.loads(path.read_text(encoding="utf-8"))
+registry["gates"]["rubric"]["paths"] = ["docs/"]
+path.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+PY
 expect_fail "the rubric gate lost its catch-all scope"
 
 # --- the ci-rubric guard --------------------------------------------------

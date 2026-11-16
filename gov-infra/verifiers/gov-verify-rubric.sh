@@ -237,10 +237,20 @@ if re.search(r"(^|[^A-Za-z0-9_-])make\s+rubric([^A-Za-z0-9_-]|$)", verifier_text
     raise SystemExit("FAIL: gov verifier must not call the rubric wrapper")
 
 ci = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
-if "bash gov-infra/verifiers/gov-verify-rubric.sh" not in ci:
-    raise SystemExit("FAIL: CI rubric job must invoke the gov verifier directly")
-if "gov-infra/evidence/" not in ci or "actions/upload-artifact@" not in ci:
-    raise SystemExit("FAIL: CI rubric job must upload gov-infra/evidence/")
+# An item passes when its result sits in a locally produced, input-bound evidence
+# record that CI verifies. CI therefore runs the verify entry point; it does not
+# execute the rubric, and it uploads nothing.
+if "scripts/evidence/verify-all.sh" not in ci and "scripts/evidence/verify.sh" not in ci:
+    raise SystemExit(
+        "FAIL: the CI rubric job must verify the evidence record "
+        "(scripts/evidence/verify-all.sh or scripts/evidence/verify.sh)"
+    )
+if "bash gov-infra/verifiers/gov-verify-rubric.sh" in ci:
+    raise SystemExit(
+        "FAIL: CI must not execute the rubric; record it locally and verify the record"
+    )
+if "actions/upload-artifact@" in ci:
+    raise SystemExit("FAIL: the verify job must upload no artifact")
 
 print("profile-descriptor: PASS")
 print("no-recursion: PASS")
