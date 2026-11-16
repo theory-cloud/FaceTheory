@@ -180,7 +180,7 @@
         "floor-node22",
         "floor-node24"
       ],
-      "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, under each supported Node major on Linux x64",
+      "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, under each supported Node major on Linux arm64, which is the architecture each proof profile really runs. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the historical GitHub runner's architecture cannot be recorded as covered. The Node-major floor is the claim these profiles carry.",
       "resource": "repo-write",
       "paths": [
         "ts/",
@@ -222,7 +222,7 @@
         "floor-node22",
         "floor-node24"
       ],
-      "description": "npm pack of the TypeScript package at the repository version on Linux x64, inspected and installed from the tarball, under each supported Node major",
+      "description": "npm pack of the TypeScript package at the repository version on Linux arm64, inspected and installed from the tarball, under each supported Node major. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the architecture recorded is the one that really ran.",
       "resource": "repo-write",
       "paths": [
         "ts/",
@@ -285,7 +285,7 @@
       "profiles": [
         "floor-node24"
       ],
-      "description": "Release asset builds produced twice and compared byte-for-byte at a pinned SOURCE_DATE_EPOCH on Linux x64, which is the environment the assets ship from",
+      "description": "Release asset builds produced twice and compared byte-for-byte at a pinned SOURCE_DATE_EPOCH on Linux arm64, the architecture this record really ran on. Release assets ship from GitHub's ubuntu-latest runner (linux/x64), so this record proves the build is reproducible on the architecture it ran on and is not a claim about the shipping image: Linux/x64 is no longer proven anywhere, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host.",
       "resource": "repo-write",
       "paths": [
         "VERSION",
@@ -322,7 +322,7 @@
       "profiles": [
         "linux-root"
       ],
-      "description": "TheoryCloud subtree staging and provenance, the destination test as an ordinary user and as UID 0, helper dry runs, rollout target fixtures and release-trust guards, produced in a Linux x64 container where the run is already UID 0",
+      "description": "TheoryCloud subtree staging and provenance, the destination test as an ordinary user and as UID 0, helper dry runs, rollout target fixtures and release-trust guards, produced in a Linux arm64 container where the run is already UID 0. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the architecture recorded is the one that really ran.",
       "resource": "repo-write",
       "paths": [
         "docs/",
