@@ -147,7 +147,6 @@ docker run --rm \
 
     bash scripts/evidence/collect.sh --gate "${EVIDENCE_GATE}" --profile "${EVIDENCE_PROFILE}"
 
-    mkdir -p "/out/$(dirname "${EVIDENCE_DIRECTORY}/${EVIDENCE_GATE}/${EVIDENCE_PROFILE}.json")"
     cp -a "${work}/${EVIDENCE_DIRECTORY}/." /out/
     chown -R "${HOST_UID:-0}:${HOST_GID:-0}" /out
   '
