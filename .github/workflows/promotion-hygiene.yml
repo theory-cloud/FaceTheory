@@ -1,0 +1,77 @@
+name: Promotion hygiene
+
+# Nothing enters the release branches except a pull request from the accepted
+# head in this repository. This check needs only the GitHub pull request
+# context: it checks out no code, runs no repository command and carries no
+# secret or credential, so it cannot be influenced by the pull request's content.
+#
+# Accepted heads:
+#   - the pull request's head repository must be this repository, so a fork
+#     branch named like an accepted head cannot pass by name;
+#   - premain takes staging, and the generated release-please RC branch;
+#   - main takes premain, and the generated release-please stable branch.
+#
+# GitHub runs a pull_request workflow from the pull request's merge ref, so the
+# head branch's version of this workflow applies and a promotion already carries
+# this check. A pull request that edits or deletes the workflow fails closed: the
+# edit is in the diff a code owner must approve, and a deleted check never
+# reports.
+on:
+  pull_request:
+    branches: ["premain", "main"]
+
+permissions: {}
+
+jobs:
+  promotion-hygiene:
+    name: promotion-hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require an accepted head branch from this repository
+        shell: bash
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          integration_branch='staging'
+          release_branch='premain'
+          main_branch='main'
+          release_please_premain_head='release-please--branches--premain'
+          release_please_main_head='release-please--branches--main'
+
+          if [ "${HEAD_REPOSITORY:-}" != "${BASE_REPOSITORY:-}" ]; then
+            echo "promotion-hygiene: FAIL (head repository '${HEAD_REPOSITORY:-<unavailable>}' is not '${BASE_REPOSITORY:-<unknown>}')" >&2
+            echo "A head branch name is not enough: a fork branch named like an accepted head must not pass." >&2
+            echo "A fork contribution targets a pre-arranged branch agreed with the code owners; a code owner then carries it to ${integration_branch} with locally produced evidence." >&2
+            exit 1
+          fi
+
+          case "${BASE_BRANCH}" in
+            "${release_branch}")
+              accepted="${integration_branch} ${release_please_premain_head}"
+              ;;
+            "${main_branch}")
+              accepted="${release_branch} ${release_please_main_head}"
+              ;;
+            *)
+              echo "promotion-hygiene: FAIL (unexpected base branch '${BASE_BRANCH}')" >&2
+              exit 1
+              ;;
+          esac
+
+          for head in ${accepted}; do
+            if [ "${HEAD_BRANCH}" = "${head}" ]; then
+              echo "promotion-hygiene: PASS (${BASE_BRANCH} <- ${HEAD_BRANCH})"
+              exit 0
+            fi
+          done
+
+          echo "promotion-hygiene: FAIL (${BASE_BRANCH} <- ${HEAD_BRANCH})" >&2
+          echo "Nothing enters ${BASE_BRANCH} except a pull request from: ${accepted}." >&2
+          echo "A fork contribution targets a pre-arranged branch agreed with the code owners; a code owner then carries it to ${integration_branch} with locally produced evidence." >&2
+          exit 1
