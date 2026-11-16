@@ -26,44 +26,44 @@
       }
     },
     "floor-node22": {
-      "description": "Node 22 runtime floor for the TypeScript suite and package on Linux x64, produced in the digest-pinned official Node 22 image (node@sha256:e13726ca604184d7a91fcacab1fc09eefd642dc28e79ac34e85540dd93b78cfb) under linux/amd64. The image carries no Go toolchain; the go field records the repository pin and is not a compared dimension for these gates.",
-      "image": "node@sha256:e13726ca604184d7a91fcacab1fc09eefd642dc28e79ac34e85540dd93b78cfb",
-      "containerPlatform": "linux/amd64",
+      "description": "Node 22 runtime floor for the TypeScript suite and package on Linux, produced in the digest-pinned official Node 22 arm64 image under linux/arm64. Produced on the Factory host's colima container runtime under linux/arm64, which is this host's native guest architecture. The historical GitHub runner was linux/x64; that architecture is not reproducible here, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap'), so the record states the architecture that really ran instead of claiming x64. The Node-major floor is the claim these profiles carry. The image carries no Go toolchain; the go field records the repository pin and is not a compared dimension for these gates.",
+      "image": "node@sha256:f796bda8a91392fe7b5c974ff42abaa5cc801eb6987dca967f1db8be493e0ee3",
+      "containerPlatform": "linux/arm64",
       "environment": {
         "go": "go1.27.4",
         "node": "22",
         "python": "3.11",
         "platform": {
           "os": "linux",
-          "arch": "x64"
+          "arch": "arm64"
         }
       }
     },
     "floor-node24": {
-      "description": "Node 24 runtime floor for the TypeScript suite, the package and the release-asset build on Linux x64, produced in the digest-pinned official Node 24 image (node@sha256:9d266751ca3d7fdbe651c878ffd5ad0a42fed49a18c283509267c97f025b7496) under linux/amd64. The image carries no Go toolchain; the go field records the repository pin and is not a compared dimension for these gates.",
-      "image": "node@sha256:9d266751ca3d7fdbe651c878ffd5ad0a42fed49a18c283509267c97f025b7496",
-      "containerPlatform": "linux/amd64",
+      "description": "Node 24 runtime floor for the TypeScript suite, the package and the release-asset build on Linux, produced in the digest-pinned official Node 24 arm64 image under linux/arm64. Produced on the Factory host's colima container runtime under linux/arm64, which is this host's native guest architecture. The historical GitHub runner was linux/x64; that architecture is not reproducible here, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap'), so the record states the architecture that really ran instead of claiming x64. The Node-major floor is the claim these profiles carry. The image carries no Go toolchain; the go field records the repository pin and is not a compared dimension for these gates.",
+      "image": "node@sha256:9e7ec64106f43779ecb669cb299cce07a033ac6c41603c1039dea7b51119e550",
+      "containerPlatform": "linux/arm64",
       "environment": {
         "go": "go1.27.4",
         "node": "24",
         "python": "3.11",
         "platform": {
           "os": "linux",
-          "arch": "x64"
+          "arch": "arm64"
         }
       }
     },
     "linux-root": {
-      "description": "Linux x64 run as UID 0 for the subtree destination claim, produced in the digest-pinned official Node 24 image (node@sha256:9d266751ca3d7fdbe651c878ffd5ad0a42fed49a18c283509267c97f025b7496) under linux/amd64, where the container's default user is root. This is the leg CI performed with sudo -n and is why the subtree claim needs no privileged step on any runner.",
-      "image": "node@sha256:9d266751ca3d7fdbe651c878ffd5ad0a42fed49a18c283509267c97f025b7496",
-      "containerPlatform": "linux/amd64",
+      "description": "Linux run as UID 0 for the subtree destination claim, produced in the digest-pinned official Node 24 arm64 image under linux/arm64, where the container's default user is root. This is the leg CI performed with sudo -n and is why the subtree claim needs no privileged step on any runner. Produced on the Factory host's colima container runtime under linux/arm64, which is this host's native guest architecture. The historical GitHub runner was linux/x64; that architecture is not reproducible here, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap'), so the record states the architecture that really ran instead of claiming x64. The Node-major floor is the claim these profiles carry.",
+      "image": "node@sha256:9e7ec64106f43779ecb669cb299cce07a033ac6c41603c1039dea7b51119e550",
+      "containerPlatform": "linux/arm64",
       "environment": {
         "go": "go1.27.4",
         "node": "24",
         "python": "3.11",
         "platform": {
           "os": "linux",
-          "arch": "x64"
+          "arch": "arm64"
         }
       }
     }
