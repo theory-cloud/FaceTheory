@@ -5,16 +5,16 @@
         "bash",
         "scripts/verify-ts-suite.sh"
       ],
-      "durationSeconds": 177.717,
+      "durationSeconds": 184.411,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-16T05:04:22Z",
+      "finishedAt": "2026-11-16T20:32:03Z",
       "id": "ts-suite",
-      "inputsDigest": "sha256:7232278512a2e6a2e4387564c2f7cafc807f70ca04f58c9784a353f88a073ccb",
-      "logDigest": "sha256:cbe74698a9d7ac914bd79eb99265baa225ba18bcf8de334db75d2b1ea709d1b2",
-      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261116T050125Z-18.log",
+      "inputsDigest": "sha256:cadfa0e21e506471a9f787589d6767b72d342ddff88695ee37e8ce265dadcf11",
+      "logDigest": "sha256:f8e2180d5475d599bc900bc405a45a1c5a554fcd060ed5cb397b48198ab440e6",
+      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261116T202858Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-16T05:01:25Z"
+      "startedAt": "2026-11-16T20:28:58Z"
     }
   ],
   "consumed": [],
@@ -36,17 +36,17 @@
   },
   "profile": "floor-node24",
   "reason": "",
-  "recordedAt": "2026-11-16T05:04:22Z",
+  "recordedAt": "2026-11-16T20:32:03Z",
   "releaseOnly": {
-    "digest": "sha256:e03bb91a5a43f48e835ab40d0ad1f1deb58a0ac78eed0633b515ca697f3f8842",
+    "digest": "sha256:dad0cb6197f43a90d1f2eaff08aab3c72d5f02aba21e3c5696638baa22c2d04b",
     "fileCount": 11,
-    "normalizedDigest": "sha256:8799c1a5654606b252254a89c0771c9f3bf24cdcf4378a0dd121820a1fe97c19",
+    "normalizedDigest": "sha256:a2440bb55cb4c1c3a8b82990f5cf558303e82074fbef4812e5020d5e3b631aa0",
     "version": "5.1.1"
   },
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:7b9ce196559b0376e38d66274def8a8d02bf6c5ed7b4988a93c7fe16201c2246",
+    "digest": "sha256:65b885c7c97eb5d8e66f23c9bcc9f9d88960d01c6d5333a8f75b975260bb3475",
     "fileCount": 643,
     "paths": [
       "ts/",
@@ -71,7 +71,7 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:cc55e378e03eccac40a4750294e732a6036dccd0aaff4e0b5802c0cae3ef8a21",
+    "digest": "sha256:3a739837d5390640df740c05dd099c377bf265b9fa60e78f16831ecf987bf00b",
     "fileCount": 782
   },
   "verdict": "PASS"
