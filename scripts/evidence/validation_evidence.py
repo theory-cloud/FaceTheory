@@ -559,16 +559,26 @@ def probe_environment() -> dict[str, Any]:
     with _ENVIRONMENT_LOCK:
         if _ENVIRONMENT_CACHE is not None:
             return _ENVIRONMENT_CACHE
+        def run_version(argv: list[str]) -> str:
+            # A profile that does not bind a toolchain may run where that
+            # toolchain is absent (the Linux floor images carry no Go). An absent
+            # binary probes as an empty version; a gate that binds the dimension
+            # then fails closed on the mismatch instead of the probe crashing.
+            try:
+                completed = subprocess.run(argv, capture_output=True, text=True, check=False)
+            except OSError:
+                return ""
+            if completed.returncode != 0:
+                return ""
+            return completed.stdout
+
         go_version = ""
-        completed = subprocess.run(["go", "version"], capture_output=True, text=True, check=False)
-        if completed.returncode == 0:
-            fields = completed.stdout.split()
+        go_stdout = run_version(["go", "version"])
+        if go_stdout:
+            fields = go_stdout.split()
             if len(fields) >= 3 and fields[1] == "version":
                 go_version = fields[2]
-        node_version = ""
-        completed = subprocess.run(["node", "--version"], capture_output=True, text=True, check=False)
-        if completed.returncode == 0:
-            node_version = completed.stdout.strip()
+        node_version = run_version(["node", "--version"]).strip()
         python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
         _ENVIRONMENT_CACHE = {
             "go": go_version,
