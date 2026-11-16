@@ -1,0 +1,61 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "make",
+        "rubric"
+      ],
+      "durationSeconds": 40.141,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-16T05:05:22Z",
+      "id": "rubric",
+      "inputsDigest": "sha256:4d36d310c6b9225f1dc5417f68311e2af854509dd07f5b2f8c131214ed50c9b6",
+      "logDigest": "sha256:55abc79192507c1efae0b588d4c2ea575233b30499a2841da06a8bca7cae9104",
+      "logRef": "gov-infra/evidence/local/rubric-rubric-20261116T050442Z-67682.log",
+      "reused": false,
+      "startedAt": "2026-11-16T05:04:42Z"
+    }
+  ],
+  "consumed": [],
+  "description": "The one local rubric entry point: consistency, completeness, security, compliance, maintainability and docs items plus the infra synth snapshots. Its input scope is every tracked file, so any tooling, workflow, docs or guard edit stales it and requires a fresh record",
+  "environment": {
+    "go": "go1.27.4",
+    "node": "v24.21.0",
+    "platform": {
+      "arch": "arm64",
+      "os": "darwin"
+    },
+    "python": "3.15.2"
+  },
+  "gate": "rubric",
+  "kind": "source",
+  "producer": {
+    "registry": "validation-gates.json",
+    "tool": "scripts/evidence/validation_evidence.py"
+  },
+  "profile": "default",
+  "reason": "",
+  "recordedAt": "2026-11-16T05:05:22Z",
+  "releaseOnly": {
+    "digest": "sha256:e03bb91a5a43f48e835ab40d0ad1f1deb58a0ac78eed0633b515ca697f3f8842",
+    "fileCount": 11,
+    "normalizedDigest": "sha256:8799c1a5654606b252254a89c0771c9f3bf24cdcf4378a0dd121820a1fe97c19",
+    "version": "5.1.1"
+  },
+  "reviews": [],
+  "schemaVersion": 1,
+  "scope": {
+    "digest": "sha256:b057f41dcc27bdec32605b079d1a26ee522584d1c93a09cc47aec56babaa2607",
+    "fileCount": 794,
+    "paths": [
+      "**"
+    ],
+    "version": 1
+  },
+  "source": {
+    "digest": "sha256:f5b1d9453ce03ff8848798f1fc6be4c17df421409e66b552935e6aa311cf9a89",
+    "fileCount": 783
+  },
+  "verdict": "PASS"
+}

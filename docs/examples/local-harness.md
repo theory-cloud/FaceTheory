@@ -11,7 +11,7 @@ harness removes inherited AWS and proxy variables, installs static dummy
 credentials, and points every AWS endpoint at a loopback port it owns. The FT1
 rows start no containers; the FT2 rows run real Lambda handlers and the SSR
 site in the official, digest-pinned Lambda runtime image through the released
-`apptheory-local` v7.1.0 and gateway; the FT3 rows start digest-pinned DynamoDB
+`apptheory-local` runner and gateway; the FT3 rows start digest-pinned DynamoDB
 Local and s3proxy, run the same examples with their real-storage stores, and
 read the stored S3 objects and DynamoDB items back directly.
 
@@ -42,7 +42,7 @@ harness's `--only`, after those same build and install steps.
 | Pending-producer ledger     | `scripts/local/examples-local-ledger.json`                     |
 | Runner image/backend pins   | `scripts/local/apptheory-local-profile.json`                   |
 | Self-tests                  | `scripts/local/test-examples-local.mjs`                        |
-| CI job                      | `.github/workflows/examples-local.yml`                         |
+| Gate command                | `scripts/verify-examples-local.sh` (recorded, not run in CI)   |
 
 ## Requirements
 
@@ -51,12 +51,12 @@ harness's `--only`, after those same build and install steps.
 - The two `infra/*` stacks need their own dependencies. `make examples-local`
   installs them with `npm ci --ignore-scripts` when `node_modules` is absent; a
   direct harness invocation fails with a named prerequisite error instead.
-- Go 1.27.3 or newer, to install the released `apptheory-local` for the FT2
-  rows. The version is pinned in `scripts/local/examples-local.json`
-  (`profile.apptheoryRunner`) as `v7.1.0`, and the repository's `.go-version`
-  supplies the toolchain.
+- Go 1.27.4 or newer, to install the released `apptheory-local` for the FT2
+  rows. The exact tag is pinned in `scripts/local/examples-local.json`
+  (`profile.apptheoryRunner`), and the repository's `.go-version` supplies the
+  toolchain.
 - No AppTheory or TableTheory checkout. The harness runs
-  `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.1.0`
+  `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.3.1`
   with `GOBIN` pointed at its own cache, verifies the installed command with
   `go version -m`, and fails closed unless it reports the pinned module and
   version. The install path and flags are the ones AppTheory documents in
@@ -119,7 +119,7 @@ streamed chunk, leaving only the managed Function URL edge, a docs/125 true
 limit.
 
 The manifest has no pending rows. The three FT2 rows and the SSG+ISR gateway row
-run through the released `apptheory-local` v7.1.0 pinned in the manifest; the
+run through the released `apptheory-local` tag pinned in the manifest; the
 five FT3 example rows run on the FT3 storage backends. No row executes against a
 sibling checkout, and the ledger is empty. A `pending` row would still be listed
 and counted separately, never as passing, and only a ledger entry for that
@@ -145,7 +145,7 @@ its own build command, not separate harness entrypoints.
 ## The pending-producer ledger
 
 `scripts/local/examples-local-ledger.json` records rows that cannot run because
-they need an unreleased producer. It is empty: the AppTheory v7.1.0 release
+they need an unreleased producer. It is empty: the pinned AppTheory runner release
 contains every capability the former `record` entries named, so the four rows
 (`lambda-url-streaming#serve`, `apptheory-lambda-url-streaming#serve`,
 `infra/apptheory-ssr-site#local-run` and `infra/apptheory-ssg-isr-site#local-run`)
@@ -224,17 +224,17 @@ CloudFront gateway with its real generated CloudFront Functions.
 
 The three FT2 rows do not start a Node server. They run the examples' real
 handlers in the official AWS Lambda Node runtime image through the released
-`apptheory-local` v7.1.0.
+`apptheory-local` runner.
 
 ### Installing and verifying the released runner
 
 For a row whose runner is in `FT2_RUNNERS`, the harness:
 
 1. reads `profile.apptheoryRunner` from the committed manifest
-   (`github.com/theory-cloud/apptheory/v7/cmd/apptheory-local` at `v7.1.0`);
+   (`github.com/theory-cloud/apptheory/v7/cmd/apptheory-local` at the pinned tag);
 2. installs it with
-   `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.1.0`
-   and `GOBIN=~/.cache/facetheory-examples-local/apptheory-local/v7.1.0/bin`;
+   `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.3.1`
+   and `GOBIN=~/.cache/facetheory-examples-local/apptheory-local/v7.3.1/bin`;
 3. runs `go version -m` on the installed binary and fails closed unless the
    `path` is the pinned command and the `mod` line is the pinned module at the
    pinned version.
@@ -307,7 +307,7 @@ the SSR function in the Node image, provisions the stack's buckets and bucket
 deployments in s3proxy, and serves the synthesized CloudFront distribution on
 `http://127.0.0.1:8241`, the `serving cloudfront …` listener it reports.
 AppTheory's
-[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.1.0/docs/examples/local-runner.md#declared-ports)
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.3.1/docs/examples/local-runner.md#declared-ports)
 fixes that order — a run binds its public surfaces from `--port-base + index`,
 Function URLs before CloudFront distributions — so the `AWS_IAM` Function URL
 takes `8240` and CloudFront the next port. The gateway selects the cache
@@ -449,14 +449,14 @@ Install the released runner once (the same path the harness uses; the version
 is pinned in `scripts/local/examples-local.json`):
 
 ```bash
-GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.1.0/bin" \
-  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.1.0
-APPTHEORY_LOCAL="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.1.0/bin/apptheory-local"
-go version -m "$APPTHEORY_LOCAL"   # path .../cmd/apptheory-local; mod .../v7 v7.1.0
+GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.3.1/bin" \
+  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.3.1
+APPTHEORY_LOCAL="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.3.1/bin/apptheory-local"
+go version -m "$APPTHEORY_LOCAL"   # path .../cmd/apptheory-local; mod .../v7 must report the tag scripts/local/examples-local.json pins
 ```
 
 The install command and profile rules are AppTheory's
-[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.1.0/docs/examples/local-runner.md#install-the-command).
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.3.1/docs/examples/local-runner.md#install-the-command).
 
 Bundle the example's own entry from `ts/` in a subshell, with `ts/dist` already
 built, so the shell stays at the repository root for the steps that follow:
@@ -507,7 +507,7 @@ curl -i http://127.0.0.1:8241/_facetheory/data/index.json
 prints both listeners: `8240` is the `AWS_IAM` Function URL, which refuses
 unsigned requests, and the CloudFront distribution is the next port (`8241`),
 the order AppTheory's
-[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.1.0/docs/examples/local-runner.md#declared-ports)
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.3.1/docs/examples/local-runner.md#declared-ports)
 defines.
 
 ### The SSG+ISR gateway
@@ -540,7 +540,7 @@ buckets, and `make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'`
 asserts the stored object and item directly. `Ctrl-C` stops the gateway and
 removes its containers and network. `8246` is the `AWS_IAM` Function URL and
 CloudFront is the next port (`8247`), as above and per the
-[`Declared ports`](https://github.com/theory-cloud/AppTheory/blob/v7.1.0/docs/examples/local-runner.md#declared-ports)
+[`Declared ports`](https://github.com/theory-cloud/AppTheory/blob/v7.3.1/docs/examples/local-runner.md#declared-ports)
 order.
 
 ### The Node-served examples
@@ -650,14 +650,19 @@ this checkout, and the checkout's state and log directories. The by-hand
 helper's `down` removes its own environment file. A PID that was reused or no
 longer matches is left running and reported.
 
-## CI
+## The gate and its evidence record
 
-`.github/workflows/examples-local.yml` runs `make examples-local` on pull
-requests into `staging`, with Node 24, Go 1.27.3 (from `.go-version`) and no AWS
-secrets. The job installs the pinned released runner with
-`node scripts/local/run-examples-local.mjs --install-runner` — the same code path
-the local harness uses — and never clones AppTheory. The job pulls only the
+The harness is a gate, not a CI job. Its command is
+`scripts/verify-examples-local.sh`: the harness self-test, every configured row
+through the released runner, and the teardown. That command's result is recorded
+in the `examples-local` evidence record and CI only verifies the record, so the
+local runner never executes in CI.
+
+Producing the record needs Node 24 and the repository Go pin from `.go-version`
+and no AWS secrets. The command installs the pinned released runner with
+`node scripts/local/run-examples-local.mjs --install-runner` — the same code
+path the harness itself uses — and never clones AppTheory. It pulls only the
 digest-pinned images named by `scripts/local/apptheory-local-profile.json` and
 `scripts/local/examples-local.json`, starts the FT3 storage backends on
-`8250`/`8251` itself, uses no service containers, and runs
-`make examples-local-down` on every outcome.
+`8250`/`8251` itself, uses no service containers, and runs the teardown on every
+outcome.

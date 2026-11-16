@@ -156,6 +156,15 @@ FaceTheory 5.1.1 moves the AppTheory pins to `v7.1.0`. That is a minor on the v7
 changelog marks breaking is the `mcpfacade` refresh-reuse change, which FaceTheory does not use. There is no FaceTheory
 API change. TableTheory stays at `v6.3.0` and `aws-cdk-lib` stays at `2.275.0`.
 
+The modernization-wave pin move takes AppTheory to `v7.3.1` and TableTheory to `v6.4.1`, both immutable GitHub
+releases. Resolve the current tags as `docs/UPSTREAM_RELEASE_PINS.md` describes instead of reading this paragraph as
+the pin. FaceTheory's API does not change and no configuration key is removed, but two upstream facts reach consumers:
+AppTheory raises its `@aws-sdk/*` floor, so a lockfile pinned from that line moves with it, and AppTheory's TypeScript
+package still declares TableTheory `v6.3.0` while the same tag's Go module requires `v6.4.1`. Keep the
+`@theory-cloud/apptheory` -> `@theory-cloud/tabletheory-ts` override pointed at the resolved TableTheory tarball, as
+`ts/package.json` does, so both resolve one TableTheory copy. `aws-cdk-lib` stays at `2.275.0`, and the reference infra
+snapshots are regenerated because the bundled handler hash changes.
+
 Validation:
 
 ```bash

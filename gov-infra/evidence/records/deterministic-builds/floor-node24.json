@@ -1,0 +1,75 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-deterministic-builds.sh"
+      ],
+      "durationSeconds": 15.804,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-16T05:04:41Z",
+      "id": "deterministic-builds",
+      "inputsDigest": "sha256:8558f1e55bf0c9a93527768644d239530e8e8f3c67f7d119e778de5e9fa2e8bd",
+      "logDigest": "sha256:8180a497eed9ece91da5f7c860d891f69c79abb40eb578b785c3fbae8707d697",
+      "logRef": "gov-infra/evidence/local/deterministic-builds-deterministic-builds-20261116T050425Z-18.log",
+      "reused": false,
+      "startedAt": "2026-11-16T05:04:25Z"
+    }
+  ],
+  "consumed": [],
+  "description": "Release asset builds produced twice and compared byte-for-byte at a pinned SOURCE_DATE_EPOCH on Linux arm64, the architecture this record really ran on. Release assets ship from GitHub's ubuntu-latest runner (linux/x64), so this record proves the build is reproducible on the architecture it ran on and is not a claim about the shipping image: Linux/x64 is no longer proven anywhere, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host.",
+  "environment": {
+    "go": "",
+    "node": "v24.22.3",
+    "platform": {
+      "arch": "aarch64",
+      "os": "linux"
+    },
+    "python": "3.11.2"
+  },
+  "gate": "deterministic-builds",
+  "kind": "source",
+  "producer": {
+    "registry": "validation-gates.json",
+    "tool": "scripts/evidence/validation_evidence.py"
+  },
+  "profile": "floor-node24",
+  "reason": "",
+  "recordedAt": "2026-11-16T05:04:41Z",
+  "releaseOnly": {
+    "digest": "sha256:e03bb91a5a43f48e835ab40d0ad1f1deb58a0ac78eed0633b515ca697f3f8842",
+    "fileCount": 11,
+    "normalizedDigest": "sha256:8799c1a5654606b252254a89c0771c9f3bf24cdcf4378a0dd121820a1fe97c19",
+    "version": "5.1.1"
+  },
+  "reviews": [],
+  "schemaVersion": 1,
+  "scope": {
+    "digest": "sha256:01f68ac00ce419cd425bb1053128fe49138f4ddde61f8af7298556ed6c7ba36e",
+    "fileCount": 633,
+    "paths": [
+      "VERSION",
+      "README.md",
+      "LICENSE",
+      "CHANGELOG.md",
+      "CHANGELOG.prerelease.md",
+      "docs/",
+      "ts/",
+      "Makefile",
+      "scripts/build-release-assets.sh",
+      "scripts/generate-checksums.sh",
+      "scripts/pack-dev-archive.sh",
+      "scripts/read-version.sh",
+      "scripts/render-release-notes.sh",
+      "scripts/generate-docs-version-override.rb",
+      "scripts/verify-deterministic-builds.sh"
+    ],
+    "version": 1
+  },
+  "source": {
+    "digest": "sha256:cc55e378e03eccac40a4750294e732a6036dccd0aaff4e0b5802c0cae3ef8a21",
+    "fileCount": 782
+  },
+  "verdict": "PASS"
+}
