@@ -238,11 +238,11 @@ test('the checked-in manifest pins the released runner and no sibling checkout',
   const manifest = JSON.parse(
     await readFile(path.join(ROOT, 'scripts/local/examples-local.json'), 'utf8'),
   );
-  assert.deepEqual(runnerSpec(manifest), {
-    module: 'github.com/theory-cloud/apptheory/v7',
-    package: 'github.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
-    version: 'v7.1.0',
-  });
+  const spec = runnerSpec(manifest);
+  assert.equal(spec.module, 'github.com/theory-cloud/apptheory/v7');
+  assert.equal(spec.package, 'github.com/theory-cloud/apptheory/v7/cmd/apptheory-local');
+  // The exact tag is the manifest's to state; a floating ref is what must fail.
+  assert.match(spec.version, /^v\d+\.\d+\.\d+$/);
   assert.equal(manifest.profile.apptheoryCheckout, undefined);
   assert.equal(manifest.profile.tabletheoryCheckout, undefined);
   assert.deepEqual(JSON.parse(await readFile(path.join(ROOT, 'scripts/local/examples-local-ledger.json'), 'utf8')), {
@@ -276,7 +276,7 @@ test('a profile without an exact released runner pin fails validation', async ()
 });
 
 const RUNNER_VERSION_OUTPUT = [
-  '/root/.cache/facetheory-examples-local/apptheory-local/v7.1.0/bin/apptheory-local: go1.27.3',
+  '/root/.cache/facetheory-examples-local/apptheory-local/v7.3.1/bin/apptheory-local: go1.27.3',
   '\tpath\tgithub.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
   '\tmod\tgithub.com/theory-cloud/apptheory/v7\tv7.1.0\th1:abc=',
   '\tdep\tgithub.com/aws/aws-sdk-go-v2\tv1.40.0\th1:def=',

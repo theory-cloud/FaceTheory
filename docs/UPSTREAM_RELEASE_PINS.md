@@ -7,11 +7,45 @@ This file records the currently pinned versions and the exact install strings we
 
 ## Pins
 
-- AppTheory (TypeScript): `v7.1.0`
-- AppTheory (CDK): `v7.1.0`
-- TableTheory (TypeScript): `v6.3.0`
+- AppTheory (TypeScript): `v7.3.1`
+- AppTheory (CDK): `v7.3.1`
+- TableTheory (TypeScript): `v6.4.1`
+- Go toolchain (`.go-version`): `1.27.4` — the floor the pinned AppTheory release declares in its `go.mod`
 
-## 7.1.0 Compatibility Impact
+These are resolved at use time, not remembered: read `gh api repos/theory-cloud/<repo>/releases/latest`,
+require `"immutable": true`, pin the exact tag, take the asset names from that tag, and verify each
+asset against the release's own `SHA256SUMS.txt` (AppTheory) or `tabletheory-SHA256SUMS.txt`
+(TableTheory) before recording the integrity.
+
+## 7.3.1 Compatibility Impact
+
+AppTheory `v7.3.1` is a minor release on the v7 line, and both release assets are immutable. The
+declaration-file surface FaceTheory imports is unchanged: `createApp`,
+`createLambdaFunctionURLStreamingHandler`, the `/apptheory` adapter types and the two test helpers are
+byte-identical to `v7.1.0`. `@theory-cloud/apptheory-cdk` `v7.3.1` keeps the same exact
+`aws-cdk-lib@2.275.0` peer (with `constructs ^10.8.1`), so the CDK packages stay pinned where they are
+and both infra snapshots pass without an edit.
+
+Two upstream facts matter for this repository:
+
+- **The AWS SDK floor moved.** `@theory-cloud/apptheory` `v7.3.1` raises its `@aws-sdk/*` ranges from
+  `^3.1156.0` to `^3.1164.0`, so the three lockfiles now resolve `@aws-sdk/*` and a few `@smithy/*`
+  transitives to the newest in-range releases. That movement is upstream-forced, not a range refresh
+  this repository chose.
+- **TableTheory is still pinned transitively at `v6.3.0`.** `@theory-cloud/apptheory` `v7.3.1`
+  declares `@theory-cloud/tabletheory-ts` `v6.3.0` as a tarball URL, while the same release's Go
+  module requires TableTheory `v6.4.1`. This is an upstream declaration gap: the TypeScript package
+  and the Go module of one AppTheory tag name different TableTheory releases. FaceTheory keeps its
+  direct dependency at the resolved `v6.4.1` tag, keeps the
+  `@theory-cloud/apptheory` -> `@theory-cloud/tabletheory-ts` override pointing at that same `v6.4.1`
+  tarball, and proves the combination in the `ts`, `ts-pack` and `examples-local` evidence records. No
+  other workaround is applied.
+
+Adopting `v7.3.1` also moves the local runner floor: `github.com/theory-cloud/apptheory/v7` at
+`v7.3.1` declares `go 1.27.4`, so `.go-version` moves with it and the runner install is verified
+against the tag the manifest names.
+
+## 7.1.0 Compatibility Impact (history)
 
 AppTheory `v7.1.0` is a minor release on the v7 line. Its generated changelog carries one commit marked breaking,
 `1165d66f feat(mcpfacade)!: serve refresh reuse instead of revoking the family`, but AppTheory's `UPGRADING.md`
@@ -82,7 +116,7 @@ Adopting TableTheory `6.4.0` is not part of this move. `aws-cdk-lib` stays `2.27
 
 The `v7.0.0` major moved the Go module path to `github.com/theory-cloud/apptheory/v7` and shipped thirteen breaking
 commits in the 2026-10-30 security wave. That analysis is retained because it explains why the v7 line is safe for this
-repository; the current pin is `v7.1.0`. Each v7 break remains unreachable from FaceTheory:
+repository; the current pin is `v7.3.1`. Each v7 break remains unreachable from FaceTheory:
 
 - **Go `/v7` module path** — no Go code or module in this repo.
 - **CDK MCP front door `LOCKED`/`DISABLED` enforcement** — no `AppTheoryMcpServer`, `McpServer` or `mcpfacade` reference
@@ -101,8 +135,8 @@ repository; the current pin is `v7.1.0`. Each v7 break remains unreachable from 
 
 No FaceTheory API, type, default or documented behaviour changes. A consumer installing `@theory-cloud/facetheory` is
 unaffected: `@theory-cloud/apptheory` is a FaceTheory devDependency, and the adapter subpath continues to require the
-consumer's own AppTheory install. Newly generated starters pick up the `v7.1.0` tarball from `ts/package.json`. The pin
-move is a `fix(deps)` compatibility update, not a breaking change for FaceTheory consumers.
+consumer's own AppTheory install. Newly generated starters pick up the pinned tarball recorded in
+`ts/package.json`. The pin move is a `build(deps)` compatibility update, not a breaking change for FaceTheory consumers.
 
 Retained history lives in `CHANGELOG.md`; this file records only the current pin set.
 
@@ -136,14 +170,14 @@ Each hash below is the SHA-256 of the downloaded GitHub Release asset, cross-che
 AppTheory `SHA256SUMS.txt` (runtime + CDK) and TableTheory `tabletheory-SHA256SUMS.txt` (all matched; a mismatch is a
 release-asset integrity stop condition).
 
-- AppTheory runtime tarball: `6af2bb45d96cb04a0fe2e8a991924601959d18aeb9bcc94fd0a92744bb0fdd2a`
-- AppTheory CDK tarball: `ef1d7857d45cdc481e434ebe0fba88722de6395907ff8fdc725f124b797b9c43`
-- TableTheory TypeScript tarball: `9507f6a6258e661546238300880659a1725f235bf1a0020edbd98145af31ea96`
+- AppTheory runtime tarball: `090534cba76a478ff6f85befd81d3b2f3144e2e0a7068278f6107ad17cff412d`
+- AppTheory CDK tarball: `c9f01b4139d1dc809e09f0796835911455c2d1a4c352a95c29622e35cf980c8b`
+- TableTheory TypeScript tarball: `9c8ff98a3d83ca80fa692ddae071f603cf59cb7ac20fb9253c217b05e44a0290`
 
 The matching SHA-512 lockfile integrities are
-`sha512-tXnOr32ZiyzbWDvPJxeY8J1eUlqK5vK+YXD8jl0QGMXKzCdTkGE3TKLWERsNu1QyzoYDEW1tY0NKWymje9H4SQ==`,
-`sha512-nc016ANnu0bYLO1ED4AQRJzYzfA5Vm4ktHO2gf+M/X8BvVgEGv/NIrSSaTYMt7+gQuoK8Ej+v8NozRUJ0Hc8RQ==`
-and `sha512-ji8q/RXu6V8UKfRozQnqotPEm6O5nY3Ikg6TJcK1dzVemU+flclZUFGOUvlOU4a8ztGbOKmQ/DA3wJeu6pMDdA==`.
+`sha512-0617gotEnWS7SaD48COYGKrcrubnCYIecQ161aEs95Z2igyuWYzXel1o5lyJ6ptubtE9m2xdBX8dKEu/PAE8JA==`,
+`sha512-vs+DYIaOIcHDTJOOJIjmZCg1maOHCjsJu21wu65MYra+FLwLWcRbPmAZd6QzI7AOR2nhsvgWDmCF7yfDykZ5MQ==`
+and `sha512-QY6PmMvJ1DLmXw6Ao7aWOkTg+/ta94ygCBNrxZrK+S1FyTtxxo2x7fH276oB/slm1T1NyGxqOnPE/bZdfc7tDg==`.
 
 ## Known Audit Exceptions
 
@@ -159,9 +193,9 @@ every dependency it names is itself allowed and it carries no advisory of its ow
 
 - **bundled `minimatch` 10.2.6 in `aws-cdk-lib@2.275.0`** — `GHSA-g3hv-75wg-m249` (DoS via globparts amplification),
   fixed in `minimatch@11.0.1`. The affected copy at `node_modules/aws-cdk-lib/node_modules/minimatch` ships inside the
-  AWS-published `aws-cdk-lib` tarball and cannot be upgraded from this repository; `2.275.0` is the newest published
-  `aws-cdk-lib` (re-checked 2026-11-10 against the npm registry) and it still declares `minimatch ^10.2.6`, so no
-  available CDK release fixes this. The scoped entry names exactly that package, version, node path, all three audited
+  AWS-published `aws-cdk-lib` tarball and cannot be upgraded from this repository; `2.275.0` is the exact `aws-cdk-lib` peer that
+  `@theory-cloud/apptheory-cdk` v7.3.1 declares, and no published `aws-cdk-lib` fixes this: `2.277.0` was the newest
+  release when re-checked on 2026-11-15 and it still declares `minimatch ^10.2.6`. The scoped entry names exactly that package, version, node path, all three audited
   projects, and the single advisory, and expires 2026-12-01. Authorised by the operator ruling of 2026-10-03 ("if a
   vulnerable dependency is bundled in AWS we make an exception until its updated there"), extended 2026-10-04 to
   AWS-published build-toolchain chains. Removal condition: the pinned `aws-cdk-lib` bundles `minimatch >= 11.0.1`.
@@ -197,10 +231,11 @@ though their peer range did not move. Restore those nodes from the prior lock wh
 them, so each lockfile diff stays scoped to the `@theory-cloud` pin nodes, then confirm the result with a real
 `npm ci`.
 
-AppTheory `v7.1.0` keeps the `^3.1156.0` `@aws-sdk/*` floor the v6.4.0 line already declared, so this pin move needs
-no AWS SDK graph movement. Each lock was regenerated with `npm install --ignore-scripts --package-lock-only`, then
-restored to the prior lock except for the AppTheory nodes (the ts lock's npm 11 `libc` field reordering was discarded
-under the restore rule above), and every lock was validated with a real `npm ci`.
+AppTheory `v7.3.1` raises the `^3.1156.0` `@aws-sdk/*` floor to `^3.1164.0`, so this pin move does
+require AWS SDK graph movement: the three locks were regenerated with
+`npm install --ignore-scripts --package-lock-only`, the only non-`@theory-cloud` nodes that moved are
+the `@aws-sdk/*` and `@smithy/*` transitives inside that new floor, the CDK `inBundle` entries were
+preserved, and every lock was validated with a real `npm ci`.
 
 Neither infra snapshot moves. The reference handlers import only `createApp` and
 `createLambdaFunctionURLStreamingHandler`, so the changed `mcpfacade` and `oauth` modules are unreachable and esbuild
@@ -212,15 +247,15 @@ pass without a snapshot edit.
 ```bash
   # AppTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v7.1.0/theory-cloud-apptheory-7.1.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v7.3.1/theory-cloud-apptheory-7.3.1.tgz
 
   # TableTheory (TS)
 npm install --save-exact \
-  https://github.com/theory-cloud/TableTheory/releases/download/v6.3.0/theory-cloud-tabletheory-ts-6.3.0.tgz
+  https://github.com/theory-cloud/TableTheory/releases/download/v6.4.1/theory-cloud-tabletheory-ts-6.4.1.tgz
 
   # AppTheory CDK (only for infra projects)
 npm install --save-exact \
-  https://github.com/theory-cloud/AppTheory/releases/download/v7.1.0/theory-cloud-apptheory-cdk-7.1.0.tgz
+  https://github.com/theory-cloud/AppTheory/releases/download/v7.3.1/theory-cloud-apptheory-cdk-7.3.1.tgz
 ```
 
 ## package.json Snippet (Pinned)
@@ -231,18 +266,18 @@ registry installs:
 ```json
 {
   "devDependencies": {
-    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v7.1.0/theory-cloud-apptheory-7.1.0.tgz",
-    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v6.3.0/theory-cloud-tabletheory-ts-6.3.0.tgz"
+    "@theory-cloud/apptheory": "https://github.com/theory-cloud/AppTheory/releases/download/v7.3.1/theory-cloud-apptheory-7.3.1.tgz",
+    "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v6.4.1/theory-cloud-tabletheory-ts-6.4.1.tgz"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
-      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v6.3.0/theory-cloud-tabletheory-ts-6.3.0.tgz"
+      "@theory-cloud/tabletheory-ts": "https://github.com/theory-cloud/TableTheory/releases/download/v6.4.1/theory-cloud-tabletheory-ts-6.4.1.tgz"
     }
   }
 }
 ```
 
-Note: AppTheory `v7.1.0` declares `@theory-cloud/tabletheory-ts` `v6.3.0` transitively, as a pinned GitHub Release tarball URL carrying its own integrity (`…/releases/download/v6.3.0/theory-cloud-tabletheory-ts-6.3.0.tgz#sha512-ji8q/RXu6V8UKfRozQnqotPEm6O5nY3Ikg6TJcK1dzVemU+flclZUFGOUvlOU4a8ztGbOKmQ/DA3wJeu6pMDdA==`). The local SHA-512 of the downloaded TableTheory `v6.3.0` tarball, the integrity AppTheory `v7.1.0` declares, and the integrity recorded in all three lockfiles agree. The `overrides` block above is therefore **not load-bearing for the resolved version**: the direct dev dependency and AppTheory's transitive requirement name the same `v6.3.0` tarball URL, so both resolve to a single deduped `v6.3.0` node (`npm ls @theory-cloud/tabletheory-ts` reports `apptheory@7.1.0 -> tabletheory-ts@6.3.0 deduped`, plus the top-level `6.3.0`). The override is retained deliberately as a narrow guard: it keeps FaceTheory's validated TableTheory tarball authoritative under `@theory-cloud/apptheory` even if a future upstream release regresses its transitive declaration. The `ts/` and infra lockfiles also keep that upstream-declared `v6.3.0` string verbatim inside the `@theory-cloud/apptheory` package node — that is AppTheory's own published manifest, not a FaceTheory pin, and it is not editable.
+Note: AppTheory `v7.3.1` declares `@theory-cloud/tabletheory-ts` `v6.3.0` transitively, as a pinned GitHub Release tarball URL carrying its own integrity (`…/releases/download/v6.3.0/theory-cloud-tabletheory-ts-6.3.0.tgz#sha512-ji8q/RXu6V8UKfRozQnqotPEm6O5nY3Ikg6TJcK1dzVemU+flclZUFGOUvlOU4a8ztGbOKmQ/DA3wJeu6pMDdA==`). FaceTheory resolves TableTheory from the immutable `v6.4.1` release instead, so the `overrides` block above **is load-bearing for the resolved version**: it keeps FaceTheory's validated TableTheory tarball authoritative under `@theory-cloud/apptheory`, and all three lockfiles resolve a single top-level `6.4.1` node. The `ts/` and infra lockfiles still keep the upstream-declared `v6.3.0` string verbatim inside the `@theory-cloud/apptheory` package node — that is AppTheory's own published manifest, not a FaceTheory pin, and it is not editable. This is the documented AppTheory v7.3.1 gap (TypeScript package `6.3.0` versus Go module `6.4.1`), reported upstream; the `ts`, `ts-pack` and `examples-local` records prove the override combination works.
 
 `facetheory create` and `facetheory doctor` carry no version constants: the create CLI derives the AppTheory, CDK, and
 TableTheory tarball URLs from `ts/package.json` at runtime, and the doctor CLI checks the generated project's override
