@@ -452,7 +452,7 @@ is pinned in `scripts/local/examples-local.json`):
 GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.3.1/bin" \
   go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.3.1
 APPTHEORY_LOCAL="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.3.1/bin/apptheory-local"
-go version -m "$APPTHEORY_LOCAL"   # path .../cmd/apptheory-local; mod .../v7 v7.1.0
+go version -m "$APPTHEORY_LOCAL"   # path .../cmd/apptheory-local; mod .../v7 must report the tag scripts/local/examples-local.json pins
 ```
 
 The install command and profile rules are AppTheory's

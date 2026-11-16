@@ -23,8 +23,12 @@ AppTheory `v7.3.1` is a minor release on the v7 line, and both release assets ar
 declaration-file surface FaceTheory imports is unchanged: `createApp`,
 `createLambdaFunctionURLStreamingHandler`, the `/apptheory` adapter types and the two test helpers are
 byte-identical to `v7.1.0`. `@theory-cloud/apptheory-cdk` `v7.3.1` keeps the same exact
-`aws-cdk-lib@2.275.0` peer (with `constructs ^10.8.1`), so the CDK packages stay pinned where they are
-and both infra snapshots pass without an edit.
+`aws-cdk-lib@2.275.0` peer (with `constructs ^10.8.1`), so the CDK package versions stay pinned where
+they are. The bundled handler asset still moves: the reference stacks bundle `@theory-cloud/apptheory`
+into the Lambda asset, and `dist/index.js` re-exports the MCP and OAuth modules, so published code the
+reference handlers never call is still inside the bundle — unreachable at runtime is not absent from the
+asset. The `v7.3.1` module changes and the `@aws-sdk/*` floor that release raises therefore produce a
+different esbuild output. Both snapshots' `Code.S3Key` values changed and both were regenerated.
 
 Two upstream facts matter for this repository:
 
@@ -237,10 +241,15 @@ require AWS SDK graph movement: the three locks were regenerated with
 the `@aws-sdk/*` and `@smithy/*` transitives inside that new floor, the CDK `inBundle` entries were
 preserved, and every lock was validated with a real `npm ci`.
 
-Neither infra snapshot moves. The reference handlers import only `createApp` and
-`createLambdaFunctionURLStreamingHandler`, so the changed `mcpfacade` and `oauth` modules are unreachable and esbuild
-emits a byte-identical handler asset; both stacks' `Code.S3Key` values are unchanged. The two CDK synth snapshot tests
-pass without a snapshot edit.
+Both infra snapshots move. The reference handlers import only `createApp` and
+`createLambdaFunctionURLStreamingHandler`, and that imported declaration surface is unchanged, but the stacks bundle
+the pinned `@theory-cloud/apptheory` release into the Lambda asset. Its `dist/index.js` re-exports the MCP and OAuth
+modules, so published code the reference handlers never call is still inside the bundle: unreachable at runtime is not
+absent from the asset. A pin move that changes that package's published code — as `v7.3.1` does, together with the
+`@aws-sdk/*` floor it raises — therefore changes the esbuild output and the handler bundle hash. Both snapshots'
+`Code.S3Key` values changed and both were regenerated; no stack shape, resource or property moved. A future pin move
+must regenerate both snapshots (`npm test` in each `infra/` project) and commit the refreshed files, and must not
+assume the hash is stable.
 
 ## Install (npm)
 
