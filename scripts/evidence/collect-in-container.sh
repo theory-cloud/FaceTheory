@@ -91,6 +91,12 @@ fi
 
 npm_cache="${FACETHEORY_CONTAINER_NPM_CACHE:-${HOME}/.cache/facetheory-evidence/npm}"
 mkdir -p "${npm_cache}"
+mkdir -p "${repo_root}/${evidence_directory}"
+
+# The container runs as root. Hand the finished records back with the checkout's
+# ownership so the host worktree stays writable and the records commit cleanly.
+host_uid="$(id -u)"
+host_gid="$(id -g)"
 
 echo "collect-in-container: gate=${gate} profile=${profile} image=${image} platform=${container_platform}" >&2
 
@@ -100,6 +106,8 @@ docker run --rm \
   -e "EVIDENCE_GATE=${gate}" \
   -e "EVIDENCE_PROFILE=${profile}" \
   -e "EVIDENCE_DIRECTORY=${evidence_directory}" \
+  -e "HOST_UID=${host_uid}" \
+  -e "HOST_GID=${host_gid}" \
   -v "${repo_root}:/src:ro" \
   -v "${repo_root}/${evidence_directory}:/out" \
   -v "${npm_cache}:/root/.npm" \
@@ -141,6 +149,7 @@ docker run --rm \
 
     mkdir -p "/out/$(dirname "${EVIDENCE_DIRECTORY}/${EVIDENCE_GATE}/${EVIDENCE_PROFILE}.json")"
     cp -a "${work}/${EVIDENCE_DIRECTORY}/." /out/
+    chown -R "${HOST_UID:-0}:${HOST_GID:-0}" /out
   '
 
 echo "collect-in-container: wrote ${evidence_directory}/${gate}/${profile}.json" >&2
