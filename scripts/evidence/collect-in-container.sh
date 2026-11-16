@@ -59,7 +59,7 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 2
 fi
 
-read -r image container_platform evidence_directory <<EOF
+read -r image container_platform evidence_directory local_log_directory <<EOF
 $(python3 - "${gate}" "${profile}" <<'PY'
 import json
 import sys
@@ -79,7 +79,7 @@ if not image.startswith("sha256:") and "@sha256:" not in image:
     raise SystemExit(f"collect-in-container: FAIL (profile {profile!r} has no digest-pinned image)")
 if not platform:
     raise SystemExit(f"collect-in-container: FAIL (profile {profile!r} has no containerPlatform)")
-print(image, platform, registry["evidenceDirectory"].strip("/"))
+print(image, platform, registry["evidenceDirectory"].strip("/"), registry["localLogDirectory"].strip("/"))
 PY
 )
 EOF
@@ -91,7 +91,7 @@ fi
 
 npm_cache="${FACETHEORY_CONTAINER_NPM_CACHE:-${HOME}/.cache/facetheory-evidence/npm}"
 mkdir -p "${npm_cache}"
-mkdir -p "${repo_root}/${evidence_directory}"
+mkdir -p "${repo_root}/${evidence_directory}" "${repo_root}/${local_log_directory}"
 
 # The container runs as root. Hand the finished records back with the checkout's
 # ownership so the host worktree stays writable and the records commit cleanly.
@@ -106,10 +106,12 @@ docker run --rm \
   -e "EVIDENCE_GATE=${gate}" \
   -e "EVIDENCE_PROFILE=${profile}" \
   -e "EVIDENCE_DIRECTORY=${evidence_directory}" \
+  -e "EVIDENCE_LOCAL_LOGS=${local_log_directory}" \
   -e "HOST_UID=${host_uid}" \
   -e "HOST_GID=${host_gid}" \
   -v "${repo_root}:/src:ro" \
   -v "${repo_root}/${evidence_directory}:/out" \
+  -v "${repo_root}/${local_log_directory}:/out-local" \
   -v "${npm_cache}:/root/.npm" \
   "${image}" \
   bash -lc '
@@ -148,6 +150,14 @@ docker run --rm \
     bash scripts/evidence/collect.sh --gate "${EVIDENCE_GATE}" --profile "${EVIDENCE_PROFILE}"
 
     cp -a "${work}/${EVIDENCE_DIRECTORY}/." /out/
+
+    # The record references its command log by digest. Keep the log where the
+    # record points at it, so a reviewer can read what actually ran instead of
+    # trusting a digest alone. Ignored by git; never part of a records commit.
+    if [[ -d "${work}/${EVIDENCE_LOCAL_LOGS}" ]]; then
+      cp -a "${work}/${EVIDENCE_LOCAL_LOGS}/." /out-local/
+    fi
+
     chown -R "${HOST_UID:-0}:${HOST_GID:-0}" /out
   '
 
