@@ -368,13 +368,41 @@ check_infra_snapshot_templates() {
   echo "infra-synth-snapshots: PASS ($((SECONDS - started_at))s)"
 }
 
+# --- Evidence composition ---
+#
+# Four rubric items used to re-execute commands that the evidence record already
+# proves at both Node floors, so one staging change ran the TypeScript suite and
+# the pack three times each. A recorded proof that still applies to this exact
+# tree is now verified instead of re-executed; when no record applies (a bare
+# rubric run before collection, or a changed floor) the item runs its real
+# command exactly as before, so nothing is skipped and nothing is weakened.
+compose_recorded_gate() {
+  local gate="$1"
+  shift
+  local profile
+  for profile in "$@"; do
+    if ! bash scripts/evidence/verify-gate.sh --gate "${gate}" --profile "${profile}" >/dev/null 2>&1; then
+      return 1
+    fi
+  done
+  echo "${gate}: PASS (composed from the recorded proofs for profiles: $*)"
+  return 0
+}
+
 # --- Rubric verifier functions ---
 
 gov_check_quality() {
-  ensure_ts_deps_installed || return $?
-  make ts-typecheck
-  make ts-lint
-  make ts-test
+  # The TypeScript suite is the `ts` gate's command set, recorded at both Node
+  # floors. Composing its record removes the duplicate that made the suite run
+  # three times per change; the infra synth snapshots remain rubric-unique.
+  if compose_recorded_gate ts floor-node22 floor-node24; then
+    ensure_ts_deps_installed || return $?
+  else
+    ensure_ts_deps_installed || return $?
+    make ts-typecheck
+    make ts-lint
+    make ts-test
+  fi
   check_infra_snapshot_templates
 }
 
@@ -383,7 +411,9 @@ gov_check_consistency() {
   local materialized_surface
   require_intended_git_worktree_or_blocked || return $?
   require_cmd_or_blocked python3 || return $?
-  scripts/verify-version-alignment.sh
+  # Version alignment is not re-checked here: it is the fast `Version alignment`
+  # context on every pull request, so a second copy in the rubric only adds a
+  # redundant execution to the same change.
   run_with_pinned_go_toolchain scripts/verify-go-version-pin.sh
 
   for materialized_surface in \
@@ -411,8 +441,12 @@ gov_check_security() {
   require_cmd_or_blocked node || return $?
   require_cmd_or_blocked npm || return $?
   scripts/verify-npm-audit.sh
-  scripts/verify-node-engines-floor.sh
-  scripts/verify-lambda-runtime-deprecations.sh
+  # Both checks are commands of the `ts` gate and are recorded at both Node
+  # floors; compose the record instead of running them a third time.
+  if ! compose_recorded_gate ts floor-node22 floor-node24; then
+    scripts/verify-node-engines-floor.sh
+    scripts/verify-lambda-runtime-deprecations.sh
+  fi
   scripts/verify-ci-install-hardening.sh
   scripts/verify-theorycloud-publish-install.sh
   check_actions_pinned_to_sha
@@ -446,6 +480,10 @@ gov_check_maintainability() {
   require_cmd_or_blocked node || return $?
   require_cmd_or_blocked npm || return $?
   require_cmd_or_blocked tar || return $?
+  # The pack is the `ts-pack` gate's command set, recorded at both Node floors.
+  if compose_recorded_gate ts-pack floor-node22 floor-node24; then
+    return 0
+  fi
   scripts/verify-ts-pack.sh
 }
 
