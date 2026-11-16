@@ -5,20 +5,20 @@
         "bash",
         "scripts/verify-deterministic-builds.sh"
       ],
-      "durationSeconds": 15.629,
+      "durationSeconds": 15.804,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-16T04:08:05Z",
+      "finishedAt": "2026-11-16T05:04:41Z",
       "id": "deterministic-builds",
-      "inputsDigest": "sha256:41b98f8810978df55e2ad5d25b68563957a835706b05e745048d4aeba4a031aa",
+      "inputsDigest": "sha256:8558f1e55bf0c9a93527768644d239530e8e8f3c67f7d119e778de5e9fa2e8bd",
       "logDigest": "sha256:8180a497eed9ece91da5f7c860d891f69c79abb40eb578b785c3fbae8707d697",
-      "logRef": "gov-infra/evidence/local/deterministic-builds-deterministic-builds-20261116T040750Z-18.log",
+      "logRef": "gov-infra/evidence/local/deterministic-builds-deterministic-builds-20261116T050425Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-16T04:07:50Z"
+      "startedAt": "2026-11-16T05:04:25Z"
     }
   ],
   "consumed": [],
-  "description": "Release asset builds produced twice and compared byte-for-byte at a pinned SOURCE_DATE_EPOCH on Linux x64, which is the environment the assets ship from",
+  "description": "Release asset builds produced twice and compared byte-for-byte at a pinned SOURCE_DATE_EPOCH on Linux arm64, the architecture this record really ran on. Release assets ship from GitHub's ubuntu-latest runner (linux/x64), so this record proves the build is reproducible on the architecture it ran on and is not a claim about the shipping image: Linux/x64 is no longer proven anywhere, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host.",
   "environment": {
     "go": "",
     "node": "v24.22.3",
@@ -36,7 +36,7 @@
   },
   "profile": "floor-node24",
   "reason": "",
-  "recordedAt": "2026-11-16T04:08:05Z",
+  "recordedAt": "2026-11-16T05:04:41Z",
   "releaseOnly": {
     "digest": "sha256:e03bb91a5a43f48e835ab40d0ad1f1deb58a0ac78eed0633b515ca697f3f8842",
     "fileCount": 11,
@@ -46,7 +46,7 @@
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:621d9b652d93f1e8b10802e95f0bfede70db09d19522ab45c9f0c6717da1cbd4",
+    "digest": "sha256:01f68ac00ce419cd425bb1053128fe49138f4ddde61f8af7298556ed6c7ba36e",
     "fileCount": 633,
     "paths": [
       "VERSION",
@@ -68,7 +68,7 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:3d15513cb2900d30bffbb944e3d3d9fd4f28701eb8d2df7c90fd80d38f75f1b3",
+    "digest": "sha256:cc55e378e03eccac40a4750294e732a6036dccd0aaff4e0b5802c0cae3ef8a21",
     "fileCount": 782
   },
   "verdict": "PASS"

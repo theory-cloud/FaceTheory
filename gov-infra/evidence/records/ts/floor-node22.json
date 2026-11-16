@@ -5,20 +5,20 @@
         "bash",
         "scripts/verify-ts-suite.sh"
       ],
-      "durationSeconds": 198.597,
+      "durationSeconds": 189.265,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-16T03:57:00Z",
+      "finishedAt": "2026-11-16T05:01:24Z",
       "id": "ts-suite",
-      "inputsDigest": "sha256:dc874750addce21836ebbf5e7b1c10089624eaf6465bb86621f615f2e97b5bdf",
-      "logDigest": "sha256:71d0eac11da0a40d34a6eb803bb646695a033f06f7faec0c3c8040cfd6c58500",
-      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261116T035341Z-18.log",
+      "inputsDigest": "sha256:b89a406edfbcdf6d71be1fd63eb266c920c12940b4ecd487793f1c04c3d1a2a3",
+      "logDigest": "sha256:0f96dfcf8b05d317c7eb37101466594b3a9cefd409970e996239b382b4290dd9",
+      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261116T045814Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-16T03:53:41Z"
+      "startedAt": "2026-11-16T04:58:14Z"
     }
   ],
   "consumed": [],
-  "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, under each supported Node major on Linux x64",
+  "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, under each supported Node major on Linux arm64, which is the architecture each proof profile really runs. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the historical GitHub runner's architecture cannot be recorded as covered. The Node-major floor is the claim these profiles carry.",
   "environment": {
     "go": "",
     "node": "v22.23.5",
@@ -36,7 +36,7 @@
   },
   "profile": "floor-node22",
   "reason": "",
-  "recordedAt": "2026-11-16T03:57:00Z",
+  "recordedAt": "2026-11-16T05:01:24Z",
   "releaseOnly": {
     "digest": "sha256:e03bb91a5a43f48e835ab40d0ad1f1deb58a0ac78eed0633b515ca697f3f8842",
     "fileCount": 11,
@@ -46,7 +46,7 @@
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:7230bad3757d1eeb4a6590da6e67fc552cd3528138a7194b65d88223e95abd90",
+    "digest": "sha256:7b9ce196559b0376e38d66274def8a8d02bf6c5ed7b4988a93c7fe16201c2246",
     "fileCount": 643,
     "paths": [
       "ts/",
@@ -71,7 +71,7 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:2396d2e45fca5edd036b4be52173852592418456f36dc0b9dffefb41bc1ee710",
+    "digest": "sha256:cc55e378e03eccac40a4750294e732a6036dccd0aaff4e0b5802c0cae3ef8a21",
     "fileCount": 782
   },
   "verdict": "PASS"

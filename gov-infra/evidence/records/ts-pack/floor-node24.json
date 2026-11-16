@@ -5,20 +5,20 @@
         "bash",
         "scripts/verify-ts-pack.sh"
       ],
-      "durationSeconds": 8.225,
+      "durationSeconds": 7.952,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-16T04:00:26Z",
+      "finishedAt": "2026-11-16T05:07:36Z",
       "id": "ts-pack",
       "inputsDigest": "sha256:c55748422ccede961da4b34a583f4c76cbbc7835a48a0216f1f2aa8e41eda469",
       "logDigest": "sha256:5fec1376f940a17a1644b5f241b7a81147976a0a9dbf093119fe52f583ad90ad",
-      "logRef": "gov-infra/evidence/local/ts-pack-ts-pack-20261116T040018Z-18.log",
+      "logRef": "gov-infra/evidence/local/ts-pack-ts-pack-20261116T050728Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-16T04:00:18Z"
+      "startedAt": "2026-11-16T05:07:28Z"
     }
   ],
   "consumed": [],
-  "description": "npm pack of the TypeScript package at the repository version on Linux x64, inspected and installed from the tarball, under each supported Node major",
+  "description": "npm pack of the TypeScript package at the repository version on Linux arm64, inspected and installed from the tarball, under each supported Node major. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the architecture recorded is the one that really ran.",
   "environment": {
     "go": "",
     "node": "v24.22.3",
@@ -36,7 +36,7 @@
   },
   "profile": "floor-node24",
   "reason": "",
-  "recordedAt": "2026-11-16T04:00:26Z",
+  "recordedAt": "2026-11-16T05:07:36Z",
   "releaseOnly": {
     "digest": "sha256:e03bb91a5a43f48e835ab40d0ad1f1deb58a0ac78eed0633b515ca697f3f8842",
     "fileCount": 11,
@@ -59,7 +59,7 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:2396d2e45fca5edd036b4be52173852592418456f36dc0b9dffefb41bc1ee710",
+    "digest": "sha256:cc55e378e03eccac40a4750294e732a6036dccd0aaff4e0b5802c0cae3ef8a21",
     "fileCount": 782
   },
   "verdict": "PASS"
