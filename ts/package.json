@@ -285,8 +285,8 @@
     "@types/react-dom": "^19.3.0",
     "@typescript-eslint/eslint-plugin": "^8.72.0",
     "@typescript-eslint/parser": "^8.72.0",
-    "@vue/server-renderer": "^3.5.44",
-    "antd": "^6.6.7",
+    "@vue/server-renderer": "^3.5.45",
+    "antd": "^6.7.1",
     "aws-cdk-lib": "2.275.0",
     "c8": "^12.0.0",
     "constructs": "10.8.1",
@@ -303,7 +303,7 @@
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",
     "vite": "^8.3.5",
-    "vue": "^3.5.44"
+    "vue": "^3.5.45"
   },
   "overrides": {
     "@theory-cloud/apptheory": {
