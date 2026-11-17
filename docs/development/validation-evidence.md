@@ -62,10 +62,24 @@ profile and the environment the collector probed. A changed input, a changed
 command set, a changed floor or a failed command makes the record inapplicable.
 CI then fails with the local collection command instead of re-running anything.
 
-Release-only version metadata (`.release-please-manifest*`, `VERSION`,
-`CHANGELOG*`, the package manifests and locks) is normalized in the scope digest,
-so a release version bump does not stale a product record. A dependency change in
-those files still does, because only the version string is normalized.
+Two release classes keep a release transform from staling product proof.
+
+- **Release-only version metadata**: `VERSION`, the package manifests and locks,
+  and the doc files release-please rewrites with the version literal (`README.md`,
+  `docs/README.md`, `docs/api-reference.md`, `docs/getting-started.md`,
+  `ts/README.md`). Only the version string is normalized, so an unrelated edit to
+  any of them — a dependency change in a lockfile included — still stales a record.
+- **Release notes**: the two changelogs and the two release-please manifests. A
+  changelog is release history prose no gate reads, so it contributes its
+  presence and mode only. A manifest is release state, so its version values are
+  projected while the structure around them stays bound.
+
+The split is measured, not assumed: the 5.1.1 stable transform rewrites exactly
+`VERSION`, both manifests, both changelogs, the five doc files and the two
+`ts/` package files, and every one of those rewrites is a version-literal
+substitution. With both classes in place a real release transform verifies
+unchanged on every gate and profile, which is what lets a back-merge carry no
+records commit.
 
 ## The rubric
 

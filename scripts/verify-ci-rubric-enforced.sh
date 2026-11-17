@@ -188,6 +188,57 @@ for gate_id, gate in gates.items():
             problems.append(f"profile {profile!r} declares no environment")
 if not registry.get("evidenceDirectory"):
     problems.append("the registry must declare an evidence directory")
+
+# The release-notes class is the one place where a tracked path can stop staling
+# evidence: its files carry release history and release state, not product bytes,
+# so no record binds their content. Silent growth is that class's risk, so the
+# reviewed set is fixed here and the registry must match it exactly. Every path a
+# release-please config can rewrite must also be release-only, or a release would
+# stale a product record for a version bump.
+APPROVED_RELEASE_NOTES = {
+    "CHANGELOG.md",
+    "CHANGELOG.prerelease.md",
+    ".release-please-manifest.json",
+    ".release-please-manifest.premain.json",
+}
+notes = registry.get("releaseNotes")
+if not isinstance(notes, dict) or set(notes) != {"exact"}:
+    problems.append("the registry must declare releaseNotes as exact paths only")
+    declared_notes = []
+else:
+    declared_notes = [str(item) for item in notes.get("exact") or []]
+    if set(declared_notes) != APPROVED_RELEASE_NOTES:
+        problems.append(
+            "releaseNotes must match the reviewed allowlist exactly: "
+            f"missing {sorted(APPROVED_RELEASE_NOTES - set(declared_notes))}, "
+            f"unreviewed {sorted(set(declared_notes) - APPROVED_RELEASE_NOTES)}"
+        )
+release_only = {str(item) for item in (registry.get("releaseOnly") or {}).get("exact") or []}
+for path in declared_notes:
+    if any(char in path for char in "*?[]") or path.endswith("/"):
+        problems.append(f"release-notes path {path!r} must name one file, never a glob or a directory")
+    elif not Path(path).is_file():
+        problems.append(f"release-notes path {path!r} is not a tracked file")
+    if path not in release_only:
+        problems.append(f"release-notes path {path!r} must also be release-only")
+for config_name in ("release-please-config.json", "release-please-config.premain.json"):
+    config_path = Path(config_name)
+    if not config_path.is_file():
+        problems.append(f"missing {config_name}")
+        continue
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    changelog = config.get("changelog-path")
+    if changelog and changelog not in release_only:
+        problems.append(f"{config_name} changelog-path {changelog} is not release-only")
+    for package in (config.get("packages") or {}).values():
+        package_changelog = package.get("changelog-path")
+        if package_changelog and package_changelog not in release_only:
+            problems.append(f"{config_name} changelog-path {package_changelog} is not release-only")
+        for extra in package.get("extra-files") or []:
+            extra_path = str(extra.get("path") or "")
+            if extra_path and extra_path not in release_only:
+                problems.append(f"{config_name} extra-file {extra_path} is not release-only")
+
 if problems:
     print("ci-rubric: FAIL (evidence registry shape)")
     for problem in problems:
