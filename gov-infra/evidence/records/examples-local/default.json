@@ -5,16 +5,16 @@
         "bash",
         "scripts/verify-examples-local.sh"
       ],
-      "durationSeconds": 217.983,
+      "durationSeconds": 224.018,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-17T13:38:45Z",
+      "finishedAt": "2026-11-17T17:12:16Z",
       "id": "examples-local-harness",
-      "inputsDigest": "sha256:928fffd8140d1f54c1c335023cafb71995143b7839e9d73060d27638d760d2bc",
-      "logDigest": "sha256:d80d3462b5fda8f4a235615cec2aa6bae5eb056c379dd6cda385168fd0e305d7",
-      "logRef": "gov-infra/evidence/local/examples-local-examples-local-harness-20261117T133507Z-28558.log",
+      "inputsDigest": "sha256:085e93c22a876b3de5d5bdffb66fd9ede756e462350a272014872d14a25118f3",
+      "logDigest": "sha256:aa281ff1f06e1a87076e6230b1c370aa132e31ae1c4559fea526ae02f1079aa2",
+      "logRef": "gov-infra/evidence/local/examples-local-examples-local-harness-20261117T170832Z-7361.log",
       "reused": false,
-      "startedAt": "2026-11-17T13:35:07Z"
+      "startedAt": "2026-11-17T17:08:32Z"
     }
   ],
   "consumed": [],
@@ -36,17 +36,17 @@
   },
   "profile": "default",
   "reason": "",
-  "recordedAt": "2026-11-17T13:38:45Z",
+  "recordedAt": "2026-11-17T17:12:16Z",
   "releaseOnly": {
-    "digest": "sha256:ff9b8ec4ce79f3057e8527bea33fcfea5b6514a43748b897008423bda5685db2",
+    "digest": "sha256:85a8bf0d8acf3d795b2b6917a51b61d0c694b4b5bf5bbf3aed87be602e7764ab",
     "fileCount": 16,
-    "normalizedDigest": "sha256:d837fae8323ee257e35291630da9ab6daa42f4d475fbe65ff253bd127fd3b608",
+    "normalizedDigest": "sha256:bd3cba7cb3d30a0c5695bcebc65a02e66e3367381f34eaeaebb2c585bc1e0cd1",
     "version": "5.1.1"
   },
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:d810bee502a1a79a6f96021b730410ee50e3e173e2a35b1b603a782f72ba41a4",
+    "digest": "sha256:5d4b5a2008a4200ca1514f6db520be90b4e8bdb5787ac2cd31caee939ee81a00",
     "fileCount": 579,
     "paths": [
       ".go-version",
@@ -59,7 +59,7 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:abbac3aa850dc46bb08fb5e92c52c80bba83d049f9dd9dc87d1f94dd058dfe3b",
+    "digest": "sha256:38419c4249f199c9eea253b22004f0bc9b82cdbc44a627be7bee2bcf0c5783db",
     "fileCount": 781
   },
   "verdict": "PASS"
