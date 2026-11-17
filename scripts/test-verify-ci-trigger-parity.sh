@@ -27,11 +27,19 @@ trap 'rm -rf "${tmpdir}"' EXIT
 
 root="${tmpdir}/root"
 mkdir -p "${root}"
-tar -C "${repo_root}" -cf - .github scripts gov-infra Makefile | tar -C "${root}" -xf -
+tar -C "${repo_root}" -cf - .github scripts gov-infra Makefile \
+  CHANGELOG.md CHANGELOG.prerelease.md \
+  .release-please-manifest.json .release-please-manifest.premain.json \
+  release-please-config.json release-please-config.premain.json \
+  | tar -C "${root}" -xf -
 
 reset() {
   rm -rf "${root}/.github" "${root}/scripts" "${root}/gov-infra" "${root}/Makefile"
-  tar -C "${repo_root}" -cf - .github scripts gov-infra Makefile | tar -C "${root}" -xf -
+  tar -C "${repo_root}" -cf - .github scripts gov-infra Makefile \
+    CHANGELOG.md CHANGELOG.prerelease.md \
+    .release-please-manifest.json .release-please-manifest.premain.json \
+    release-please-config.json release-please-config.premain.json \
+    | tar -C "${root}" -xf -
   cp "${repo_root}/scripts/verify-ci-trigger-parity.sh" "${root}/scripts/verify-ci-trigger-parity.sh"
   cp "${repo_root}/scripts/verify-ci-rubric-enforced.sh" "${root}/scripts/verify-ci-rubric-enforced.sh"
 }
@@ -196,6 +204,19 @@ reset
 replace_line .github/workflows/ci.yml "run: bash scripts/evidence/verify-all.sh" \
   "run: bash gov-infra/verifiers/gov-verify-rubric.sh"
 expect_fail "the rubric executed again in CI"
+
+reset
+python3 - "${root}/scripts/evidence/validation-gates.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+registry = json.loads(path.read_text(encoding="utf-8"))
+registry["releaseNotes"]["exact"].append("VERSION")
+path.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+PY
+expect_rubric_fail "ci-rubric: an unreviewed release-notes path entered the class"
 
 reset
 replace_line .github/workflows/ci.yml "run: bash scripts/evidence/verify-all.sh" \
