@@ -11,7 +11,10 @@
 #          only the pull request context: no checkout, no credential, and a
 #          head-repository equality condition so a fork branch cannot pass by
 #          name. Its accepted heads name the integration branch and the release
-#          automation branches this repository actually generates.
+#          automation branches this repository actually generates. It also runs
+#          on the eligible `pull_request_review` event, because a dispatched
+#          check run never satisfies a required status check; the per-base
+#          eligible path is proved by scripts/verify-release-pr-check-lane.sh.
 #
 # A shape this checker does not model fails closed rather than passing by
 # omission: an unlisted push-triggered workflow, an unknown verify entry point,
@@ -387,11 +390,11 @@ hygiene = workflows.get(HYGIENE_PATH)
 if hygiene is None:
     fail(f"missing the head-branch check at {HYGIENE_PATH}")
 else:
-    if sorted(hygiene["events"]) != ["pull_request", "workflow_dispatch"]:
+    if sorted(hygiene["events"]) != ["pull_request", "pull_request_review", "workflow_dispatch"]:
         fail(
-            f"{HYGIENE_PATH}: must trigger on pull_request and workflow_dispatch; got {hygiene['events']}. "
-            "The dispatch path is how a generated release pull request, whose events the built-in "
-            "token does not start, still gets this context"
+            f"{HYGIENE_PATH}: must trigger on pull_request, pull_request_review and workflow_dispatch; "
+            f"got {hygiene['events']}. The dispatch path is the lane's early verdict; the code-owner "
+            "review is the eligible event that makes the context a required check"
         )
     branches = hygiene["event_branches"].get("pull_request") or []
     if not branches:
@@ -422,7 +425,7 @@ else:
             f"{HYGIENE_PATH}: must compare github.event.pull_request.head.repo.full_name with github.repository, "
             "so a fork branch named like an accepted head cannot pass by name"
         )
-    if "HEAD_REPOSITORY:" not in hygiene["text"] or "BASE_REPOSITORY:" not in hygiene["text"]:
+    if "PR_HEAD_REPOSITORY:" not in hygiene["text"] or "BASE_REPOSITORY:" not in hygiene["text"]:
         fail(f"{HYGIENE_PATH}: must pass the head and base repositories through env: to the run body")
     for head in (STAGING, RELEASE_PLEASE_PREMAIN, RELEASE_PLEASE_MAIN):
         if head not in hygiene["text"]:

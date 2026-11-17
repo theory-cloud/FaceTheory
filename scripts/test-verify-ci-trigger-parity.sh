@@ -236,8 +236,8 @@ expect_fail "the verify job widened onto a release branch"
 # --- REL-1: the head-branch check ----------------------------------------
 reset
 replace_line .github/workflows/promotion-hygiene.yml \
-  "HEAD_REPOSITORY: \${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}" \
-  "HEAD_REPOSITORY: \${{ github.repository }}"
+  "PR_HEAD_REPOSITORY: \${{ github.event.pull_request.head.repo.full_name }}" \
+  "PR_HEAD_REPOSITORY: \${{ github.repository }}"
 expect_fail "the head check stopped requiring the head repository"
 
 reset
@@ -289,6 +289,12 @@ reset
 replace_line .github/workflows/promotion-hygiene.yml '    branches: ["premain", "main"]' \
   '    branches: ["premain"]'
 expect_fail "the head check stopped reporting on main"
+
+# --- REL-1: the eligible review event ------------------------------------
+reset
+replace_line .github/workflows/promotion-hygiene.yml "  pull_request_review:" \
+  "  pull_request_target:"
+expect_fail "the head check lost the eligible code-owner review event"
 
 # --- the catch-all scope --------------------------------------------------
 reset
