@@ -260,6 +260,10 @@ require_contains ".github/workflows/promotion-hygiene.yml" "release-please--bran
   "the head-branch check must accept the generated main release-please branch"
 require_contains ".github/workflows/promotion-hygiene.yml" "  workflow_dispatch:" \
   "the head-branch check must keep a dispatch path: a generated release pull request gets no pull_request run"
+require_contains ".github/workflows/promotion-hygiene.yml" "  pull_request_review:" \
+  "the head-branch check must also run on the code-owner review, the eligible event that makes a generated release pull request's context a required check"
+require_contains ".github/workflows/promotion-hygiene.yml" "types: [submitted]" \
+  "the review trigger must subscribe to the submitted activity the release ruleset requires"
 require_contains ".github/workflows/promotion-hygiene.yml" "release_pr_number:" \
   "the dispatch path must take the generated release pull request number it verifies"
 require_not_contains ".github/workflows/promotion-hygiene.yml" "actions/checkout@" \
