@@ -5,16 +5,16 @@
         "bash",
         "scripts/verify-deterministic-builds.sh"
       ],
-      "durationSeconds": 17.681,
+      "durationSeconds": 15.656,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-16T20:36:21Z",
+      "finishedAt": "2026-11-17T13:39:01Z",
       "id": "deterministic-builds",
-      "inputsDigest": "sha256:9d35e287f856f680faa084e3ab918aee42dd2bcda9c56a322d9afbc210f1acd8",
+      "inputsDigest": "sha256:12aee014efeb61eb4418c71d9379ce9e43cc4b4b06d34ca4559a7b8e82fcef33",
       "logDigest": "sha256:8180a497eed9ece91da5f7c860d891f69c79abb40eb578b785c3fbae8707d697",
-      "logRef": "gov-infra/evidence/local/deterministic-builds-deterministic-builds-20261116T203603Z-18.log",
+      "logRef": "gov-infra/evidence/local/deterministic-builds-deterministic-builds-20261117T133845Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-16T20:36:03Z"
+      "startedAt": "2026-11-17T13:38:45Z"
     }
   ],
   "consumed": [],
@@ -36,17 +36,17 @@
   },
   "profile": "floor-node24",
   "reason": "",
-  "recordedAt": "2026-11-16T20:36:21Z",
+  "recordedAt": "2026-11-17T13:39:01Z",
   "releaseOnly": {
-    "digest": "sha256:dad0cb6197f43a90d1f2eaff08aab3c72d5f02aba21e3c5696638baa22c2d04b",
-    "fileCount": 11,
-    "normalizedDigest": "sha256:a2440bb55cb4c1c3a8b82990f5cf558303e82074fbef4812e5020d5e3b631aa0",
+    "digest": "sha256:ff9b8ec4ce79f3057e8527bea33fcfea5b6514a43748b897008423bda5685db2",
+    "fileCount": 16,
+    "normalizedDigest": "sha256:d837fae8323ee257e35291630da9ab6daa42f4d475fbe65ff253bd127fd3b608",
     "version": "5.1.1"
   },
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:afa2d9b0cfd0ee6874d028e6acd928897c797d9a03c13793c3b381abfeb3dee3",
+    "digest": "sha256:68acfb065859608a0c73fd02f6a40f4346036041e5ffd574f2b3266cb96b4107",
     "fileCount": 633,
     "paths": [
       "VERSION",
@@ -68,8 +68,8 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:3a739837d5390640df740c05dd099c377bf265b9fa60e78f16831ecf987bf00b",
-    "fileCount": 782
+    "digest": "sha256:77de0d9ff432a9f4b085d102935ef444a191a052588678d1e7a2b8e9327e99fe",
+    "fileCount": 780
   },
   "verdict": "PASS"
 }

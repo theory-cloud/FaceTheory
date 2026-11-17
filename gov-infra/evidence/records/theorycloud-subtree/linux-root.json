@@ -5,16 +5,16 @@
         "bash",
         "scripts/verify-theorycloud-subtree-path.sh"
       ],
-      "durationSeconds": 1.091,
+      "durationSeconds": 1.063,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-16T20:36:23Z",
+      "finishedAt": "2026-11-17T13:42:34Z",
       "id": "theorycloud-subtree-path",
-      "inputsDigest": "sha256:8c72d135f8a56a575731744a06bbf69cd893fa7796d2b6b47f8df92377c23e24",
+      "inputsDigest": "sha256:406372ea0ab4e93f56dbe71d929b0097737d42c91eea048ec109f8c4b9c18a3e",
       "logDigest": "sha256:c1525051ce18fc8af053475cf21498f4122b8d8a89124cf6771e04fb321907b8",
-      "logRef": "gov-infra/evidence/local/theorycloud-subtree-theorycloud-subtree-path-20261116T203622Z-18.log",
+      "logRef": "gov-infra/evidence/local/theorycloud-subtree-theorycloud-subtree-path-20261117T134232Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-16T20:36:22Z"
+      "startedAt": "2026-11-17T13:42:32Z"
     }
   ],
   "consumed": [],
@@ -36,18 +36,18 @@
   },
   "profile": "linux-root",
   "reason": "",
-  "recordedAt": "2026-11-16T20:36:23Z",
+  "recordedAt": "2026-11-17T13:42:34Z",
   "releaseOnly": {
-    "digest": "sha256:dad0cb6197f43a90d1f2eaff08aab3c72d5f02aba21e3c5696638baa22c2d04b",
-    "fileCount": 11,
-    "normalizedDigest": "sha256:a2440bb55cb4c1c3a8b82990f5cf558303e82074fbef4812e5020d5e3b631aa0",
+    "digest": "sha256:ff9b8ec4ce79f3057e8527bea33fcfea5b6514a43748b897008423bda5685db2",
+    "fileCount": 16,
+    "normalizedDigest": "sha256:d837fae8323ee257e35291630da9ab6daa42f4d475fbe65ff253bd127fd3b608",
     "version": "5.1.1"
   },
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:7ed4be258698a953528b9fbbadc581589b16477165a2de447c05d332bd258c34",
-    "fileCount": 181,
+    "digest": "sha256:f0f29e158c83d5a6c7f08d02f0eb89ba47e74124297f25944e2242af96b275b8",
+    "fileCount": 183,
     "paths": [
       "docs/",
       "Makefile",
@@ -58,8 +58,8 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:3a739837d5390640df740c05dd099c377bf265b9fa60e78f16831ecf987bf00b",
-    "fileCount": 782
+    "digest": "sha256:77de0d9ff432a9f4b085d102935ef444a191a052588678d1e7a2b8e9327e99fe",
+    "fileCount": 780
   },
   "verdict": "PASS"
 }
