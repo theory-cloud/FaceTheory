@@ -67,8 +67,13 @@ Two release classes keep a release transform from staling product proof.
 - **Release-only version metadata**: `VERSION`, the package manifests and locks,
   and the doc files release-please rewrites with the version literal (`README.md`,
   `docs/README.md`, `docs/api-reference.md`, `docs/getting-started.md`,
-  `ts/README.md`). Only the version string is normalized, so an unrelated edit to
-  any of them — a dependency change in a lockfile included — still stales a record.
+  `ts/README.md`). Only the managed version slots are projected: the version
+  literal in a text file, and the top-level `version` plus the lockfile's
+  `packages[""].version` in a JSON document. Every other value stays bound, so an
+  unrelated edit — a dependency change in a lockfile included — still stales a
+  record. A whole-literal substitution would be wrong here: `safe-buffer` sits at
+  5.1.2 in `ts/package-lock.json` while the package is at 5.1.1, so the mask would
+  move onto that dependency as soon as the package reached 5.1.2.
 - **Release notes**: the two changelogs and the two release-please manifests. A
   changelog is release history prose no gate reads, so it contributes its
   presence and mode only. A manifest is release state, so its version values are
