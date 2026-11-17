@@ -114,15 +114,21 @@ pull-request path needs no checkout and holds only read-only built-in access.
 
 A generated release pull request is opened by release-please with the built-in
 `GITHUB_TOKEN`, and GitHub starts no `pull_request` workflow for events that token
-causes. `prerelease-pr.yml` and `release-pr.yml` therefore attach the required
-context themselves: `scripts/sync-release-pr-checks.sh` dispatches
-`promotion-hygiene.yml` against the release branch, waits for it at the pull
-request head, keeps the pull request a draft until that head is green, reuses an
-already-green check, refuses to re-dispatch around a red one, and marks the pull
-request ready only after re-reading the head. The declaration in
-`.github/release-lane.json` is the single source of truth for which context each
-release branch requires, and `scripts/verify-release-pr-check-lane.sh` fails
-closed when a producer, the dispatch binding or the built-in-token rule drifts.
+causes. Two paths cover it, and they are not equal. `prerelease-pr.yml` and
+`release-pr.yml` attach an early verdict: `scripts/sync-release-pr-checks.sh`
+dispatches `promotion-hygiene.yml` against the release branch, waits for it at the
+pull request head, keeps the pull request a draft until that head is green, reuses
+an already-green check, refuses to re-dispatch around a red one, and marks the pull
+request ready only after re-reading the head, warning at that point that the
+dispatched checks never satisfy the ruleset. The context becomes a required status
+check only from an eligible event, and the eligible event here is the code-owner
+approval the ruleset already requires: `promotion-hygiene.yml` also triggers on
+`pull_request_review: [submitted]` for `premain` and `main`, so the review runs the
+same `promotion-hygiene` job for the reviewed pull request, with no credential and
+no extra human step. The declaration in `.github/release-lane.json` is the single source of
+truth for which context each release branch requires, and
+`scripts/verify-release-pr-check-lane.sh` fails closed when a producer, the
+dispatch binding, the review path for a base, or the built-in-token rule drifts.
 
 Fork contributions arrive on a pre-arranged branch negotiated with the code
 owners; a code owner carries the change into `staging` with locally produced
