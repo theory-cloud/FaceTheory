@@ -47,10 +47,12 @@ and evidence-only commits. Inputs are partitioned into disjoint sets:
   and release state, not product bytes, so no record binds their content.
 
 Each gate carries its own declared input scope. A gate record stores a scope
-digest computed over exactly that scope, with release-only files normalized by
-substituting the recorded version literal and release-notes files projected to
-what they contribute: a changelog's presence and mode, and a manifest's
-structure with its version values excluded. A documentation or evidence-only
+digest computed over exactly that scope, with release-only files normalized at
+their managed version slots (the version literal for a text file, the top-level
+and root-package ``version`` values for a JSON manifest or lockfile) and
+release-notes files projected to what they contribute: a changelog's presence
+and mode, and a release-please manifest's structure with its version values
+excluded. A documentation or evidence-only
 change therefore does not invalidate product proof, while an edit inside a
 gate's scope does. A file that matches no product scope and no declared
 non-product path is an unknown input: every product gate falls back to broad
@@ -443,6 +445,48 @@ def normalize_release_bytes(data: bytes, version: str) -> bytes:
     return data.replace(literal, VERSION_TOKEN)
 
 
+RELEASE_JSON_VERSION_TOKEN = "@@FACETHEORY_RELEASE_JSON_VERSION@@"
+
+
+def normalize_release_json_bytes(data: bytes, version: str) -> bytes:
+    """Project a release-only JSON document to its content.
+
+    A released package's manifest and lockfile carry the package version in the
+    two places release-please writes: the document's top-level ``version`` and
+    the lockfile's ``packages[""].version``. Both move on every release.
+
+    Masking the version literal *everywhere* is wrong for a lockfile, because a
+    dependency can carry the same number: ``safe-buffer`` is at 5.1.2 in
+    ``ts/package-lock.json`` while the package is at 5.1.1, so the release that
+    bumps the package to 5.1.2 would move the mask onto that dependency and an
+    otherwise unchanged lockfile would project differently. Projecting the
+    parsed document masks exactly the managed slots, keeps every other value
+    bound, and makes formatting irrelevant instead of binding it.
+    """
+    try:
+        document = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return normalize_release_bytes(data, version)
+    if not isinstance(document, dict):
+        return normalize_release_bytes(data, version)
+    if isinstance(document.get("version"), str):
+        document["version"] = RELEASE_JSON_VERSION_TOKEN
+    packages = document.get("packages")
+    if isinstance(packages, dict):
+        root_package = packages.get("")
+        if isinstance(root_package, dict) and isinstance(root_package.get("version"), str):
+            root_package["version"] = RELEASE_JSON_VERSION_TOKEN
+    if isinstance(document.get("."), str):
+        document["."] = RELEASE_JSON_VERSION_TOKEN
+    return json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def project_release_only(relative: str, data: bytes, version: str) -> bytes:
+    if relative.endswith(".json"):
+        return normalize_release_json_bytes(data, version)
+    return normalize_release_bytes(data, version)
+
+
 def normalize_release_notes_bytes(relative: str, data: bytes) -> bytes:
     """Project a release-notes file to what it contributes to product proof.
 
@@ -511,7 +555,7 @@ def load_snapshot(root: Path, registry: Registry) -> Snapshot:
             if release_notes:
                 normalized = normalize_release_notes_bytes(relative, data)
             else:
-                normalized = normalize_release_bytes(data, version)
+                normalized = project_release_only(relative, data, version)
             normalized_lines.append(
                 b"%d\t%s\t%s\n" % (mode, relative.encode("utf-8"), sha256_bytes(normalized).encode("ascii"))
             )
@@ -543,7 +587,7 @@ def scope_digest(snapshot: Snapshot, patterns: list[str]) -> tuple[str, int]:
             data = normalize_release_notes_bytes(relative, entry.data)
             kind = b"release-notes"
         elif entry.release_only:
-            data = normalize_release_bytes(entry.data, snapshot.release_version)
+            data = project_release_only(relative, entry.data, snapshot.release_version)
             kind = b"release-normalized"
         else:
             data = entry.data
