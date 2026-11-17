@@ -5,16 +5,16 @@
         "make",
         "rubric"
       ],
-      "durationSeconds": 49.622,
+      "durationSeconds": 57.027,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-17T15:29:18Z",
+      "finishedAt": "2026-11-17T17:13:33Z",
       "id": "rubric",
-      "inputsDigest": "sha256:905eb56b223ec10d55c7c8dfe91dff8ff3e05dc92df59494948f9f4d04999262",
+      "inputsDigest": "sha256:805702d6046bbdaf0d5fdc84910be2084f1f7a9f9edf52d9429527c3bf381b6f",
       "logDigest": "sha256:4201ca823ae55416fd8f419f2e8890af679790766d7a547cb77e02b3ad55ed8c",
-      "logRef": "gov-infra/evidence/local/rubric-rubric-20261117T152829Z-13613.log",
+      "logRef": "gov-infra/evidence/local/rubric-rubric-20261117T171236Z-17053.log",
       "reused": false,
-      "startedAt": "2026-11-17T15:28:29Z"
+      "startedAt": "2026-11-17T17:12:36Z"
     }
   ],
   "consumed": [],
@@ -36,17 +36,17 @@
   },
   "profile": "default",
   "reason": "",
-  "recordedAt": "2026-11-17T15:29:18Z",
+  "recordedAt": "2026-11-17T17:13:33Z",
   "releaseOnly": {
-    "digest": "sha256:ff9b8ec4ce79f3057e8527bea33fcfea5b6514a43748b897008423bda5685db2",
+    "digest": "sha256:85a8bf0d8acf3d795b2b6917a51b61d0c694b4b5bf5bbf3aed87be602e7764ab",
     "fileCount": 16,
-    "normalizedDigest": "sha256:d837fae8323ee257e35291630da9ab6daa42f4d475fbe65ff253bd127fd3b608",
+    "normalizedDigest": "sha256:bd3cba7cb3d30a0c5695bcebc65a02e66e3367381f34eaeaebb2c585bc1e0cd1",
     "version": "5.1.1"
   },
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:cdbbf9212aa23853edd4081c0cdb0bae2921eba1df3888df72357a3d9c074cdc",
+    "digest": "sha256:c4e22ea4a7b336d7246cc419607fee28330f7f7c623b0f09a852624941c9f8c2",
     "fileCount": 797,
     "paths": [
       "**"
@@ -54,7 +54,7 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:276c1e8084da886c745e6f51802b42e064deed9c8fbdb4d76e032c4f929cd2bb",
+    "digest": "sha256:38419c4249f199c9eea253b22004f0bc9b82cdbc44a627be7bee2bcf0c5783db",
     "fileCount": 781
   },
   "verdict": "PASS"

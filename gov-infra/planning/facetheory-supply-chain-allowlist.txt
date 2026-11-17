@@ -30,10 +30,10 @@
 # 7.3.1 (pin and peer agree, so there is no mismatch to reconcile).
 # The copy at node_modules/aws-cdk-lib/node_modules/minimatch is published
 # inside the AWS tarball and cannot be upgraded from this repository; no
-# published aws-cdk-lib fixes it (2.277.0 was the newest on 2026-11-15 and it
+# published aws-cdk-lib fixes it (2.277.0 was the newest on 2026-11-17 and it
 # still declares minimatch ^10.2.6), so no available CDK release fixes this.
 # Every non-bundled minimatch copy is
-# resolved by the ts/package.json override to 11.0.1, so this exception covers
+# resolved by the ts/package.json override to 11.0.9, so this exception covers
 # only the AWS-published copy and no other path.
 # Operator ruling 2026-10-03 (extended 2026-10-04 to AWS-published
 # build-toolchain chains): "if a vulnerable dependency is bundled in AWS we make

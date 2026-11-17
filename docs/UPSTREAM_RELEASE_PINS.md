@@ -199,7 +199,7 @@ every dependency it names is itself allowed and it carries no advisory of its ow
   fixed in `minimatch@11.0.1`. The affected copy at `node_modules/aws-cdk-lib/node_modules/minimatch` ships inside the
   AWS-published `aws-cdk-lib` tarball and cannot be upgraded from this repository; `2.275.0` is the exact `aws-cdk-lib` peer that
   `@theory-cloud/apptheory-cdk` v7.3.1 declares, and no published `aws-cdk-lib` fixes this: `2.277.0` was the newest
-  release when re-checked on 2026-11-15 and it still declares `minimatch ^10.2.6`. The scoped entry names exactly that package, version, node path, all three audited
+  release when re-checked on 2026-11-17 and it still declares `minimatch ^10.2.6`. The scoped entry names exactly that package, version, node path, all three audited
   projects, and the single advisory, and expires 2026-12-01. Authorised by the operator ruling of 2026-10-03 ("if a
   vulnerable dependency is bundled in AWS we make an exception until its updated there"), extended 2026-10-04 to
   AWS-published build-toolchain chains. Removal condition: the pinned `aws-cdk-lib` bundles `minimatch >= 11.0.1`.
@@ -208,8 +208,8 @@ every dependency it names is itself allowed and it carries no advisory of its ow
 
 Non-bundled copies are not eligible for an exception and are resolved by upgrade instead. The same advisory batch
 (2026-10-30) also published `GHSA-3g3m-2fjr-6pw4` against `glob` (patched `14.0.2`), so `ts/package.json` overrides
-`minimatch` to `11.0.1` and `glob` to `14.0.3`; `ts/package-lock.json` resolves every non-bundled `minimatch` to
-`11.0.1` and `glob` to `14.0.3`, leaving only the AWS-bundled node above.
+`minimatch` to `11.0.9` and `glob` to `14.0.3`; `ts/package-lock.json` resolves every non-bundled `minimatch` to
+`11.0.9` and `glob` to `14.0.3`, leaving only the AWS-bundled node above.
 
 ### Recently cleared
 
