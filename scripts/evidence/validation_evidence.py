@@ -41,11 +41,18 @@ and evidence-only commits. Inputs are partitioned into disjoint sets:
 * source inputs -- every tracked or untracked-but-not-ignored file except the
   dedicated evidence directory and the release-only set;
 * release-only inputs -- the explicit version-coupled and regenerated artifact
-  paths named in the registry.
+  paths named in the registry;
+* release-notes inputs -- the registry's ``releaseNotes`` files (the changelogs,
+  and the release-please manifests' version values). They carry release history
+  and release state, not product bytes, so no record binds their content.
 
 Each gate carries its own declared input scope. A gate record stores a scope
-digest computed over exactly that scope, with release-only files normalized by
-substituting the recorded version literal. A documentation or evidence-only
+digest computed over exactly that scope, with release-only files normalized at
+their managed version slots (the version literal for a text file, the top-level
+and root-package ``version`` values for a JSON manifest or lockfile) and
+release-notes files projected to what they contribute: a changelog's presence
+and mode, and a release-please manifest's structure with its version values
+excluded. A documentation or evidence-only
 change therefore does not invalidate product proof, while an edit inside a
 gate's scope does. A file that matches no product scope and no declared
 non-product path is an unknown input: every product gate falls back to broad
@@ -93,6 +100,8 @@ ENVIRONMENT_ALIASES = {
     "toolchain+platform": ["go", "node", "python", "platform"],
 }
 VERSION_TOKEN = b"@@FACETHEORY_VERSION@@"
+RELEASE_NOTES_TOKEN = b"@@FACETHEORY_RELEASE_NOTES@@\n"
+RELEASE_VERSION_VALUE_RE = re.compile(rb'"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.+-]+)?"')
 SOURCE_HEADER = b"facetheory-validation-source-v1\n"
 RELEASE_HEADER = b"facetheory-validation-release-v1\n"
 NORMALIZED_HEADER = b"facetheory-validation-release-normalized-v1\n"
@@ -410,6 +419,11 @@ def matches_security_input(relative: str, registry: Registry) -> bool:
     return any(fnmatch.fnmatchcase(relative, pattern) for pattern in policy.get("patterns", []))
 
 
+def matches_release_notes(relative: str, registry: Registry) -> bool:
+    policy = registry.data.get("releaseNotes") or {}
+    return relative in {str(item) for item in policy.get("exact", [])}
+
+
 def read_version(root: Path) -> str:
     version_file = root / "VERSION"
     try:
@@ -431,11 +445,71 @@ def normalize_release_bytes(data: bytes, version: str) -> bytes:
     return data.replace(literal, VERSION_TOKEN)
 
 
+RELEASE_JSON_VERSION_TOKEN = "@@FACETHEORY_RELEASE_JSON_VERSION@@"
+
+
+def normalize_release_json_bytes(data: bytes, version: str) -> bytes:
+    """Project a release-only JSON document to its content.
+
+    A released package's manifest and lockfile carry the package version in the
+    two places release-please writes: the document's top-level ``version`` and
+    the lockfile's ``packages[""].version``. Both move on every release.
+
+    Masking the version literal *everywhere* is wrong for a lockfile, because a
+    dependency can carry the same number: ``safe-buffer`` is at 5.1.2 in
+    ``ts/package-lock.json`` while the package is at 5.1.1, so the release that
+    bumps the package to 5.1.2 would move the mask onto that dependency and an
+    otherwise unchanged lockfile would project differently. Projecting the
+    parsed document masks exactly the managed slots, keeps every other value
+    bound, and makes formatting irrelevant instead of binding it.
+    """
+    try:
+        document = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return normalize_release_bytes(data, version)
+    if not isinstance(document, dict):
+        return normalize_release_bytes(data, version)
+    if isinstance(document.get("version"), str):
+        document["version"] = RELEASE_JSON_VERSION_TOKEN
+    packages = document.get("packages")
+    if isinstance(packages, dict):
+        root_package = packages.get("")
+        if isinstance(root_package, dict) and isinstance(root_package.get("version"), str):
+            root_package["version"] = RELEASE_JSON_VERSION_TOKEN
+    if isinstance(document.get("."), str):
+        document["."] = RELEASE_JSON_VERSION_TOKEN
+    return json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def project_release_only(relative: str, data: bytes, version: str) -> bytes:
+    if relative.endswith(".json"):
+        return normalize_release_json_bytes(data, version)
+    return normalize_release_bytes(data, version)
+
+
+def normalize_release_notes_bytes(relative: str, data: bytes) -> bytes:
+    """Project a release-notes file to what it contributes to product proof.
+
+    A changelog is release history prose: release-please prepends a generated
+    section on every release, and no gate reads it. Its content cannot change a
+    claim, so it contributes its presence and mode only, never its bytes.
+
+    A release-please manifest is release state: every version value moves on a
+    release, including the prerelease track's value that the tracked ``VERSION``
+    literal does not name. Only those values are projected; the structure around
+    them stays bound, so an unrelated edit to the manifest still fails closed.
+    """
+    if relative.endswith(".json"):
+        return RELEASE_VERSION_VALUE_RE.sub(b'"@@FACETHEORY_RELEASE_NOTES@@"', data)
+    return RELEASE_NOTES_TOKEN
+
+
 @dataclass(frozen=True)
 class FileEntry:
     mode: int
     data: bytes
     release_only: bool
+    release_notes: bool = False
 
 
 @dataclass(frozen=True)
@@ -469,7 +543,8 @@ def load_snapshot(root: Path, registry: Registry) -> Snapshot:
             continue
         mode, data = read_input_bytes(root, relative)
         release_only = matches_release_only(relative, registry)
-        files[relative] = FileEntry(mode=mode, data=data, release_only=release_only)
+        release_notes = release_only and matches_release_notes(relative, registry)
+        files[relative] = FileEntry(mode=mode, data=data, release_only=release_only, release_notes=release_notes)
         content_digest = sha256_bytes(data)
         if matches_security_input(relative, registry):
             dependency_count += 1
@@ -477,7 +552,10 @@ def load_snapshot(root: Path, registry: Registry) -> Snapshot:
         if release_only:
             release_count += 1
             release_lines.append(b"%d\t%s\t%s\n" % (mode, relative.encode("utf-8"), content_digest.encode("ascii")))
-            normalized = normalize_release_bytes(data, version)
+            if release_notes:
+                normalized = normalize_release_notes_bytes(relative, data)
+            else:
+                normalized = project_release_only(relative, data, version)
             normalized_lines.append(
                 b"%d\t%s\t%s\n" % (mode, relative.encode("utf-8"), sha256_bytes(normalized).encode("ascii"))
             )
@@ -505,8 +583,15 @@ def scope_digest(snapshot: Snapshot, patterns: list[str]) -> tuple[str, int]:
         if not matches_any(relative, patterns):
             continue
         entry = snapshot.files[relative]
-        data = normalize_release_bytes(entry.data, snapshot.release_version) if entry.release_only else entry.data
-        kind = b"release-normalized" if entry.release_only else b"source"
+        if entry.release_notes:
+            data = normalize_release_notes_bytes(relative, entry.data)
+            kind = b"release-notes"
+        elif entry.release_only:
+            data = project_release_only(relative, entry.data, snapshot.release_version)
+            kind = b"release-normalized"
+        else:
+            data = entry.data
+            kind = b"source"
         lines.append(
             b"%d\t%s\t%s\t%s\n" % (entry.mode, relative.encode("utf-8"), kind, sha256_bytes(data).encode("ascii"))
         )

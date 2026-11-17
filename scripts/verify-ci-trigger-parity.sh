@@ -11,7 +11,10 @@
 #          only the pull request context: no checkout, no credential, and a
 #          head-repository equality condition so a fork branch cannot pass by
 #          name. Its accepted heads name the integration branch and the release
-#          automation branches this repository actually generates.
+#          automation branches this repository actually generates. It also runs
+#          on the eligible `pull_request_review` event, because a dispatched
+#          check run never satisfies a required status check; the per-base
+#          eligible path is proved by scripts/verify-release-pr-check-lane.sh.
 #
 # A shape this checker does not model fails closed rather than passing by
 # omission: an unlisted push-triggered workflow, an unknown verify entry point,
@@ -387,16 +390,34 @@ hygiene = workflows.get(HYGIENE_PATH)
 if hygiene is None:
     fail(f"missing the head-branch check at {HYGIENE_PATH}")
 else:
-    if hygiene["events"] != ["pull_request"]:
-        fail(f"{HYGIENE_PATH}: must trigger on pull_request only; got {hygiene['events']}")
+    if sorted(hygiene["events"]) != ["pull_request", "pull_request_review", "workflow_dispatch"]:
+        fail(
+            f"{HYGIENE_PATH}: must trigger on pull_request, pull_request_review and workflow_dispatch; "
+            f"got {hygiene['events']}. The dispatch path is the lane's early verdict; the code-owner "
+            "review is the eligible event that makes the context a required check"
+        )
     branches = hygiene["event_branches"].get("pull_request") or []
     if not branches:
         fail(f"{HYGIENE_PATH}: must restrict its pull_request trigger to {RELEASE_BRANCH}/{MAIN_BRANCH}")
     for branch in (RELEASE_BRANCH, MAIN_BRANCH):
         if branch not in branches:
             fail(f"{HYGIENE_PATH}: must report on pull requests into {branch!r}; got {branches}")
-    if not re.search(r"^permissions:\s*\{\}\s*$", hygiene["text"], re.MULTILINE):
-        fail(f"{HYGIENE_PATH}: must declare `permissions: {{}}`; the head check needs no credential")
+    if not re.search(r"^permissions:\n(?:  [a-z-]+: [a-z]+\n)+", hygiene["text"], re.MULTILINE):
+        fail(f"{HYGIENE_PATH}: must declare its read-only permissions explicitly")
+    for permission in re.findall(r"^  ([a-z-]+): ([a-z]+)$", hygiene["text"], re.MULTILINE):
+        name, level = permission
+        if level != "read":
+            fail(
+                f"{HYGIENE_PATH}: permission {name!r} is {level!r}; the head check needs read-only "
+                "built-in access and must never hold a write credential"
+            )
+    if not re.search(r"^  pull-requests: read$", hygiene["text"], re.MULTILINE):
+        fail(
+            f"{HYGIENE_PATH}: must declare `pull-requests: read`; the dispatch path reads the generated "
+            "pull request by number to bind the run to its head"
+        )
+    if "release_pr_number:" not in hygiene["text"]:
+        fail(f"{HYGIENE_PATH}: the dispatch path must take the generated release pull request number")
     if "actions/checkout" in hygiene["text"]:
         fail(f"{HYGIENE_PATH}: must not check out the pull request; it needs only the pull request context")
     if "github.event.pull_request.head.repo.full_name" not in hygiene["text"]:
@@ -404,7 +425,7 @@ else:
             f"{HYGIENE_PATH}: must compare github.event.pull_request.head.repo.full_name with github.repository, "
             "so a fork branch named like an accepted head cannot pass by name"
         )
-    if "HEAD_REPOSITORY:" not in hygiene["text"] or "BASE_REPOSITORY:" not in hygiene["text"]:
+    if "PR_HEAD_REPOSITORY:" not in hygiene["text"] or "BASE_REPOSITORY:" not in hygiene["text"]:
         fail(f"{HYGIENE_PATH}: must pass the head and base repositories through env: to the run body")
     for head in (STAGING, RELEASE_PLEASE_PREMAIN, RELEASE_PLEASE_MAIN):
         if head not in hygiene["text"]:
@@ -413,10 +434,57 @@ else:
                 f"{STAGING!r} into {RELEASE_BRANCH}, {RELEASE_BRANCH!r} into {MAIN_BRANCH}, plus the "
                 "release-please branch each of them generates"
             )
-    for job_id, body in hygiene["jobs"].items():
-        for run in run_bodies(body):
-            if "git " in run or "gh " in run:
-                fail(f"{HYGIENE_PATH}: job {job_id!r} runs a repository command; the head check needs none")
+    # A dispatched run must prove the pull request it names is the branch and
+    # commit it is running on, or it would certify a different tree than the one
+    # the ruleset gates.
+    for marker in ("RELEASE_PR_NUMBER", "DISPATCHED_REF_NAME", "DISPATCHED_SHA", 'head.get("sha")'):
+        if marker not in hygiene["text"]:
+            fail(
+                f"{HYGIENE_PATH}: the dispatch path must bind the run to the pull request head "
+                f"(missing {marker})"
+            )
+
+    def hygiene_steps(text):
+        steps = []
+        current = None
+        for line in text.splitlines():
+            if re.match(r"^      - ", line):
+                if current is not None:
+                    steps.append(current)
+                current = [line]
+                continue
+            if current is not None and (
+                re.match(r"^  [A-Za-z0-9_-]+:\s*$", line) or re.match(r"^[A-Za-z0-9_.-]+:\s*", line)
+            ):
+                steps.append(current)
+                current = None
+                continue
+            if current is not None:
+                current.append(line)
+        if current is not None:
+            steps.append(current)
+        return ["\n".join(step) for step in steps]
+
+    dispatch_gate = "if: github.event_name == 'workflow_dispatch'"
+    gh_steps = 0
+    for step in hygiene_steps(hygiene["text"]):
+        for run in run_bodies(step):
+            if "git " in run:
+                fail(
+                    f"{HYGIENE_PATH}: a step runs a git command; the head check needs only the "
+                    "pull request context"
+                )
+            if "gh " in run:
+                gh_steps += 1
+                if dispatch_gate not in step:
+                    fail(
+                        f"{HYGIENE_PATH}: a step outside the workflow_dispatch binding runs gh; the "
+                        "pull_request path must stay context-only"
+                    )
+    if gh_steps != 1:
+        fail(
+            f"{HYGIENE_PATH}: exactly one step (the dispatch binding) may call gh, found {gh_steps}"
+        )
 
 if failures:
     print("ci-trigger-parity: FAIL")

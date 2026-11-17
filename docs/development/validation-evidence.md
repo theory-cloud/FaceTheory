@@ -62,10 +62,29 @@ profile and the environment the collector probed. A changed input, a changed
 command set, a changed floor or a failed command makes the record inapplicable.
 CI then fails with the local collection command instead of re-running anything.
 
-Release-only version metadata (`.release-please-manifest*`, `VERSION`,
-`CHANGELOG*`, the package manifests and locks) is normalized in the scope digest,
-so a release version bump does not stale a product record. A dependency change in
-those files still does, because only the version string is normalized.
+Two release classes keep a release transform from staling product proof.
+
+- **Release-only version metadata**: `VERSION`, the package manifests and locks,
+  and the doc files release-please rewrites with the version literal (`README.md`,
+  `docs/README.md`, `docs/api-reference.md`, `docs/getting-started.md`,
+  `ts/README.md`). Only the managed version slots are projected: the version
+  literal in a text file, and the top-level `version` plus the lockfile's
+  `packages[""].version` in a JSON document. Every other value stays bound, so an
+  unrelated edit — a dependency change in a lockfile included — still stales a
+  record. A whole-literal substitution would be wrong here: `safe-buffer` sits at
+  5.1.2 in `ts/package-lock.json` while the package is at 5.1.1, so the mask would
+  move onto that dependency as soon as the package reached 5.1.2.
+- **Release notes**: the two changelogs and the two release-please manifests. A
+  changelog is release history prose no gate reads, so it contributes its
+  presence and mode only. A manifest is release state, so its version values are
+  projected while the structure around them stays bound.
+
+The split is measured, not assumed: the 5.1.1 stable transform rewrites exactly
+`VERSION`, both manifests, both changelogs, the five doc files and the two
+`ts/` package files, and every one of those rewrites is a version-literal
+substitution. With both classes in place a real release transform verifies
+unchanged on every gate and profile, which is what lets a back-merge carry no
+records commit.
 
 ## The rubric
 
@@ -90,8 +109,26 @@ trigger: a merge publishes, it does not re-verify.
 `.github/workflows/promotion-hygiene.yml` runs on pull requests into `premain` and
 `main` and accepts only `staging` into `premain`, `release-please--branches--premain`
 into `premain`, `premain` into `main`, and `release-please--branches--main` into
-`main` — and only from this repository, so a fork branch cannot pass by name. It
-needs no checkout and holds no credential.
+`main` — and only from this repository, so a fork branch cannot pass by name. The
+pull-request path needs no checkout and holds only read-only built-in access.
+
+A generated release pull request is opened by release-please with the built-in
+`GITHUB_TOKEN`, and GitHub starts no `pull_request` workflow for events that token
+causes. Two paths cover it, and they are not equal. `prerelease-pr.yml` and
+`release-pr.yml` attach an early verdict: `scripts/sync-release-pr-checks.sh`
+dispatches `promotion-hygiene.yml` against the release branch, waits for it at the
+pull request head, keeps the pull request a draft until that head is green, reuses
+an already-green check, refuses to re-dispatch around a red one, and marks the pull
+request ready only after re-reading the head, warning at that point that the
+dispatched checks never satisfy the ruleset. The context becomes a required status
+check only from an eligible event, and the eligible event here is the code-owner
+approval the ruleset already requires: `promotion-hygiene.yml` also triggers on
+`pull_request_review: [submitted]` for `premain` and `main`, so the review runs the
+same `promotion-hygiene` job for the reviewed pull request, with no credential and
+no extra human step. The declaration in `.github/release-lane.json` is the single source of
+truth for which context each release branch requires, and
+`scripts/verify-release-pr-check-lane.sh` fails closed when a producer, the
+dispatch binding, the review path for a base, or the built-in-token rule drifts.
 
 Fork contributions arrive on a pre-arranged branch negotiated with the code
 owners; a code owner carries the change into `staging` with locally produced

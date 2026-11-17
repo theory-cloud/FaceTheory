@@ -89,12 +89,25 @@
       "CHANGELOG.md",
       "CHANGELOG.prerelease.md",
       "VERSION",
+      "README.md",
+      "docs/README.md",
+      "docs/api-reference.md",
+      "docs/getting-started.md",
+      "ts/README.md",
       "ts/package.json",
       "ts/package-lock.json",
       "infra/apptheory-ssr-site/package.json",
       "infra/apptheory-ssr-site/package-lock.json",
       "infra/apptheory-ssg-isr-site/package.json",
       "infra/apptheory-ssg-isr-site/package-lock.json"
+    ]
+  },
+  "releaseNotes": {
+    "exact": [
+      "CHANGELOG.md",
+      "CHANGELOG.prerelease.md",
+      ".release-please-manifest.json",
+      ".release-please-manifest.premain.json"
     ]
   },
   "securityInputs": {

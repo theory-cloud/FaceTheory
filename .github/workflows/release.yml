@@ -49,7 +49,7 @@ jobs:
       - name: Resolve release metadata
         id: metadata
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
         run: |
           set -euo pipefail
@@ -274,7 +274,7 @@ jobs:
       - name: Upload and publish existing tag draft release
         id: publish
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
           EXPECTED_SOURCE_COMMIT: ${{ needs.build-existing-tag-assets.outputs.source_commit }}
         run: |
@@ -496,7 +496,7 @@ jobs:
 
       - name: Recover missing current stable Release Please state
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -563,7 +563,7 @@ jobs:
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          token: ${{ github.token }}
           target-branch: main
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
@@ -587,7 +587,7 @@ jobs:
       - name: Resolve draft release metadata
         id: draft
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
         run: |
           set -euo pipefail
@@ -763,7 +763,7 @@ jobs:
       - name: Upload and publish draft release assets
         id: publish
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
           EXPECTED_SOURCE_COMMIT: ${{ github.sha }}
         run: |
@@ -986,7 +986,7 @@ jobs:
     steps:
       - name: Cleanup failed draft stable release (no remnants)
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
         run: |
           if [[ -z "${TAG_NAME}" ]]; then

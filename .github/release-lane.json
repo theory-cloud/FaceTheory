@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "requiredContexts": {
+    "premain": [
+      {
+        "context": "promotion-hygiene",
+        "workflow": "promotion-hygiene.yml",
+        "job": "promotion-hygiene"
+      }
+    ],
+    "main": [
+      {
+        "context": "promotion-hygiene",
+        "workflow": "promotion-hygiene.yml",
+        "job": "promotion-hygiene"
+      }
+    ]
+  },
+  "generatedReleasePullRequests": [
+    {
+      "workflow": "prerelease-pr.yml",
+      "base": "premain",
+      "head": "release-please--branches--premain"
+    },
+    {
+      "workflow": "release-pr.yml",
+      "base": "main",
+      "head": "release-please--branches--main"
+    }
+  ]
+}
