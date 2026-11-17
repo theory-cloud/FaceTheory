@@ -105,7 +105,9 @@ jobs:
     needs: check-baseline
     if: needs.check-baseline.outputs.ready == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     permissions:
+      actions: write
       contents: write
       issues: write
       pull-requests: write
@@ -144,3 +146,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: scripts/verify-release-pr-postcondition.sh stable
+
+      # release-please (or the aligned release-as computation above) creates the
+      # stable pull request with the built-in token, so no pull_request workflow
+      # starts for it. Dispatch the required context against the release branch,
+      # bound to the pull request head, then keep the pull request a draft until
+      # that head is green and mark it ready.
+      - name: Verify required checks on the generated release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          bash scripts/sync-release-pr-checks.sh \
+            --repo "${GITHUB_REPOSITORY}" \
+            --head-branch release-please--branches--main

@@ -466,6 +466,11 @@ gov_check_compliance() {
   require_cmd_or_blocked bash || return $?
   scripts/verify-ci-rubric-enforced.sh
   scripts/verify-ci-trigger-parity.sh
+  # The release lane: every generated release pull request gets its required
+  # release-branch context from the workflow alone. --self-test proves the guard
+  # rejects a lane that stops dispatching, loses the head binding, or is handed a
+  # write permission.
+  scripts/verify-release-pr-check-lane.sh --self-test
   scripts/test-ensure-release-branches.sh
   scripts/test-verify-release-draft-target.sh
   scripts/test-check-release-baseline-ready.sh

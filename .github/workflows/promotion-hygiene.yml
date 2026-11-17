@@ -3,7 +3,7 @@ name: Promotion hygiene
 # Nothing enters the release branches except a pull request from the accepted
 # head in this repository. This check needs only the GitHub pull request
 # context: it checks out no code, runs no repository command and carries no
-# secret or credential, so it cannot be influenced by the pull request's content.
+# write credential, so it cannot be influenced by the pull request's content.
 #
 # Accepted heads:
 #   - the pull request's head repository must be this repository, so a fork
@@ -16,11 +16,30 @@ name: Promotion hygiene
 # this check. A pull request that edits or deletes the workflow fails closed: the
 # edit is in the diff a code owner must approve, and a deleted check never
 # reports.
+#
+# Dispatch path. release-please opens and updates its pull requests with the
+# built-in `GITHUB_TOKEN`, and GitHub starts no pull_request workflow for events
+# that token causes, so a generated RC or stable pull request never gets this
+# context by itself. `workflow_dispatch` is the documented exception: the
+# generated-release lane (scripts/sync-release-pr-checks.sh, run by
+# prerelease-pr.yml and release-pr.yml) dispatches this workflow against the
+# release branch with the pull request number. A dispatched run is bound to the
+# pull request head before the head rule is evaluated: the pull request must be
+# open, target a release branch, come from this repository, and carry exactly the
+# dispatched branch and SHA. The job id is `promotion-hygiene` in both modes, so
+# the required context is the same one.
 on:
   pull_request:
     branches: ["premain", "main"]
+  workflow_dispatch:
+    inputs:
+      release_pr_number:
+        description: "Generated release pull request number this run verifies"
+        required: true
+        type: string
 
-permissions: {}
+permissions:
+  pull-requests: read
 
 jobs:
   promotion-hygiene:
@@ -28,12 +47,82 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Bind a dispatched run to the generated release pull request head
+        id: bound
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR_NUMBER: ${{ inputs.release_pr_number }}
+          DISPATCHED_REF_NAME: ${{ github.ref_name }}
+          DISPATCHED_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if ! [[ "${RELEASE_PR_NUMBER:-}" =~ ^[0-9]+$ ]]; then
+            echo "promotion-hygiene: FAIL (release_pr_number must be numeric, got '${RELEASE_PR_NUMBER:-<empty>}')" >&2
+            exit 1
+          fi
+          if ! [[ "${DISPATCHED_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "promotion-hygiene: FAIL (the dispatched SHA is not a lowercase commit id)" >&2
+            exit 1
+          fi
+
+          pr_json="$(gh api "repos/${REPOSITORY}/pulls/${RELEASE_PR_NUMBER}")" || {
+            echo "promotion-hygiene: FAIL (cannot read pull request #${RELEASE_PR_NUMBER} in ${REPOSITORY})" >&2
+            exit 1
+          }
+
+          PR_JSON="${pr_json}" \
+            PR_NUMBER="${RELEASE_PR_NUMBER}" \
+            REF_NAME="${DISPATCHED_REF_NAME}" \
+            REF_SHA="${DISPATCHED_SHA}" \
+            REPOSITORY="${REPOSITORY}" \
+            python3 - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["PR_JSON"])
+          number = os.environ["PR_NUMBER"]
+          ref_name = os.environ["REF_NAME"]
+          ref_sha = os.environ["REF_SHA"]
+          repository = os.environ["REPOSITORY"]
+
+          def fail(message: str) -> None:
+              print(f"promotion-hygiene: FAIL ({message})", file=__import__("sys").stderr)
+              raise SystemExit(1)
+
+          base = data.get("base") or {}
+          head = data.get("head") or {}
+          base_ref = str(base.get("ref") or "")
+          head_ref = str(head.get("ref") or "")
+          head_repo = str((head.get("repo") or {}).get("full_name") or "")
+
+          if str(data.get("number") or "") != number:
+              fail(f"answered pull request {data.get('number')} for requested #{number}")
+          if str(data.get("state") or "") != "open":
+              fail(f"generated release PR #{number} is {str(data.get('state') or 'unknown')}, not open")
+          if base_ref not in ("premain", "main"):
+              fail(f"generated release PR #{number} targets {base_ref or '<empty>'}, not a release branch")
+          if head_repo != repository:
+              fail(f"generated release PR #{number} head repository {head_repo or '<empty>'} != {repository}")
+          if head_ref != ref_name:
+              fail(f"dispatched ref {ref_name} != generated release PR head {head_ref or '<empty>'}")
+          if str(head.get("sha") or "") != ref_sha:
+              fail(f"dispatched ref SHA {ref_sha} != generated release PR head {str(head.get('sha') or '<empty>')}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"base_branch={base_ref}\n")
+              handle.write(f"head_branch={head_ref}\n")
+          PY
+
       - name: Require an accepted head branch from this repository
         shell: bash
         env:
-          BASE_BRANCH: ${{ github.base_ref }}
-          HEAD_BRANCH: ${{ github.head_ref }}
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_BRANCH: ${{ github.event_name == 'pull_request' && github.base_ref || steps.bound.outputs.base_branch }}
+          HEAD_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || steps.bound.outputs.head_branch }}
+          HEAD_REPOSITORY: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
           BASE_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail

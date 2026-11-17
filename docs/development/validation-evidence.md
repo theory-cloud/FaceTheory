@@ -90,8 +90,20 @@ trigger: a merge publishes, it does not re-verify.
 `.github/workflows/promotion-hygiene.yml` runs on pull requests into `premain` and
 `main` and accepts only `staging` into `premain`, `release-please--branches--premain`
 into `premain`, `premain` into `main`, and `release-please--branches--main` into
-`main` — and only from this repository, so a fork branch cannot pass by name. It
-needs no checkout and holds no credential.
+`main` — and only from this repository, so a fork branch cannot pass by name. The
+pull-request path needs no checkout and holds only read-only built-in access.
+
+A generated release pull request is opened by release-please with the built-in
+`GITHUB_TOKEN`, and GitHub starts no `pull_request` workflow for events that token
+causes. `prerelease-pr.yml` and `release-pr.yml` therefore attach the required
+context themselves: `scripts/sync-release-pr-checks.sh` dispatches
+`promotion-hygiene.yml` against the release branch, waits for it at the pull
+request head, keeps the pull request a draft until that head is green, reuses an
+already-green check, refuses to re-dispatch around a red one, and marks the pull
+request ready only after re-reading the head. The declaration in
+`.github/release-lane.json` is the single source of truth for which context each
+release branch requires, and `scripts/verify-release-pr-check-lane.sh` fails
+closed when a producer, the dispatch binding or the built-in-token rule drifts.
 
 Fork contributions arrive on a pre-arranged branch negotiated with the code
 owners; a code owner carries the change into `staging` with locally produced

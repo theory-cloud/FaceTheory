@@ -207,6 +207,24 @@ require_contains ".github/workflows/promotion-hygiene.yml" "release-please--bran
   "the head-branch check must accept the generated premain release-please branch"
 require_contains ".github/workflows/promotion-hygiene.yml" "release-please--branches--main" \
   "the head-branch check must accept the generated main release-please branch"
+require_contains ".github/workflows/promotion-hygiene.yml" "  workflow_dispatch:" \
+  "the head-branch check must keep a dispatch path: a generated release pull request gets no pull_request run"
+require_contains ".github/workflows/promotion-hygiene.yml" "release_pr_number:" \
+  "the dispatch path must take the generated release pull request number it verifies"
+require_not_contains ".github/workflows/promotion-hygiene.yml" "actions/checkout@" \
+  "the head-branch check must not check out the pull request"
+
+# The lane that makes a generated release pull request gate itself. The wiring is
+# proved in full by scripts/verify-release-pr-check-lane.sh --self-test; these
+# assertions keep the producer call sites from disappearing silently.
+require_contains ".github/workflows/prerelease-pr.yml" "scripts/sync-release-pr-checks.sh" \
+  "the RC release-PR workflow must attach the required checks to its generated pull request"
+require_contains ".github/workflows/prerelease-pr.yml" "release-please--branches--premain" \
+  "the RC release-PR workflow must target the generated premain release branch"
+require_contains ".github/workflows/release-pr.yml" "scripts/sync-release-pr-checks.sh" \
+  "the stable release-PR workflow must attach the required checks to its generated pull request"
+require_contains ".github/workflows/release-pr.yml" "release-please--branches--main" \
+  "the stable release-PR workflow must target the generated main release branch"
 
 # The gate commands keep their scanned surfaces. These are input-scope pins: if a
 # surface drops out of the scanner, the recorded proof no longer covers it.

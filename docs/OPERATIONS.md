@@ -285,7 +285,8 @@ The workflow guardrails are intentionally fail-closed:
 
 - PRs into `premain` and `main` are release intent. If Release Please does not open the expected RC/stable PR, the postcondition scripts fail instead of silently skipping.
 - Premain owns RC tags and releases. Main must not create, publish, or advertise an RC-shaped release.
-- The full rubric and deterministic release-asset build verifier run only for `staging` PRs (or explicit manual CI dispatch), not on release-branch pushes or release publication jobs.
+- Gates run only for `staging` PRs, and only as a verification of the committed evidence record; nothing executes a gate on a release-branch pull request, a release-branch push or a release publication job.
+- `promotion-hygiene` is the release-branch head check. Release Please opens its RC and stable PRs with the built-in token, which starts no `pull_request` workflow, so `prerelease-pr.yml` and `release-pr.yml` dispatch that check against the generated branch, hold the PR as a draft until its head is green, and mark it ready only after re-reading the head.
 - Release workflows run hygiene/build/postcondition checks only and never automate the post-release `main` -> `staging` sync.
 
 ### Release tag identity (2026-10-17 RC incident)

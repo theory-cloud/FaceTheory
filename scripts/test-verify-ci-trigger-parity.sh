@@ -5,9 +5,11 @@
 # For verify-ci-trigger-parity.sh (MAI-4 / REL-1): a push trigger regained by
 # ci.yml, a gate re-executed in CI, the verify job widened past staging or given
 # a toolchain, a head-branch check without the head-repository equality
-# condition, a head check that checks out the pull request, a `run:` body that
-# interpolates a workflow expression, an unlisted push-triggered workflow, and a
-# registry whose catch-all scope was dropped.
+# condition, a head check that checks out the pull request or reads the pull
+# request outside its dispatch binding, a head check that asks for write access
+# or loses the dispatch path a generated release pull request needs, a `run:`
+# body that interpolates a workflow expression, an unlisted push-triggered
+# workflow, and a registry whose catch-all scope was dropped.
 #
 # For verify-ci-rubric-enforced.sh: the executing rubric restored, the pack or
 # deterministic-build gate restored to CI, and the verify job given a toolchain.
@@ -213,7 +215,7 @@ expect_fail "the verify job widened onto a release branch"
 # --- REL-1: the head-branch check ----------------------------------------
 reset
 replace_line .github/workflows/promotion-hygiene.yml \
-  "HEAD_REPOSITORY: \${{ github.event.pull_request.head.repo.full_name }}" \
+  "HEAD_REPOSITORY: \${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}" \
   "HEAD_REPOSITORY: \${{ github.repository }}"
 expect_fail "the head check stopped requiring the head repository"
 
@@ -228,8 +230,39 @@ replace_line .github/workflows/promotion-hygiene.yml "release_branch='premain'" 
 expect_fail "the head check interpolated a workflow expression inside run"
 
 reset
-replace_line .github/workflows/promotion-hygiene.yml "permissions: {}" "permissions: {contents: read}"
-expect_fail "the head check asked for a permission"
+replace_line .github/workflows/promotion-hygiene.yml "  pull-requests: read" \
+  "  pull-requests: write"
+expect_fail "the head check asked for a write permission"
+
+reset
+replace_line .github/workflows/promotion-hygiene.yml "  pull-requests: read" \
+  "  contents: read"
+expect_fail "the head check lost its pull request read access"
+
+reset
+replace_line .github/workflows/promotion-hygiene.yml "  workflow_dispatch:" "  schedule:"
+expect_fail "the head check lost the dispatch path a generated release PR needs"
+
+reset
+python3 - "${root}/.github/workflows/promotion-hygiene.yml" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+path.write_text(
+    text.replace(
+        "    steps:\n",
+        "    steps:\n"
+        "      - name: Read the pull request on the pull_request path\n"
+        "        run: |\n"
+        "          gh api repos/example/example/pulls/1\n",
+        1,
+    ),
+    encoding="utf-8",
+)
+PY
+expect_fail "a gh read slipped onto the pull_request path"
 
 reset
 replace_line .github/workflows/promotion-hygiene.yml '    branches: ["premain", "main"]' \
