@@ -17,11 +17,11 @@ pr_author="${PR_AUTHOR:-}"
 remote="origin"
 self_test="false"
 
-# The canonical generated Release Please identity. The release workflow passes
-# `secrets.RELEASE_PLEASE_TOKEN || github.token`, and no PAT secret exists, so
-# release-please opens PRs with the default workflow token, which GitHub reports
-# as this bot login. A different author means the generated-PR exception must be
-# revisited in the same change that introduces it.
+# The canonical generated Release Please identity. The release workflows pass the
+# built-in `github.token` and nothing else, so release-please opens PRs with the
+# default workflow token, which GitHub reports as this bot login. A different
+# author means the generated-PR exception must be revisited in the same change
+# that introduces it.
 release_please_author="github-actions[bot]"
 
 usage() {
