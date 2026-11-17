@@ -95,7 +95,11 @@ jobs:
       # built-in token, and GitHub starts no pull_request workflow for events
       # that token causes. Dispatch the required context against the release
       # branch, bound to the pull request head, then keep the pull request a
-      # draft until that head is green and mark it ready.
+      # draft until that head is green and mark it ready. That dispatch is an
+      # early verdict: a required status check counts only for a run from an
+      # eligible event, so the ruleset is satisfied by the code-owner approval
+      # this pull request needs, which runs promotion-hygiene.yml on
+      # pull_request_review: [submitted].
       - name: Verify required checks on the generated release PR
         env:
           GH_TOKEN: ${{ github.token }}

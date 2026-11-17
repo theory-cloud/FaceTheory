@@ -2,15 +2,25 @@
 set -euo pipefail
 
 # Attach the required release-branch check to a generated release pull request
-# without a human action.
+# and hold the verdict to one head.
 #
 # release-please opens and updates its pull request with the repository's
 # built-in `GITHUB_TOKEN`, and GitHub does not start `pull_request` workflows for
-# events caused by that token. A generated RC or stable pull request therefore
-# never gets its required `promotion-hygiene` context on its own, and the only
-# repair used to be closing and reopening it. `workflow_dispatch` is the
-# documented exception, so this lane dispatches the verifying workflow against
-# the release branch and holds it to the exact pull request head.
+# events caused by that token. `workflow_dispatch` is the documented exception,
+# so this lane dispatches the verifying workflow against the release branch and
+# holds it to the exact pull request head.
+#
+# A dispatched check run is an early verdict, never the ruleset. GitHub counts a
+# required status check only for runs triggered by push, pull_request,
+# pull_request_review, pull_request_target, deployment or deployment_status: a
+# dispatched run's checks do not appear in the pull request's checks section and
+# do not satisfy a required status check even when they pass at the head. The
+# eligible event for a generated release pull request is the code-owner approval
+# the premain/main ruleset already requires -- `promotion-hygiene.yml` runs on
+# `pull_request_review: [submitted]` and reports the same context for the
+# reviewed pull request. The lane therefore states that remedy whenever it marks
+# a pull request ready, and it never treats its own dispatch as satisfying the
+# ruleset.
 #
 # The lane is deliberately conservative:
 #
@@ -411,12 +421,18 @@ if [[ "$(project_pr "$(read_pr)" | awk -F= '$1 == "draft" { print $2 }')" != "fa
   fail "PR #${pr_number} could not be marked ready"
 fi
 
-# The commit-level check runs are what the ruleset evaluates. The pull-request
-# rollup is a GitHub-side projection of them, and it can lag or drop a context
-# after a close/reopen, so a missing rollup entry is reported rather than
-# treated as a missing check.
+# The dispatch above is this lane's early, head-bound verdict; it is not the
+# ruleset. GitHub counts a required status check only for runs from an eligible
+# event, so the required context is reported by the code-owner approval this
+# pull request needs at this head, which runs promotion-hygiene.yml on
+# pull_request_review: [submitted].
+echo "sync-release-pr-checks: WARN (PR #${pr_number} is ready at ${head_sha}; the dispatched check runs above never satisfy the ruleset, because the required context is reported by the code-owner approval of this pull request at ${head_sha}, which runs promotion-hygiene.yml on pull_request_review: [submitted])" >&2
+
+# The pull request rollup is where the eligible-event difference shows: a
+# dispatched check run never appears there, so an absent entry is the expected
+# state until that approval lands, not a missing check.
 if [[ "$(rollup_reports_context)" != "present" ]]; then
-  echo "sync-release-pr-checks: WARN (PR #${pr_number} rollup does not list every required context yet; the check runs exist at ${head_sha}, which is what the ruleset evaluates)" >&2
+  echo "sync-release-pr-checks: WARN (PR #${pr_number} does not list every required context in its pull request rollup at ${head_sha}; the code-owner approval named above is what adds it)" >&2
 fi
 
 echo "sync-release-pr-checks: PASS (PR #${pr_number} ready at ${head_sha} with green required checks)"
