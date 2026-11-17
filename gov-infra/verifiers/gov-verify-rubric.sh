@@ -467,9 +467,10 @@ gov_check_compliance() {
   scripts/verify-ci-rubric-enforced.sh
   scripts/verify-ci-trigger-parity.sh
   # The release lane: every generated release pull request gets its required
-  # release-branch context from the workflow alone. --self-test proves the guard
-  # rejects a lane that stops dispatching, loses the head binding, or is handed a
-  # write permission.
+  # release-branch context from the workflow alone, on the eligible code-owner
+  # review event. --self-test proves the guard rejects a lane that stops
+  # dispatching, loses the head binding, loses the review path for a base, is
+  # given a write permission, or whose job can skip the review event.
   scripts/verify-release-pr-check-lane.sh --self-test
   scripts/test-ensure-release-branches.sh
   scripts/test-verify-release-draft-target.sh

@@ -7,11 +7,13 @@ set -euo pipefail
 # The failure this prevents is a release lane that looks wired but cannot gate
 # itself. release-please creates its pull requests with the built-in
 # `GITHUB_TOKEN`, and GitHub starts no `pull_request` workflow for events that
-# token causes, so a required context never reports. The only repairs used to be
-# closing and reopening the pull request, or a human dispatching the workflow by
-# hand. The declaration in `.github/release-lane.json` names, per base branch,
-# the required contexts and the workflow that reports each one; this guard proves
-# that:
+# token causes, so a required context never reports. Closing and reopening the
+# pull request, or a human dispatching the workflow by hand, used to be the only
+# repairs. Dispatch alone is also not enough: a required status check counts only
+# for a run from an eligible event, so the lane pairs the dispatch with the
+# code-owner review the release ruleset already requires. The declaration in
+# `.github/release-lane.json` names, per base branch, the required contexts and
+# the workflow that reports each one; this guard proves that:
 #
 #   1. every workflow that creates a generated release pull request declares the
 #      permission to create pull requests and to dispatch workflows;
@@ -20,7 +22,13 @@ set -euo pipefail
 #   3. each required context is a job id in a workflow that has a
 #      workflow_dispatch path taking the pull request number and binding the run
 #      to that pull request's head, so a run can never certify a different tree;
-#   4. no workflow reintroduces a release-please token fallback: the lane runs on
+#   4. each required context also has an eligible-event path for that base: the
+#      code-owner review of the pull request starts the same workflow on the
+#      reviewed head (`pull_request_review: [submitted]`), and the reporting job
+#      carries no `if:` that could skip it. A dispatched run never satisfies a
+#      required status check, so without this path the lane would look green and
+#      gate nothing;
+#   5. no workflow reintroduces a release-please token fallback: the lane runs on
 #      the built-in token only.
 #
 # The self-test proves the guard is not vacuous: it mutates copies of the real
@@ -63,6 +71,130 @@ failures=0
 report() {
   echo "release-pr-check-lane: $1" >&2
   failures=$((failures + 1))
+}
+
+# A required status check counts only for a run from push, pull_request,
+# pull_request_review, pull_request_target, deployment or deployment_status. A
+# generated release pull request produces exactly one eligible run: the
+# code-owner review its release ruleset already requires. The reporting workflow
+# must therefore run on that event for the reviewed base, and the reporting job
+# must not carry an `if:` that can skip it -- a skipped job reports no context.
+eligible_event_checks() {
+  local verifier_workflow="$1"
+  local base="$2"
+  local context="$3"
+  local job="$4"
+  local path="${workflows}/${verifier_workflow}"
+  local output
+  local status=0
+  output="$(python3 - "${path}" "${base}" "${context}" "${job}" <<'PY' 2>&1
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+base = sys.argv[2]
+context = sys.argv[3]
+job = sys.argv[4]
+lines = path.read_text(encoding="utf-8").splitlines()
+problems: list[str] = []
+
+
+def fail(message: str) -> None:
+    problems.append(f"{path.name} {message}")
+
+
+def event_block(name: str) -> list[str] | None:
+    for index, line in enumerate(lines):
+        if line.rstrip() == f"  {name}:":
+            block: list[str] = []
+            for candidate in lines[index + 1 :]:
+                if candidate.strip() == "":
+                    continue
+                if not candidate.startswith("    "):
+                    break
+                block.append(candidate)
+            return block
+    return None
+
+
+def values(block: list[str], key: str) -> list[str] | None:
+    """The list under `key`, from an inline `[...]` or a block `- item` list."""
+    for index, line in enumerate(block):
+        match = re.match(rf"^    {re.escape(key)}:[ \t]*(.*)$", line)
+        if match is None:
+            continue
+        inline = match.group(1).strip()
+        if inline.startswith("[") and inline.endswith("]"):
+            return [item.strip().strip("'\"") for item in inline[1:-1].split(",") if item.strip()]
+        collected = []
+        for candidate in block[index + 1 :]:
+            item = re.match(r"^      -[ \t]+(.+?)[ \t]*$", candidate)
+            if item is None:
+                break
+            collected.append(item.group(1).strip().strip("'\""))
+        return collected
+    return None
+
+
+review = event_block("pull_request_review")
+if review is None:
+    fail(
+        "has no pull_request_review trigger, so the code-owner review of a generated "
+        f"release pull request cannot make {context} a required check"
+    )
+else:
+    types = values(review, "types")
+    if not types or "submitted" not in types:
+        fail("does not subscribe its pull_request_review trigger to the submitted activity")
+    branches = values(review, "branches")
+    if branches is None:
+        fail(
+            "does not scope its pull_request_review trigger to a base branch, so every "
+            "staging review would run it too"
+        )
+    elif base not in branches:
+        fail(f"does not subscribe its pull_request_review trigger to base {base!r} (branches: {branches})")
+
+job_block: list[str] | None = None
+for index, line in enumerate(lines):
+    if line.rstrip() == f"  {job}:":
+        job_block = []
+        for candidate in lines[index + 1 :]:
+            if not candidate.startswith((" ", "\t")):
+                break
+            if re.match(r"^  [A-Za-z0-9_-]+:[ \t]*$", candidate):
+                break
+            job_block.append(candidate)
+        break
+
+if job_block is not None:
+    for line in job_block:
+        condition = re.match(r"^    if:[ \t]*(.+?)[ \t]*$", line)
+        if condition is None:
+            continue
+        # A job-level condition is accepted only when it names the review event.
+        # This is deliberately conservative: a negation-shaped condition that
+        # happens to include the event is rejected too, and no workflow here is
+        # written that way.
+        if "pull_request_review" not in condition.group(1):
+            fail(
+                f"job {job} carries `if: {condition.group(1)}`, which can exclude "
+                f"pull_request_review, so the code-owner review would never report {context}"
+            )
+        break
+
+for problem in problems:
+    print(problem)
+if problems:
+    raise SystemExit(1)
+PY
+)" || status=$?
+  if (( status != 0 )); then
+    while IFS= read -r line; do
+      [[ -n "${line}" ]] && report "${line}"
+    done <<<"${output}"
+  fi
 }
 
 config="${root}/.github/release-lane.json"
@@ -184,6 +316,7 @@ while IFS=$'\t' read -r kind a b c d; do
       if grep -Eq '^[[:space:]]+[a-z-]+:[[:space:]]*write[[:space:]]*$' "${path}"; then
         report "${verifier_workflow} asks for a write permission; the lane runs on read-only built-in access"
       fi
+      eligible_event_checks "${verifier_workflow}" "${a}" "${context}" "${job}"
       ;;
   esac
 done < <(printf '%s\n' "${plan}")
@@ -354,6 +487,69 @@ path.write_text(text.replace("  pull-requests: read\n", "  pull-requests: write\
 PY
   expect_fixture_failure "a verifying workflow with a write permission fails" \
     "asks for a write permission" "${fixture}"
+
+  # 9. The eligible-event path removed: the code-owner review can no longer make
+  #    the context count, so the dispatched run would gate nothing.
+  fixture="$(new_fixture no-review-trigger)"
+  python3 - "${fixture}/.github/workflows/promotion-hygiene.yml" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+out: list[str] = []
+skipping = False
+for line in lines:
+    if line.rstrip("\n") == "  pull_request_review:":
+        skipping = True
+        continue
+    if skipping:
+        if line.startswith("    "):
+            continue
+        skipping = False
+    out.append(line)
+path.write_text("".join(out), encoding="utf-8")
+PY
+  expect_fixture_failure "a verifying workflow without the review trigger fails" \
+    "has no pull_request_review trigger" "${fixture}"
+
+  # 10. The review trigger subscribed to the wrong base: the review of a release
+  #     pull request would not run the context that base requires.
+  fixture="$(new_fixture review-without-base)"
+  python3 - "${fixture}/.github/workflows/promotion-hygiene.yml" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+path.write_text(
+    text.replace("    branches: [premain, main]\n", "    branches: [main]\n", 1),
+    encoding="utf-8",
+)
+PY
+  expect_fixture_failure "a review trigger that skips a release base fails" \
+    "does not subscribe its pull_request_review trigger to base 'premain'" "${fixture}"
+
+  # 11. A reporting job whose condition excludes the review event would be
+  #     skipped there, and a skipped job reports no context.
+  fixture="$(new_fixture review-excluded-by-if)"
+  python3 - "${fixture}/.github/workflows/promotion-hygiene.yml" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+path.write_text(
+    text.replace(
+        "  promotion-hygiene:\n    name: promotion-hygiene\n",
+        "  promotion-hygiene:\n    name: promotion-hygiene\n    if: github.event_name == 'pull_request'\n",
+        1,
+    ),
+    encoding="utf-8",
+)
+PY
+  expect_fixture_failure "a reporting job that excludes the review event fails" \
+    "can exclude pull_request_review" "${fixture}"
 
   echo "release-pr-check-lane self-test: PASS (${cases} cases)"
 }
