@@ -44,3 +44,12 @@ docs/_config_versions.yml
 .claude/
 .theorymcp/
 AGENTS.md
+
+# Evidence: records are committed; raw runner output is not
+gov-infra/evidence/*-output.log
+gov-infra/evidence/gov-rubric-report.json
+gov-infra/evidence/local/
+
+# Python bytecode
+__pycache__/
+*.pyc

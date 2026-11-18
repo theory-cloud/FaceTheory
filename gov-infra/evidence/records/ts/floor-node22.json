@@ -1,0 +1,78 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-ts-suite.sh"
+      ],
+      "durationSeconds": 186.58,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-18T00:29:48Z",
+      "id": "ts-suite",
+      "inputsDigest": "sha256:29c02104d94ceb83439f5bbf3539228d6a9c103caa98d9209d83949497fab554",
+      "logDigest": "sha256:e432290114fba4377a1f466b4c1f172c39b87150d2fa90e91abc572ecd0d369f",
+      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261118T002641Z-18.log",
+      "reused": false,
+      "startedAt": "2026-11-18T00:26:41Z"
+    }
+  ],
+  "consumed": [],
+  "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, under each supported Node major on Linux arm64, which is the architecture each proof profile really runs. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the historical GitHub runner's architecture cannot be recorded as covered. The Node-major floor is the claim these profiles carry.",
+  "environment": {
+    "go": "",
+    "node": "v22.23.5",
+    "platform": {
+      "arch": "aarch64",
+      "os": "linux"
+    },
+    "python": "3.11.2"
+  },
+  "gate": "ts",
+  "kind": "source",
+  "producer": {
+    "registry": "validation-gates.json",
+    "tool": "scripts/evidence/validation_evidence.py"
+  },
+  "profile": "floor-node22",
+  "reason": "",
+  "recordedAt": "2026-11-18T00:29:48Z",
+  "releaseOnly": {
+    "digest": "sha256:714c900b21d21043e845d26ccea4417b9eea47f0b14d730712411bb157e83d30",
+    "fileCount": 16,
+    "normalizedDigest": "sha256:ed3ab6f4049ed07f97d920d326d055d73989dd9ebf7796e28cf1836c17085afa",
+    "version": "5.1.1"
+  },
+  "reviews": [],
+  "schemaVersion": 1,
+  "scope": {
+    "digest": "sha256:e88c8ec2edf03591c88ade21ab01eb5841cb19811da0059a9ba220ad993007c3",
+    "fileCount": 643,
+    "paths": [
+      "ts/",
+      "docs/",
+      ".github/workflows/",
+      "README.md",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "AGENTS.md",
+      "Makefile",
+      "scripts/verify-ts-suite.sh",
+      "scripts/verify-docs-export-map.sh",
+      "scripts/verify-node-engines-floor.sh",
+      "scripts/check-node-engines-floor.mjs",
+      "scripts/verify-lambda-runtime-deprecations.sh",
+      "scripts/check-lambda-runtime-deprecations.mjs",
+      "infra/apptheory-ssr-site/package-lock.json",
+      "infra/apptheory-ssg-isr-site/package-lock.json",
+      "infra/apptheory-ssr-site/src/stack.ts",
+      "infra/apptheory-ssg-isr-site/src/stack.ts"
+    ],
+    "version": 1
+  },
+  "source": {
+    "digest": "sha256:82b6656b224a8836fcb05d77f6f34f869b8157bbad82ccad07ede86ed4a1a873",
+    "fileCount": 780
+  },
+  "verdict": "PASS"
+}

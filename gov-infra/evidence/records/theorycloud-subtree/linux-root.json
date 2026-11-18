@@ -1,0 +1,65 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-theorycloud-subtree-path.sh"
+      ],
+      "durationSeconds": 0.947,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-18T00:37:19Z",
+      "id": "theorycloud-subtree-path",
+      "inputsDigest": "sha256:a53a5ceaf3c0f10958a4690ba22eef4032595a394bfca21e51289cec09297a79",
+      "logDigest": "sha256:c1525051ce18fc8af053475cf21498f4122b8d8a89124cf6771e04fb321907b8",
+      "logRef": "gov-infra/evidence/local/theorycloud-subtree-theorycloud-subtree-path-20261118T003718Z-18.log",
+      "reused": false,
+      "startedAt": "2026-11-18T00:37:18Z"
+    }
+  ],
+  "consumed": [],
+  "description": "TheoryCloud subtree staging and provenance, the destination test as an ordinary user and as UID 0, helper dry runs, rollout target fixtures and release-trust guards, produced in a Linux arm64 container where the run is already UID 0. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the architecture recorded is the one that really ran.",
+  "environment": {
+    "go": "",
+    "node": "v24.22.3",
+    "platform": {
+      "arch": "aarch64",
+      "os": "linux"
+    },
+    "python": "3.11.2"
+  },
+  "gate": "theorycloud-subtree",
+  "kind": "source",
+  "producer": {
+    "registry": "validation-gates.json",
+    "tool": "scripts/evidence/validation_evidence.py"
+  },
+  "profile": "linux-root",
+  "reason": "",
+  "recordedAt": "2026-11-18T00:37:19Z",
+  "releaseOnly": {
+    "digest": "sha256:714c900b21d21043e845d26ccea4417b9eea47f0b14d730712411bb157e83d30",
+    "fileCount": 16,
+    "normalizedDigest": "sha256:ed3ab6f4049ed07f97d920d326d055d73989dd9ebf7796e28cf1836c17085afa",
+    "version": "5.1.1"
+  },
+  "reviews": [],
+  "schemaVersion": 1,
+  "scope": {
+    "digest": "sha256:0d32a83e9df22733d1a17b46b368f5b645d25fa93dc17c47e2a854819c28484b",
+    "fileCount": 183,
+    "paths": [
+      "docs/",
+      "Makefile",
+      "README.md",
+      ".github/workflows/theorycloud-facetheory-subtree-publish.yml",
+      "scripts/"
+    ],
+    "version": 1
+  },
+  "source": {
+    "digest": "sha256:82b6656b224a8836fcb05d77f6f34f869b8157bbad82ccad07ede86ed4a1a873",
+    "fileCount": 780
+  },
+  "verdict": "PASS"
+}

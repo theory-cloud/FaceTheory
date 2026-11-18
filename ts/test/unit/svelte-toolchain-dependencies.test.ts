@@ -16,7 +16,7 @@ const packageRoot = path.resolve(
 
 const OLD_PLUGIN = '@sveltejs/vite-plugin-svelte';
 const SELECTED_VERSIONS = {
-  rollup: '4.67.2',
+  rollup: '4.68.4',
   'rollup-plugin-svelte': '7.2.3',
 } as const;
 const SVELTE_VITE_CONFIGS = [
@@ -157,11 +157,11 @@ function svelteTemplateContext(): CreateTemplateContext {
     facetheoryTarball:
       'https://github.com/theory-cloud/FaceTheory/releases/download/v5.0.3/theory-cloud-facetheory-5.0.3.tgz',
     appTheoryTarball:
-      'https://github.com/theory-cloud/AppTheory/releases/download/v7.1.0/theory-cloud-apptheory-7.1.0.tgz',
+      'https://github.com/theory-cloud/AppTheory/releases/download/v7.4.0/theory-cloud-apptheory-7.4.0.tgz',
     appTheoryCdkTarball:
-      'https://github.com/theory-cloud/AppTheory/releases/download/v7.1.0/theory-cloud-apptheory-cdk-7.1.0.tgz',
+      'https://github.com/theory-cloud/AppTheory/releases/download/v7.4.0/theory-cloud-apptheory-cdk-7.4.0.tgz',
     tableTheoryTarball:
-      'https://github.com/theory-cloud/TableTheory/releases/download/v6.3.0/theory-cloud-tabletheory-ts-6.3.0.tgz',
+      'https://github.com/theory-cloud/TableTheory/releases/download/v6.5.1/theory-cloud-tabletheory-ts-6.5.1.tgz',
     dependencyVersions: {},
   };
 }
@@ -190,7 +190,7 @@ test('manifest pins the exact replacement toolchain and drops the old plugin', a
   );
   assert.equal(devDependencies[OLD_PLUGIN], undefined);
   assert.equal(devDependencies.svelte, '^5.57.2');
-  assert.equal(devDependencies.vite, '^8.3.5');
+  assert.equal(devDependencies.vite, '^8.3.8');
 });
 
 test('lockfile locks the exact replacement versions and drops the old plugin', async () => {

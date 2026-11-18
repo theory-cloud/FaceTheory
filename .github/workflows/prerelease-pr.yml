@@ -62,7 +62,9 @@ jobs:
     needs: check-baseline
     if: needs.check-baseline.outputs.ready == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     permissions:
+      actions: write
       contents: write
       issues: write
       pull-requests: write
@@ -71,7 +73,7 @@ jobs:
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          token: ${{ github.token }}
           target-branch: premain
           config-file: release-please-config.premain.json
           manifest-file: .release-please-manifest.premain.json
@@ -88,3 +90,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: scripts/verify-release-pr-postcondition.sh prerelease
+
+      # release-please writes its commits and opens its pull request with the
+      # built-in token, and GitHub starts no pull_request workflow for events
+      # that token causes. Dispatch the required context against the release
+      # branch, bound to the pull request head, then keep the pull request a
+      # draft until that head is green and mark it ready. That dispatch is an
+      # early verdict: a required status check counts only for a run from an
+      # eligible event, so the ruleset is satisfied by the code-owner approval
+      # this pull request needs, which runs promotion-hygiene.yml on
+      # pull_request_review: [submitted].
+      - name: Verify required checks on the generated release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          bash scripts/sync-release-pr-checks.sh \
+            --repo "${GITHUB_REPOSITORY}" \
+            --head-branch release-please--branches--premain

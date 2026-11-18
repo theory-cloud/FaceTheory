@@ -1,32 +1,25 @@
 #!/usr/bin/env bash
-# Purpose: fail closed when the CI job/trigger wiring lets a job run on a path
-# that can promote code (push to a protected release branch, or a
-# staging -> premain / premain -> main promotion pull request) without an
-# equivalent job running on pull requests targeting staging -- the class of gap
-# that lets a pull request merge green and then fail promotion.
+# Purpose: fail closed when the committed CI shape stops matching the
+# verified-once standard (TMS served MAI-4 / REL-1).
 #
-# Requirements enforced (R-F1, as amended by the operator ruling 2026-09-28 --
-# "rubric is only needed in staging; premain and main only ever come from staging
-# and do not need to repeat the full rubric"):
-#   A. the rubric job runs only for pull requests targeting staging, plus the
-#      opt-in manual dispatch -- never on a protected-branch push and never on a
-#      promotion pull request;
-#   B. the deterministic-build job has the same staging-PR-only shape;
-#   C. every other job in ci.yml that can run on push must also run on
-#      pull_request (the #623 push-parity class);
-#   D. the staging -> premain readiness gate still exists and stays premain-scoped;
-#   E. the PR -> main readiness gate still exists and stays main-scoped;
-#   F. a PR -> staging readiness counterpart exists and runs the readiness verifier;
-#   G. any non-exempt job that can run on a promotion pull request must also run
-#      on pull requests to staging, or appear in the exemption table with a reason;
-#   H. every cross-workflow exemption still holds its stated mechanical reason.
+# What is enforced, in the served definitions' terms:
+#   MAI-4  the repository has an evidence registry and a verify entry point; CI
+#          verifies the record on pull requests to the integration branch; no
+#          workflow executes a gate; no workflow has a gate-class push trigger;
+#          no gate runs on a release-branch pull request.
+#   REL-1  release-branch pull requests carry the head-branch check, which needs
+#          only the pull request context: no checkout, no credential, and a
+#          head-repository equality condition so a fork branch cannot pass by
+#          name. Its accepted heads name the integration branch and the release
+#          automation branches this repository actually generates. It also runs
+#          on the eligible `pull_request_review` event, because a dispatched
+#          check run never satisfies a required status check; the per-base
+#          eligible path is proved by scripts/verify-release-pr-check-lane.sh.
 #
-# A job whose `if:` uses a predicate this checker does not model -- an unknown or
-# absent event predicate, a negated event predicate, or a negated / unmodelled PR
-# base-ref predicate -- is a failure, never a pass: unknown wiring must be made
-# explicit here before it can ship. The `on:` block is modelled structurally too:
-# a pull_request branch filter fails closed, because it can silently remove the
-# rubric from the staging pull request that is the only place it runs.
+# A shape this checker does not model fails closed rather than passing by
+# omission: an unlisted push-triggered workflow, an unknown verify entry point,
+# a workflow that runs a gate command, or a `run:` body that interpolates
+# `${{ }}` is a failure.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -37,34 +30,62 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 python3 <<'PY'
-import itertools
+import json
 import re
 import sys
 from pathlib import Path
 
 CI_PATH = ".github/workflows/ci.yml"
-RUBRIC_JOB = "rubric"
-DETERMINISTIC_JOB = "deterministic-builds"
-PR_STAGING_READINESS = "Release readiness (PR -> staging)"
-PROMOTION_BASES = {"premain", "main"}
+HYGIENE_PATH = ".github/workflows/promotion-hygiene.yml"
+REGISTRY_PATH = "scripts/evidence/validation-gates.json"
+VERIFY_ALL = "scripts/evidence/verify-all.sh"
+VERIFY_GATE = "scripts/evidence/verify-gate.sh"
 STAGING = "staging"
-# The rubric and deterministic-build jobs are staging-PR-only under the ruling.
-STAGING_PR_ONLY_EVENTS = {"pull_request", "workflow_dispatch"}
+RELEASE_BRANCH = "premain"
+MAIN_BRANCH = "main"
+RELEASE_PLEASE_PREMAIN = "release-please--branches--premain"
+RELEASE_PLEASE_MAIN = "release-please--branches--main"
 
-# Jobs that may run on a promotion pull request without also running on pull
-# requests to staging. Each entry must state why, and the reason must hold
-# mechanically: the named counterpart job is what makes the promotion gate
-# predictable from a staging pull request.
-PROMOTION_EXEMPT = {
-    "Prerelease readiness (staging -> premain)": (
-        "promotion-edge readiness; its PR-time counterpart is "
-        f"{PR_STAGING_READINESS!r}"
-    ),
-    "Release readiness (PR -> main)": (
-        "promotion-edge readiness; its PR-time counterpart is "
-        f"{PR_STAGING_READINESS!r}"
-    ),
+# Workflows allowed to keep a push trigger: publish, release-please and release
+# mechanics. None of them may run a gate, which the gate-command scan enforces
+# for every workflow below.
+PUSH_ALLOWED = {
+    ".github/workflows/pages.yml",
+    ".github/workflows/prerelease-pr.yml",
+    ".github/workflows/prerelease.yml",
+    ".github/workflows/release-pr.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/release-branch-bootstrap.yml",
+    ".github/workflows/theorycloud-facetheory-subtree-publish.yml",
 }
+
+# The command set that belongs to the evidence record. A workflow that runs one
+# of these is executing a gate in CI.
+GATE_COMMANDS = (
+    "make rubric",
+    "gov-verify-rubric.sh",
+    "scripts/evidence/collect.sh",
+    "scripts/evidence/collect-all.sh",
+    "scripts/evidence/collect-in-container.sh",
+    "scripts/verify-ts-suite.sh",
+    "scripts/verify-ts-pack.sh",
+    "scripts/verify-deterministic-builds.sh",
+    "scripts/verify-examples-local.sh",
+    "scripts/verify-theorycloud-subtree-path.sh",
+    "scripts/verify-node-engines-floor.sh",
+    "scripts/verify-lambda-runtime-deprecations.sh",
+    "scripts/local/run-examples-local.mjs",
+    "make ts-typecheck",
+    "make ts-lint",
+    "make ts-test",
+    "make ts-coverage",
+    "make examples-local",
+    "make infra-snapshot-test",
+)
+
+# Release mechanics keep their own build steps (`npm ci`, asset assembly). Those
+# are not gates: a gate is a proof of the candidate, not the construction of the
+# artifact that ships from it.
 
 failures = []
 
@@ -73,471 +94,396 @@ def fail(message):
     failures.append(message)
 
 
-def parse_ci():
-    ci = Path(CI_PATH)
-    if not ci.is_file():
-        fail(f"missing {CI_PATH}")
-        return None, {}
-    lines = ci.read_text(encoding="utf-8").splitlines()
-
-    trigger_names = []
+def parse_workflow(path):
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    events = []
     push_branches = []
-    pr_branch_filters = []
+    event_branches = {}
     section = None
-    trigger = None
-    for line in lines:
-        if re.match(r"^on:\s*$", line):
-            section = "on"
-            trigger = None
-            continue
-        if re.match(r"^[A-Za-z0-9_.-]+:\s*$", line) and not line.startswith((" ", "\t")):
-            section = "jobs" if line.startswith("jobs:") else None
-            trigger = None
-            continue
-        if section != "on":
-            continue
-        match = re.match(r"^  ([A-Za-z0-9_-]+):", line)
-        if match:
-            trigger = match.group(1)
-            trigger_names.append(trigger)
-            continue
-        if trigger is None or trigger == "push":
-            # The push branch list is validated directly below through
-            # push_branches; only non-push triggers can carry a filter that hides
-            # a job from the staging pull request.
-            branch = re.match(r'^      -\s*"?([A-Za-z0-9_.-]+)"?\s*$', line)
-            if branch and trigger == "push":
-                push_branches.append(branch.group(1))
-            continue
-        key = re.match(r"^    (branches|branches-ignore):\s*([^\s].*)?$", line)
-        if key and key.group(2):
-            pr_branch_filters.append((trigger, key.group(1), key.group(2).strip()))
-            continue
-        if key:
-            pr_branch_filters.append((trigger, key.group(1), None))
-            continue
-        branch = re.match(r'^      -\s*"?([A-Za-z0-9_.-]+)"?\s*$', line)
-        if branch:
-            pr_branch_filters.append((trigger, "branches", branch.group(1)))
-
+    current_event = None
     jobs = {}
     job_name = None
     buffer = []
+    in_jobs = False
 
-    def flush():
+    def flush_job():
+        nonlocal job_name, buffer
         if job_name is not None:
             jobs[job_name] = "\n".join(buffer)
+        job_name = None
+        buffer = []
 
     for line in lines:
-        match = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
-        if match:
-            flush()
-            job_name = match.group(1)
-            buffer = []
+        if re.match(r"^on:\s*$", line):
+            section = "on"
+            current_event = None
+            flush_job() if in_jobs else None
+            in_jobs = False
             continue
-        if job_name is not None:
-            buffer.append(line)
-    flush()
+        if re.match(r"^jobs:\s*$", line):
+            section = "jobs"
+            in_jobs = True
+            continue
+        if re.match(r"^[A-Za-z0-9_.-]+:\s*", line) and not line.startswith((" ", "\t")):
+            if section == "jobs":
+                flush_job()
+            section = None
+            in_jobs = False
+            continue
+        if section == "on":
+            match = re.match(r"^  ([A-Za-z0-9_-]+):", line)
+            if match:
+                current_event = match.group(1)
+                events.append(current_event)
+                continue
+            inline = re.match(r'^    branches:\s*\[(.*)\]\s*$', line)
+            if inline and current_event:
+                for item in inline.group(1).split(","):
+                    value = item.strip().strip("'\"")
+                    if value:
+                        event_branches.setdefault(current_event, []).append(value)
+                continue
+            branch = re.match(r'^\s+-\s*"?([A-Za-z0-9_.*-]+)"?\s*$', line)
+            if branch and current_event:
+                event_branches.setdefault(current_event, []).append(branch.group(1))
+                if current_event == "push":
+                    push_branches.append(branch.group(1))
+            continue
+        if in_jobs:
+            match = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
+            if match:
+                flush_job()
+                job_name = match.group(1)
+                buffer = []
+                continue
+            if job_name is not None:
+                buffer.append(line)
+    if in_jobs:
+        flush_job()
 
-    if "pull_request" not in trigger_names:
-        fail(f"{CI_PATH}: must trigger on pull_request")
-    if "push" not in trigger_names:
-        fail(f"{CI_PATH}: must trigger on push")
-    for branch in (STAGING, "premain", "main"):
-        if branch not in push_branches:
-            fail(f"{CI_PATH}: push trigger must include {branch!r}")
-    for trigger_name, key, value in pr_branch_filters:
-        detail = f" ({key}: {value})" if value else f" ({key})"
-        if trigger_name == "pull_request":
-            fail(
-                f"{CI_PATH}: pull_request trigger carries a branch filter{detail} this "
-                "checker does not model; the staging pull request is the only place the "
-                "rubric runs, so spell the coverage out here before it can ship"
-            )
-        else:
-            fail(
-                f"{CI_PATH}: {trigger_name!r} trigger carries a {key!r} filter{detail} "
-                "this checker does not model; make the handled branches explicit before "
-                "shipping"
-            )
-
-    return lines, jobs
-
-
-# === job-condition evaluation ==============================================
-# A job-level if: is parsed and evaluated over the event/base combinations this
-# checker cares about instead of being substring-matched. Substring matching
-# read `github.event_name == 'pull_request' && false` as a pull-request job and
-# defaulted a base-less PR job to all three bases; evaluating the expression
-# closes both gaps. `&&`, `||`, parentheses, `always()`, the literals true/false,
-# and the event/base/head/input atoms below are modelled; `!`, `!=`, and every
-# other token or shape fail closed. Predicates on the same workflow symbol are
-# correlated -- `head.ref` holds one value and each `inputs.<name>` one boolean --
-# so a self-contradictory condition like `head.ref == 'staging' && head.ref ==
-# 'main'` is unsatisfiable rather than read as two settable predicates.
-
-KNOWN_EVENTS = ("push", "pull_request", "workflow_dispatch")
-KNOWN_BASES = ("staging", "premain", "main")
-
-
-class UnmodelledCondition(Exception):
-    pass
-
-
-CONDITION_TOKEN_RE = re.compile(
-    r"\s*(?:(?P<and>&&)|(?P<or>\|\|)|(?P<neq>!=)|(?P<not>!)"
-    r"|(?P<eq>==)|(?P<lparen>\()|(?P<rparen>\))|(?P<string>'[^']*')"
-    r"|(?P<ident>[A-Za-z_$][A-Za-z0-9_$.]*))"
-)
+    return {
+        "path": path,
+        "text": text,
+        "events": events,
+        "push_branches": push_branches,
+        "event_branches": event_branches,
+        "jobs": jobs,
+    }
 
 
-def tokenize_condition(text):
-    tokens = []
-    position = 0
-    while position < len(text):
-        match = CONDITION_TOKEN_RE.match(text, position)
+def job_field(body, field):
+    match = re.search(r"^    " + field + r":\s*(.+?)\s*$", body, re.MULTILINE)
+    if match is None:
+        return None
+    value = match.group(1).strip()
+    if value.startswith("${{") and value.endswith("}}"):
+        value = value[3:-2].strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        value = value[1:-1]
+    return value
+
+
+def run_bodies(body):
+    """Every `run:` scalar in a job body, including block scalars."""
+    bodies = []
+    lines = body.splitlines()
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        match = re.match(r"^\s*(-\s+)?run:\s*(.*)$", line)
         if match is None:
-            if text[position:].strip() == "":
-                break
-            raise UnmodelledCondition(f"unrecognised text {text[position:].strip()!r}")
-        position = match.end()
-        kind = match.lastgroup
-        tokens.append((kind, match.group(kind)))
-    return tokens
-
-
-class ConditionParser:
-    def __init__(self, tokens, text):
-        self.tokens = tokens
-        self.position = 0
-        self.text = text
-
-    def peek(self):
-        if self.position < len(self.tokens):
-            return self.tokens[self.position]
-        return (None, None)
-
-    def expect(self, kind):
-        token = self.peek()
-        if token[0] != kind:
-            raise UnmodelledCondition(f"expected {kind!r} in {self.text!r}")
-        self.position += 1
-        return token[1]
-
-    def parse(self):
-        node = self.parse_or()
-        if self.position != len(self.tokens):
-            raise UnmodelledCondition(f"trailing tokens in {self.text!r}")
-        return node
-
-    def parse_or(self):
-        node = self.parse_and()
-        while self.peek()[0] == "or":
-            self.position += 1
-            node = ("or", node, self.parse_and())
-        return node
-
-    def parse_and(self):
-        node = self.parse_unary()
-        while self.peek()[0] == "and":
-            self.position += 1
-            node = ("and", node, self.parse_unary())
-        return node
-
-    def parse_unary(self):
-        kind = self.peek()[0]
-        if kind in ("not", "neq"):
-            raise UnmodelledCondition("negated predicates are not modelled")
-        if kind == "lparen":
-            self.position += 1
-            node = self.parse_or()
-            self.expect("rparen")
-            return node
-        return self.parse_atom()
-
-    def parse_atom(self):
-        kind, value = self.peek()
-        if kind != "ident":
-            raise UnmodelledCondition(f"unexpected token {value!r}")
-        if value == "always":
-            self.position += 1
-            self.expect("lparen")
-            self.expect("rparen")
-            return ("const", True)
-        if value in ("true", "false"):
-            self.position += 1
-            return ("const", value == "true")
-        self.position += 1
-        self.expect("eq")
-        right_kind, right_value = self.peek()
-        if right_kind == "string":
-            self.position += 1
-            return self.comparison(value, right_value[1:-1])
-        if right_kind == "ident" and right_value in ("true", "false"):
-            self.position += 1
-            return self.comparison(value, right_value)
-        raise UnmodelledCondition(f"unsupported comparison in {self.text!r}")
-
-    @staticmethod
-    def comparison(left, right):
-        if left == "github.event_name":
-            if right not in KNOWN_EVENTS:
-                raise UnmodelledCondition(f"event {right!r} is not modelled")
-            return ("atom", ("event", right))
-        if left == "github.event.pull_request.base.ref":
-            if right not in KNOWN_BASES:
-                raise UnmodelledCondition(f"PR base {right!r} is not modelled")
-            return ("atom", ("base", right))
-        if left == "github.event.pull_request.head.ref":
-            return ("atom", ("head", right))
-        if left.startswith("inputs."):
-            if right not in ("true", "false"):
-                raise UnmodelledCondition(f"input predicate {left} == {right!r} is not modelled")
-            return ("atom", ("input", left, right))
-        raise UnmodelledCondition(f"unsupported predicate {left} == {right!r}")
-
-
-def condition_atoms(node):
-    kind = node[0]
-    if kind == "atom":
-        return {node[1]}
-    if kind in ("and", "or"):
-        return condition_atoms(node[1]) | condition_atoms(node[2])
-    return set()
-
-
-def evaluate_condition(node, assignment):
-    kind = node[0]
-    if kind == "const":
-        return node[1]
-    if kind == "atom":
-        return assignment[node[1]]
-    if kind == "and":
-        return evaluate_condition(node[1], assignment) and evaluate_condition(node[2], assignment)
-    if kind == "or":
-        return evaluate_condition(node[1], assignment) or evaluate_condition(node[2], assignment)
-    raise UnmodelledCondition(f"unknown node {kind!r}")
-
-
-def condition_symbol(atom):
-    """The single workflow symbol whose value an atom's truth tracks."""
-    if atom[0] == "event":
-        return "github.event_name"
-    if atom[0] == "base":
-        return "github.event.pull_request.base.ref"
-    if atom[0] == "head":
-        return "github.event.pull_request.head.ref"
-    return atom[1]  # ("input", "inputs.<name>", value)
-
-
-def condition_value(atom):
-    if atom[0] == "input":
-        return atom[2]
-    return atom[1]
-
-
-def condition_holds(node, event, base=None):
-    """True when some real input assignment fixes the given event/base and satisfies node.
-
-    Atoms are correlated by the one workflow symbol each reads instead of being
-    enumerated independently. `github.event.pull_request.head.ref` holds a single
-    value and every `inputs.<name>` is one boolean, so `head.ref == 'staging' &&
-    head.ref == 'main'` -- and likewise `inputs.x == 'true' && inputs.x ==
-    'false'` -- is unsatisfiable, not two independently settable predicates.
-    Each remaining free symbol takes one of the values it is compared against,
-    or some other value that leaves all of its atoms false.
-    """
-    symbols = {}
-    for atom in condition_atoms(node):
-        symbols.setdefault(condition_symbol(atom), []).append(atom)
-
-    fixed = {}
-    free = []
-    for symbol, group in symbols.items():
-        values = sorted({condition_value(atom) for atom in group})
-        if symbol == "github.event_name":
-            for atom in group:
-                fixed[atom] = condition_value(atom) == event
-        elif symbol == "github.event.pull_request.base.ref":
-            if event != "pull_request":
-                for atom in group:
-                    fixed[atom] = False
-            elif base is not None:
-                for atom in group:
-                    fixed[atom] = condition_value(atom) == base
-            else:
-                free.append((group, values + [None]))
+            index += 1
+            continue
+        inline = match.group(2).strip()
+        indent = len(line) - len(line.lstrip(" "))
+        collected = []
+        if inline in ("|", ">", "|-", ">-", "|+", ">+"):
+            index += 1
+            while index < len(lines):
+                candidate = lines[index]
+                if candidate.strip() == "":
+                    collected.append("")
+                    index += 1
+                    continue
+                candidate_indent = len(candidate) - len(candidate.lstrip(" "))
+                if candidate_indent <= indent:
+                    break
+                collected.append(candidate)
+                index += 1
         else:
-            free.append((group, values + [None]))
-
-    combinations = 1
-    for _, states in free:
-        combinations *= len(states)
-    if combinations > 4096:
-        raise UnmodelledCondition(f"too many input combinations in {node!r}")
-
-    for chosen in itertools.product(*[states for _, states in free]):
-        assignment = dict(fixed)
-        for (group, _), state in zip(free, chosen):
-            for atom in group:
-                assignment[atom] = condition_value(atom) == state
-        if evaluate_condition(node, assignment):
-            return True
-    return False
+            collected.append(inline)
+            index += 1
+        bodies.append("\n".join(collected))
+    return bodies
 
 
-def classify(job_id, body):
-    """Return (events, pr_bases) for a job, or None when its if: is unmodelled."""
-    lines = [line for line in body.splitlines() if line.strip()]
-    if_lines = [line for line in lines if re.match(r"^    if:", line)]
-    if len(if_lines) > 1:
-        fail(f"{CI_PATH}: job {job_id!r} declares more than one job-level if:")
+def check_no_interpolation_in_run(workflow, job_id, body):
+    for run in run_bodies(body):
+        if "${{" in run:
+            fail(
+                f"{workflow['path']}: job {job_id!r} interpolates a workflow expression "
+                "inside a run body; pass it through env: instead"
+            )
+
+
+def check_no_gate_execution(workflow):
+    for job_id, body in workflow["jobs"].items():
+        for run in run_bodies(body):
+            for command in GATE_COMMANDS:
+                if command in run:
+                    fail(
+                        f"{workflow['path']}: job {job_id!r} executes a gate command "
+                        f"({command!r}); gates are produced locally and CI verifies the record"
+                    )
+
+
+def load_workflow(path_text):
+    path = Path(path_text)
+    if not path.is_file():
         return None
-    if not if_lines:
-        return {"push", "pull_request", "workflow_dispatch"}, {"staging", "premain", "main"}
+    return parse_workflow(path)
 
-    text = if_lines[0].split("if:", 1)[1].strip()
-    if text.startswith("${{") and text.endswith("}}"):
-        text = text[3:-2].strip()
+
+# --- registry and verify entry point (MAI-4 step 1) -------------------------
+registry_path = Path(REGISTRY_PATH)
+if not registry_path.is_file():
+    fail(f"missing evidence registry at {REGISTRY_PATH}; the rubric gate's input scope and profiles are declared there")
+    registry = None
+else:
     try:
-        node = ConditionParser(tokenize_condition(text), text).parse()
-    except UnmodelledCondition as error:
-        fail(f"{CI_PATH}: job {job_id!r} uses a condition this checker does not model ({error}): {text}")
-        return None
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        fail(f"{REGISTRY_PATH} is not valid JSON ({error})")
+        registry = None
 
-    events = {event for event in KNOWN_EVENTS if condition_holds(node, event)}
-    if not events:
-        fail(f"{CI_PATH}: job {job_id!r} if: names no handled event: {text}")
-        return None
-    pr_bases = {base for base in KNOWN_BASES if condition_holds(node, "pull_request", base)}
-    return events, pr_bases
+for entry_point in (VERIFY_ALL, VERIFY_GATE):
+    if not Path(entry_point).is_file():
+        fail(f"missing evidence verify entry point at {entry_point}")
 
-
-parsed = parse_ci()
-if parsed is not None:
-    _, jobs = parsed
-    wiring = {}
-    for job_id, body in jobs.items():
-        result = classify(job_id, body)
-        if result is not None:
-            wiring[job_id] = result
-
-    for job_id, (events, pr_bases) in wiring.items():
-        if "push" in events and "pull_request" not in events:
-            fail(
-                f"{CI_PATH}: job {job_id!r} runs on push but never on pull_request "
-                "(R-F1 push parity)"
-            )
-
-    # Ruling: the rubric and deterministic-build jobs are staging-PR-only; they
-    # must not run on a protected-branch push or on a promotion pull request, so
-    # a required promotion context can never depend on them.
-    for required_job in (RUBRIC_JOB, DETERMINISTIC_JOB):
-        if required_job not in wiring:
-            fail(f"{CI_PATH}: missing job {required_job!r}")
-            continue
-        events, pr_bases = wiring[required_job]
-        if events != STAGING_PR_ONLY_EVENTS:
-            fail(
-                f"{CI_PATH}: job {required_job!r} must run only for pull requests to "
-                f"staging plus opted-in manual dispatch; got events={sorted(events)}"
-            )
-        if pr_bases != {STAGING}:
-            fail(
-                f"{CI_PATH}: job {required_job!r} must be scoped to pull requests "
-                f"targeting {STAGING!r}; got bases={sorted(pr_bases)}"
-            )
-
-    names = {}
-    for job_id, body in jobs.items():
-        match = re.search(r"^    name:\s*(.+?)\s*$", body, re.MULTILINE)
-        names[job_id] = match.group(1).strip().strip('"\'') if match else job_id
-
-    by_name = {name: job_id for job_id, name in names.items()}
-
-    if PR_STAGING_READINESS not in by_name:
-        fail(f"{CI_PATH}: missing the {PR_STAGING_READINESS!r} job (R-F1 PR parity)")
+if registry is not None:
+    rubric = (registry.get("gates") or {}).get("rubric")
+    if rubric is None:
+        fail(f"{REGISTRY_PATH}: the catch-all 'rubric' gate is missing")
     else:
-        job_id = by_name[PR_STAGING_READINESS]
-        events, pr_bases = wiring.get(job_id, (set(), set()))
-        if "pull_request" not in events or pr_bases != {STAGING}:
+        if "**" not in (rubric.get("paths") or []):
             fail(
-                f"{CI_PATH}: {PR_STAGING_READINESS!r} must be scoped to pull_request "
-                f"events targeting {STAGING!r}, got events={sorted(events)} bases={sorted(pr_bases)}"
+                f"{REGISTRY_PATH}: the 'rubric' gate must keep a '**' input scope, so a tooling, "
+                "workflow or guard edit stales it"
             )
-        if "scripts/verify-release-readiness.sh" not in jobs[job_id]:
-            fail(
-                f"{CI_PATH}: {PR_STAGING_READINESS!r} must run "
-                "scripts/verify-release-readiness.sh"
-            )
+        if not (rubric.get("profiles") or []):
+            fail(f"{REGISTRY_PATH}: the 'rubric' gate must declare at least one proof profile")
+    profiles = registry.get("proofProfiles") or {}
+    for gate_id, gate in (registry.get("gates") or {}).items():
+        for profile in gate.get("profiles") or []:
+            declaration = profiles.get(profile)
+            if declaration is None:
+                fail(f"{REGISTRY_PATH}: gate {gate_id!r} names undeclared proof profile {profile!r}")
+                continue
+            image = str(declaration.get("image") or "")
+            environment = declaration.get("environment") or {}
+            platform = (environment.get("platform") or {}).get("os")
+            if platform == "linux":
+                if "@sha256:" not in image:
+                    fail(
+                        f"{REGISTRY_PATH}: Linux proof profile {profile!r} must pin its container image "
+                        "by digest"
+                    )
+                if not declaration.get("containerPlatform"):
+                    fail(f"{REGISTRY_PATH}: Linux proof profile {profile!r} must declare containerPlatform")
 
-    for required_name, expected_base in (
-        ("Prerelease readiness (staging -> premain)", "premain"),
-        ("Release readiness (PR -> main)", "main"),
-    ):
-        if required_name not in by_name:
-            fail(f"{CI_PATH}: missing the {required_name!r} promotion gate")
-            continue
-        events, pr_bases = wiring.get(by_name[required_name], (set(), set()))
-        if events != {"pull_request"} or pr_bases != {expected_base}:
-            fail(
-                f"{CI_PATH}: {required_name!r} must stay scoped to pull_request events "
-                f"targeting {expected_base!r}, got events={sorted(events)} bases={sorted(pr_bases)}"
-            )
-
-    for job_id, (events, pr_bases) in wiring.items():
-        name = names[job_id]
-        if not (pr_bases & PROMOTION_BASES):
-            continue
-        if pr_bases == {STAGING}:
-            continue
-        if name in PROMOTION_EXEMPT:
-            if PR_STAGING_READINESS not in by_name:
-                fail(
-                    f"{CI_PATH}: {name!r} is exempt from PR parity but its counterpart "
-                    f"{PR_STAGING_READINESS!r} is missing"
-                )
-            continue
-        if pr_bases != {"staging", "premain", "main"}:
-            fail(
-                f"{CI_PATH}: job {job_id!r} runs on promotion PRs ({sorted(pr_bases)}) but "
-                "not on PRs to staging; add a staging equivalent or an exemption with a reason"
-            )
-
-# Cross-workflow exemptions: surfaces outside ci.yml that carry post-merge or
-# deploy jobs. Each reason is re-checked mechanically here.
-cross_checks = [
-    (
-        ".github/workflows/pages.yml",
-        lambda text: "pull_request" not in text,
-        "docs deploy publisher; it gates nothing on a promotion path and never runs on PRs",
-    ),
-    (
-        ".github/workflows/theorycloud-facetheory-subtree-publish.yml",
-        lambda text: "pull_request" not in text,
-        "deploy publisher; its dry-run equivalents run at PR time in ci.yml",
-    ),
-    (
-        ".github/workflows/release-branch-bootstrap.yml",
-        lambda text: "pull_request" not in text,
-        "branch bootstrap; gates nothing and its script test runs in the rubric",
-    ),
-]
-
-for path, predicate, reason in cross_checks:
-    target = Path(path)
-    if not target.is_file():
-        fail(f"missing {path}")
+# --- workflows -------------------------------------------------------------
+workflow_paths = sorted(str(path) for path in Path(".github/workflows").glob("*.y*ml"))
+workflows = {}
+for path_text in workflow_paths:
+    workflow = load_workflow(path_text)
+    if workflow is None:
         continue
-    if not predicate(target.read_text(encoding="utf-8")):
-        fail(f"{path}: cross-workflow exemption no longer holds ({reason})")
-
-subtree_job = "TheoryCloud subtree publishing path"
-if Path(CI_PATH).is_file():
-    if subtree_job not in Path(CI_PATH).read_text(encoding="utf-8"):
+    workflows[path_text] = workflow
+    check_no_gate_execution(workflow)
+    if path_text == HYGIENE_PATH:
+        for job_id, body in workflow["jobs"].items():
+            check_no_interpolation_in_run(workflow, job_id, body)
+    if "push" in workflow["events"] and path_text not in PUSH_ALLOWED:
         fail(
-            f"{CI_PATH}: missing the {subtree_job!r} dry-run job that is the PR-time "
-            "counterpart of the deploy-only TheoryCloud publisher"
+            f"{path_text}: has a push trigger but is not an allowed publish/release workflow; "
+            "a merge publishes, it does not re-run a gate"
+        )
+
+ci = workflows.get(CI_PATH)
+if ci is None:
+    fail(f"missing {CI_PATH}")
+else:
+    if "push" in ci["events"]:
+        fail(f"{CI_PATH}: must not trigger on push; the merged tree is the tree the pull request verified")
+    if "pull_request" not in ci["events"]:
+        fail(f"{CI_PATH}: must trigger on pull_request")
+    if "workflow_dispatch" in ci["events"]:
+        fail(
+            f"{CI_PATH}: a manual dispatch would offer an execution path with no record; "
+            "remove it or model why it cannot run a gate"
+        )
+
+    rubric_body = ci["jobs"].get("rubric")
+    if rubric_body is None:
+        fail(f"{CI_PATH}: missing the 'rubric' verify job")
+    else:
+        condition = (job_field(rubric_body, "if") or "")
+        if f"github.event.pull_request.base.ref == '{STAGING}'" not in condition:
+            fail(
+                f"{CI_PATH}: the 'rubric' job must be scoped to pull requests targeting {STAGING!r}; "
+                f"got if: {condition!r}"
+            )
+        for release_base in (RELEASE_BRANCH, MAIN_BRANCH):
+            if f"'{release_base}'" in condition:
+                fail(f"{CI_PATH}: the 'rubric' job must not run on {release_base!r} pull requests")
+        runs = "\n".join(run_bodies(rubric_body))
+        if VERIFY_ALL not in runs and VERIFY_GATE not in runs:
+            fail(
+                f"{CI_PATH}: the 'rubric' job must run {VERIFY_ALL} (or {VERIFY_GATE}); "
+                "it verifies the record and executes nothing"
+            )
+        for provisioning in ("actions/setup-node", "actions/setup-go", "npm ci", "actions/upload-artifact"):
+            if provisioning in rubric_body:
+                fail(
+                    f"{CI_PATH}: the 'rubric' job must provision no toolchain and upload no artifact "
+                    f"(found {provisioning!r}); it only verifies records"
+                )
+
+    alignment = ci["jobs"].get("version-alignment")
+    if alignment is None:
+        fail(f"{CI_PATH}: missing the fast 'Version alignment' job")
+    else:
+        if "scripts/verify-version-alignment.sh" not in alignment:
+            fail(f"{CI_PATH}: 'Version alignment' must run scripts/verify-version-alignment.sh")
+        condition = job_field(alignment, "if")
+        if condition:
+            fail(
+                f"{CI_PATH}: 'Version alignment' must report on every pull request; it currently carries "
+                f"if: {condition!r}"
+            )
+
+    train = ci["jobs"].get("release-train-promotion")
+    if train is None:
+        fail(f"{CI_PATH}: missing the trusted 'Release train promotion gate' job")
+    elif "scripts/verify-release-train-promotion.sh" not in train:
+        fail(f"{CI_PATH}: the release-train promotion gate must run scripts/verify-release-train-promotion.sh")
+
+    for required_job, expected in (
+        ("prerelease-readiness", f"github.event.pull_request.base.ref == '{RELEASE_BRANCH}'"),
+        ("release-readiness", f"github.event.pull_request.base.ref == '{MAIN_BRANCH}'"),
+        ("staging-readiness", f"github.event.pull_request.base.ref == '{STAGING}'"),
+    ):
+        body = ci["jobs"].get(required_job)
+        if body is None:
+            fail(f"{CI_PATH}: missing the release-hygiene job {required_job!r}")
+            continue
+        condition = job_field(body, "if") or ""
+        if expected not in condition:
+            fail(
+                f"{CI_PATH}: release-hygiene job {required_job!r} must keep its branch scope; "
+                f"got if: {condition!r}"
+            )
+
+# --- REL-1: promotion hygiene ---------------------------------------------
+hygiene = workflows.get(HYGIENE_PATH)
+if hygiene is None:
+    fail(f"missing the head-branch check at {HYGIENE_PATH}")
+else:
+    if sorted(hygiene["events"]) != ["pull_request", "pull_request_review", "workflow_dispatch"]:
+        fail(
+            f"{HYGIENE_PATH}: must trigger on pull_request, pull_request_review and workflow_dispatch; "
+            f"got {hygiene['events']}. The dispatch path is the lane's early verdict; the code-owner "
+            "review is the eligible event that makes the context a required check"
+        )
+    branches = hygiene["event_branches"].get("pull_request") or []
+    if not branches:
+        fail(f"{HYGIENE_PATH}: must restrict its pull_request trigger to {RELEASE_BRANCH}/{MAIN_BRANCH}")
+    for branch in (RELEASE_BRANCH, MAIN_BRANCH):
+        if branch not in branches:
+            fail(f"{HYGIENE_PATH}: must report on pull requests into {branch!r}; got {branches}")
+    if not re.search(r"^permissions:\n(?:  [a-z-]+: [a-z]+\n)+", hygiene["text"], re.MULTILINE):
+        fail(f"{HYGIENE_PATH}: must declare its read-only permissions explicitly")
+    for permission in re.findall(r"^  ([a-z-]+): ([a-z]+)$", hygiene["text"], re.MULTILINE):
+        name, level = permission
+        if level != "read":
+            fail(
+                f"{HYGIENE_PATH}: permission {name!r} is {level!r}; the head check needs read-only "
+                "built-in access and must never hold a write credential"
+            )
+    if not re.search(r"^  pull-requests: read$", hygiene["text"], re.MULTILINE):
+        fail(
+            f"{HYGIENE_PATH}: must declare `pull-requests: read`; the dispatch path reads the generated "
+            "pull request by number to bind the run to its head"
+        )
+    if "release_pr_number:" not in hygiene["text"]:
+        fail(f"{HYGIENE_PATH}: the dispatch path must take the generated release pull request number")
+    if "actions/checkout" in hygiene["text"]:
+        fail(f"{HYGIENE_PATH}: must not check out the pull request; it needs only the pull request context")
+    if "github.event.pull_request.head.repo.full_name" not in hygiene["text"]:
+        fail(
+            f"{HYGIENE_PATH}: must compare github.event.pull_request.head.repo.full_name with github.repository, "
+            "so a fork branch named like an accepted head cannot pass by name"
+        )
+    if "PR_HEAD_REPOSITORY:" not in hygiene["text"] or "BASE_REPOSITORY:" not in hygiene["text"]:
+        fail(f"{HYGIENE_PATH}: must pass the head and base repositories through env: to the run body")
+    for head in (STAGING, RELEASE_PLEASE_PREMAIN, RELEASE_PLEASE_MAIN):
+        if head not in hygiene["text"]:
+            fail(
+                f"{HYGIENE_PATH}: does not name the accepted head {head!r}. Accept exactly "
+                f"{STAGING!r} into {RELEASE_BRANCH}, {RELEASE_BRANCH!r} into {MAIN_BRANCH}, plus the "
+                "release-please branch each of them generates"
+            )
+    # A dispatched run must prove the pull request it names is the branch and
+    # commit it is running on, or it would certify a different tree than the one
+    # the ruleset gates.
+    for marker in ("RELEASE_PR_NUMBER", "DISPATCHED_REF_NAME", "DISPATCHED_SHA", 'head.get("sha")'):
+        if marker not in hygiene["text"]:
+            fail(
+                f"{HYGIENE_PATH}: the dispatch path must bind the run to the pull request head "
+                f"(missing {marker})"
+            )
+
+    def hygiene_steps(text):
+        steps = []
+        current = None
+        for line in text.splitlines():
+            if re.match(r"^      - ", line):
+                if current is not None:
+                    steps.append(current)
+                current = [line]
+                continue
+            if current is not None and (
+                re.match(r"^  [A-Za-z0-9_-]+:\s*$", line) or re.match(r"^[A-Za-z0-9_.-]+:\s*", line)
+            ):
+                steps.append(current)
+                current = None
+                continue
+            if current is not None:
+                current.append(line)
+        if current is not None:
+            steps.append(current)
+        return ["\n".join(step) for step in steps]
+
+    dispatch_gate = "if: github.event_name == 'workflow_dispatch'"
+    gh_steps = 0
+    for step in hygiene_steps(hygiene["text"]):
+        for run in run_bodies(step):
+            if "git " in run:
+                fail(
+                    f"{HYGIENE_PATH}: a step runs a git command; the head check needs only the "
+                    "pull request context"
+                )
+            if "gh " in run:
+                gh_steps += 1
+                if dispatch_gate not in step:
+                    fail(
+                        f"{HYGIENE_PATH}: a step outside the workflow_dispatch binding runs gh; the "
+                        "pull_request path must stay context-only"
+                    )
+    if gh_steps != 1:
+        fail(
+            f"{HYGIENE_PATH}: exactly one step (the dispatch binding) may call gh, found {gh_steps}"
         )
 
 if failures:
@@ -546,5 +492,5 @@ if failures:
         print(f"- {failure}")
     sys.exit(1)
 
-print("ci-trigger-parity: PASS")
+print("ci-trigger-parity: PASS (verify-only CI, no gate-class push trigger, release heads gated)")
 PY

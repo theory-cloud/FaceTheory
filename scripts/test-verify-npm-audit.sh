@@ -96,6 +96,10 @@ case "${FAKE_NPM_MODE}" in
     printf '%s\n' '{"vulnerabilities":{"brace-expansion":{"name":"brace-expansion","severity":"high","via":[{"name":"brace-expansion","url":"https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"}],"nodes":["node_modules/aws-cdk-lib/node_modules/brace-expansion"]},"aws-cdk-lib":{"name":"aws-cdk-lib","severity":"high","via":["not-reported"],"nodes":["node_modules/aws-cdk-lib"]}}}'
     exit 1
     ;;
+  split-scope-ok|split-scope-uncovered|split-scope-version-drift)
+    printf '%s\n' '{"vulnerabilities":{"picomatch":{"name":"picomatch","severity":"high","via":[{"name":"picomatch","url":"https://github.com/advisories/GHSA-fc5q-39xc-vjpf"}],"nodes":["node_modules/picomatch","node_modules/vite/node_modules/picomatch","node_modules/tinyglobby/node_modules/picomatch"]}}}'
+    exit 1
+    ;;
   *)
     echo "unknown FAKE_NPM_MODE ${FAKE_NPM_MODE}" >&2
     exit 1
@@ -243,5 +247,45 @@ status="$(run_gate bundled-chain-orphan)"
 [[ "${status}" != "0" ]] || fail "a parent naming an unreported dependency must fail the gate"
 grep -Fq 'aws-cdk-lib: severity=' "${tmpdir}/bundled-chain-orphan.err" ||
   fail "the parent of an unreported dependency was not reported as a failure"
+
+# (o) One advisory that npm groups across copies at different installed versions
+# is covered by exact scoped entries that together name every reported node, and
+# ONLY then: an unnamed node or a version drift on any one node still fails.
+write_split_locks() {
+  local first="$1" second="$2" third="${3:-}"
+  local packages
+  packages="\"node_modules/picomatch\":{\"version\":\"${first}\"},\"node_modules/vite/node_modules/picomatch\":{\"version\":\"${second}\"}"
+  if [[ -n "${third}" ]]; then
+    packages="${packages},\"node_modules/tinyglobby/node_modules/picomatch\":{\"version\":\"${third}\"}"
+  fi
+  for project in ts infra/apptheory-ssr-site infra/apptheory-ssg-isr-site; do
+    printf '{"name":"scratch","lockfileVersion":3,"packages":{%s}}\n' \
+      "${packages}" > "${fake_root}/${project}/package-lock.json"
+  done
+}
+
+split_allowlist="$(printf '%s\n%s' \
+  "allow ids=GHSA-fc5q-39xc-vjpf package=picomatch version=2.3.2 nodes=node_modules/picomatch projects=${all_projects} expires=2999-01-01" \
+  "allow ids=GHSA-fc5q-39xc-vjpf package=picomatch version=4.0.7 nodes=node_modules/vite/node_modules/picomatch,node_modules/tinyglobby/node_modules/picomatch projects=${all_projects} expires=2999-01-01")"
+write_allowlist "${split_allowlist}"
+write_split_locks 2.3.2 4.0.7 4.0.7
+status="$(run_gate split-scope-ok)"
+[[ "${status}" == "0" ]] || fail "exact scoped entries covering every grouped node should pass, got status ${status}"
+grep -Fq 'npm-audit: ALLOW (ts) picomatch via GHSA-fc5q-39xc-vjpf [scoped exception, expires 2999-01-01]' "${tmpdir}/split-scope-ok.out" ||
+  fail "the grouped-node allowance was not reported"
+
+# (p) A node the entries do not name is NOT covered, even when the others are.
+write_split_locks 2.3.2 4.0.7 ""
+status="$(run_gate split-scope-uncovered)"
+[[ "${status}" != "0" ]] || fail "an unnamed node at an installed version must fail the grouped finding"
+grep -Fq 'picomatch: severity=' "${tmpdir}/split-scope-uncovered.err" ||
+  fail "the uncovered grouped node was not reported as a failure"
+
+# (q) One drifted version is NOT covered, even when the entries name every node.
+write_split_locks 2.3.2 4.0.8 4.0.7
+status="$(run_gate split-scope-version-drift)"
+[[ "${status}" != "0" ]] || fail "a drifted installed version must fail the grouped finding"
+grep -Fq 'picomatch: severity=' "${tmpdir}/split-scope-version-drift.err" ||
+  fail "the drifted grouped node was not reported as a failure"
 
 echo "test-verify-npm-audit: PASS"

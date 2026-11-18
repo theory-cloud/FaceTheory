@@ -3,8 +3,8 @@
 # repository working directory on the module search path.
 #
 # Finding e9b5a4cb2d28819180cc7f148d8bd265: prerelease.yml/release.yml exported
-# `secrets.RELEASE_PLEASE_TOKEN` (falling back to the write-capable job token)
-# into an inline `python3 -` step whose cwd was the repository root. For programs
+# the write-capable job token into an inline `python3 -` step whose cwd was the
+# repository root. For programs
 # read from standard input, Python puts the current directory on sys.path, so a
 # checked-in `json.py` shadows the standard library and runs repository-controlled
 # code with the release token in its environment.
