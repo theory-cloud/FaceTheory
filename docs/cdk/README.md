@@ -98,8 +98,8 @@ runner at the version pinned in `scripts/local/examples-local.json`
 (no AppTheory checkout):
 
 ```bash
-GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.3.1/bin" \
-  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.3.1
+GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.4.0/bin" \
+  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.4.0
 make examples-local ONLY='infra/apptheory-ssr-site#local-run'
 make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'
 ```
