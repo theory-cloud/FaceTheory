@@ -16,8 +16,13 @@
 #    - ids      every `via` advisory id must be listed here
 #    - package  exact npm package name (the finding name and every via[].name)
 #    - version  exact installed version, read from the project lockfile per node
-#    - nodes    every reported node path must be listed here (a copy on any
-#               other path, bundled or not, still fails)
+#    - nodes    the reported node paths this entry covers, each at `version`.
+#               npm groups every copy of one package into a single finding, so a
+#               finding may name several nodes at different versions; several
+#               entries may then cover one finding, but only when together they
+#               name every reported node at that node's installed version. An
+#               unnamed node, a drifted version, or a copy on any other path
+#               still fails.
 #    - projects every audited project dir this exception may apply to
 #    - expires  UTC date; the entry is ignored on or after this date, so the
 #               gate fails again and the exception must be revisited
@@ -41,3 +46,19 @@
 # Removal: retire this entry when the pinned aws-cdk-lib bundles
 # minimatch >= 11.0.1.
 allow ids=GHSA-g3hv-75wg-m249 package=minimatch version=10.2.6 nodes=node_modules/aws-cdk-lib/node_modules/minimatch projects=ts,infra/apptheory-ssr-site,infra/apptheory-ssg-isr-site expires=2026-12-01
+
+# picomatch <= 4.0.7 is affected by GHSA-fc5q-39xc-vjpf (ReDoS through
+# single-branch repeated extglobs). npm publishes NO patched picomatch: 4.0.7 is
+# the newest release and the advisory carries no fixed event, so nothing
+# installable clears it. Operator-ruled 2026-11-17 (Factory docs/058
+# DEPS-20261117) as a scoped, expiring exception, the ruling AppTheory records
+# for its own lint chain. Nothing wider is claimed here.
+# Every node below is build/lint/test-time only: each is `dev: true`, reached
+# through rollup-plugin-svelte -> @rollup/pluginutils or vite/tinyglobby, and
+# neither the published package's runtime dependencies (none) nor its peer
+# dependencies mention picomatch. No infra project resolves picomatch at all,
+# so both entries are scoped to ts.
+# Removal: retire both entries when a stable picomatch >= 4.0.8 is published, or
+# when ts/ no longer resolves picomatch <= 4.0.7.
+allow ids=GHSA-fc5q-39xc-vjpf package=picomatch version=2.3.2 nodes=node_modules/picomatch projects=ts expires=2026-12-01
+allow ids=GHSA-fc5q-39xc-vjpf package=picomatch version=4.0.7 nodes=node_modules/tinyglobby/node_modules/picomatch,node_modules/vite/node_modules/picomatch projects=ts expires=2026-12-01
