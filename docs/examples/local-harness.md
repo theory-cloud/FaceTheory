@@ -56,7 +56,7 @@ harness's `--only`, after those same build and install steps.
   (`profile.apptheoryRunner`), and the repository's `.go-version` supplies the
   toolchain.
 - No AppTheory or TableTheory checkout. The harness runs
-  `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.3.1`
+  `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.4.0`
   with `GOBIN` pointed at its own cache, verifies the installed command with
   `go version -m`, and fails closed unless it reports the pinned module and
   version. The install path and flags are the ones AppTheory documents in
@@ -233,8 +233,8 @@ For a row whose runner is in `FT2_RUNNERS`, the harness:
 1. reads `profile.apptheoryRunner` from the committed manifest
    (`github.com/theory-cloud/apptheory/v7/cmd/apptheory-local` at the pinned tag);
 2. installs it with
-   `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.3.1`
-   and `GOBIN=~/.cache/facetheory-examples-local/apptheory-local/v7.3.1/bin`;
+   `go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.4.0`
+   and `GOBIN=~/.cache/facetheory-examples-local/apptheory-local/v7.4.0/bin`;
 3. runs `go version -m` on the installed binary and fails closed unless the
    `path` is the pinned command and the `mod` line is the pinned module at the
    pinned version.
@@ -307,7 +307,7 @@ the SSR function in the Node image, provisions the stack's buckets and bucket
 deployments in s3proxy, and serves the synthesized CloudFront distribution on
 `http://127.0.0.1:8241`, the `serving cloudfront …` listener it reports.
 AppTheory's
-[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.3.1/docs/examples/local-runner.md#declared-ports)
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.4.0/docs/examples/local-runner.md#declared-ports)
 fixes that order — a run binds its public surfaces from `--port-base + index`,
 Function URLs before CloudFront distributions — so the `AWS_IAM` Function URL
 takes `8240` and CloudFront the next port. The gateway selects the cache
@@ -449,14 +449,14 @@ Install the released runner once (the same path the harness uses; the version
 is pinned in `scripts/local/examples-local.json`):
 
 ```bash
-GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.3.1/bin" \
-  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.3.1
-APPTHEORY_LOCAL="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.3.1/bin/apptheory-local"
+GOBIN="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.4.0/bin" \
+  go install github.com/theory-cloud/apptheory/v7/cmd/apptheory-local@v7.4.0
+APPTHEORY_LOCAL="$HOME/.cache/facetheory-examples-local/apptheory-local/v7.4.0/bin/apptheory-local"
 go version -m "$APPTHEORY_LOCAL"   # path .../cmd/apptheory-local; mod .../v7 must report the tag scripts/local/examples-local.json pins
 ```
 
 The install command and profile rules are AppTheory's
-[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.3.1/docs/examples/local-runner.md#install-the-command).
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.4.0/docs/examples/local-runner.md#install-the-command).
 
 Bundle the example's own entry from `ts/` in a subshell, with `ts/dist` already
 built, so the shell stays at the repository root for the steps that follow:
@@ -507,7 +507,7 @@ curl -i http://127.0.0.1:8241/_facetheory/data/index.json
 prints both listeners: `8240` is the `AWS_IAM` Function URL, which refuses
 unsigned requests, and the CloudFront distribution is the next port (`8241`),
 the order AppTheory's
-[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.3.1/docs/examples/local-runner.md#declared-ports)
+[`docs/examples/local-runner.md`](https://github.com/theory-cloud/AppTheory/blob/v7.4.0/docs/examples/local-runner.md#declared-ports)
 defines.
 
 ### The SSG+ISR gateway
@@ -540,7 +540,7 @@ buckets, and `make examples-local ONLY='infra/apptheory-ssg-isr-site#local-run'`
 asserts the stored object and item directly. `Ctrl-C` stops the gateway and
 removes its containers and network. `8246` is the `AWS_IAM` Function URL and
 CloudFront is the next port (`8247`), as above and per the
-[`Declared ports`](https://github.com/theory-cloud/AppTheory/blob/v7.3.1/docs/examples/local-runner.md#declared-ports)
+[`Declared ports`](https://github.com/theory-cloud/AppTheory/blob/v7.4.0/docs/examples/local-runner.md#declared-ports)
 order.
 
 ### The Node-served examples
