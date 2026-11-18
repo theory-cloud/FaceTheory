@@ -333,7 +333,7 @@ required = (
     "    permissions:\n      contents: write\n",
     "    outputs:\n      release_json: ${{ steps.draft.outputs.release_json }}\n",
     "      - name: Resolve draft release metadata\n",
-    "          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}\n",
+    "          GH_TOKEN: ${{ github.token }}\n",
 )
 for needle in required:
     if needle not in resolver:

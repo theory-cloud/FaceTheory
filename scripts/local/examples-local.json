@@ -15,7 +15,7 @@
     "apptheoryRunner": {
       "module": "github.com/theory-cloud/apptheory/v7",
       "package": "github.com/theory-cloud/apptheory/v7/cmd/apptheory-local",
-      "version": "v7.1.0"
+      "version": "v7.4.0"
     },
     "storage": {
       "ports": { "dynamodb": 8250, "s3": 8251 },
@@ -49,8 +49,8 @@
           "runtime": "nodejs24.x",
           "handler": "index.handler",
           "expect": { "profile": "apptheory", "incremental": true },
-          "gap": "The real handler and the pinned @theory-cloud/apptheory v7.1.0 runtime run in the digest-pinned official Lambda Node image. The runner's warm invoke protocol forwards each streamed chunk before the result line, so the row proves a first chunk and the document end in a later chunk. The managed Function URL edge (TLS, auth, edge network) is a docs/125 true limit and is not exercised.",
-          "description": "AppTheory streaming handler over a FaceTheory app, run through the released apptheory-local v7.1.0; incremental chunk delivery, catch-all and the 405 method refusal."
+          "gap": "The real handler and the pinned @theory-cloud/apptheory runtime run in the digest-pinned official Lambda Node image. The runner's warm invoke protocol forwards each streamed chunk before the result line, so the row proves a first chunk and the document end in a later chunk. The managed Function URL edge (TLS, auth, edge network) is a docs/125 true limit and is not exercised.",
+          "description": "AppTheory streaming handler over a FaceTheory app, run through the released apptheory-local runner the manifest pins; incremental chunk delivery, catch-all and the 405 method refusal."
         }
       ]
     },
@@ -175,7 +175,7 @@
           "handler": "index.handler",
           "expect": { "profile": "facetheory", "echoRequestId": true, "incremental": true },
           "gap": "The real handler runs in the digest-pinned official Lambda Node image. The runner's warm invoke protocol forwards each streamed chunk before the result line, so the row proves a first chunk and the document end in a later chunk. The managed Function URL edge (TLS, auth, edge network) is a docs/125 true limit and is not exercised.",
-          "description": "Direct FaceTheory Lambda Function URL streaming handler run through the released apptheory-local v7.1.0; incremental chunk delivery, catch-all and the example's method behaviour."
+          "description": "Direct FaceTheory Lambda Function URL streaming handler run through the released apptheory-local runner the manifest pins; incremental chunk delivery, catch-all and the example's method behaviour."
         }
       ]
     },

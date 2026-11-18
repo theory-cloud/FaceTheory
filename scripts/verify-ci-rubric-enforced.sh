@@ -121,12 +121,168 @@ PY
 
 ci=".github/workflows/ci.yml"
 
-require_contains "${ci}" "  release-train-promotion:" "CI must define the release train promotion gate"
-require_contains "${ci}" "ref: refs/heads/staging" "release train gate must checkout trusted staging verifier code"
-require_contains "${ci}" "scripts/verify-release-train-promotion.sh" "release train gate must use the verifier script"
-require_contains "${ci}" "  rubric:" "CI must define the full rubric job"
-require_contains "${ci}" "run: bash gov-infra/verifiers/gov-verify-rubric.sh" "CI rubric job must run the gov-infra verifier"
-require_contains "${ci}" "run: bash scripts/verify-node-engines-floor.sh" "CI must run the node engines floor gate at PR time"
+# --- the verified-once CI shape (MAI-4) ------------------------------------
+#
+# The rubric no longer executes in CI. The `rubric` job verifies the committed
+# evidence record for every gate and every tracked proof profile, and a missing
+# or stale record fails it. These assertions are what make the old executing
+# shape fail here rather than only in review.
+
+require_contains "${ci}" "  rubric:" "CI must define the rubric verify job"
+require_contains "${ci}" "    name: rubric" "the rubric verify job must keep the required context name"
+require_contains "${ci}" "    if: github.event.pull_request.base.ref == 'staging'" \
+  "the rubric verify job must be scoped to pull requests targeting staging"
+require_contains "${ci}" "run: bash scripts/evidence/verify-all.sh" \
+  "the rubric job must verify the recorded evidence"
+require_not_contains "${ci}" "run: bash gov-infra/verifiers/gov-verify-rubric.sh" \
+  "the rubric must not execute in CI"
+require_not_contains "${ci}" "run: scripts/verify-ts-pack.sh" "the pack gate must not execute in CI"
+require_not_contains "${ci}" "run: scripts/verify-deterministic-builds.sh" \
+  "deterministic builds must not execute in CI"
+require_not_contains "${ci}" "actions/setup-node" "the verify job must provision no toolchain"
+require_not_contains "${ci}" "actions/setup-go" "the verify job must provision no toolchain"
+require_not_contains "${ci}" "actions/upload-artifact" "the verify job must upload no artifact"
+require_not_contains "${ci}" "run: cd ts && npm ci --ignore-scripts" "CI must not install a package tree"
+
+if grep -Eq '^  push:' "${ci}"; then
+  fail "CI must not trigger on push; the merged tree is the tree the pull request verified"
+fi
+if grep -Eq '^  workflow_dispatch:' "${ci}"; then
+  fail "CI must not offer a manual dispatch: it would be an execution path with no record"
+fi
+require_contains "${ci}" "  version-alignment:" "CI must keep the fast version-alignment job"
+require_contains "${ci}" "run: scripts/verify-version-alignment.sh" \
+  "version alignment must run the verifier"
+require_contains "${ci}" "  staging-readiness:" "CI must keep the PR -> staging release readiness job"
+require_contains "${ci}" "name: Release readiness (PR -> staging)" \
+  "PR -> staging readiness job name must stay stable for branch protection visibility"
+require_contains "${ci}" "scripts/verify-release-readiness.sh origin/staging HEAD staging" \
+  "PR -> staging readiness must check the pull request's own commits"
+
+registry="scripts/evidence/validation-gates.json"
+require_contains "${registry}" '"make",' \
+  "the rubric gate must record the repository's one rubric entry point"
+if ! python3 - "${registry}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+registry = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+gates = registry.get("gates") or {}
+profiles = registry.get("proofProfiles") or {}
+problems = []
+rubric = gates.get("rubric") or {}
+if "**" not in (rubric.get("paths") or []):
+    problems.append("the rubric gate must keep a '**' input scope")
+if not rubric.get("profiles"):
+    problems.append("the rubric gate must declare a proof profile")
+for gate_id, gate in gates.items():
+    if not gate.get("commands"):
+        problems.append(f"gate {gate_id!r} declares no approved command")
+    for profile in gate.get("profiles") or []:
+        declaration = profiles.get(profile)
+        if declaration is None:
+            problems.append(f"gate {gate_id!r} names undeclared profile {profile!r}")
+            continue
+        if not (declaration.get("environment") or {}):
+            problems.append(f"profile {profile!r} declares no environment")
+if not registry.get("evidenceDirectory"):
+    problems.append("the registry must declare an evidence directory")
+
+# The release-notes class is the one place where a tracked path can stop staling
+# evidence: its files carry release history and release state, not product bytes,
+# so no record binds their content. Silent growth is that class's risk, so the
+# reviewed set is fixed here and the registry must match it exactly. Every path a
+# release-please config can rewrite must also be release-only, or a release would
+# stale a product record for a version bump.
+APPROVED_RELEASE_NOTES = {
+    "CHANGELOG.md",
+    "CHANGELOG.prerelease.md",
+    ".release-please-manifest.json",
+    ".release-please-manifest.premain.json",
+}
+notes = registry.get("releaseNotes")
+if not isinstance(notes, dict) or set(notes) != {"exact"}:
+    problems.append("the registry must declare releaseNotes as exact paths only")
+    declared_notes = []
+else:
+    declared_notes = [str(item) for item in notes.get("exact") or []]
+    if set(declared_notes) != APPROVED_RELEASE_NOTES:
+        problems.append(
+            "releaseNotes must match the reviewed allowlist exactly: "
+            f"missing {sorted(APPROVED_RELEASE_NOTES - set(declared_notes))}, "
+            f"unreviewed {sorted(set(declared_notes) - APPROVED_RELEASE_NOTES)}"
+        )
+release_only = {str(item) for item in (registry.get("releaseOnly") or {}).get("exact") or []}
+for path in declared_notes:
+    if any(char in path for char in "*?[]") or path.endswith("/"):
+        problems.append(f"release-notes path {path!r} must name one file, never a glob or a directory")
+    elif not Path(path).is_file():
+        problems.append(f"release-notes path {path!r} is not a tracked file")
+    if path not in release_only:
+        problems.append(f"release-notes path {path!r} must also be release-only")
+for config_name in ("release-please-config.json", "release-please-config.premain.json"):
+    config_path = Path(config_name)
+    if not config_path.is_file():
+        problems.append(f"missing {config_name}")
+        continue
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    changelog = config.get("changelog-path")
+    if changelog and changelog not in release_only:
+        problems.append(f"{config_name} changelog-path {changelog} is not release-only")
+    for package in (config.get("packages") or {}).values():
+        package_changelog = package.get("changelog-path")
+        if package_changelog and package_changelog not in release_only:
+            problems.append(f"{config_name} changelog-path {package_changelog} is not release-only")
+        for extra in package.get("extra-files") or []:
+            extra_path = str(extra.get("path") or "")
+            if extra_path and extra_path not in release_only:
+                problems.append(f"{config_name} extra-file {extra_path} is not release-only")
+
+if problems:
+    print("ci-rubric: FAIL (evidence registry shape)")
+    for problem in problems:
+        print(f"- {problem}")
+    sys.exit(1)
+PY
+then
+  fail "the evidence registry must declare its gates, profiles and catch-all scope"
+fi
+
+require_contains ".github/workflows/promotion-hygiene.yml" "name: promotion-hygiene" \
+  "the head-branch check must report under the required context name"
+require_contains ".github/workflows/promotion-hygiene.yml" \
+  "github.event.pull_request.head.repo.full_name" \
+  "the head-branch check must require the head repository to be this repository"
+require_contains ".github/workflows/promotion-hygiene.yml" "release-please--branches--premain" \
+  "the head-branch check must accept the generated premain release-please branch"
+require_contains ".github/workflows/promotion-hygiene.yml" "release-please--branches--main" \
+  "the head-branch check must accept the generated main release-please branch"
+require_contains ".github/workflows/promotion-hygiene.yml" "  workflow_dispatch:" \
+  "the head-branch check must keep a dispatch path: a generated release pull request gets no pull_request run"
+require_contains ".github/workflows/promotion-hygiene.yml" "  pull_request_review:" \
+  "the head-branch check must also run on the code-owner review, the eligible event that makes a generated release pull request's context a required check"
+require_contains ".github/workflows/promotion-hygiene.yml" "types: [submitted]" \
+  "the review trigger must subscribe to the submitted activity the release ruleset requires"
+require_contains ".github/workflows/promotion-hygiene.yml" "release_pr_number:" \
+  "the dispatch path must take the generated release pull request number it verifies"
+require_not_contains ".github/workflows/promotion-hygiene.yml" "actions/checkout@" \
+  "the head-branch check must not check out the pull request"
+
+# The lane that makes a generated release pull request gate itself. The wiring is
+# proved in full by scripts/verify-release-pr-check-lane.sh --self-test; these
+# assertions keep the producer call sites from disappearing silently.
+require_contains ".github/workflows/prerelease-pr.yml" "scripts/sync-release-pr-checks.sh" \
+  "the RC release-PR workflow must attach the required checks to its generated pull request"
+require_contains ".github/workflows/prerelease-pr.yml" "release-please--branches--premain" \
+  "the RC release-PR workflow must target the generated premain release branch"
+require_contains ".github/workflows/release-pr.yml" "scripts/sync-release-pr-checks.sh" \
+  "the stable release-PR workflow must attach the required checks to its generated pull request"
+require_contains ".github/workflows/release-pr.yml" "release-please--branches--main" \
+  "the stable release-PR workflow must target the generated main release branch"
+
+# The gate commands keep their scanned surfaces. These are input-scope pins: if a
+# surface drops out of the scanner, the recorded proof no longer covers it.
 require_contains \
   "scripts/check-node-engines-floor.mjs" \
   "ts/package-lock.json" \
@@ -139,7 +295,6 @@ require_contains \
   "scripts/check-node-engines-floor.mjs" \
   "infra/apptheory-ssg-isr-site/package-lock.json" \
   "node engines floor gate must scan infra/apptheory-ssg-isr-site/package-lock.json"
-require_contains "${ci}" "run: bash scripts/verify-lambda-runtime-deprecations.sh" "CI must gate deprecated Lambda runtimes at PR time"
 # The scanned-surface pins are quote-anchored deliberately. The bare paths also
 # appear in the checker's header comment, so an unanchored needle is satisfied
 # by that prose even after both surface lists are emptied; anchoring on the
@@ -156,187 +311,6 @@ require_contains \
   "scripts/check-lambda-runtime-deprecations.mjs" \
   '"ts/src/create-templates/index.ts",' \
   "deprecated runtime gate must scan ts/src/create-templates/index.ts"
-if ! python3 - "${ci}" <<'PY'
-import re
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-lines = path.read_text(encoding="utf-8").splitlines()
-
-job_starts = []
-for index, line in enumerate(lines):
-    match = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
-    if match:
-        job_starts.append((index, match.group(1)))
-
-jobs = {}
-for position, (index, name) in enumerate(job_starts):
-    end = job_starts[position + 1][0] if position + 1 < len(job_starts) else len(lines)
-    jobs[name] = lines[index:end]
-
-
-def steps_of(job_lines):
-    starts = [index for index, line in enumerate(job_lines) if re.match(r"^      - ", line)]
-    steps = []
-    for position, start in enumerate(starts):
-        end = starts[position + 1] if position + 1 < len(starts) else len(job_lines)
-        steps.append("\n".join(job_lines[start:end]))
-    return steps
-
-
-# Row 22: bind the trusted release-train gate to the exact job it validates. The
-# job must still exist, must run on pull_request via the exact canonical
-# predicate (a `&& false` conjunct or any other drift must fail here, not only in
-# the parity checker), and must carry its trusted checkout and verifier
-# invocation inside that job rather than anywhere in the file.
-release_job = jobs.get("release-train-promotion")
-if release_job is None:
-    raise SystemExit("ci-rubric: FAIL (missing release-train-promotion job)")
-
-release_if = [line for line in release_job if re.match(r"^    if:", line)]
-if len(release_if) != 1:
-    raise SystemExit("ci-rubric: FAIL (release-train-promotion must declare exactly one job-level if:)")
-release_condition = release_if[0].split("if:", 1)[1].strip()
-if release_condition.startswith("${{") and release_condition.endswith("}}"):
-    release_condition = release_condition[3:-2].strip()
-if release_condition != "github.event_name == 'pull_request'":
-    raise SystemExit(
-        "ci-rubric: FAIL (release-train-promotion if: must be exactly "
-        "github.event_name == 'pull_request'; got " + repr(release_condition) + ")"
-    )
-
-release_steps = steps_of(release_job)
-if not any("ref: refs/heads/staging" in step for step in release_steps):
-    raise SystemExit("ci-rubric: FAIL (release-train-promotion must checkout trusted staging code)")
-if not any("scripts/verify-release-train-promotion.sh" in step for step in release_steps):
-    raise SystemExit("ci-rubric: FAIL (release-train-promotion must run the verifier script)")
-
-# Row 38: the governance-evidence upload must be a real step in the rubric job
-# whose own `uses:` carries the pinned upload-artifact action and whose `with:`
-# carries the evidence path and artifact name. Those keys are read at their
-# property positions rather than as substrings, so the identical pin in the
-# unrelated TypeScript coverage step -- or a `run:` block echoing the strings --
-# can no longer stand in for the upload.
-rubric_job = jobs.get("rubric")
-if rubric_job is None:
-    raise SystemExit("ci-rubric: FAIL (missing rubric job)")
-
-PINNED_UPLOAD = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9"
-PINNED_USES_RE = re.compile(r"^" + re.escape(PINNED_UPLOAD) + r"(\s+#.*)?$")
-
-
-def split_step_entries(step_text):
-    """Return (indent, key, value) for each mapping entry in a step block.
-
-    The list marker is normalised to spaces so the step's own keys share one
-    indent and nested keys (`with:` children) sit deeper. Block-scalar (`|`/`>`)
-    bodies and comment lines are skipped so their literal text is never read as
-    structure.
-    """
-    entries = []
-    block_indent = None
-    for raw in step_text.splitlines():
-        indent = len(raw) - len(raw.lstrip(" "))
-        if block_indent is not None:
-            if raw.strip() == "" or indent > block_indent:
-                continue
-            block_indent = None
-        if raw.strip() == "" or raw.lstrip().startswith("#"):
-            continue
-        without_marker = re.sub(r"^(\s*)- ", r"\1  ", raw, count=1)
-        content = without_marker.strip()
-        match = re.match(r"([A-Za-z0-9_.-]+):\s*(.*)$", content)
-        if match is None:
-            continue
-        key, value = match.group(1), match.group(2).strip()
-        entry_indent = len(without_marker) - len(without_marker.lstrip(" "))
-        entries.append((entry_indent, key, value))
-        if re.match(r"^[|>][+-]?\s*$", value):
-            block_indent = entry_indent
-    return entries
-
-
-def step_property(step_text, key):
-    entries = split_step_entries(step_text)
-    if not entries:
-        return None
-    base = min(indent for indent, _, _ in entries)
-    for indent, entry_key, value in entries:
-        if indent == base and entry_key == key:
-            return value
-    return None
-
-
-def step_with_children(step_text):
-    entries = split_step_entries(step_text)
-    if not entries:
-        return {}
-    base = min(indent for indent, _, _ in entries)
-    children = {}
-    in_with = False
-    for indent, key, value in entries:
-        if indent == base:
-            in_with = key == "with"
-            continue
-        if in_with and indent > base:
-            children[key] = value
-    return children
-
-
-governance_steps = [
-    step
-    for step in steps_of(rubric_job)
-    if step_property(step, "name") == "Upload governance evidence"
-]
-if len(governance_steps) != 1:
-    raise SystemExit("ci-rubric: FAIL (rubric job must have exactly one governance evidence upload step)")
-
-governance_uses = step_property(governance_steps[0], "uses")
-governance_with = step_with_children(governance_steps[0])
-missing = []
-if governance_uses is None or not PINNED_USES_RE.match(governance_uses):
-    missing.append("uses: " + PINNED_UPLOAD)
-if governance_with.get("path") != "gov-infra/evidence/":
-    missing.append("path: gov-infra/evidence/")
-if governance_with.get("name") != "gov-infra-evidence":
-    missing.append("name: gov-infra-evidence")
-if missing:
-    raise SystemExit(
-        "ci-rubric: FAIL (governance evidence upload step is missing " + ", ".join(missing) + ")"
-    )
-PY
-then
-  fail "CI release-train gate and governance evidence upload must stay bound to their canonical jobs"
-fi
-require_contains "${ci}" "run_full_rubric:" "manual CI dispatch must expose an explicit full-rubric toggle"
-require_contains "${ci}" "default: true" "manual CI dispatch must continue to run the full rubric by default"
-# Operator ruling 2026-09-28: the rubric is only needed in staging; premain and
-# main only ever come from staging, so the full rubric must not run on a
-# protected-branch push or on a promotion pull request.
-require_contains \
-  "${ci}" \
-  "if: (github.event_name == 'workflow_dispatch' && (inputs.run_full_rubric == true || inputs.run_full_rubric == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')" \
-  "full rubric must run only for PRs targeting staging plus opted-in manual dispatch"
-require_contains "${ci}" "  deterministic-builds:" "CI must define the standalone deterministic-build job"
-require_contains "${ci}" "name: Verify deterministic builds" "CI must keep the deterministic-build job name stable for branch protection visibility"
-require_contains "${ci}" "run: scripts/verify-deterministic-builds.sh" "deterministic-build job must run the verifier script"
-require_contains \
-  "${ci}" \
-  "if: (github.event_name == 'workflow_dispatch' && (inputs.run_deterministic_builds == true || inputs.run_deterministic_builds == 'true')) || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging')" \
-  "deterministic builds must run only for PRs targeting staging plus opted-in manual dispatch"
-
-# R-F1 promotion-path parity: the PR -> staging readiness job must exist and must
-# check the pull request's own commits.
-require_contains "${ci}" "  staging-readiness:" "CI must define the PR -> staging release readiness job"
-require_contains \
-  "${ci}" \
-  "name: Release readiness (PR -> staging)" \
-  "PR -> staging readiness job name must stay stable for branch protection visibility"
-require_contains \
-  "${ci}" \
-  "scripts/verify-release-readiness.sh origin/staging HEAD staging" \
-  "PR -> staging readiness must check the pull request's own commits"
 
 for release_path in \
   ".github/workflows/prerelease.yml" \
@@ -392,10 +366,8 @@ if grep -R -Fq 'run: scripts/verify-deterministic-builds.sh' .github/workflows/p
   fail "release workflows must not run deterministic builds"
 fi
 
-require_contains \
-  "${ci}" \
-  "run: cd ts && npm ci --ignore-scripts" \
-  "CI installs must disable npm install scripts"
+# CI installs nothing any more: the install happens where the gate runs, and the
+# release workflows keep their own hardened install below.
 require_contains \
   ".github/workflows/prerelease.yml" \
   "cd ts && npm ci --ignore-scripts" \

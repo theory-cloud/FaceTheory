@@ -129,20 +129,46 @@ const lockPackages = (() => {
   }
 })();
 
-function isScopedAllowlisted(exception, name, vulnerability) {
-  if (!exception.expires || today >= exception.expires) return false;
-  if (name !== exception.package || vulnerability?.name !== exception.package) return false;
-  if (!exception.projects.includes(project)) return false;
+// npm groups every copy of one package into a single finding, so one advisory
+// can name several nodes at different installed versions. A scoped exception
+// therefore covers a node when it names that node and records its version;
+// entries compose only in that they must together name every reported node. An
+// entry that names a node outside this finding covers nothing, and a node no
+// entry names at its installed version still fails.
+function scopedCoveredNodes(exception, name, vulnerability) {
+  if (!exception.expires || today >= exception.expires) return [];
+  if (name !== exception.package || vulnerability?.name !== exception.package) return [];
+  if (!exception.projects.includes(project)) return [];
 
   const nodes = Array.isArray(vulnerability.nodes) ? vulnerability.nodes : [];
-  if (nodes.length === 0 || !nodes.every((node) => exception.nodes.includes(node))) return false;
-  if (!nodes.every((node) => lockPackages[node]?.version === exception.version)) return false;
+  if (nodes.length === 0) return [];
 
   const via = viaAdvisories(vulnerability);
-  if (via.length === 0) return false;
-  return via.every(
-    (entry) => entry.name === exception.package && entry.id !== undefined && exception.ids.includes(entry.id),
+  if (via.length === 0) return [];
+  if (!via.every((entry) => entry.name === exception.package && entry.id !== undefined && exception.ids.includes(entry.id))) {
+    return [];
+  }
+
+  return nodes.filter(
+    (node) => exception.nodes.includes(node) && lockPackages[node]?.version === exception.version,
   );
+}
+
+function scopedMatch(name, vulnerability) {
+  const nodes = Array.isArray(vulnerability.nodes) ? vulnerability.nodes : [];
+  if (nodes.length === 0) return null;
+
+  const covered = new Map();
+  const expiries = new Set();
+  for (const exception of scoped) {
+    const hit = scopedCoveredNodes(exception, name, vulnerability);
+    if (hit.length === 0) continue;
+    expiries.add(exception.expires);
+    for (const node of hit) covered.set(node, exception);
+  }
+  if (expiries.size === 0 || !nodes.every((node) => covered.has(node))) return null;
+
+  return { expires: [...expiries].sort().join(',') };
 }
 
 const reasons = new Map();
@@ -154,7 +180,7 @@ for (const [name, vulnerability] of entries) {
     reasons.set(name, `via ${advisoryIds} [allowlist id]`);
     continue;
   }
-  const match = scoped.find((exception) => isScopedAllowlisted(exception, name, vulnerability));
+  const match = scopedMatch(name, vulnerability);
   if (match) {
     reasons.set(name, `via ${advisoryIds} [scoped exception, expires ${match.expires}]`);
   }

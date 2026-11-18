@@ -5,11 +5,16 @@ Scope: this file applies to `gov-infra/**`.
 ## Start here
 
 1. Read `gov-infra/README.md`.
-2. Run the deterministic verifier from repository root:
-   - `bash gov-infra/verifiers/gov-verify-rubric.sh`
+2. Produce the evidence record from the repository root; CI verifies records and
+   never executes a gate:
+   - `scripts/evidence/collect-all.sh` (or `--gate <gate> --profile <profile>`)
+   - `scripts/evidence/verify-all.sh` to check what CI will check
 3. Inspect:
-   - `gov-infra/evidence/gov-rubric-report.json`
-   - `gov-infra/evidence/*-output.log`
+   - the committed record at `gov-infra/evidence/records/<gate>/<profile>.json`
+   - `gov-infra/evidence/gov-rubric-report.json` and `gov-infra/evidence/*-output.log`
+     (runtime output from the rubric gate; not committed)
+4. `bash gov-infra/verifiers/gov-verify-rubric.sh` remains the one rubric entry
+   point (`make rubric`); run it through the collector when you need a record.
 
 ## Constraints
 

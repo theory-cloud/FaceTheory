@@ -1,5 +1,43 @@
 # Changelog
 
+## [5.2.0-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.1.1...v5.2.0-rc) (2026-11-18)
+
+
+### Features
+
+* **ci:** verified once on staging — verify-only CI, staging-only gates, promotion hygiene ([45bd242](https://github.com/theory-cloud/FaceTheory/commit/45bd2425effc80e21b70182d12e895b658b4b742))
+* **ci:** verify a locally produced evidence record instead of executing gates ([4a0d922](https://github.com/theory-cloud/FaceTheory/commit/4a0d922f881026eaab2dacd9674717099e135a2b))
+
+
+### Bug Fixes
+
+* **ci:** fail closed when a release base has no review-triggered path ([3379e8b](https://github.com/theory-cloud/FaceTheory/commit/3379e8b5d1be559f010d5747ad645acf70e6f834))
+* **ci:** pin the review trigger in the rubric-enforced guard ([801dd7b](https://github.com/theory-cloud/FaceTheory/commit/801dd7b80bdc41918ca13a3e9e49b763d940a4f1))
+* **ci:** run promotion-hygiene on the code-owner review ([92dc1a8](https://github.com/theory-cloud/FaceTheory/commit/92dc1a8854815dd4fa84149666280d1ecfeb1708))
+* **deps:** pin AppTheory v7.4.0 and TableTheory v6.5.1, and prove the release lane end to end ([0933f3d](https://github.com/theory-cloud/FaceTheory/commit/0933f3d2c2c04d7c4bace334ff2df6704bcc6372))
+* **deps:** pin AppTheory v7.4.0, TableTheory v6.5.1 and aws-cdk-lib 2.277.0 ([dea5fb3](https://github.com/theory-cloud/FaceTheory/commit/dea5fb3d5e431054a01f560673d69d018f84b6d1))
+* **deps:** raise the vue, antd, and server-renderer compat pins ([5ed8f1b](https://github.com/theory-cloud/FaceTheory/commit/5ed8f1bec2e96494d0d68908e74caa65dfaf2a46))
+* **docs:** correct the pin-move snapshot claim and stale v7.1.0 prose ([19a542e](https://github.com/theory-cloud/FaceTheory/commit/19a542ee403ca66a44752a71efafb635882b8ef1))
+* **docs:** state the eligible event for the release check ([9df90d5](https://github.com/theory-cloud/FaceTheory/commit/9df90d52643582015167f7a3730ae5975a066a4d))
+* **evidence:** project release notes out of the scope digest ([15229aa](https://github.com/theory-cloud/FaceTheory/commit/15229aa1cebc4c124d5775f5f41c032c06cc0027))
+* **evidence:** project release-only JSON at its managed version slots ([1b9c373](https://github.com/theory-cloud/FaceTheory/commit/1b9c373fd7f4c88fc532eff796eb201df1961a40))
+* **evidence:** prove the release-notes allowlist rejects a new path ([9b31b69](https://github.com/theory-cloud/FaceTheory/commit/9b31b690de735416b92857adc9bc771a1bfa9bf7))
+* **evidence:** record the architecture the Linux floors really run ([4ae8930](https://github.com/theory-cloud/FaceTheory/commit/4ae8930a649cec9eb27a34e6af569946a97891e6))
+* **evidence:** state the JSON projection in the evidence doc ([6376291](https://github.com/theory-cloud/FaceTheory/commit/63762911bd56caf5d275de2df71075b8d285347b))
+* **release:** gate generated release PRs from the workflow alone ([81b1ecc](https://github.com/theory-cloud/FaceTheory/commit/81b1ecc708962e0bdc4b63c0ccd23cebf30aea45))
+* **release:** make every FaceTheory PR class get its checks from the workflows alone ([9d2b8d6](https://github.com/theory-cloud/FaceTheory/commit/9d2b8d6f6d41678fefe09b98f7313ec5fd356702))
+* **release:** run every release workflow on the built-in token ([c0164b0](https://github.com/theory-cloud/FaceTheory/commit/c0164b00b83093c018182e6cdb4ba82877de1d93))
+* **release:** state that a dispatched check never satisfies the ruleset ([9b066a4](https://github.com/theory-cloud/FaceTheory/commit/9b066a4d3df7425950468ac119bed42b4da63755))
+* **rubric:** align the COM-1 descriptor check and the guard fixtures to verify-only ([f9d7265](https://github.com/theory-cloud/FaceTheory/commit/f9d72651376b4af372a5eca013dc28cb2960a4b8))
+* **rubric:** compose recorded proofs and enforce the verify-only CI shape ([e721cdd](https://github.com/theory-cloud/FaceTheory/commit/e721cdda3d4a55ce12591fa48b90beabf6232ec8))
+* **rubric:** hand a container-produced record back with the checkout owner ([9341fbb](https://github.com/theory-cloud/FaceTheory/commit/9341fbb9d68ee6fddd090807d646c2d194e025e6))
+* **rubric:** keep a container gate's command log next to its record ([24a8289](https://github.com/theory-cloud/FaceTheory/commit/24a828973df7dcc177497f51a22513afdc655e1c))
+* **rubric:** make the evidence tooling record a container without Go ([ab7286f](https://github.com/theory-cloud/FaceTheory/commit/ab7286f8f36af93d2c1556ebce697e4f55b4da21))
+* **rubric:** record the Linux floors on the host's native arm64 container ([1e590d9](https://github.com/theory-cloud/FaceTheory/commit/1e590d9245efaa3b52e36de16a1b3798d223d3d2))
+* **rubric:** stop pre-creating a nested directory in the evidence mount ([c8260f8](https://github.com/theory-cloud/FaceTheory/commit/c8260f8cb2246ab1150bd14f270ff94b6f3aa542))
+* **rubric:** stop tracking raw rubric output and follow the verify-only shape ([4ec4885](https://github.com/theory-cloud/FaceTheory/commit/4ec4885e9bf93ff83a2e8eb307d2ab22e64b9c2c))
+* **security:** scope one advisory across the copies npm groups together ([5fb2cb3](https://github.com/theory-cloud/FaceTheory/commit/5fb2cb32b19af3da122a5b3ea2fe08175b384159))
+
 ## [5.1.1-rc](https://github.com/theory-cloud/FaceTheory/compare/v5.1.0...v5.1.1-rc) (2026-11-10)
 
 

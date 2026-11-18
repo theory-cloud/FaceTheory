@@ -1,0 +1,386 @@
+{
+  "schemaVersion": 1,
+  "evidenceDirectory": "gov-infra/evidence/records",
+  "localLogDirectory": "gov-infra/evidence/local",
+  "clockSkewSeconds": 300,
+  "runner": {
+    "maxWorkers": 1,
+    "resources": {
+      "cpu": 2,
+      "repo-write": 1,
+      "docker": 1,
+      "network": 1
+    }
+  },
+  "proofProfiles": {
+    "default": {
+      "description": "Producing host for the portable source proofs and the local journey: the repository Go pin, Node 24 and the host Python on darwin/arm64. Not a Linux floor claim.",
+      "environment": {
+        "go": "go1.27.4",
+        "node": "24",
+        "python": "3.15",
+        "platform": {
+          "os": "darwin",
+          "arch": "arm64"
+        }
+      }
+    },
+    "floor-node22": {
+      "description": "Node 22 runtime floor for the TypeScript suite and package on Linux, produced in the digest-pinned official Node 22 arm64 image under linux/arm64. Produced on the Factory host's colima container runtime under linux/arm64, which is this host's native guest architecture. The historical GitHub runner was linux/x64; that architecture is not reproducible here, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap'), so the record states the architecture that really ran instead of claiming x64. The Node-major floor is the claim these profiles carry. The image carries no Go toolchain; the go field records the repository pin and is not a compared dimension for these gates.",
+      "image": "node@sha256:f796bda8a91392fe7b5c974ff42abaa5cc801eb6987dca967f1db8be493e0ee3",
+      "containerPlatform": "linux/arm64",
+      "environment": {
+        "go": "go1.27.4",
+        "node": "22",
+        "python": "3.11",
+        "platform": {
+          "os": "linux",
+          "arch": "arm64"
+        }
+      }
+    },
+    "floor-node24": {
+      "description": "Node 24 runtime floor for the TypeScript suite, the package and the release-asset build on Linux, produced in the digest-pinned official Node 24 arm64 image under linux/arm64. Produced on the Factory host's colima container runtime under linux/arm64, which is this host's native guest architecture. The historical GitHub runner was linux/x64; that architecture is not reproducible here, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap'), so the record states the architecture that really ran instead of claiming x64. The Node-major floor is the claim these profiles carry. The image carries no Go toolchain; the go field records the repository pin and is not a compared dimension for these gates.",
+      "image": "node@sha256:9e7ec64106f43779ecb669cb299cce07a033ac6c41603c1039dea7b51119e550",
+      "containerPlatform": "linux/arm64",
+      "environment": {
+        "go": "go1.27.4",
+        "node": "24",
+        "python": "3.11",
+        "platform": {
+          "os": "linux",
+          "arch": "arm64"
+        }
+      }
+    },
+    "linux-root": {
+      "description": "Linux run as UID 0 for the subtree destination claim, produced in the digest-pinned official Node 24 arm64 image under linux/arm64, where the container's default user is root. This is the leg CI performed with sudo -n and is why the subtree claim needs no privileged step on any runner. Produced on the Factory host's colima container runtime under linux/arm64, which is this host's native guest architecture. The historical GitHub runner was linux/x64; that architecture is not reproducible here, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap'), so the record states the architecture that really ran instead of claiming x64. The Node-major floor is the claim these profiles carry.",
+      "image": "node@sha256:9e7ec64106f43779ecb669cb299cce07a033ac6c41603c1039dea7b51119e550",
+      "containerPlatform": "linux/arm64",
+      "environment": {
+        "go": "go1.27.4",
+        "node": "24",
+        "python": "3.11",
+        "platform": {
+          "os": "linux",
+          "arch": "arm64"
+        }
+      }
+    }
+  },
+  "nonProductPaths": [
+    "docs/",
+    "gov-infra/",
+    ".github/",
+    "scripts/",
+    "README.md",
+    "LICENSE",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "AGENTS.md",
+    ".gitignore",
+    "release-please-config.json",
+    "release-please-config.premain.json"
+  ],
+  "releaseOnly": {
+    "exact": [
+      ".release-please-manifest.json",
+      ".release-please-manifest.premain.json",
+      "CHANGELOG.md",
+      "CHANGELOG.prerelease.md",
+      "VERSION",
+      "README.md",
+      "docs/README.md",
+      "docs/api-reference.md",
+      "docs/getting-started.md",
+      "ts/README.md",
+      "ts/package.json",
+      "ts/package-lock.json",
+      "infra/apptheory-ssr-site/package.json",
+      "infra/apptheory-ssr-site/package-lock.json",
+      "infra/apptheory-ssg-isr-site/package.json",
+      "infra/apptheory-ssg-isr-site/package-lock.json"
+    ]
+  },
+  "releaseNotes": {
+    "exact": [
+      "CHANGELOG.md",
+      "CHANGELOG.prerelease.md",
+      ".release-please-manifest.json",
+      ".release-please-manifest.premain.json"
+    ]
+  },
+  "securityInputs": {
+    "exact": [
+      "ts/package.json",
+      "ts/package-lock.json",
+      "infra/apptheory-ssr-site/package.json",
+      "infra/apptheory-ssr-site/package-lock.json",
+      "infra/apptheory-ssg-isr-site/package.json",
+      "infra/apptheory-ssg-isr-site/package-lock.json"
+    ]
+  },
+  "executionMatrix": [
+    {
+      "id": "pr-staging",
+      "leg": "pull request -> staging",
+      "old": "nine jobs executed the TypeScript suite, the pack matrix, deterministic builds, the subtree path and the rubric on the pull-request merge ref",
+      "new": "one verify job (rubric) verifies the committed record for every gate and every tracked proof profile; nothing executes, and a missing or stale record fails with the local collection command. Version alignment stays a fast check"
+    },
+    {
+      "id": "push-staging",
+      "leg": "merge push -> staging",
+      "old": "the same five gate jobs re-executed on the merged tree",
+      "new": "no gate-class job runs on the merge; the pushed tree is the pull-request tree that was already verified"
+    },
+    {
+      "id": "pr-staging-premain",
+      "leg": "staging -> premain promotion pull request",
+      "old": "the TypeScript suite, pack matrix, subtree path and version alignment re-executed",
+      "new": "promotion hygiene, release-train promotion and version alignment only; no product job runs"
+    },
+    {
+      "id": "push-premain",
+      "leg": "promotion merge push -> premain",
+      "old": "the gate set re-executed, then release-please generated the RC pull request",
+      "new": "release-please generation and publish only"
+    },
+    {
+      "id": "release-pr-premain",
+      "leg": "generated RC release pull request",
+      "old": "the gate set re-executed on generated artifacts",
+      "new": "promotion hygiene and version alignment; no product job runs"
+    },
+    {
+      "id": "release-merge-premain",
+      "leg": "RC merge/publish on premain",
+      "old": "the gate set re-executed, then the publisher built the assets again",
+      "new": "publish only; the publisher builds the real release assets once"
+    },
+    {
+      "id": "pr-premain-main",
+      "leg": "premain -> main promotion pull request",
+      "old": "the gate set re-executed",
+      "new": "promotion hygiene, release readiness and version alignment only"
+    },
+    {
+      "id": "push-main",
+      "leg": "release merge push -> main",
+      "old": "the gate set re-executed, then the publisher built the assets again",
+      "new": "release-please, publish and the docs publisher only"
+    },
+    {
+      "id": "release-pr-main",
+      "leg": "generated stable release pull request",
+      "old": "the gate set re-executed on generated artifacts",
+      "new": "promotion hygiene and version alignment; no product job runs"
+    },
+    {
+      "id": "backmerge-main-staging",
+      "leg": "main -> staging back-merge pull request",
+      "old": "the gate set re-executed on the back-merge",
+      "new": "the record is re-verified as on any staging pull request; release-only version metadata is normalized in the scope digest, so a release version bump does not stale a product record"
+    }
+  ],
+  "gates": {
+    "ts": {
+      "kind": "source",
+      "environment": [
+        "node",
+        "platform"
+      ],
+      "profiles": [
+        "floor-node22",
+        "floor-node24"
+      ],
+      "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, under each supported Node major on Linux arm64, which is the architecture each proof profile really runs. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the historical GitHub runner's architecture cannot be recorded as covered. The Node-major floor is the claim these profiles carry.",
+      "resource": "repo-write",
+      "paths": [
+        "ts/",
+        "docs/",
+        ".github/workflows/",
+        "README.md",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "AGENTS.md",
+        "Makefile",
+        "scripts/verify-ts-suite.sh",
+        "scripts/verify-docs-export-map.sh",
+        "scripts/verify-node-engines-floor.sh",
+        "scripts/check-node-engines-floor.mjs",
+        "scripts/verify-lambda-runtime-deprecations.sh",
+        "scripts/check-lambda-runtime-deprecations.mjs",
+        "infra/apptheory-ssr-site/package-lock.json",
+        "infra/apptheory-ssg-isr-site/package-lock.json",
+        "infra/apptheory-ssr-site/src/stack.ts",
+        "infra/apptheory-ssg-isr-site/src/stack.ts"
+      ],
+      "commands": [
+        {
+          "id": "ts-suite",
+          "argv": [
+            "bash",
+            "scripts/verify-ts-suite.sh"
+          ]
+        }
+      ]
+    },
+    "ts-pack": {
+      "kind": "source",
+      "environment": [
+        "node",
+        "platform"
+      ],
+      "profiles": [
+        "floor-node22",
+        "floor-node24"
+      ],
+      "description": "npm pack of the TypeScript package at the repository version on Linux arm64, inspected and installed from the tarball, under each supported Node major. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the architecture recorded is the one that really ran.",
+      "resource": "repo-write",
+      "paths": [
+        "ts/",
+        "VERSION",
+        "Makefile",
+        "scripts/verify-ts-pack.sh",
+        "scripts/read-version.sh",
+        "scripts/pack-dev-archive.sh"
+      ],
+      "commands": [
+        {
+          "id": "ts-pack",
+          "argv": [
+            "bash",
+            "scripts/verify-ts-pack.sh"
+          ]
+        }
+      ]
+    },
+    "examples-local": {
+      "kind": "source",
+      "environment": [
+        "go",
+        "node",
+        "platform"
+      ],
+      "profiles": [
+        "default"
+      ],
+      "description": "Local examples harness: the harness self-test, every configured example and infra row through the released AppTheory local runner whose tag scripts/local/examples-local.json pins, and the teardown",
+      "resources": [
+        "docker",
+        "repo-write",
+        "network"
+      ],
+      "paths": [
+        ".go-version",
+        "Makefile",
+        "ts/",
+        "infra/",
+        "scripts/local/",
+        "scripts/verify-examples-local.sh"
+      ],
+      "commands": [
+        {
+          "id": "examples-local-harness",
+          "argv": [
+            "bash",
+            "scripts/verify-examples-local.sh"
+          ]
+        }
+      ]
+    },
+    "deterministic-builds": {
+      "kind": "source",
+      "environment": [
+        "node",
+        "platform"
+      ],
+      "profiles": [
+        "floor-node24"
+      ],
+      "description": "Release asset builds produced twice and compared byte-for-byte at a pinned SOURCE_DATE_EPOCH on Linux arm64, the architecture this record really ran on. Release assets ship from GitHub's ubuntu-latest runner (linux/x64), so this record proves the build is reproducible on the architecture it ran on and is not a claim about the shipping image: Linux/x64 is no longer proven anywhere, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host.",
+      "resource": "repo-write",
+      "paths": [
+        "VERSION",
+        "README.md",
+        "LICENSE",
+        "CHANGELOG.md",
+        "CHANGELOG.prerelease.md",
+        "docs/",
+        "ts/",
+        "Makefile",
+        "scripts/build-release-assets.sh",
+        "scripts/generate-checksums.sh",
+        "scripts/pack-dev-archive.sh",
+        "scripts/read-version.sh",
+        "scripts/render-release-notes.sh",
+        "scripts/generate-docs-version-override.rb",
+        "scripts/verify-deterministic-builds.sh"
+      ],
+      "commands": [
+        {
+          "id": "deterministic-builds",
+          "argv": [
+            "bash",
+            "scripts/verify-deterministic-builds.sh"
+          ]
+        }
+      ]
+    },
+    "theorycloud-subtree": {
+      "kind": "source",
+      "environment": [
+        "platform"
+      ],
+      "profiles": [
+        "linux-root"
+      ],
+      "description": "TheoryCloud subtree staging and provenance, the destination test as an ordinary user and as UID 0, helper dry runs, rollout target fixtures and release-trust guards, produced in a Linux arm64 container where the run is already UID 0. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the architecture recorded is the one that really ran.",
+      "resource": "repo-write",
+      "paths": [
+        "docs/",
+        "Makefile",
+        "README.md",
+        ".github/workflows/theorycloud-facetheory-subtree-publish.yml",
+        "scripts/"
+      ],
+      "commands": [
+        {
+          "id": "theorycloud-subtree-path",
+          "argv": [
+            "bash",
+            "scripts/verify-theorycloud-subtree-path.sh"
+          ]
+        }
+      ]
+    },
+    "rubric": {
+      "kind": "source",
+      "environment": [
+        "go",
+        "node",
+        "platform"
+      ],
+      "dependsOn": [
+        "ts-pack"
+      ],
+      "profiles": [
+        "default"
+      ],
+      "description": "The one local rubric entry point: consistency, completeness, security, compliance, maintainability and docs items plus the infra synth snapshots. Its input scope is every tracked file, so any tooling, workflow, docs or guard edit stales it and requires a fresh record",
+      "resource": "repo-write",
+      "paths": [
+        "**"
+      ],
+      "commands": [
+        {
+          "id": "rubric",
+          "argv": [
+            "make",
+            "rubric"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -31,8 +31,9 @@ your SSR Lambda function.
 FaceTheory's SSG/ISR reference stack (`infra/apptheory-ssg-isr-site/`) uses `AppTheorySsrSite` with
 `mode: AppTheorySsrSiteMode.SSG_ISR` for the CloudFront distribution, Lambda Function URL origin, generated edge
 rewrite/request-id functions, and ISR runtime env wiring. The stack keeps explicit FaceTheory-owned `BucketDeployment`
-resources for immutable assets, the Vite manifest, and SSG HTML because AppTheory v7.1.0 does not yet expose
-per-deployment `distributionPaths` invalidation controls for those uploads. Treat that as the remaining AppTheory
+resources for immutable assets, the Vite manifest, and SSG HTML because the pinned AppTheory CDK release
+(`docs/UPSTREAM_RELEASE_PINS.md`) does not yet expose per-deployment `distributionPaths` invalidation controls for
+those uploads. Treat that as the remaining AppTheory
 coordination item; it is not permission to hand-roll the CloudFront distribution or origin group in FaceTheory.
 
 When using `AppTheorySsrSite` in `ssg-isr` mode:
