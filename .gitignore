@@ -28,6 +28,7 @@ ts/*.tgz
 .codex/
 .mcp.json
 .claude
+.vibe/
 .agents/
 .kimi-code/
 GEMINI.md
