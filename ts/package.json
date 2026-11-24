@@ -271,7 +271,7 @@
     "verify:format-gate": "node scripts/verify-format-gate.mjs"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1156.0",
+    "@aws-sdk/client-s3": "^3.1175.0",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/server": "^11.11.0",
@@ -285,7 +285,7 @@
     "@types/react-dom": "^19.3.0",
     "@typescript-eslint/eslint-plugin": "^8.73.0",
     "@typescript-eslint/parser": "^8.72.0",
-    "@vue/server-renderer": "^3.5.45",
+    "@vue/server-renderer": "^3.5.46",
     "antd": "^6.7.1",
     "aws-cdk-lib": "2.277.0",
     "c8": "^12.0.0",
@@ -297,13 +297,13 @@
     "prettier": "^3.10.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "rollup": "4.68.4",
+    "rollup": "4.68.8",
     "rollup-plugin-svelte": "7.2.3",
-    "svelte": "^5.57.2",
+    "svelte": "^5.59.1",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",
     "vite": "^8.3.8",
-    "vue": "^3.5.45"
+    "vue": "^3.5.46"
   },
   "overrides": {
     "@theory-cloud/apptheory": {

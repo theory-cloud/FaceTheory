@@ -16,7 +16,7 @@ const packageRoot = path.resolve(
 
 const OLD_PLUGIN = '@sveltejs/vite-plugin-svelte';
 const SELECTED_VERSIONS = {
-  rollup: '4.68.4',
+  rollup: '4.68.8',
   'rollup-plugin-svelte': '7.2.3',
 } as const;
 const SVELTE_VITE_CONFIGS = [
@@ -189,7 +189,7 @@ test('manifest pins the exact replacement toolchain and drops the old plugin', a
     SELECTED_VERSIONS['rollup-plugin-svelte'],
   );
   assert.equal(devDependencies[OLD_PLUGIN], undefined);
-  assert.equal(devDependencies.svelte, '^5.57.2');
+  assert.equal(devDependencies.svelte, '^5.59.1');
   assert.equal(devDependencies.vite, '^8.3.8');
 });
 

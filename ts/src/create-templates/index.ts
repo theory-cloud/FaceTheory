@@ -85,7 +85,7 @@ function renderPackageJson(ctx: CreateTemplateContext): string {
       '^19',
     );
   } else if (ctx.adapter === 'svelte') {
-    devDependencies.rollup = dependencyVersion(ctx, 'rollup', '4.68.4');
+    devDependencies.rollup = dependencyVersion(ctx, 'rollup', '4.68.8');
     devDependencies['rollup-plugin-svelte'] = dependencyVersion(
       ctx,
       'rollup-plugin-svelte',
