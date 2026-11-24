@@ -5,23 +5,23 @@
         "make",
         "rubric"
       ],
-      "durationSeconds": 45.938,
+      "durationSeconds": 68.972,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-18T00:38:06Z",
+      "finishedAt": "2026-11-24T14:44:59Z",
       "id": "rubric",
-      "inputsDigest": "sha256:ec1785621098d0147b1fca1c2fe2a56e3ed038be961816a5464010f11157bf53",
-      "logDigest": "sha256:55abc79192507c1efae0b588d4c2ea575233b30499a2841da06a8bca7cae9104",
-      "logRef": "gov-infra/evidence/local/rubric-rubric-20261118T003720Z-10384.log",
+      "inputsDigest": "sha256:ae32f0f770b5aaf4383d71932906a4c1409316fa947b1b713b1e6d214eb0bcf4",
+      "logDigest": "sha256:fe858f595cdf0513958e297b3815faaa75f80a418f09b41a1fe5991e0f9a605e",
+      "logRef": "gov-infra/evidence/local/rubric-rubric-20261124T144350Z-64088.log",
       "reused": false,
-      "startedAt": "2026-11-18T00:37:20Z"
+      "startedAt": "2026-11-24T14:43:50Z"
     }
   ],
   "consumed": [],
   "description": "The one local rubric entry point: consistency, completeness, security, compliance, maintainability and docs items plus the infra synth snapshots. Its input scope is every tracked file, so any tooling, workflow, docs or guard edit stales it and requires a fresh record",
   "environment": {
     "go": "go1.27.4",
-    "node": "v24.21.0",
+    "node": "v24.13.1",
     "platform": {
       "arch": "arm64",
       "os": "darwin"
@@ -36,17 +36,17 @@
   },
   "profile": "default",
   "reason": "",
-  "recordedAt": "2026-11-18T00:38:06Z",
+  "recordedAt": "2026-11-24T14:44:59Z",
   "releaseOnly": {
-    "digest": "sha256:714c900b21d21043e845d26ccea4417b9eea47f0b14d730712411bb157e83d30",
+    "digest": "sha256:a2d29b8d54a54362b37c41c7816548777f05dbcdaaddbfe25d1c2c3525e50983",
     "fileCount": 16,
     "normalizedDigest": "sha256:ed3ab6f4049ed07f97d920d326d055d73989dd9ebf7796e28cf1836c17085afa",
-    "version": "5.1.1"
+    "version": "5.2.0"
   },
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:230348fd49e58064531733a2a5895b19a480358f20fa06a8af13797e3bd5ecfa",
+    "digest": "sha256:e9f10cb771888d0f9fb12fc9530eb6fe760a8f3120dbd07742f7f570abad3118",
     "fileCount": 797,
     "paths": [
       "**"
@@ -54,7 +54,7 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:3a7eb7505f4c9fcf21101ee302b2f8ba0252ca526bac8ed21e5d3c9d9d93ef1d",
+    "digest": "sha256:652e1086f5b2ff1ae135498d69d7326f7418471f432afe24fe586e3c3d3a4c14",
     "fileCount": 781
   },
   "verdict": "PASS"
