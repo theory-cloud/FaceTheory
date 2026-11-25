@@ -46,7 +46,10 @@ harness's `--only`, after those same build and install steps.
 
 ## Requirements
 
-- Node.js 24 or newer and npm.
+- Node.js 24 or newer and npm. This is the harness's own requirement — it is the
+  `default` proof profile, Node 24 on the producing host — not the package support
+  matrix; [Runtime Support](/runtimes/support/) is the authority for which Node
+  lines FaceTheory itself supports and which release carries each row.
 - `cd ts && npm ci` once per checkout, to install the example dependencies.
 - The two `infra/*` stacks need their own dependencies. `make examples-local`
   installs them with `npm ci --ignore-scripts` when `node_modules` is absent; a

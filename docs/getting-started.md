@@ -10,10 +10,10 @@ FaceTheory is a TypeScript runtime for SSR, SSG, and blocking ISR on Node.js `>=
 
 Required:
 
-- Node.js `>=22` (Node 20 reached end of life in April 2026; the floor moved from 20 to 22)
+- Node.js `>=22` — see [Runtime Support](/runtimes/support/) for the tested lines, the deprecated line, and which release carries each row
 - npm
 
-Node 22, 24, and 26 are all tested and supported on the `staging` candidate tree. Node 26 support landed there and ships in the next FaceTheory release. The tarball you install below is `v5.2.0`, the latest published release, and it predates that support: `v5.2.0` and earlier releases were built and verified on Node 22 and Node 24 only, so Node 26 is not a claim about them. Node 22 is deprecated against its 2027-04-30 upstream end of life and is planned to leave the floor in the 2027-02 major; see [Runtime Support](/runtimes/support/) for the support table, when each row reaches a release, the schedule, and what each line is proven by.
+The tarball you install below is `v5.2.0`, the latest published release. [Runtime Support](/runtimes/support/) states which Node lines that release is verified on and which line the next release adds; do not assume the newest line in the repository is available in the release you pin.
 
 Optional:
 

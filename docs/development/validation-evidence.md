@@ -26,7 +26,10 @@ holds no credential, and runs nothing on a push.
 
 A profile is a tracked environment declaration. The collector probes the real
 versions it runs under and refuses a profile the live host does not satisfy, so a
-Node 24 host cannot record a Node 22 floor.
+Node 24 host cannot record a Node 22 floor. A profile is a way to prove a claim,
+not the claim itself: which Node lines FaceTheory supports, which one is
+deprecated, and which release carries each row is [Runtime Support](/runtimes/support/),
+and this page owns only the mechanism that produces a record.
 
 | Profile | Environment | Producing environment |
 | --- | --- | --- |
@@ -37,11 +40,11 @@ Node 24 host cannot record a Node 22 floor.
 | `linux-root` | Node 24, UID 0 | digest-pinned `node` arm64 image, linux/arm64 |
 
 The Linux profiles exist because the checks they carry only ran in CI before: the Node 22/24/26 matrices, the
-release-asset build, and the subtree destination test as UID 0. `floor-node22` is the oldest supported line — deprecated
-but still tested, because that is what a consumer who has not moved yet installs; `floor-node26` is the newest supported
-line; `floor-node24` sits between them and is also the producing host's major. Each is produced in the container its
-profile names, pinned by image digest in the registry, so the platform claim in the record is the platform that really
-ran.
+release-asset build, and the subtree destination test as UID 0. `floor-node22` is the oldest Node profile and
+`floor-node26` the newest; which of those lines is supported, which is deprecated, and which release carries each row is
+[Runtime Support](/runtimes/support/)'s claim, not this page's. `floor-node24` is also the producing host's major. Each
+is produced in the container its profile names, pinned by image digest in the registry, so the platform claim in the
+record is the platform that really ran.
 
 The guest architecture is `linux/arm64`, the Factory host's native colima
 architecture. GitHub's historical runner was `linux/x64`, and that is not

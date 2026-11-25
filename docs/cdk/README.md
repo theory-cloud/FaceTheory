@@ -157,6 +157,11 @@ new CfnOutput(this, "CloudFrontDomainName", {
 `AWS_IAM` is the default Function URL posture; AppTheory adds Lambda URL Origin Access Control so viewers reach Lambda
 through CloudFront, not through a public unauthenticated Function URL.
 
+`runtime: lambda.Runtime.NODEJS_24_X` above is the managed Lambda runtime this example deploys onto, not a statement
+about which Node lines the FaceTheory package supports — the two follow different deadlines. Package support is
+[Runtime Support](/runtimes/support/)'s claim; the managed-runtime deadline is
+[Migration 11](/migration-guide/#migration-11-node-20-to-node-24-lambda-runtime).
+
 ### SSG + blocking ISR
 
 Use `SSG_ISR` mode when S3 should be the primary HTML origin and Lambda should handle SSR/ISR fallback on S3 `403`/`404`
