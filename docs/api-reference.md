@@ -14,7 +14,7 @@ Package:
 
 Runtime:
 
-- Node.js `>=22` (Node 22, 24, and 26 are tested; Node 22 is deprecated — see [Runtime Support](/runtimes/support/))
+- Node.js `>=22`. Node 22, 24, and 26 are all tested and supported on the `staging` candidate tree; Node 26 support landed there and ships in the next FaceTheory release. The `v5.2.0` asset installed below predates that support, and `v5.2.0` and earlier releases were built and verified on Node 22 and Node 24 only, so Node 26 is not a claim about them. Node 22 is deprecated — see [Runtime Support](/runtimes/support/).
 
 Primary package exports are defined in `ts/package.json`. The repository also includes a local SSG CLI entrypoint used by `npm run ssg`.
 
