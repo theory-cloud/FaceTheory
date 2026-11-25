@@ -276,7 +276,7 @@ test('a profile without an exact released runner pin fails validation', async ()
 });
 
 const RUNNER_VERSION_OUTPUT = [
-  '/root/.cache/facetheory-examples-local/apptheory-local/v7.4.0/bin/apptheory-local: go1.27.3',
+  '/root/.cache/facetheory-examples-local/apptheory-local/v7.5.0/bin/apptheory-local: go1.27.3',
   '\tpath\tgithub.com/theory-cloud/apptheory/v7/cmd/apptheory-local',
   '\tmod\tgithub.com/theory-cloud/apptheory/v7\tv7.1.0\th1:abc=',
   '\tdep\tgithub.com/aws/aws-sdk-go-v2\tv1.40.0\th1:def=',

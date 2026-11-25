@@ -157,11 +157,11 @@ function svelteTemplateContext(): CreateTemplateContext {
     facetheoryTarball:
       'https://github.com/theory-cloud/FaceTheory/releases/download/v5.0.3/theory-cloud-facetheory-5.0.3.tgz',
     appTheoryTarball:
-      'https://github.com/theory-cloud/AppTheory/releases/download/v7.4.0/theory-cloud-apptheory-7.4.0.tgz',
+      'https://github.com/theory-cloud/AppTheory/releases/download/v7.5.0/theory-cloud-apptheory-7.5.0.tgz',
     appTheoryCdkTarball:
-      'https://github.com/theory-cloud/AppTheory/releases/download/v7.4.0/theory-cloud-apptheory-cdk-7.4.0.tgz',
+      'https://github.com/theory-cloud/AppTheory/releases/download/v7.5.0/theory-cloud-apptheory-cdk-7.5.0.tgz',
     tableTheoryTarball:
-      'https://github.com/theory-cloud/TableTheory/releases/download/v6.5.1/theory-cloud-tabletheory-ts-6.5.1.tgz',
+      'https://github.com/theory-cloud/TableTheory/releases/download/v6.5.3/theory-cloud-tabletheory-ts-6.5.3.tgz',
     dependencyVersions: {},
   };
 }
