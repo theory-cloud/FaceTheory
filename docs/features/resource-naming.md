@@ -409,6 +409,18 @@ legacy config that leaves a consumed entry with neither a pin nor a `generated`
 entry cannot synthesize at all, so the check raises the contract's refusal instead
 of reporting an empty result that would read as an all-clear.
 
+**The check assumes a config that synthesizes; it does not validate one.** It reads
+the stage config the way the stack does, but it is not the stack, so a config the
+stack refuses still produces a list. Listing the SSG+ISR stack's ISR table as
+`generated` instead of pinned returns an entry with no name to compare, and
+therefore an empty comparison, while `src/stack.ts` refuses that config outright:
+`AppTheoryDynamoTable` needs a physical `tableName`. Pinning a legacy site bucket is
+the other direction — the pin is compared as the name it is, while `createSiteBucket`
+refuses it, because naming a bucket CloudFormation generated replaces the bucket and
+deletes its objects. Run `cdk synth` (or construct the stack) on each config first,
+and treat the answer as evidence about two configs that synthesized: an empty result
+from a config the stack refuses is not an all-clear.
+
 A stack that is not one of these two — a copy that grew another named resource —
 uses the same shape, one call per construct that consumes a contract entry:
 

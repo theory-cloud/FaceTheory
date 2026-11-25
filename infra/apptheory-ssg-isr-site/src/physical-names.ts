@@ -86,6 +86,16 @@ function entryName(
  * needs a pin under the legacy profile: `AppTheoryDynamoTable` takes a physical
  * `tableName`, so `src/stack.ts` refuses a `generated` entry for it.
  *
+ * This list therefore **assumes a config that synthesizes; it does not validate
+ * one.** Only the contract's own refusals surface here, and they are not the
+ * stack's: list the ISR table as `generated` and this function returns a
+ * well-formed entry with no name, which `sharedPhysicalNames` skips, while
+ * `src/stack.ts` refuses that config with "needs a pins entry, not a generated
+ * entry" — so the comparison is empty for a config that never deploys. Run
+ * `cdk synth`, or construct the stack as `test/unit/resource-naming.test.ts` does,
+ * on each config before comparing the two, and read an empty result as evidence
+ * about two configs that synthesized.
+ *
  * The names are the ones this stack's own template sets, and
  * `test/unit/resource-naming.test.ts` pins this list against a synthesized
  * template, so the list cannot drift from what the stack deploys.
@@ -154,6 +164,10 @@ function comparableName(entry: FaceTheoryDerivedPhysicalName): string | undefine
  *   and not a proof that the account is collision-free. Whether two app ids may
  *   share an account at all is the registry question the Factory resource-naming
  *   contract (`docs/155`) scopes.
+ * - It reports names for **configs, not for deployments**. A config the stack
+ *   refuses still compares: a `generated` ISR table entry is skipped here while
+ *   `src/stack.ts` refuses it. Run `cdk synth` (or construct the stack) on each
+ *   config first; this function does not validate a legacy edit.
  */
 export function sharedPhysicalNames(
   a: readonly FaceTheoryDerivedPhysicalName[],

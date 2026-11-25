@@ -41,6 +41,9 @@ shortened name that equals a valid name. Before a second site shares an account,
 of both — `derivedPhysicalNames()` and `sharedPhysicalNames()` in
 [`src/physical-names.ts`](src/physical-names.ts) — rather than one bucket prefix: that check reports either class
 when the pair you compare is the affected one, and it reads no AWS, so a name a third site already owns is outside it.
+It also assumes a config that synthesizes and does not validate one — a `generated` ISR table entry is skipped while the
+stack refuses that config — so run `cdk synth` (or construct the stack) on each config first, and do not read an empty
+comparison from a config the stack refuses as an all-clear.
 
 Set `account` in `src/stage-config.ts` to your twelve-digit account id before deploying. The first deploy after this
 change **replaces** both buckets and the ISR table and **removes** the per-stack S3 access-log bucket.

@@ -84,6 +84,16 @@ function entryName(
  * and the stack refuses to synthesize — so the contract's own error is what this
  * function raises, rather than a silent gap in the list.
  *
+ * This list therefore **assumes a config that synthesizes; it does not validate
+ * one.** Only the contract's own refusals surface here, and they are not the
+ * stack's: pin `s3_bucket:${logical}-assets` under the legacy profile and this
+ * function returns that name for comparison while `createSiteBucket` refuses the
+ * config, because setting `BucketName` on a bucket CloudFormation generated
+ * replaces the bucket and deletes its objects. Run `cdk synth`, or construct the
+ * stack as `test/unit/resource-naming.test.ts` does, on each config before
+ * comparing the two, and read an empty result as evidence about two configs that
+ * synthesized.
+ *
  * The names are the ones this stack's own template sets, and
  * `test/unit/resource-naming.test.ts` pins this list against a synthesized
  * template, so the list cannot drift from what the stack deploys.
@@ -145,6 +155,10 @@ function comparableName(entry: FaceTheoryDerivedPhysicalName): string | undefine
  *   and not a proof that the account is collision-free. Whether two app ids may
  *   share an account at all is the registry question the Factory resource-naming
  *   contract (`docs/155`) scopes.
+ * - It reports names for **configs, not for deployments**. A config the stack
+ *   refuses still compares: a pinned legacy site bucket is compared here while
+ *   `createSiteBucket` refuses it. Run `cdk synth` (or construct the stack) on
+ *   each config first; this function does not validate a legacy edit.
  */
 export function sharedPhysicalNames(
   a: readonly FaceTheoryDerivedPhysicalName[],

@@ -466,8 +466,10 @@ and [the contract,
 [a shortened name that equals a valid name](/features/resource-naming/#known-limit-a-shortened-name-can-equal-a-valid-name).
 Until that contract lands, compare the complete derived name set of two sites —
 [both reference stacks ship the list](/features/resource-naming/#check-two-sites-before-they-share-an-account) —
-before they share an account. The framework API is unchanged; the deployed resource names are not. The
-resource-by-resource table, the exact derived names and the upgrade consequences live in
+before they share an account. That list assumes a config that synthesizes and does not validate one, so run
+`cdk synth` (or construct the stack) on each config first: a legacy edit the stack refuses still produces a list, and an
+empty comparison from such a config is not an all-clear. The framework API is unchanged; the deployed resource names are
+not. The resource-by-resource table, the exact derived names and the upgrade consequences live in
 [Resource Naming](/features/resource-naming/).
 
 Before you deploy:
