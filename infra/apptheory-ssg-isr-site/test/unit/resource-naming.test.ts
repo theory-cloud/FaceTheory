@@ -301,6 +301,42 @@ test('the collision check refuses a legacy config it cannot name', () => {
   );
 });
 
+test('the collision check does not validate a config the stack refuses', () => {
+  // SANITY-639-N2-01: `derivedPhysicalNames` assumes a config that synthesizes; it
+  // does not validate one. Listing the ISR table as `generated` instead of pinned is
+  // a config the stack refuses (`AppTheoryDynamoTable` needs a physical tableName),
+  // yet the list is well formed and the comparison comes back empty — which is why
+  // the guide says to run `cdk synth` (or construct the stack) on each config first.
+  const refused: FaceTheoryReferenceStageConfig = {
+    ...REFERENCE_STAGE_CONFIG,
+    namingProfile: 'legacy',
+    loggingProfile: 'legacy',
+    generated: [
+      's3_bucket:site-assets',
+      's3_bucket:site-html-store',
+      'dynamodb_table:site-isr-metadata',
+    ],
+  };
+
+  assert.throws(
+    () => synth(refused),
+    /needs a pins entry, not a generated entry/,
+    'the stack refuses the config, so no name in it is ever deployed',
+  );
+
+  const entries = derivedPhysicalNames(refused);
+  assert.deepEqual(
+    entries.map((entry) => entry.name),
+    [undefined, undefined, undefined],
+    'the refused table entry has no name to compare, so the check has nothing to say about it',
+  );
+  assert.deepEqual(
+    sharedPhysicalNames(entries, derivedPhysicalNames(refused)),
+    [],
+    'an empty comparison from a config the stack refuses is not an all-clear',
+  );
+});
+
 test('the legacy profiles keep the physical names a deployment already owns', () => {
   // The migration path documented in docs/features/resource-naming.md: the two
   // buckets keep the names CloudFormation generated, the table keeps the name the

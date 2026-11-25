@@ -301,6 +301,35 @@ test('the collision check refuses a legacy config it cannot name', () => {
   );
 });
 
+test('the collision check does not validate a config the stack refuses', () => {
+  // SANITY-639-N2-01: `derivedPhysicalNames` assumes a config that synthesizes; it
+  // does not validate one. A `pins` entry for a legacy site bucket is compared as the
+  // literal it is, while `createSiteBucket` refuses it — naming a bucket
+  // CloudFormation generated replaces the bucket and deletes its objects — which is
+  // why the guide says to run `cdk synth` (or construct the stack) on each config
+  // first.
+  const refused: FaceTheoryReferenceStageConfig = {
+    ...REFERENCE_STAGE_CONFIG,
+    namingProfile: 'legacy',
+    loggingProfile: 'legacy',
+    pins: { 's3_bucket:site-assets': 'shop-lab-lab-site-assets' },
+  };
+
+  assert.throws(
+    () => synth(refused),
+    /createSiteBucket refuses a pin for s3_bucket:site-assets/,
+    'the stack refuses the config, so the pinned name is never deployed',
+  );
+
+  const entries = derivedPhysicalNames(refused);
+  assert.equal(entries[0].name, 'shop-lab-lab-site-assets');
+  assert.deepEqual(
+    sharedPhysicalNames(entries, derivedPhysicalNames(refused)),
+    ['s3_bucket: shop-lab-lab-site-assets'],
+    'the check compares a name the stack refuses, which is why the config must synthesize first',
+  );
+});
+
 test('the legacy profiles keep the physical names a deployment already owns', () => {
   // The migration path documented in docs/features/resource-naming.md: no name is
   // derived, CloudFormation keeps the bucket it generated, and CloudFront goes
