@@ -455,10 +455,12 @@ Rollback:
 ## Migration 12: Adopt The Resource Naming Contract In A Reference Stack
 
 The reference stacks (`infra/apptheory-ssr-site`, `infra/apptheory-ssg-isr-site`) now bind AppTheory's
-`theorycloud_resource_naming.v0.1` contract, so every resource they create is named from stage config and two FaceTheory
-sites in one account cannot collide. The framework API is unchanged; the deployed resource names are not. The
-resource-by-resource table, the exact derived names and the upgrade consequences live in
-[Resource Naming](/features/resource-naming/).
+`theorycloud_resource_naming.v0.1` contract, so every resource they create is named from stage config: names are
+reviewable in a template diff, and two deployments in one account whose composed `app`/`stage`/`logical` strings differ
+cannot collide. Distinct app ids alone are not enough — the contract joins its segments with `-`, which leaves one known
+ambiguity, documented with the workaround in [Resource Naming](/features/resource-naming/#known-limit-the-separator-is-ambiguous).
+The framework API is unchanged; the deployed resource names are not. The resource-by-resource table, the exact derived
+names and the upgrade consequences live in [Resource Naming](/features/resource-naming/).
 
 Before you deploy:
 
@@ -478,14 +480,18 @@ npx cdk deploy
 ```
 
 If nothing may be replaced — for example a bucket that holds objects the stacks did not put there — move the config to
-the legacy naming and logging profiles first, which keeps every physical resource name the deployment already owns, then
-cut over to the derived profile in a window you choose. Both paths, with the exact `pins`/`generated` entries, are in
+the legacy naming and logging profiles first. That keeps every physical resource name **and** every CloudFormation
+logical ID the deployment already owns, so `cdk diff` shows an in-place update and deletes nothing; the buckets take
+`generated` entries (a `pins` entry for one is refused, because naming a CloudFormation-generated bucket replaces it),
+and the stack exports `AccessLogsBucketName` instead of `AccessLogGroupName`. Cut over to the derived profile in a window
+you choose. Both paths, with the exact `pins`/`generated` entries, are in
 [Resource Naming](/features/resource-naming/#upgrading-an-existing-deployment).
 
 Validation:
 
-- `npm run test` in each affected stack asserts the derived names, the contract posture, and that two sites in one
-  account derive disjoint names.
+- `npm run test` in each affected stack asserts the derived names, the contract posture, that the two reference sites
+  derive disjoint names in one account, that the separator ambiguity is still the documented limit, and that the legacy
+  profile synthesizes the pre-contract template — logical IDs included — as a committed snapshot.
 - `npx cdk diff` is the review artefact: the resource names above should be the only physical-name changes.
 
 ## Rollback Notes

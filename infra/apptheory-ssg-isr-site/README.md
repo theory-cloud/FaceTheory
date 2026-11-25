@@ -35,8 +35,9 @@ Set `account` in `src/stage-config.ts` to your twelve-digit account id before de
 change **replaces** both buckets and the ISR table and **removes** the per-stack S3 access-log bucket. Replacement is
 safe for the state they hold — assets re-upload, pre-rendered SSG HTML re-deploys, and ISR cache metadata and leases
 regenerate per cache key — but copy any S3 access logs you want to keep before you approve the change set. To keep
-today's names instead, move the config to the legacy naming and logging profiles first: see
-[Resource Naming](../../docs/features/resource-naming.md#path-b-keep-todays-names).
+today's resources instead — names and CloudFormation logical IDs both — move the config to the legacy naming and logging
+profiles first: see
+[Resource Naming](../../docs/features/resource-naming.md#path-b-keep-todays-resources).
 
 ## Build Requirement
 

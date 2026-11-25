@@ -29,8 +29,9 @@ Set `account` in `src/stage-config.ts` to your twelve-digit account id before de
 placeholder, and the stack is environment-bound because the standard logging profile can only prove the CloudFront
 delivery lives in `us-east-1`. The first deploy after this change **replaces** the assets bucket (S3 cannot rename a
 bucket) and **removes** the per-stack S3 access-log bucket; assets are re-uploaded by the stack's bucket deployment. If a
-deployment must keep today's names, move the config to the legacy naming and logging profiles first — see
-[Resource Naming](../../docs/features/resource-naming.md#path-b-keep-todays-names).
+deployment must keep today's resources — names and CloudFormation logical IDs both — move the config to the legacy
+naming and logging profiles first — see
+[Resource Naming](../../docs/features/resource-naming.md#path-b-keep-todays-resources).
 
 ## Local Commands
 

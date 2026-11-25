@@ -6,13 +6,18 @@ FaceTheory's reference stacks now name every AWS resource they create through
 AppTheory's [resource-naming contract](#the-contract)
 (`theorycloud_resource_naming.v0.1`, shipped in `@theory-cloud/apptheory-cdk`
 7.5.0). Before this, a FaceTheory site's names came from CloudFormation
-generation and from the stack name, so two FaceTheory sites — or a FaceTheory
-site and any other Theory Cloud app — could collide on the account's shared
-namespaces, and no name was reviewable in a template diff.
+generation and from the stack name: no name was reviewable in a template diff,
+and nothing in the template said which other deployment could collide with it.
+Names are now derived from stage config, so a reviewer can read them and two
+deployments whose composed `app`/`stage`/`logical` strings differ cannot collide.
+
+That last clause is narrower than "no collisions", deliberately — the contract
+joins its segments with `-`, which leaves one known ambiguity, documented under
+[the separator limit](#known-limit-the-separator-is-ambiguous).
 
 This page states what changed, resource by resource, which resources an existing
-deployment replaces, and the two upgrade paths. Read it before deploying any
-stack that was synthesized from an earlier FaceTheory release.
+deployment replaces, which path keeps them, and the limit above. Read it before
+deploying any stack that was synthesized from an earlier FaceTheory release.
 
 ## The contract
 
@@ -44,7 +49,7 @@ Two profiles sit on top of the context:
 
 The reference stacks ship `derived` + `standard`. Both profiles are reachable
 from the same config record, which is what makes the [replacement-free upgrade
-path](#path-b-keep-todays-names) possible.
+path](#path-b-keep-todays-resources) possible.
 
 ## Derived names and the upgrade consequence
 
@@ -123,13 +128,27 @@ Expect CloudFormation to report *replace* for the two buckets and the table, and
 *remove* for the access-log bucket. Review the change set before you approve it;
 that is where the table above should match what you see.
 
-### Path B: keep today's names
+### Path B: keep today's resources
 
 If a deployment must not replace a resource — for example a bucket that holds
 objects the FaceTheory stacks did not put there — move the stage config to the
-legacy profiles first. Under `legacy` no name is derived: a `pins` entry is used
-verbatim and a `generated` entry sets no name, so CloudFormation keeps the
-physical resource it already owns.
+legacy profiles first. Under `legacy` no name is derived and no construct level
+moves, so the physical names **and** the CloudFormation logical IDs stay where
+the deployment already has them: `cdk diff` reports an in-place update for the
+buckets and the table, and nothing data-bearing is deleted.
+
+Both halves matter. CloudFormation keys a resource on its logical ID, and CDK
+derives that ID from the construct path, so putting the same bucket one construct
+deeper renames the logical ID (`AssetsBucket5CB76180` becomes
+`AssetsBucket0481D73F`). CloudFormation then treats the pair as a *different*
+resource: it creates the new bucket and deletes the old one with the objects in
+it — and the auto-delete custom resource with it — even though no `BucketName` is
+set. A legacy path that only suppressed the name property would still destroy the
+bucket, so on this profile the stack creates each site bucket with the
+pre-contract construct shape and no name property at all. The result is committed
+as a snapshot: `test/__snapshots__/ssr-site-stack.legacy.template.json` and
+`…/ssg-isr-site-stack.legacy.template.json`, and
+`test/unit/legacy-preservation.test.ts` pins the logical IDs by name.
 
 `src/stage-config.ts` carries both profiles, so the switch is config-only:
 
@@ -154,14 +173,24 @@ export const REFERENCE_STAGE_CONFIG: FaceTheoryReferenceStageConfig = {
 The bucket names CloudFormation generated are not predictable from the config, so
 `generated` (not `pins`) is the right entry for them; read the deployed name from
 the stack's `AssetsBucketName` / `IsrBucketName` output if you need it recorded.
+
+> **Do not** pin one of these buckets. A pin is a literal name, and setting
+> `BucketName` on a bucket CloudFormation named is a replacement — the same
+> delete as Path A, with none of Path A's warnings. The stack refuses it: a `pins`
+> entry for `s3_bucket:<logical>` fails synthesis and says to use a `generated`
+> entry instead.
+
 With `loggingProfile: legacy` the construct creates the S3 access-log bucket
 again and sets the distribution's `Logging` block, so no log destination moves
-and no log data is lost.
+and no log data is lost. The stack then exports `AccessLogsBucketName` — the
+bucket CloudFront actually writes to — instead of `AccessLogGroupName`, which
+would have named a log group this profile does not create.
 
-The template still changes: the stack is environment-bound now (see above), so
-`cdk diff` shows the CDK asset-bucket literal and the stack's account/region
-binding. What stays fixed is every *physical resource name* — no bucket, table or
-distribution is replaced.
+The template still changes, but only outside the deployed resources: the stack is
+environment-bound now (see above), so `cdk diff` shows the CDK asset-bucket
+literal and the stack's account/region binding, and the new
+`AccessLogsBucketName` output appears. No bucket, table or distribution is
+replaced or removed.
 
 Then cut over to the derived profile at a maintenance window you choose: drop the
 profiles and the entries above, review the change set, and accept the
@@ -172,21 +201,73 @@ replacements Path A describes.
 > in the account-regional namespace) still replaces the bucket, because the
 > deployed resource is still the one CloudFormation generated.
 
+## Known limit: the separator is ambiguous
+
+The contract composes a derived name as `<app>-<stage>-<logical>`, joined with
+`-`. The result does not record where one segment ends and the next begins, so two
+different contexts can compose the same string:
+
+| Context | Bucket prefix for the site's assets bucket |
+| --- | --- |
+| app `shop`, `logicalName` `lab-site` | `shop-lab-lab-site-assets` |
+| app `shop-lab`, `logicalName` `site` | `shop-lab-lab-site-assets` |
+
+Both stacks in that example derive the same assets prefix, and the SSG+ISR pair
+also shares its html store prefix and its ISR metadata table name. What this
+adoption therefore guarantees is: **derived names are disjoint when the composed
+app/stage/logical strings differ.** Distinct app ids alone are not enough.
+
+This is a limit of `theorycloud_resource_naming.v0.1`'s `-` composition, not a
+FaceTheory rule. FaceTheory consumes the contract as published and does not
+re-implement the composition, so the fix belongs upstream in AppTheory; the
+consumer-side workaround is in your own stage config. `infra/*/test/unit/naming-limits.test.ts`
+pins the collision as a known limit, so the day the contract encodes its segment
+boundaries that test fails and this section goes away with it.
+
+Until then, keep two deployments in one account disjoint:
+
+- **Give each site its own `app` id** (`facetheory-ssr-site` and
+  `facetheory-ssg-isr`) and use `logicalName` for what varies inside a site — that
+  is the shape both reference stacks follow.
+- **Do not put stage-shaped tokens in `app` or `logicalName`.** `app: shop-lab` at
+  stage `lab` reads as three segments, which is exactly the ambiguous case.
+- **Do not let a `logicalName` start with a segment that could belong to the app
+  id**, and do not rely on "the app ids are different" as the only argument:
+  compare the composed strings.
+- **Check the composed name before deploying a second site into an account.** The
+  contract call is the check, and no synthesis is needed:
+
+  ```ts
+  import { AppTheoryResourceNaming } from '@theory-cloud/apptheory-cdk';
+
+  AppTheoryResourceNaming.physicalName(valuesA, 's3_bucket', 'site-assets').bucketNamePrefix;
+  AppTheoryResourceNaming.physicalName(valuesB, 's3_bucket', 'site-assets').bucketNamePrefix;
+  ```
+
+  Equal prefixes means one of the two must change its `app` or `logicalName`
+  before it deploys. A collision is a real collision: the second stack's deploy
+  fails on the shared bucket prefix or table name rather than silently sharing the
+  resource.
+
 ## Rules this adoption keeps
 
 - **No construct takes a hand-built name.** Under a naming context AppTheory
   refuses `bucketName`, `bucketNamePrefix`, `bucketNamespace`, `isrMetadataTableName`
   and `cacheTableName`; the values come from derivation, a pin, or a generated
-  entry only.
+  entry only. The legacy path sets no name property at all, and it refuses a pin
+  for a bucket exactly because that pin is a hand-built name for a resource
+  CloudFormation already owns.
 - **One source of truth per name.** The FaceTheory stacks create the buckets and
   the table themselves, so they name those resources and pass the resources to
   `AppTheorySsrSite`; the construct consumes no entry for a caller-owned
   resource. The ISR table uses the same `{logicalName}-isr-metadata` entry the
   construct would consume if it created the table, so a later move to
   construct-owned resources keeps one name.
-- **Two sites, one account, no collisions.** The naming tests synthesize two
-  stacks in one account with different app ids and different stages and assert
-  the derived name sets are disjoint, and that derivation is deterministic.
+- **Two sites, one account, disjoint names.** The naming tests synthesize the two
+  actual reference stacks against one account, and a same-app/same-stage pair that
+  differs only in `logicalName`, and assert the derived name sets are disjoint and
+  that derivation is deterministic. Names that do collide come from the separator
+  limit above and are pinned as such.
 - **AWS stays visible.** These are AWS names — CloudFront, S3, Lambda, DynamoDB
   through TableTheory — not an abstraction over them. The contract is AppTheory's,
   and FaceTheory consumes it rather than re-implementing it.
