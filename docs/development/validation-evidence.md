@@ -24,13 +24,15 @@ Node 24 host cannot record a Node 22 floor.
 | `default` | Go from `.go-version`, Node 24, host Python | the producing host, darwin/arm64 |
 | `floor-node22` | Node 22 | digest-pinned `node` arm64 image, linux/arm64 |
 | `floor-node24` | Node 24 | digest-pinned `node` arm64 image, linux/arm64 |
+| `floor-node26` | Node 26 | digest-pinned `node` arm64 image, linux/arm64 |
 | `linux-root` | Node 24, UID 0 | digest-pinned `node` arm64 image, linux/arm64 |
 
-The three Linux profiles exist because the checks they carry only ran in CI
-before: the Node 22/24 matrices, the release-asset build, and the subtree
-destination test as UID 0. Each is produced in the container its profile names,
-pinned by image digest in the registry, so the platform claim in the record is
-the platform that really ran.
+The Linux profiles exist because the checks they carry only ran in CI before: the Node 22/24/26 matrices, the
+release-asset build, and the subtree destination test as UID 0. `floor-node22` is the oldest supported line — deprecated
+but still tested, because that is what a consumer who has not moved yet installs; `floor-node26` is the newest supported
+line; `floor-node24` sits between them and is also the producing host's major. Each is produced in the container its
+profile names, pinned by image digest in the registry, so the platform claim in the record is the platform that really
+ran.
 
 The guest architecture is `linux/arm64`, the Factory host's native colima
 architecture. GitHub's historical runner was `linux/x64`, and that is not

@@ -14,7 +14,7 @@ Package:
 
 Runtime:
 
-- Node.js `>=22`
+- Node.js `>=22` (Node 22, 24, and 26 are tested; Node 22 is deprecated — see [Runtime Support](/runtimes/support/))
 
 Primary package exports are defined in `ts/package.json`. The repository also includes a local SSG CLI entrypoint used by `npm run ssg`.
 

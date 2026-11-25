@@ -13,6 +13,8 @@ Required:
 - Node.js `>=22` (Node 20 reached end of life in April 2026; the floor moved from 20 to 22)
 - npm
 
+Node 22, 24, and 26 are all tested and supported today. Node 22 is deprecated against its 2027-04-30 upstream end of life and is planned to leave the floor in the 2027-02 major; see [Runtime Support](/runtimes/support/) for the support table, the schedule, and what each line is proven by.
+
 Optional:
 
 - AWS familiarity if you plan to use the reference deployment stacks

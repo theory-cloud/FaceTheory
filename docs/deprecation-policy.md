@@ -16,9 +16,15 @@ FaceTheory has published a post-1.0 release line since v1.0.0, so post-1.0 SemVe
 
 ## Deprecations
 
-No deprecation is open on the current release line. Every deprecation announced on the 3.x release line was removed in
-the v4.0.0 major, so the replacement surfaces have been the only supported ones since then. The rows below are
-historical, and the `Removed` column records the release that dropped each one.
+One support line is deprecated on the current release line: **Node.js 22**.
+
+| Surface            | Replacement              | Announced | Ends                                    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------ | ------------------------ | --------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js 22 runtime | Node.js 24 or Node.js 26 | 2026-11   | The 2027-02 major that raises the floor | Node 22's upstream end of life is 2027-04-30. The floor raise to `>=24` is scheduled for 2027-02 so it lands before security fixes stop, and it leaves the Node 22 row out of the tested matrix. Node 22 stays tested and installable until that release ships, so no consumer change is required today — see [Runtime Support](/runtimes/support/) and [Migration 13](./migration-guide.md#migration-13-node-22-runtime-support-deprecation). |
+
+Every API deprecation announced on the 3.x release line was removed in the v4.0.0 major, so the replacement surfaces have
+been the only supported ones since then. The rows below are historical, and the `Removed` column records the release that
+dropped each one.
 
 | Surface                                       | Replacement                         | Removed | Notes                                                                                                                                                                                                                   |
 | --------------------------------------------- | ----------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

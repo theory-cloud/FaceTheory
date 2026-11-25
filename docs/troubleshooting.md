@@ -88,7 +88,7 @@ Symptoms:
 
 Cause:
 
-- FaceTheory requires Node.js `>=22`. The floor moved from 20 to 22 when Node 20 reached end of life in April 2026.
+- FaceTheory requires Node.js `>=22`. The floor moved from 20 to 22 when Node 20 reached end of life in April 2026. Node 22 is deprecated against its 2027-04-30 upstream end of life and leaves the floor in the 2027-02 major; Node 24 and Node 26 are the lines to move to. See [Runtime Support](/runtimes/support/).
 
 Solution:
 
