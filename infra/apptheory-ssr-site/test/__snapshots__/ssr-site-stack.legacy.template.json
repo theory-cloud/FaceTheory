@@ -1,0 +1,1551 @@
+{
+  "Resources": {
+    "AssetsBucket5CB76180": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true"
+          },
+          {
+            "Key": "aws-cdk:cr-owned:assets:5dd37aa4",
+            "Value": "true"
+          },
+          {
+            "Key": "aws-cdk:cr-owned:d959ac8d",
+            "Value": "true"
+          },
+          {
+            "Key": "aws-cdk:cr-owned:dac8df36",
+            "Value": "true"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "AssetsBucketPolicyFFACF6C4": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "AssetsBucket5CB76180"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "AssetsBucket5CB76180",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "AssetsBucket5CB76180",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "s3:PutBucketPolicy",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+                    "Arn"
+                  ]
+                }
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "AssetsBucket5CB76180",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "AssetsBucket5CB76180",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": "s3:GetObject",
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition"
+                        },
+                        ":cloudfront::",
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        ":distribution/",
+                        {
+                          "Ref": "SiteDistribution390DED28"
+                        }
+                      ]
+                    ]
+                  }
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com"
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "AssetsBucket5CB76180",
+                        "Arn"
+                      ]
+                    },
+                    "/*"
+                  ]
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "AssetsBucketAutoDeleteObjectsCustomResource51BA1286": {
+      "Type": "Custom::S3AutoDeleteObjects",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+            "Arn"
+          ]
+        },
+        "BucketName": {
+          "Ref": "AssetsBucket5CB76180"
+        }
+      },
+      "DependsOn": [
+        "AssetsBucketPolicyFFACF6C4"
+      ],
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          }
+        ]
+      }
+    },
+    "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
+          "S3Key": "6dba3da2af96b69a187d689b326e5272b9abc8671c0427845a8bed243e02877d.zip"
+        },
+        "Timeout": 900,
+        "MemorySize": 128,
+        "Handler": "index.handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Description": {
+          "Fn::Join": [
+            "",
+            [
+              "Lambda function for auto-deleting objects in ",
+              {
+                "Ref": "AssetsBucket5CB76180"
+              },
+              " S3 bucket."
+            ]
+          ]
+        }
+      },
+      "DependsOn": [
+        "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092"
+      ]
+    },
+    "SsrFunctionServiceRoleF0484DAB": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    "SsrFunctionServiceRoleDefaultPolicyCCE3E6AD": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "AssetsBucket5CB76180",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "AssetsBucket5CB76180",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "SsrFunctionServiceRoleDefaultPolicyCCE3E6AD",
+        "Roles": [
+          {
+            "Ref": "SsrFunctionServiceRoleF0484DAB"
+          }
+        ]
+      }
+    },
+    "SsrFunctionD22C6F1E": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
+          "S3Key": "f9d2425cab432d078e9b8b90c6e2a9cb895bd7abc2250c8d4de5b295d65be950.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "APPTHEORY_ASSETS_BUCKET": {
+              "Ref": "AssetsBucket5CB76180"
+            },
+            "APPTHEORY_ASSETS_PREFIX": "assets",
+            "APPTHEORY_ASSETS_MANIFEST_KEY": ".vite/manifest.json"
+          }
+        },
+        "Handler": "index.handler",
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "SsrFunctionServiceRoleF0484DAB",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 10
+      },
+      "DependsOn": [
+        "SsrFunctionServiceRoleDefaultPolicyCCE3E6AD",
+        "SsrFunctionServiceRoleF0484DAB"
+      ]
+    },
+    "SsrFunctionAllowCloudFrontInvokeFunctionViaUrl8D4F8C8A": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "SsrFunctionD22C6F1E",
+            "Arn"
+          ]
+        },
+        "InvokedViaFunctionUrl": true,
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":cloudfront::000000000000:distribution/",
+              {
+                "Ref": "SiteDistribution390DED28"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "AssetsDeploymentImmutableAwsCliLayer40CE6A61": {
+      "Type": "AWS::Lambda::LayerVersion",
+      "Properties": {
+        "Content": {
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
+          "S3Key": "fa8e14e761e0a29058a42409f160eea065c3dd13909951db47e4a0f1c44f01aa.zip"
+        },
+        "Description": "/opt/awscli/aws"
+      }
+    },
+    "AssetsDeploymentImmutableCustomResourceA7751C5E": {
+      "Type": "Custom::CDKBucketDeployment",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536",
+            "Arn"
+          ]
+        },
+        "SourceBucketNames": [
+          "cdk-hnb659fds-assets-000000000000-us-east-1"
+        ],
+        "SourceObjectKeys": [
+          "11e653c5774eb2dc104211a3d7210c9582ea65d430764e1923e05b953aeb8b48.zip"
+        ],
+        "DestinationBucketName": {
+          "Ref": "AssetsBucket5CB76180"
+        },
+        "DestinationBucketKeyPrefix": "assets",
+        "WaitForDistributionInvalidation": true,
+        "Prune": true,
+        "SystemMetadata": {
+          "cache-control": "public,max-age=31536000,immutable"
+        },
+        "OutputObjectKeys": true
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::cdk-hnb659fds-assets-000000000000-us-east-1"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::cdk-hnb659fds-assets-000000000000-us-east-1/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+                "s3:PutObject",
+                "s3:PutObjectLegalHold",
+                "s3:PutObjectRetention",
+                "s3:PutObjectTagging",
+                "s3:PutObjectVersionTagging",
+                "s3:Abort*"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "AssetsBucket5CB76180",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "AssetsBucket5CB76180",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF",
+        "Roles": [
+          {
+            "Ref": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265"
+          }
+        ]
+      }
+    },
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "arm64"
+        ],
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
+          "S3Key": "a12efc822af4855efaddc35cac5d42dfa7a132ded579c17dbca95a4a89d0db43.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "AWS_CA_BUNDLE": "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
+          }
+        },
+        "Handler": "index.handler",
+        "Layers": [
+          {
+            "Ref": "AssetsDeploymentImmutableAwsCliLayer40CE6A61"
+          }
+        ],
+        "MemorySize": 1024,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",
+            "Arn"
+          ]
+        },
+        "Runtime": "python3.13",
+        "Timeout": 900
+      },
+      "DependsOn": [
+        "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF",
+        "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265"
+      ]
+    },
+    "AssetsDeploymentManifestAwsCliLayer6D319942": {
+      "Type": "AWS::Lambda::LayerVersion",
+      "Properties": {
+        "Content": {
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
+          "S3Key": "fa8e14e761e0a29058a42409f160eea065c3dd13909951db47e4a0f1c44f01aa.zip"
+        },
+        "Description": "/opt/awscli/aws"
+      }
+    },
+    "AssetsDeploymentManifestCustomResourceBC905EC7": {
+      "Type": "Custom::CDKBucketDeployment",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536",
+            "Arn"
+          ]
+        },
+        "SourceBucketNames": [
+          "cdk-hnb659fds-assets-000000000000-us-east-1"
+        ],
+        "SourceObjectKeys": [
+          "b4b10d9b3bf8319f2e6a65aaaaf03bca4dc6471c4807f98a6b0f91a0c65431a7.zip"
+        ],
+        "DestinationBucketName": {
+          "Ref": "AssetsBucket5CB76180"
+        },
+        "DestinationBucketKeyPrefix": "",
+        "WaitForDistributionInvalidation": true,
+        "Prune": false,
+        "SystemMetadata": {
+          "cache-control": "public,max-age=0,must-revalidate"
+        },
+        "OutputObjectKeys": true
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "AssetsDeploymentSsgDataAwsCliLayerA258FFEA": {
+      "Type": "AWS::Lambda::LayerVersion",
+      "Properties": {
+        "Content": {
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
+          "S3Key": "fa8e14e761e0a29058a42409f160eea065c3dd13909951db47e4a0f1c44f01aa.zip"
+        },
+        "Description": "/opt/awscli/aws"
+      }
+    },
+    "AssetsDeploymentSsgDataCustomResourceDF93279A": {
+      "Type": "Custom::CDKBucketDeployment",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536",
+            "Arn"
+          ]
+        },
+        "SourceBucketNames": [
+          "cdk-hnb659fds-assets-000000000000-us-east-1"
+        ],
+        "SourceObjectKeys": [
+          "e12eddbce84cee8d0275c88f25bfdb3ad648a21927741ef11315cd79b106a3d1.zip"
+        ],
+        "DestinationBucketName": {
+          "Ref": "AssetsBucket5CB76180"
+        },
+        "DestinationBucketKeyPrefix": "",
+        "WaitForDistributionInvalidation": true,
+        "Prune": false,
+        "SystemMetadata": {
+          "cache-control": "public,max-age=0,s-maxage=600"
+        },
+        "OutputObjectKeys": true
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "SiteCloudFrontLogsBucketF9C1CD02": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "ObjectWriter"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true"
+          }
+        ]
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "SiteCloudFrontLogsBucketPolicy816DFF56": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "SiteCloudFrontLogsBucketF9C1CD02"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "SiteCloudFrontLogsBucketF9C1CD02",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "SiteCloudFrontLogsBucketF9C1CD02",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "s3:PutBucketPolicy",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+                    "Arn"
+                  ]
+                }
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "SiteCloudFrontLogsBucketF9C1CD02",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "SiteCloudFrontLogsBucketF9C1CD02",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "SiteCloudFrontLogsBucketAutoDeleteObjectsCustomResource016FEC8F": {
+      "Type": "Custom::S3AutoDeleteObjects",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+            "Arn"
+          ]
+        },
+        "BucketName": {
+          "Ref": "SiteCloudFrontLogsBucketF9C1CD02"
+        }
+      },
+      "DependsOn": [
+        "SiteCloudFrontLogsBucketPolicy816DFF56"
+      ],
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
+    },
+    "SiteSsrUrl2D74149D": {
+      "Type": "AWS::Lambda::Url",
+      "Properties": {
+        "AuthType": "AWS_IAM",
+        "InvokeMode": "RESPONSE_STREAM",
+        "TargetFunctionArn": {
+          "Fn::GetAtt": [
+            "SsrFunctionD22C6F1E",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "SiteSsrOriginRequestPolicyF6A13560": {
+      "Type": "AWS::CloudFront::OriginRequestPolicy",
+      "Properties": {
+        "OriginRequestPolicyConfig": {
+          "CookiesConfig": {
+            "CookieBehavior": "all"
+          },
+          "HeadersConfig": {
+            "HeaderBehavior": "whitelist",
+            "Headers": [
+              "cloudfront-forwarded-proto",
+              "cloudfront-viewer-address",
+              "x-apptheory-original-host",
+              "x-facetheory-original-host",
+              "x-apptheory-original-uri",
+              "x-facetheory-original-uri",
+              "x-request-id"
+            ]
+          },
+          "Name": "FaceTheoryAppTheorySsrSiteSsrOriginRequestPolicyE60347B7",
+          "QueryStringsConfig": {
+            "QueryStringBehavior": "all"
+          }
+        }
+      }
+    },
+    "SiteHtmlOriginRequestPolicy308D38C5": {
+      "Type": "AWS::CloudFront::OriginRequestPolicy",
+      "Properties": {
+        "OriginRequestPolicyConfig": {
+          "CookiesConfig": {
+            "CookieBehavior": "none"
+          },
+          "HeadersConfig": {
+            "HeaderBehavior": "whitelist",
+            "Headers": [
+              "cloudfront-forwarded-proto",
+              "cloudfront-viewer-address",
+              "x-apptheory-original-host",
+              "x-facetheory-original-host",
+              "x-apptheory-original-uri",
+              "x-facetheory-original-uri",
+              "x-request-id"
+            ]
+          },
+          "Name": "FaceTheoryAppTheorySsrSiteHtmlOriginRequestPolicy46FBEFF3",
+          "QueryStringsConfig": {
+            "QueryStringBehavior": "all"
+          }
+        }
+      }
+    },
+    "SiteStaticAssetsCachePolicy416A79D8": {
+      "Type": "AWS::CloudFront::CachePolicy",
+      "Properties": {
+        "CachePolicyConfig": {
+          "Comment": "AppTheory direct S3 asset/data cache policy: origin Cache-Control bounded by no viewer header forwarding",
+          "DefaultTTL": 86400,
+          "MaxTTL": 31536000,
+          "MinTTL": 0,
+          "Name": "FaceTheoryAppTheorySsrSiteStaticAssetsCachePolicy3EB22229-us-east-1",
+          "ParametersInCacheKeyAndForwardedToOrigin": {
+            "CookiesConfig": {
+              "CookieBehavior": "none"
+            },
+            "EnableAcceptEncodingBrotli": true,
+            "EnableAcceptEncodingGzip": true,
+            "HeadersConfig": {
+              "HeaderBehavior": "none"
+            },
+            "QueryStringsConfig": {
+              "QueryStringBehavior": "none"
+            }
+          }
+        }
+      }
+    },
+    "SiteHtmlCachePolicy2B4843D5": {
+      "Type": "AWS::CloudFront::CachePolicy",
+      "Properties": {
+        "CachePolicyConfig": {
+          "Comment": "FaceTheory HTML cache policy keyed by query strings and stable public variant headers",
+          "DefaultTTL": 0,
+          "MaxTTL": 31536000,
+          "MinTTL": 0,
+          "Name": "FaceTheoryAppTheorySsrSiteHtmlCachePolicyAF6B8BB0-us-east-1",
+          "ParametersInCacheKeyAndForwardedToOrigin": {
+            "CookiesConfig": {
+              "CookieBehavior": "none"
+            },
+            "EnableAcceptEncodingBrotli": true,
+            "EnableAcceptEncodingGzip": true,
+            "HeadersConfig": {
+              "HeaderBehavior": "whitelist",
+              "Headers": [
+                "x-apptheory-original-host",
+                "x-facetheory-original-host"
+              ]
+            },
+            "QueryStringsConfig": {
+              "QueryStringBehavior": "all"
+            }
+          }
+        }
+      }
+    },
+    "SiteSsrViewerRequestFunction103872E5": {
+      "Type": "AWS::CloudFront::Function",
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "function handler(event) {\n\t  var request = event.request;\n\t  request.headers = request.headers || {};\n\t  var headers = request.headers;\n\t  var uri = request.uri || '/';\n\t  var blockedViewerTenantHeaders = [\n\t    'x-tenant-id'\n\t  ];\n\n\t  for (var blockedIndex = 0; blockedIndex < blockedViewerTenantHeaders.length; blockedIndex++) {\n\t    delete headers[blockedViewerTenantHeaders[blockedIndex]];\n\t  }\n\n\t  var requestIdHeader = headers['x-request-id'];\n\t  var requestId = requestIdHeader && requestIdHeader.value ? requestIdHeader.value.trim() : '';\n\n\t  if (!requestId) {\n\t    requestId = event.context && event.context.requestId ? String(event.context.requestId).trim() : '';\n\t  }\n\n\t  if (!requestId) {\n\t    requestId = 'req_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);\n\t  }\n\n\t  headers['x-request-id'] = { value: requestId };\n\t  headers['x-apptheory-original-uri'] = { value: uri };\n\t  headers['x-facetheory-original-uri'] = { value: uri };\n\n\t  if (headers.host && headers.host.value) {\n\t    headers['x-apptheory-original-host'] = { value: headers.host.value };\n\t    headers['x-facetheory-original-host'] = { value: headers.host.value };\n\t  }\n\n\t  if ('ssr-only' === 'ssg-isr') {\n\t    var rawS3Prefixes = [\n\t      '/_facetheory/data',\n      '/assets',\n      '/.vite'\n\t    ];\n\t    var lambdaPassthroughPrefixes = [\n\t      '/_facetheory/ssr-data'\n\t    ];\n\t    var isLambdaPassthroughPath = false;\n\n\t    for (var i = 0; i < lambdaPassthroughPrefixes.length; i++) {\n\t      var prefix = lambdaPassthroughPrefixes[i];\n\t      if (uri === prefix || uri.startsWith(prefix + '/')) {\n\t        isLambdaPassthroughPath = true;\n\t        break;\n\t      }\n\t    }\n\n\t    if (!isLambdaPassthroughPath) {\n\t      var isRawS3Path = false;\n\n\t      for (var j = 0; j < rawS3Prefixes.length; j++) {\n\t        var rawPrefix = rawS3Prefixes[j];\n\t        if (uri === rawPrefix || uri.startsWith(rawPrefix + '/')) {\n\t          isRawS3Path = true;\n\t          break;\n\t        }\n\t      }\n\n\t      var lastSlash = uri.lastIndexOf('/');\n\t      var lastSegment = lastSlash >= 0 ? uri.substring(lastSlash + 1) : uri;\n\n\t      if (!isRawS3Path && lastSegment.indexOf('.') === -1) {\n\t        request.uri = uri.endsWith('/') ? uri + 'index.html' : uri + '/index.html';\n\t      }\n\t    }\n\t  }\n\n\t  return request;\n\t}",
+        "FunctionConfig": {
+          "Comment": "FaceTheory viewer-request edge context for SSR site",
+          "Runtime": "cloudfront-js-2.0"
+        },
+        "Name": "us-east-1FaceTheoryAppTherRequestFunction4DEF6843"
+      }
+    },
+    "SiteSsrViewerResponseFunction3CF15787": {
+      "Type": "AWS::CloudFront::Function",
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "function handler(event) {\n\t  var request = event.request;\n\t  var response = event.response;\n\t  var requestIdHeader = request.headers['x-request-id'];\n\t  var requestId = requestIdHeader && requestIdHeader.value ? requestIdHeader.value.trim() : '';\n\n\t  if (!requestId) {\n\t    requestId = event.context && event.context.requestId ? String(event.context.requestId).trim() : '';\n\t  }\n\n\t  if (requestId) {\n\t    response.headers = response.headers || {};\n\t    if (!response.headers['x-request-id']) {\n\t      response.headers['x-request-id'] = { value: requestId };\n\t    }\n\t  }\n\n\t  return response;\n\t}",
+        "FunctionConfig": {
+          "Comment": "FaceTheory viewer-response request-id echo for SSR site",
+          "Runtime": "cloudfront-js-2.0"
+        },
+        "Name": "us-east-1FaceTheoryAppTheResponseFunction39325CE9"
+      }
+    },
+    "SiteResponseHeadersPolicy5F343E8C": {
+      "Type": "AWS::CloudFront::ResponseHeadersPolicy",
+      "Properties": {
+        "ResponseHeadersPolicyConfig": {
+          "Comment": "FaceTheory baseline security headers (CSP stays origin-defined)",
+          "CustomHeadersConfig": {
+            "Items": [
+              {
+                "Header": "permissions-policy",
+                "Override": true,
+                "Value": "camera=(), microphone=(), geolocation=()"
+              }
+            ]
+          },
+          "Name": "FaceTheoryAppTheorySsrSiteResponseHeadersPolicy26FEC031",
+          "SecurityHeadersConfig": {
+            "ContentTypeOptions": {
+              "Override": true
+            },
+            "FrameOptions": {
+              "FrameOption": "DENY",
+              "Override": true
+            },
+            "ReferrerPolicy": {
+              "Override": true,
+              "ReferrerPolicy": "strict-origin-when-cross-origin"
+            },
+            "StrictTransportSecurity": {
+              "AccessControlMaxAgeSec": 63072000,
+              "IncludeSubdomains": true,
+              "Override": true,
+              "Preload": true
+            },
+            "XSSProtection": {
+              "ModeBlock": true,
+              "Override": true,
+              "Protection": true
+            }
+          }
+        }
+      }
+    },
+    "SiteDistributionOrigin1FunctionUrlOriginAccessControlFF5C1633": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": "FaceTheoryAppTheorySsrSiteDinctionUrlOriginAccessControl506FC69E",
+          "OriginAccessControlOriginType": "lambda",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      }
+    },
+    "SiteDistributionOrigin1InvokeFromApiForFaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA468D34E14C": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunctionUrl",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "SiteSsrUrl2D74149D",
+            "FunctionArn"
+          ]
+        },
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":cloudfront::",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":distribution/",
+              {
+                "Ref": "SiteDistribution390DED28"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "SiteDistributionOrigin1InvokeFunctionFromCloudFrontForFaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA462EBFE010": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "SiteSsrUrl2D74149D",
+            "FunctionArn"
+          ]
+        },
+        "InvokedViaFunctionUrl": true,
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":cloudfront::",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":distribution/",
+              {
+                "Ref": "SiteDistribution390DED28"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "SiteDistributionOrigin2S3OriginAccessControlD62333BA": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": "FaceTheoryAppTheorySsrSiteDiOrigin2S3OriginAccessControl8D90DFA0",
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      }
+    },
+    "SiteDistribution390DED28": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "DistributionConfig": {
+          "CacheBehaviors": [
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": "assets/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsrSiteDistributionOrigin27438863E",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": "assets",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsrSiteDistributionOrigin27438863E",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": ".vite/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsrSiteDistributionOrigin27438863E",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": ".vite",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsrSiteDistributionOrigin27438863E",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": "_facetheory/data/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsrSiteDistributionOrigin27438863E",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS"
+              ],
+              "CachePolicyId": {
+                "Ref": "SiteStaticAssetsCachePolicy416A79D8"
+              },
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "PathPattern": "_facetheory/data",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsrSiteDistributionOrigin27438863E",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS",
+                "PUT",
+                "PATCH",
+                "POST",
+                "DELETE"
+              ],
+              "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "OriginRequestPolicyId": {
+                "Ref": "SiteSsrOriginRequestPolicyF6A13560"
+              },
+              "PathPattern": "_facetheory/ssr-data/*",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA46",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            },
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS",
+                "PUT",
+                "PATCH",
+                "POST",
+                "DELETE"
+              ],
+              "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerRequestFunction103872E5",
+                      "FunctionARN"
+                    ]
+                  }
+                },
+                {
+                  "EventType": "viewer-response",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "SiteSsrViewerResponseFunction3CF15787",
+                      "FunctionARN"
+                    ]
+                  }
+                }
+              ],
+              "OriginRequestPolicyId": {
+                "Ref": "SiteSsrOriginRequestPolicyF6A13560"
+              },
+              "PathPattern": "_facetheory/ssr-data",
+              "ResponseHeadersPolicyId": {
+                "Ref": "SiteResponseHeadersPolicy5F343E8C"
+              },
+              "TargetOriginId": "FaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA46",
+              "ViewerProtocolPolicy": "redirect-to-https"
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "AllowedMethods": [
+              "GET",
+              "HEAD",
+              "OPTIONS",
+              "PUT",
+              "PATCH",
+              "POST",
+              "DELETE"
+            ],
+            "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+            "Compress": true,
+            "FunctionAssociations": [
+              {
+                "EventType": "viewer-request",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "SiteSsrViewerRequestFunction103872E5",
+                    "FunctionARN"
+                  ]
+                }
+              },
+              {
+                "EventType": "viewer-response",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "SiteSsrViewerResponseFunction3CF15787",
+                    "FunctionARN"
+                  ]
+                }
+              }
+            ],
+            "OriginRequestPolicyId": {
+              "Ref": "SiteSsrOriginRequestPolicyF6A13560"
+            },
+            "ResponseHeadersPolicyId": {
+              "Ref": "SiteResponseHeadersPolicy5F343E8C"
+            },
+            "TargetOriginId": "FaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA46",
+            "ViewerProtocolPolicy": "redirect-to-https"
+          },
+          "Enabled": true,
+          "HttpVersion": "http2",
+          "IPV6Enabled": true,
+          "Logging": {
+            "Bucket": {
+              "Fn::GetAtt": [
+                "SiteCloudFrontLogsBucketF9C1CD02",
+                "RegionalDomainName"
+              ]
+            },
+            "Prefix": "cloudfront/"
+          },
+          "Origins": [
+            {
+              "CustomOriginConfig": {
+                "OriginProtocolPolicy": "https-only",
+                "OriginSSLProtocols": [
+                  "TLSv1.2"
+                ]
+              },
+              "DomainName": {
+                "Fn::Select": [
+                  2,
+                  {
+                    "Fn::Split": [
+                      "/",
+                      {
+                        "Fn::GetAtt": [
+                          "SiteSsrUrl2D74149D",
+                          "FunctionUrl"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "Id": "FaceTheoryAppTheorySsrSiteDistributionOrigin1ADF5CA46",
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "SiteDistributionOrigin1FunctionUrlOriginAccessControlFF5C1633",
+                  "Id"
+                ]
+              }
+            },
+            {
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "AssetsBucket5CB76180",
+                  "RegionalDomainName"
+                ]
+              },
+              "Id": "FaceTheoryAppTheorySsrSiteDistributionOrigin27438863E",
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "SiteDistributionOrigin2S3OriginAccessControlD62333BA",
+                  "Id"
+                ]
+              },
+              "S3OriginConfig": {
+                "OriginAccessIdentity": ""
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "CloudFrontDomainName": {
+      "Value": {
+        "Fn::GetAtt": [
+          "SiteDistribution390DED28",
+          "DomainName"
+        ]
+      }
+    },
+    "AssetsBucketName": {
+      "Value": {
+        "Ref": "AssetsBucket5CB76180"
+      }
+    },
+    "AccessLogsBucketName": {
+      "Value": {
+        "Ref": "SiteCloudFrontLogsBucketF9C1CD02"
+      }
+    },
+    "SsrFunctionUrl": {
+      "Value": {
+        "Fn::GetAtt": [
+          "SiteSsrUrl2D74149D",
+          "FunctionUrl"
+        ]
+      }
+    }
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Type": "AWS::SSM::Parameter::Value<String>",
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+    }
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5"
+                  ],
+                  {
+                    "Ref": "BootstrapVersion"
+                  }
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+        }
+      ]
+    }
+  }
+}

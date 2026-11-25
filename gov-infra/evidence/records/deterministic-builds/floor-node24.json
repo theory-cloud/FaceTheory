@@ -5,16 +5,16 @@
         "bash",
         "scripts/verify-deterministic-builds.sh"
       ],
-      "durationSeconds": 17.03,
+      "durationSeconds": 16.158,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-25T02:41:58Z",
+      "finishedAt": "2026-11-25T06:08:18Z",
       "id": "deterministic-builds",
-      "inputsDigest": "sha256:263d71d1589669d95b79daf27c5509282f8800e2e31d2eb17286ced16f7bec80",
+      "inputsDigest": "sha256:91c79caa60461cecd057579ad34351126f274ab04239c0b2a891639859991f83",
       "logDigest": "sha256:b95e69e2df78acab4cf30aa475903910657b14733db8c1ef4ba60cf5b49dd1b0",
-      "logRef": "gov-infra/evidence/local/deterministic-builds-deterministic-builds-20261125T024141Z-18.log",
+      "logRef": "gov-infra/evidence/local/deterministic-builds-deterministic-builds-20261125T060802Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-25T02:41:41Z"
+      "startedAt": "2026-11-25T06:08:02Z"
     }
   ],
   "consumed": [],
@@ -36,7 +36,7 @@
   },
   "profile": "floor-node24",
   "reason": "",
-  "recordedAt": "2026-11-25T02:41:58Z",
+  "recordedAt": "2026-11-25T06:08:18Z",
   "releaseOnly": {
     "digest": "sha256:d3d0770d031d3d3229a92eb34897e6c29e37fc336668535292e95d7b6fa9cf3a",
     "fileCount": 16,
@@ -46,8 +46,8 @@
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:ff3da5cafa3fe5fac42218f26e42ef0ae64ccfd75e18b91c85031081add1f7df",
-    "fileCount": 633,
+    "digest": "sha256:60bf54ac5b605d0b0700f46f75c320f0b5dd2f7f095dd840ce0f982994be88d5",
+    "fileCount": 634,
     "paths": [
       "VERSION",
       "README.md",
@@ -68,8 +68,8 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:fd375d140e0fa0f308e6343b5e04ba47702c7b6c4ea081b62584cd9ba2417d85",
-    "fileCount": 780
+    "digest": "sha256:e00fbb3ebd9825324126e2c166adba39b89e39df9d670f3989b12295e68eca9c",
+    "fileCount": 797
   },
   "verdict": "PASS"
 }

@@ -21,6 +21,15 @@ FaceTheory application hooks:
 - `observability.log(record)` for request completion records
 - `observability.metric(record)` for request and render measurements
 
+CloudFront access logs:
+- the reference stacks use AppTheory's standard logging profile, which delivers CloudFront access logs to CloudWatch Logs
+  instead of a per-stack S3 bucket
+- the log group is named `theorycloud_theorycloud_<app>_<stage>_logs_access_cdn_<logicalName>` (30-day retention), so
+  operator queries resolve it from the contract instead of from a generated bucket name
+- the stacks export the log-group name as the `AccessLogGroupName` CloudFormation output
+- under the legacy logging profile nothing creates that log group, so the stacks export `AccessLogsBucketName` — the S3
+  access-log bucket CloudFront writes to — instead of a log-group name that resolves to nothing
+
 Recommended headers:
 - `x-request-id`
 - `x-facetheory-isr`

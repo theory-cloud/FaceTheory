@@ -13,6 +13,14 @@ import {
 } from '@theory-cloud/apptheory-cdk';
 import { Construct } from 'constructs';
 
+import { createSiteBucket } from './site-bucket.js';
+import {
+  REFERENCE_STAGE_CONFIG,
+  createNamingContext,
+  stageEnvironment,
+  type FaceTheoryReferenceStageConfig,
+} from './stage-config.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function requireDir(name: string, relativePath: string): string {
@@ -26,10 +34,29 @@ function requireDir(name: string, relativePath: string): string {
 export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
   public readonly site: AppTheorySsrSite;
 
-  constructor(scope: Construct, id: string, props: StackProps = {}) {
-    super(scope, id, props);
+  /**
+   * The bound stage config this stack synthesized from.
+   */
+  public readonly stageConfig: FaceTheoryReferenceStageConfig;
 
-    const assetsBucket = new s3.Bucket(this, 'AssetsBucket', {
+  constructor(
+    scope: Construct,
+    id: string,
+    props: StackProps = {},
+    stageConfig: FaceTheoryReferenceStageConfig = REFERENCE_STAGE_CONFIG,
+  ) {
+    super(scope, id, { env: stageEnvironment(stageConfig), ...props });
+
+    this.stageConfig = stageConfig;
+
+    // Every physical name this stack sets comes from the naming context, which
+    // is bound from the stage config above.
+    const naming = createNamingContext(this, stageConfig);
+    const logical = stageConfig.logicalName;
+
+    const assetsBucket = createSiteBucket(this, 'AssetsBucket', {
+      namingContext: naming,
+      logical: `${logical}-assets`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
@@ -37,7 +64,9 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
       autoDeleteObjects: true,
     });
 
-    const isrBucket = new s3.Bucket(this, 'IsrBucket', {
+    const isrBucket = createSiteBucket(this, 'IsrBucket', {
+      namingContext: naming,
+      logical: `${logical}-html-store`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
@@ -66,8 +95,25 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
     });
 
     // DynamoDB table for FaceTheory ISR metadata and leases (TableTheory schema).
+    //
+    // The name is the contract's `dynamodb_table` derivation for the same
+    // `{logicalName}-isr-metadata` entry AppTheorySsrSite would consume if it
+    // created the table itself, so the construct still owns no name here and the
+    // stack's table and the site's ISR wiring agree. Under the derived naming
+    // context AppTheoryDynamoTable also applies the contract's Security Hub
+    // defaults: point-in-time recovery on, and deletion protection only for a
+    // RETAIN table (this one is DESTROY, so protection stays off).
+    const isrMetadataTableName = naming.physicalName('dynamodb_table', `${logical}-isr-metadata`).name;
+    if (!isrMetadataTableName) {
+      throw new Error(
+        `the naming context did not derive a name for dynamodb_table:${logical}-isr-metadata; ` +
+          'AppTheoryDynamoTable requires a physical tableName, so under the legacy naming profile a DynamoDB table ' +
+          'needs a pins entry, not a generated entry',
+      );
+    }
     const cacheTable = new AppTheoryDynamoTable(this, 'CacheTable', {
-      tableName: `${Stack.of(this).stackName}-facetheory-cache`,
+      tableName: isrMetadataTableName,
+      namingContext: naming,
       partitionKeyName: 'pk',
       sortKeyName: 'sk',
       timeToLiveAttribute: 'ttl',
@@ -146,11 +192,34 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
       enableLogging: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
+      namingContext: naming,
+      logicalName: logical,
     });
 
     new CfnOutput(this, 'CloudFrontDomainName', {
       value: this.site.distribution.distributionDomainName,
     });
+
+    // The output names the destination this stack actually deploys. Under the
+    // standard logging profile that is a contract-named CloudWatch Logs group the
+    // site construct creates; under the legacy profile it is the construct's S3
+    // access-log bucket, and exporting a log-group name there would point an
+    // operator at a group nothing creates.
+    if (naming.standardLogging) {
+      new CfnOutput(this, 'AccessLogGroupName', {
+        value: naming.logGroupName(`logs/access/cdn/${logical}`),
+      });
+    } else {
+      const accessLogsBucket = this.site.logsBucket;
+      if (!accessLogsBucket) {
+        throw new Error(
+          'the legacy logging profile must create the site S3 access-log bucket; enableLogging is required for this stack',
+        );
+      }
+      new CfnOutput(this, 'AccessLogsBucketName', {
+        value: accessLogsBucket.bucketName,
+      });
+    }
 
     new CfnOutput(this, 'AssetsBucketName', {
       value: assetsBucket.bucketName,

@@ -5,16 +5,16 @@
         "bash",
         "scripts/verify-theorycloud-subtree-path.sh"
       ],
-      "durationSeconds": 1.01,
+      "durationSeconds": 0.991,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-25T02:17:31Z",
+      "finishedAt": "2026-11-25T06:08:20Z",
       "id": "theorycloud-subtree-path",
-      "inputsDigest": "sha256:7391db6c0d5b00afd963b0fbefdd538ac7b857b439e43bc5df8446ad2cc2f8d5",
-      "logDigest": "sha256:c1525051ce18fc8af053475cf21498f4122b8d8a89124cf6771e04fb321907b8",
-      "logRef": "gov-infra/evidence/local/theorycloud-subtree-theorycloud-subtree-path-20261125T021730Z-18.log",
+      "inputsDigest": "sha256:95284f5d3bb1e1779cd19b4537cfc61e7e08a042437b0a9767c8a88778a9f669",
+      "logDigest": "sha256:e833ea680b9ae93fc7b8219d403a2bbaec556273c52700f74c36cc16659380a9",
+      "logRef": "gov-infra/evidence/local/theorycloud-subtree-theorycloud-subtree-path-20261125T060819Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-25T02:17:30Z"
+      "startedAt": "2026-11-25T06:08:19Z"
     }
   ],
   "consumed": [],
@@ -36,7 +36,7 @@
   },
   "profile": "linux-root",
   "reason": "",
-  "recordedAt": "2026-11-25T02:17:31Z",
+  "recordedAt": "2026-11-25T06:08:20Z",
   "releaseOnly": {
     "digest": "sha256:d3d0770d031d3d3229a92eb34897e6c29e37fc336668535292e95d7b6fa9cf3a",
     "fileCount": 16,
@@ -46,8 +46,8 @@
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:624d7cbf049ae110b55fc38b4bbce916e2c15f157b7acdb1bbb51471a7aa5cdd",
-    "fileCount": 183,
+    "digest": "sha256:7d73b20afe1a54cfa60d4799f8d426a8d699854db49645194ce7ae3a168e62b7",
+    "fileCount": 184,
     "paths": [
       "docs/",
       "Makefile",
@@ -58,8 +58,8 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:8987d00392a2ac21916a87c1018d4bf5c9a8472f0199e5ce25e9a583bfd0ffd5",
-    "fileCount": 780
+    "digest": "sha256:e00fbb3ebd9825324126e2c166adba39b89e39df9d670f3989b12295e68eca9c",
+    "fileCount": 797
   },
   "verdict": "PASS"
 }

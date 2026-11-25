@@ -123,6 +123,12 @@ groups:
           url: /features/operator-visibility/,
           icon: compass,
         }
+      - {
+          id: feature-resource-naming,
+          title: Resource Naming,
+          url: /features/resource-naming/,
+          icon: tag,
+        }
 
   - label: Integrations
     items:
@@ -241,6 +247,7 @@ order:
   - feature-ssr-hydration-sidecars
   - feature-isr-tenant-safety
   - feature-operator-visibility
+  - feature-resource-naming
   - int-apptheory
   - int-tabletheory
   - int-autheory
@@ -282,6 +289,7 @@ url_to_id:
   /features/ssr-hydration-sidecars/: feature-ssr-hydration-sidecars
   /features/isr-tenant-safety/: feature-isr-tenant-safety
   /features/operator-visibility/: feature-operator-visibility
+  /features/resource-naming/: feature-resource-naming
   /integrations/apptheory/: int-apptheory
   /integrations/tabletheory/: int-tabletheory
   /integrations/autheory/: int-autheory

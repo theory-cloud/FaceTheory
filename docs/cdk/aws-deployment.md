@@ -202,3 +202,8 @@ These stacks are implementation references for the documented topology rather th
 
 - `infra/apptheory-ssr-site/` for CloudFront plus S3 plus Lambda URL SSR
 - `infra/apptheory-ssg-isr-site/` for SSG failover and blocking ISR
+
+Both derive their physical names — the asset and html store buckets, the ISR metadata table, and the CloudFront log
+destination — from AppTheory's `theorycloud_resource_naming.v0.1` contract, with the stage config in
+`src/stage-config.ts` as the only input. [Resource Naming](../features/resource-naming.md) lists the derived names and
+what upgrading an existing deployment replaces.
