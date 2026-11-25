@@ -56,20 +56,27 @@ This is a support-contract change rather than an API change, following the [Depr
 
 ## Reproducing these claims locally
 
-Each row above is a committed evidence record, verified by CI without executing anything. To reproduce one on this host:
+Each row above is a committed evidence record, verified by CI without executing anything. A row names two records — the `ts` gate (the suite and the clean-consumer install) and the `ts-pack` gate (the packed package) — so reproducing a line means re-executing both on that line, not one of them.
+
+Collection is incremental: a record that still applies to the tree is reused and its commands do not run. Every command below therefore carries `--force`, which re-executes the gate inside the digest-pinned image its profile names. Drop `--force` and you are re-verifying the committed record instead of reproducing the claim.
 
 ```bash
-# oldest line (deprecated, still tested)
-scripts/evidence/collect-in-container.sh --gate ts --profile floor-node22
+# oldest line (deprecated, still tested): suite + consumer install, then package
+scripts/evidence/collect-in-container.sh --gate ts --profile floor-node22 --force
+scripts/evidence/collect-in-container.sh --gate ts-pack --profile floor-node22 --force
 
 # middle line
-scripts/evidence/collect-in-container.sh --gate ts --profile floor-node24
+scripts/evidence/collect-in-container.sh --gate ts --profile floor-node24 --force
+scripts/evidence/collect-in-container.sh --gate ts-pack --profile floor-node24 --force
 
 # newest line
-scripts/evidence/collect-in-container.sh --gate ts --profile floor-node26
+scripts/evidence/collect-in-container.sh --gate ts --profile floor-node26 --force
+scripts/evidence/collect-in-container.sh --gate ts-pack --profile floor-node26 --force
 
-# verify what CI verifies, for the tree you are about to push
+# verify what CI verifies, for the tree you are about to push (executes nothing)
 scripts/evidence/verify-all.sh
 ```
 
-The gate matrix, the proof profiles and their digest-pinned images live in `scripts/evidence/validation-gates.json`; [Validation evidence](/development/validation-evidence/) explains how a record binds to its inputs.
+`scripts/evidence/collect-all.sh --force` re-executes every gate and profile in one run, including the `examples-local`, `deterministic-builds`, `theorycloud-subtree` and `rubric` records beside the Node lines.
+
+The gate matrix, the proof profiles and their digest-pinned images live in `scripts/evidence/validation-gates.json`; [Validation evidence](/development/validation-evidence/) explains how a record binds to its inputs and where verify ends and a fresh run begins.

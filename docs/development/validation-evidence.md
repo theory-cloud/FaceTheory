@@ -10,8 +10,15 @@ holds no credential, and runs nothing on a push.
   `scripts/evidence/collect-all.sh` for every gate and profile.
 - Container profiles: `scripts/evidence/collect-in-container.sh --gate <gate> --profile <profile>`.
 - Verify (this is what CI runs): `scripts/evidence/verify-all.sh`.
+- Re-execute: add `--force` to any producer. Collection is incremental by design —
+  a gate/profile pair whose committed record still applies to this tree is reused
+  and its commands do not run — so `--force` is what turns "produce" into "run
+  again". See [Verify, and fresh-run](#verify-and-fresh-run).
 - Records: `gov-infra/evidence/records/<gate>/<profile>.json`. Raw runner logs are
   not committed.
+- Scripts are directly executable. `scripts/evidence/*.sh` are tracked `100755`,
+  so the commands on this page run as written; `bash <script>` is equivalent and
+  never required.
 
 ## Proof profiles
 
@@ -50,6 +57,7 @@ git status --short
 
 # 2. Produce the records: host profiles on this machine, floor profiles in their
 #    containers. The rubric runs last because it composes the ts-pack record.
+#    This is incremental: a pair whose record still applies is reused, not re-run.
 scripts/evidence/collect-all.sh
 
 # 3. Commit the records on their own. A records-only commit contains record
@@ -58,6 +66,40 @@ scripts/evidence/collect-all.sh
 # 4. Verify exactly what CI will verify, at the head you are about to push.
 scripts/evidence/verify-all.sh
 ```
+
+## Verify, and fresh-run
+
+These answer two different questions and they are not interchangeable.
+
+**Verify** is the CI path, and it executes nothing. `scripts/evidence/verify-all.sh`
+recomputes each gate's input projection and compares it with the committed record.
+Green verify means the committed proof still describes this exact tree; it does not
+mean any gate ran.
+
+**Fresh-run** is the reproduction path: it re-executes the gate itself and rewrites
+the record. Producing a record is incremental — a pair with an applicable record is
+reused — so a fresh run is a producer plus `--force`:
+
+```bash
+# every gate and every profile, re-executed in the producer each one declares
+scripts/evidence/collect-all.sh --force
+
+# one container-bound pair, re-executed inside its digest-pinned image
+scripts/evidence/collect-in-container.sh --gate ts --profile floor-node26 --force
+
+# one host-profile pair, re-executed on this machine
+scripts/evidence/collect.sh --gate examples-local --profile default --force
+
+# then verify what CI will verify at this head
+scripts/evidence/verify-all.sh
+```
+
+A container-bound profile cannot be produced on this host at all: the collector
+probes the live environment and refuses a profile it does not satisfy, which is
+what keeps a Node 26 record from being written on a Node 24 host. The producer for
+a profile is its `image` in the registry — `collect-in-container.sh` when it
+declares one, `collect.sh` when it does not — and a missing-record failure names
+the right one for you.
 
 A record binds the gate's input scope, each command's inputs, the tracked proof
 profile and the environment the collector probed. A changed input, a changed
