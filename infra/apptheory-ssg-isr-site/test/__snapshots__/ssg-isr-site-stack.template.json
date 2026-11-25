@@ -1,6 +1,6 @@
 {
   "Resources": {
-    "AssetsBucket5CB76180": {
+    "AssetsBucket0481D73F": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
         "BucketEncryption": {
@@ -12,6 +12,8 @@
             }
           ]
         },
+        "BucketNamePrefix": "facetheory-ssg-isr-lab-site-assets",
+        "BucketNamespace": "account-regional",
         "PublicAccessBlockConfiguration": {
           "BlockPublicAcls": true,
           "BlockPublicPolicy": true,
@@ -40,11 +42,11 @@
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
     },
-    "AssetsBucketPolicyFFACF6C4": {
+    "AssetsBucketPolicyE8CC694A": {
       "Type": "AWS::S3::BucketPolicy",
       "Properties": {
         "Bucket": {
-          "Ref": "AssetsBucket5CB76180"
+          "Ref": "AssetsBucket0481D73F"
         },
         "PolicyDocument": {
           "Statement": [
@@ -62,7 +64,7 @@
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "AssetsBucket5CB76180",
+                    "AssetsBucket0481D73F",
                     "Arn"
                   ]
                 },
@@ -72,7 +74,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "AssetsBucket5CB76180",
+                          "AssetsBucket0481D73F",
                           "Arn"
                         ]
                       },
@@ -101,7 +103,7 @@
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "AssetsBucket5CB76180",
+                    "AssetsBucket0481D73F",
                     "Arn"
                   ]
                 },
@@ -111,7 +113,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "AssetsBucket5CB76180",
+                          "AssetsBucket0481D73F",
                           "Arn"
                         ]
                       },
@@ -156,7 +158,7 @@
                   [
                     {
                       "Fn::GetAtt": [
-                        "AssetsBucket5CB76180",
+                        "AssetsBucket0481D73F",
                         "Arn"
                       ]
                     },
@@ -170,7 +172,7 @@
         }
       }
     },
-    "AssetsBucketAutoDeleteObjectsCustomResource51BA1286": {
+    "AssetsBucketAutoDeleteObjectsCustomResource4EEDE0F2": {
       "Type": "Custom::S3AutoDeleteObjects",
       "Properties": {
         "ServiceToken": {
@@ -180,11 +182,11 @@
           ]
         },
         "BucketName": {
-          "Ref": "AssetsBucket5CB76180"
+          "Ref": "AssetsBucket0481D73F"
         }
       },
       "DependsOn": [
-        "AssetsBucketPolicyFFACF6C4"
+        "AssetsBucketPolicyE8CC694A"
       ],
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
@@ -215,9 +217,7 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          },
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
           "S3Key": "6dba3da2af96b69a187d689b326e5272b9abc8671c0427845a8bed243e02877d.zip"
         },
         "Timeout": 900,
@@ -236,7 +236,7 @@
             [
               "Lambda function for auto-deleting objects in ",
               {
-                "Ref": "AssetsBucket5CB76180"
+                "Ref": "AssetsBucket0481D73F"
               },
               " S3 bucket."
             ]
@@ -247,7 +247,7 @@
         "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092"
       ]
     },
-    "IsrBucketCAA25890": {
+    "IsrBucket9673BF26": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
         "BucketEncryption": {
@@ -259,6 +259,8 @@
             }
           ]
         },
+        "BucketNamePrefix": "facetheory-ssg-isr-lab-site-aatexg6p",
+        "BucketNamespace": "account-regional",
         "PublicAccessBlockConfiguration": {
           "BlockPublicAcls": true,
           "BlockPublicPolicy": true,
@@ -279,11 +281,11 @@
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
     },
-    "IsrBucketPolicy39B2E35A": {
+    "IsrBucketPolicy0265AF9A": {
       "Type": "AWS::S3::BucketPolicy",
       "Properties": {
         "Bucket": {
-          "Ref": "IsrBucketCAA25890"
+          "Ref": "IsrBucket9673BF26"
         },
         "PolicyDocument": {
           "Statement": [
@@ -301,7 +303,7 @@
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "IsrBucketCAA25890",
+                    "IsrBucket9673BF26",
                     "Arn"
                   ]
                 },
@@ -311,7 +313,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "IsrBucketCAA25890",
+                          "IsrBucket9673BF26",
                           "Arn"
                         ]
                       },
@@ -340,7 +342,7 @@
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "IsrBucketCAA25890",
+                    "IsrBucket9673BF26",
                     "Arn"
                   ]
                 },
@@ -350,7 +352,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "IsrBucketCAA25890",
+                          "IsrBucket9673BF26",
                           "Arn"
                         ]
                       },
@@ -395,7 +397,7 @@
                   [
                     {
                       "Fn::GetAtt": [
-                        "IsrBucketCAA25890",
+                        "IsrBucket9673BF26",
                         "Arn"
                       ]
                     },
@@ -409,7 +411,7 @@
         }
       }
     },
-    "IsrBucketAutoDeleteObjectsCustomResourceD92212A8": {
+    "IsrBucketAutoDeleteObjectsCustomResourceDDB116B0": {
       "Type": "Custom::S3AutoDeleteObjects",
       "Properties": {
         "ServiceToken": {
@@ -419,11 +421,11 @@
           ]
         },
         "BucketName": {
-          "Ref": "IsrBucketCAA25890"
+          "Ref": "IsrBucket9673BF26"
         }
       },
       "DependsOn": [
-        "IsrBucketPolicy39B2E35A"
+        "IsrBucketPolicy0265AF9A"
       ],
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
@@ -481,7 +483,7 @@
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "IsrBucketCAA25890",
+                    "IsrBucket9673BF26",
                     "Arn"
                   ]
                 },
@@ -491,7 +493,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "IsrBucketCAA25890",
+                          "IsrBucket9673BF26",
                           "Arn"
                         ]
                       },
@@ -549,7 +551,7 @@
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "AssetsBucket5CB76180",
+                    "AssetsBucket0481D73F",
                     "Arn"
                   ]
                 },
@@ -559,7 +561,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "AssetsBucket5CB76180",
+                          "AssetsBucket0481D73F",
                           "Arn"
                         ]
                       },
@@ -584,20 +586,18 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          },
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
           "S3Key": "abdcf10665cb05fe0549a0aa00f9e130d0401137b5059fadb53fb51a10a6fa28.zip"
         },
         "Environment": {
           "Variables": {
             "APPTHEORY_ASSETS_BUCKET": {
-              "Ref": "AssetsBucket5CB76180"
+              "Ref": "AssetsBucket0481D73F"
             },
             "APPTHEORY_ASSETS_PREFIX": "assets",
             "APPTHEORY_ASSETS_MANIFEST_KEY": ".vite/manifest.json",
             "FACETHEORY_ISR_BUCKET": {
-              "Ref": "IsrBucketCAA25890"
+              "Ref": "IsrBucket9673BF26"
             },
             "FACETHEORY_ISR_PREFIX": "isr",
             "APPTHEORY_CACHE_TABLE_NAME": {
@@ -650,11 +650,7 @@
               {
                 "Ref": "AWS::Partition"
               },
-              ":cloudfront::",
-              {
-                "Ref": "AWS::AccountId"
-              },
-              ":distribution/",
+              ":cloudfront::000000000000:distribution/",
               {
                 "Ref": "SiteDistribution390DED28"
               }
@@ -677,6 +673,7 @@
           }
         ],
         "BillingMode": "PAY_PER_REQUEST",
+        "DeletionProtectionEnabled": false,
         "KeySchema": [
           {
             "AttributeName": "pk",
@@ -693,7 +690,7 @@
         "SSESpecification": {
           "SSEEnabled": true
         },
-        "TableName": "FaceTheoryAppTheorySsgIsrSite-facetheory-cache",
+        "TableName": "facetheory-ssg-isr-lab-site-isr-metadata",
         "TimeToLiveSpecification": {
           "AttributeName": "ttl",
           "Enabled": true
@@ -706,9 +703,7 @@
       "Type": "AWS::Lambda::LayerVersion",
       "Properties": {
         "Content": {
-          "S3Bucket": {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          },
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
           "S3Key": "fa8e14e761e0a29058a42409f160eea065c3dd13909951db47e4a0f1c44f01aa.zip"
         },
         "Description": "/opt/awscli/aws"
@@ -724,15 +719,13 @@
           ]
         },
         "SourceBucketNames": [
-          {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          }
+          "cdk-hnb659fds-assets-000000000000-us-east-1"
         ],
         "SourceObjectKeys": [
           "57bb0c734711119ef1877dd625c476f4310f5062d24ab73be5741aa3327ddf8e.zip"
         ],
         "DestinationBucketName": {
-          "Ref": "AssetsBucket5CB76180"
+          "Ref": "AssetsBucket0481D73F"
         },
         "DestinationBucketKeyPrefix": "assets",
         "WaitForDistributionInvalidation": true,
@@ -797,10 +790,7 @@
                       {
                         "Ref": "AWS::Partition"
                       },
-                      ":s3:::",
-                      {
-                        "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-                      }
+                      ":s3:::cdk-hnb659fds-assets-000000000000-us-east-1"
                     ]
                   ]
                 },
@@ -812,11 +802,7 @@
                       {
                         "Ref": "AWS::Partition"
                       },
-                      ":s3:::",
-                      {
-                        "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-                      },
-                      "/*"
+                      ":s3:::cdk-hnb659fds-assets-000000000000-us-east-1/*"
                     ]
                   ]
                 }
@@ -839,7 +825,7 @@
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "AssetsBucket5CB76180",
+                    "AssetsBucket0481D73F",
                     "Arn"
                   ]
                 },
@@ -849,7 +835,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "AssetsBucket5CB76180",
+                          "AssetsBucket0481D73F",
                           "Arn"
                         ]
                       },
@@ -876,7 +862,7 @@
               "Resource": [
                 {
                   "Fn::GetAtt": [
-                    "IsrBucketCAA25890",
+                    "IsrBucket9673BF26",
                     "Arn"
                   ]
                 },
@@ -886,7 +872,7 @@
                     [
                       {
                         "Fn::GetAtt": [
-                          "IsrBucketCAA25890",
+                          "IsrBucket9673BF26",
                           "Arn"
                         ]
                       },
@@ -914,9 +900,7 @@
           "arm64"
         ],
         "Code": {
-          "S3Bucket": {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          },
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
           "S3Key": "a12efc822af4855efaddc35cac5d42dfa7a132ded579c17dbca95a4a89d0db43.zip"
         },
         "Environment": {
@@ -949,9 +933,7 @@
       "Type": "AWS::Lambda::LayerVersion",
       "Properties": {
         "Content": {
-          "S3Bucket": {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          },
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
           "S3Key": "fa8e14e761e0a29058a42409f160eea065c3dd13909951db47e4a0f1c44f01aa.zip"
         },
         "Description": "/opt/awscli/aws"
@@ -967,15 +949,13 @@
           ]
         },
         "SourceBucketNames": [
-          {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          }
+          "cdk-hnb659fds-assets-000000000000-us-east-1"
         ],
         "SourceObjectKeys": [
           "b4b10d9b3bf8319f2e6a65aaaaf03bca4dc6471c4807f98a6b0f91a0c65431a7.zip"
         ],
         "DestinationBucketName": {
-          "Ref": "AssetsBucket5CB76180"
+          "Ref": "AssetsBucket0481D73F"
         },
         "DestinationBucketKeyPrefix": "",
         "WaitForDistributionInvalidation": true,
@@ -992,9 +972,7 @@
       "Type": "AWS::Lambda::LayerVersion",
       "Properties": {
         "Content": {
-          "S3Bucket": {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          },
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
           "S3Key": "fa8e14e761e0a29058a42409f160eea065c3dd13909951db47e4a0f1c44f01aa.zip"
         },
         "Description": "/opt/awscli/aws"
@@ -1010,15 +988,13 @@
           ]
         },
         "SourceBucketNames": [
-          {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          }
+          "cdk-hnb659fds-assets-000000000000-us-east-1"
         ],
         "SourceObjectKeys": [
           "d50e801fbc938af9c5abca424efd7626df60b8f45b727f3ba1230a8924152327.zip"
         ],
         "DestinationBucketName": {
-          "Ref": "IsrBucketCAA25890"
+          "Ref": "IsrBucket9673BF26"
         },
         "DestinationBucketKeyPrefix": "isr",
         "WaitForDistributionInvalidation": true,
@@ -1035,9 +1011,7 @@
       "Type": "AWS::Lambda::LayerVersion",
       "Properties": {
         "Content": {
-          "S3Bucket": {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          },
+          "S3Bucket": "cdk-hnb659fds-assets-000000000000-us-east-1",
           "S3Key": "fa8e14e761e0a29058a42409f160eea065c3dd13909951db47e4a0f1c44f01aa.zip"
         },
         "Description": "/opt/awscli/aws"
@@ -1053,15 +1027,13 @@
           ]
         },
         "SourceBucketNames": [
-          {
-            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-          }
+          "cdk-hnb659fds-assets-000000000000-us-east-1"
         ],
         "SourceObjectKeys": [
           "a5b2e1cf8d5c476e1c982926db0cabd7e418d35dab40f3b098049130cedaf6b9.zip"
         ],
         "DestinationBucketName": {
-          "Ref": "AssetsBucket5CB76180"
+          "Ref": "AssetsBucket0481D73F"
         },
         "DestinationBucketKeyPrefix": "_facetheory/data",
         "WaitForDistributionInvalidation": true,
@@ -1071,146 +1043,6 @@
         },
         "OutputObjectKeys": true
       },
-      "UpdateReplacePolicy": "Delete",
-      "DeletionPolicy": "Delete"
-    },
-    "SiteCloudFrontLogsBucketF9C1CD02": {
-      "Type": "AWS::S3::Bucket",
-      "Properties": {
-        "BucketEncryption": {
-          "ServerSideEncryptionConfiguration": [
-            {
-              "ServerSideEncryptionByDefault": {
-                "SSEAlgorithm": "AES256"
-              }
-            }
-          ]
-        },
-        "OwnershipControls": {
-          "Rules": [
-            {
-              "ObjectOwnership": "ObjectWriter"
-            }
-          ]
-        },
-        "PublicAccessBlockConfiguration": {
-          "BlockPublicAcls": true,
-          "BlockPublicPolicy": true,
-          "IgnorePublicAcls": true,
-          "RestrictPublicBuckets": true
-        },
-        "Tags": [
-          {
-            "Key": "aws-cdk:auto-delete-objects",
-            "Value": "true"
-          }
-        ]
-      },
-      "UpdateReplacePolicy": "Delete",
-      "DeletionPolicy": "Delete"
-    },
-    "SiteCloudFrontLogsBucketPolicy816DFF56": {
-      "Type": "AWS::S3::BucketPolicy",
-      "Properties": {
-        "Bucket": {
-          "Ref": "SiteCloudFrontLogsBucketF9C1CD02"
-        },
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": "s3:*",
-              "Condition": {
-                "Bool": {
-                  "aws:SecureTransport": "false"
-                }
-              },
-              "Effect": "Deny",
-              "Principal": {
-                "AWS": "*"
-              },
-              "Resource": [
-                {
-                  "Fn::GetAtt": [
-                    "SiteCloudFrontLogsBucketF9C1CD02",
-                    "Arn"
-                  ]
-                },
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      {
-                        "Fn::GetAtt": [
-                          "SiteCloudFrontLogsBucketF9C1CD02",
-                          "Arn"
-                        ]
-                      },
-                      "/*"
-                    ]
-                  ]
-                }
-              ]
-            },
-            {
-              "Action": [
-                "s3:PutBucketPolicy",
-                "s3:GetBucket*",
-                "s3:List*",
-                "s3:DeleteObject*"
-              ],
-              "Effect": "Allow",
-              "Principal": {
-                "AWS": {
-                  "Fn::GetAtt": [
-                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
-                    "Arn"
-                  ]
-                }
-              },
-              "Resource": [
-                {
-                  "Fn::GetAtt": [
-                    "SiteCloudFrontLogsBucketF9C1CD02",
-                    "Arn"
-                  ]
-                },
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      {
-                        "Fn::GetAtt": [
-                          "SiteCloudFrontLogsBucketF9C1CD02",
-                          "Arn"
-                        ]
-                      },
-                      "/*"
-                    ]
-                  ]
-                }
-              ]
-            }
-          ],
-          "Version": "2012-10-17"
-        }
-      }
-    },
-    "SiteCloudFrontLogsBucketAutoDeleteObjectsCustomResource016FEC8F": {
-      "Type": "Custom::S3AutoDeleteObjects",
-      "Properties": {
-        "ServiceToken": {
-          "Fn::GetAtt": [
-            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
-            "Arn"
-          ]
-        },
-        "BucketName": {
-          "Ref": "SiteCloudFrontLogsBucketF9C1CD02"
-        }
-      },
-      "DependsOn": [
-        "SiteCloudFrontLogsBucketPolicy816DFF56"
-      ],
       "UpdateReplacePolicy": "Delete",
       "DeletionPolicy": "Delete"
     },
@@ -1287,17 +1119,7 @@
           "DefaultTTL": 86400,
           "MaxTTL": 31536000,
           "MinTTL": 0,
-          "Name": {
-            "Fn::Join": [
-              "",
-              [
-                "FaceTheoryAppTheorySsgIsrSiteStaticAssetsCachePolicy3C8CC3BD-",
-                {
-                  "Ref": "AWS::Region"
-                }
-              ]
-            ]
-          },
+          "Name": "FaceTheoryAppTheorySsgIsrSiteStaticAssetsCachePolicy3C8CC3BD-us-east-1",
           "ParametersInCacheKeyAndForwardedToOrigin": {
             "CookiesConfig": {
               "CookieBehavior": "none"
@@ -1322,17 +1144,7 @@
           "DefaultTTL": 0,
           "MaxTTL": 31536000,
           "MinTTL": 0,
-          "Name": {
-            "Fn::Join": [
-              "",
-              [
-                "FaceTheoryAppTheorySsgIsrSiteHtmlCachePolicy13EF5DE2-",
-                {
-                  "Ref": "AWS::Region"
-                }
-              ]
-            ]
-          },
+          "Name": "FaceTheoryAppTheorySsgIsrSiteHtmlCachePolicy13EF5DE2-us-east-1",
           "ParametersInCacheKeyAndForwardedToOrigin": {
             "CookiesConfig": {
               "CookieBehavior": "none"
@@ -1362,17 +1174,7 @@
           "Comment": "FaceTheory viewer-request edge context and HTML rewrite for SSR site",
           "Runtime": "cloudfront-js-2.0"
         },
-        "Name": {
-          "Fn::Join": [
-            "",
-            [
-              {
-                "Ref": "AWS::Region"
-              },
-              "FaceTheoryAppTherRequestFunctionA4A8A767"
-            ]
-          ]
-        }
+        "Name": "us-east-1FaceTheoryAppTherRequestFunctionA4A8A767"
       }
     },
     "SiteSsrViewerResponseFunction3CF15787": {
@@ -1384,17 +1186,7 @@
           "Comment": "FaceTheory viewer-response request-id echo for SSR site",
           "Runtime": "cloudfront-js-2.0"
         },
-        "Name": {
-          "Fn::Join": [
-            "",
-            [
-              {
-                "Ref": "AWS::Region"
-              },
-              "FaceTheoryAppTheResponseFunction697D5730"
-            ]
-          ]
-        }
+        "Name": "us-east-1FaceTheoryAppTheResponseFunction697D5730"
       }
     },
     "SiteResponseHeadersPolicy5F343E8C": {
@@ -1888,18 +1680,10 @@
             "TargetOriginId": "FaceTheoryAppTheorySsgIsrSiteDistributionOriginGroup1746AE2B5",
             "ViewerProtocolPolicy": "redirect-to-https"
           },
+          "DefaultRootObject": "index.html",
           "Enabled": true,
           "HttpVersion": "http2",
           "IPV6Enabled": true,
-          "Logging": {
-            "Bucket": {
-              "Fn::GetAtt": [
-                "SiteCloudFrontLogsBucketF9C1CD02",
-                "RegionalDomainName"
-              ]
-            },
-            "Prefix": "cloudfront/"
-          },
           "OriginGroups": {
             "Items": [
               {
@@ -1932,7 +1716,7 @@
             {
               "DomainName": {
                 "Fn::GetAtt": [
-                  "IsrBucketCAA25890",
+                  "IsrBucket9673BF26",
                   "RegionalDomainName"
                 ]
               },
@@ -1982,7 +1766,7 @@
             {
               "DomainName": {
                 "Fn::GetAtt": [
-                  "AssetsBucket5CB76180",
+                  "AssetsBucket0481D73F",
                   "RegionalDomainName"
                 ]
               },
@@ -2000,6 +1784,76 @@
           ]
         }
       }
+    },
+    "SiteCdnLoggingLogGroup5FA337C7": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "theorycloud_theorycloud_facetheory-ssg-isr_lab_logs_access_cdn_site",
+        "RetentionInDays": 30
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain"
+    },
+    "SiteCdnLoggingDeliverySource159DB5E3": {
+      "Type": "AWS::Logs::DeliverySource",
+      "Properties": {
+        "LogType": "ACCESS_LOGS",
+        "Name": "facetheory-ssg-isr-lab-logs-access-cdn-site",
+        "ResourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":cloudfront::000000000000:distribution/",
+              {
+                "Ref": "SiteDistribution390DED28"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "SiteCdnLoggingDeliveryDestinationC2E0B5F7": {
+      "Type": "AWS::Logs::DeliveryDestination",
+      "Properties": {
+        "DestinationResourceArn": {
+          "Fn::GetAtt": [
+            "SiteCdnLoggingLogGroup5FA337C7",
+            "Arn"
+          ]
+        },
+        "Name": "facetheory-ssg-isr-lab-logs-access-cdn-site",
+        "OutputFormat": "json"
+      }
+    },
+    "SiteCdnLoggingDelivery1416FEBB": {
+      "Type": "AWS::Logs::Delivery",
+      "Properties": {
+        "DeliveryDestinationArn": {
+          "Fn::GetAtt": [
+            "SiteCdnLoggingDeliveryDestinationC2E0B5F7",
+            "Arn"
+          ]
+        },
+        "DeliverySourceName": "facetheory-ssg-isr-lab-logs-access-cdn-site",
+        "RecordFields": [
+          "timestamp",
+          "x-edge-request-id",
+          "cs-method",
+          "cs-uri-stem",
+          "sc-status",
+          "sc-bytes",
+          "time-taken",
+          "x-edge-result-type",
+          "c-ip"
+        ]
+      },
+      "DependsOn": [
+        "SiteCdnLoggingDeliverySource159DB5E3"
+      ]
     }
   },
   "Outputs": {
@@ -2011,14 +1865,17 @@
         ]
       }
     },
+    "AccessLogGroupName": {
+      "Value": "theorycloud_theorycloud_facetheory-ssg-isr_lab_logs_access_cdn_site"
+    },
     "AssetsBucketName": {
       "Value": {
-        "Ref": "AssetsBucket5CB76180"
+        "Ref": "AssetsBucket0481D73F"
       }
     },
     "IsrBucketName": {
       "Value": {
-        "Ref": "IsrBucketCAA25890"
+        "Ref": "IsrBucket9673BF26"
       }
     },
     "CacheTableName": {

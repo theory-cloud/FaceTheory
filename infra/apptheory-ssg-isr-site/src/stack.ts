@@ -7,11 +7,19 @@ import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import {
+  AppTheoryBucket,
   AppTheoryDynamoTable,
   AppTheorySsrSite,
   AppTheorySsrSiteMode,
 } from '@theory-cloud/apptheory-cdk';
 import { Construct } from 'constructs';
+
+import {
+  REFERENCE_STAGE_CONFIG,
+  createNamingContext,
+  stageEnvironment,
+  type FaceTheoryReferenceStageConfig,
+} from './stage-config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,24 +34,45 @@ function requireDir(name: string, relativePath: string): string {
 export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
   public readonly site: AppTheorySsrSite;
 
-  constructor(scope: Construct, id: string, props: StackProps = {}) {
-    super(scope, id, props);
+  /**
+   * The bound stage config this stack synthesized from.
+   */
+  public readonly stageConfig: FaceTheoryReferenceStageConfig;
 
-    const assetsBucket = new s3.Bucket(this, 'AssetsBucket', {
+  constructor(
+    scope: Construct,
+    id: string,
+    props: StackProps = {},
+    stageConfig: FaceTheoryReferenceStageConfig = REFERENCE_STAGE_CONFIG,
+  ) {
+    super(scope, id, { env: stageEnvironment(stageConfig), ...props });
+
+    this.stageConfig = stageConfig;
+
+    // Every physical name this stack sets comes from the naming context, which
+    // is bound from the stage config above.
+    const naming = createNamingContext(this, stageConfig);
+    const logical = stageConfig.logicalName;
+
+    const assetsBucket = new AppTheoryBucket(this, 'AssetsBucket', {
+      namingContext: naming,
+      logical: `${logical}-assets`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
-    });
+    }).bucket;
 
-    const isrBucket = new s3.Bucket(this, 'IsrBucket', {
+    const isrBucket = new AppTheoryBucket(this, 'IsrBucket', {
+      namingContext: naming,
+      logical: `${logical}-html-store`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
-    });
+    }).bucket;
 
     const ssrFunction = new NodejsFunction(this, 'SsrFunction', {
       runtime: lambda.Runtime.NODEJS_24_X,
@@ -66,8 +95,25 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
     });
 
     // DynamoDB table for FaceTheory ISR metadata and leases (TableTheory schema).
+    //
+    // The name is the contract's `dynamodb_table` derivation for the same
+    // `{logicalName}-isr-metadata` entry AppTheorySsrSite would consume if it
+    // created the table itself, so the construct still owns no name here and the
+    // stack's table and the site's ISR wiring agree. Under the derived naming
+    // context AppTheoryDynamoTable also applies the contract's Security Hub
+    // defaults: point-in-time recovery on, and deletion protection only for a
+    // RETAIN table (this one is DESTROY, so protection stays off).
+    const isrMetadataTableName = naming.physicalName('dynamodb_table', `${logical}-isr-metadata`).name;
+    if (!isrMetadataTableName) {
+      throw new Error(
+        `the naming context did not derive a name for dynamodb_table:${logical}-isr-metadata; ` +
+          'AppTheoryDynamoTable requires a physical tableName, so under the legacy naming profile a DynamoDB table ' +
+          'needs a pins entry, not a generated entry',
+      );
+    }
     const cacheTable = new AppTheoryDynamoTable(this, 'CacheTable', {
-      tableName: `${Stack.of(this).stackName}-facetheory-cache`,
+      tableName: isrMetadataTableName,
+      namingContext: naming,
       partitionKeyName: 'pk',
       sortKeyName: 'sk',
       timeToLiveAttribute: 'ttl',
@@ -146,10 +192,18 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
       enableLogging: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
+      namingContext: naming,
+      logicalName: logical,
     });
 
     new CfnOutput(this, 'CloudFrontDomainName', {
       value: this.site.distribution.distributionDomainName,
+    });
+
+    new CfnOutput(this, 'AccessLogGroupName', {
+      // The standard logging profile puts CloudFront access logs in this
+      // contract-named log group instead of a per-stack S3 logs bucket.
+      value: naming.logGroupName(`logs/access/cdn/${logical}`),
     });
 
     new CfnOutput(this, 'AssetsBucketName', {

@@ -2,7 +2,9 @@
 
 This folder contains a code-local reference stack for CloudFront plus S3 plus DynamoDB plus Lambda Function URL deployment.
 
-Canonical operator guidance lives under [`../../docs/cdk/README.md`](../../docs/cdk/README.md).
+Canonical operator guidance lives under [`../../docs/cdk/README.md`](../../docs/cdk/README.md). The resource names this
+stack derives, and what an existing deployment experiences on upgrade, are documented in
+[Resource Naming](../../docs/features/resource-naming.md).
 
 ## What This Stack Demonstrates
 
@@ -13,6 +15,28 @@ Canonical operator guidance lives under [`../../docs/cdk/README.md`](../../docs/
 - baseline security headers
 - escaped reflected request context on the SSR 404 example page
 - blocking ISR using FaceTheory HTML storage plus TableTheory metadata
+
+## Resource Naming
+
+Every physical name comes from AppTheory's `theorycloud_resource_naming.v0.1` contract, bound from
+[`src/stage-config.ts`](src/stage-config.ts) — stage config, never an operator environment variable. With the committed
+config (`app: facetheory-ssg-isr`, `stage: lab`, `region: us-east-1`) the stack derives:
+
+| Resource | Name |
+| --- | --- |
+| Assets bucket | prefix `facetheory-ssg-isr-lab-site-assets` in the `account-regional` namespace |
+| ISR html store bucket | prefix `facetheory-ssg-isr-lab-site-aatexg6p` in the `account-regional` namespace (the contract's 63-character budget shortens `facetheory-ssg-isr-lab-site-html-store`) |
+| ISR metadata table | `facetheory-ssg-isr-lab-site-isr-metadata`, point-in-time recovery on, deletion protection off while the table is `DESTROY` |
+| CloudFront access-log group | `theorycloud_theorycloud_facetheory-ssg-isr_lab_logs_access_cdn_site`, 30-day retention |
+| Log delivery source and destination | `facetheory-ssg-isr-lab-logs-access-cdn-site` |
+| Distribution root object | `index.html`, served from the S3 html store; a miss still fails over to the Lambda origin |
+
+Set `account` in `src/stage-config.ts` to your twelve-digit account id before deploying. The first deploy after this
+change **replaces** both buckets and the ISR table and **removes** the per-stack S3 access-log bucket. Replacement is
+safe for the state they hold — assets re-upload, pre-rendered SSG HTML re-deploys, and ISR cache metadata and leases
+regenerate per cache key — but copy any S3 access logs you want to keep before you approve the change set. To keep
+today's names instead, move the config to the legacy naming and logging profiles first: see
+[Resource Naming](../../docs/features/resource-naming.md#path-b-keep-todays-names).
 
 ## Build Requirement
 

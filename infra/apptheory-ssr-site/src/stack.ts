@@ -6,8 +6,15 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
-import { AppTheorySsrSite } from '@theory-cloud/apptheory-cdk';
+import { AppTheoryBucket, AppTheorySsrSite } from '@theory-cloud/apptheory-cdk';
 import { Construct } from 'constructs';
+
+import {
+  REFERENCE_STAGE_CONFIG,
+  createNamingContext,
+  stageEnvironment,
+  type FaceTheoryReferenceStageConfig,
+} from './stage-config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,16 +29,39 @@ function requireDir(name: string, relativePath: string): string {
 export class FaceTheoryAppTheorySsrSiteStack extends Stack {
   public readonly site: AppTheorySsrSite;
 
-  constructor(scope: Construct, id: string, props: StackProps = {}) {
-    super(scope, id, props);
+  /**
+   * The bound stage config this stack synthesized from.
+   */
+  public readonly stageConfig: FaceTheoryReferenceStageConfig;
 
-    const assetsBucket = new s3.Bucket(this, 'AssetsBucket', {
+  constructor(
+    scope: Construct,
+    id: string,
+    props: StackProps = {},
+    stageConfig: FaceTheoryReferenceStageConfig = REFERENCE_STAGE_CONFIG,
+  ) {
+    super(scope, id, { env: stageEnvironment(stageConfig), ...props });
+
+    this.stageConfig = stageConfig;
+
+    // Every physical name this stack sets comes from the naming context, which
+    // is bound from the stage config above. No construct here takes a hand-built
+    // name: the contract treats an explicit name under a context as an error.
+    const naming = createNamingContext(this, stageConfig);
+    const logical = stageConfig.logicalName;
+
+    const assetsBucket = new AppTheoryBucket(this, 'AssetsBucket', {
+      namingContext: naming,
+      // Matches the logical AppTheorySsrSite derives for a bucket it creates
+      // itself, so this stack's own bucket and the construct's default are the
+      // same entry.
+      logical: `${logical}-assets`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
-    });
+    }).bucket;
 
     const ssrFunction = new NodejsFunction(this, 'SsrFunction', {
       runtime: lambda.Runtime.NODEJS_24_X,
@@ -98,6 +128,8 @@ export class FaceTheoryAppTheorySsrSiteStack extends Stack {
       enableLogging: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
+      namingContext: naming,
+      logicalName: logical,
     });
 
     new CfnOutput(this, 'CloudFrontDomainName', {
@@ -106,6 +138,13 @@ export class FaceTheoryAppTheorySsrSiteStack extends Stack {
 
     new CfnOutput(this, 'AssetsBucketName', {
       value: assetsBucket.bucketName,
+    });
+
+    new CfnOutput(this, 'AccessLogGroupName', {
+      // The standard logging profile puts CloudFront access logs in this
+      // contract-named log group; the site construct creates it and AppTheory
+      // attaches the delivery source, destination and delivery.
+      value: naming.logGroupName(`logs/access/cdn/${logical}`),
     });
 
     new CfnOutput(this, 'SsrFunctionUrl', {

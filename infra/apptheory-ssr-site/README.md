@@ -2,13 +2,35 @@
 
 This folder contains a code-local reference stack for CloudFront plus S3 plus Lambda Function URL SSR using `@theory-cloud/apptheory-cdk`.
 
-Canonical operator guidance lives under [`../../docs/cdk/README.md`](../../docs/cdk/README.md).
+Canonical operator guidance lives under [`../../docs/cdk/README.md`](../../docs/cdk/README.md). The resource names this
+stack derives, and what an existing deployment experiences on upgrade, are documented in
+[Resource Naming](../../docs/features/resource-naming.md).
 
 ## What This Stack Provisions
 
 - private S3 storage for assets
 - Lambda Function URL origin with response streaming and explicit `AWS_IAM` auth
 - CloudFront behaviors for assets, Vite manifests, SSG hydration data, SSR hydration sidecars, and SSR HTML
+
+## Resource Naming
+
+Every physical name comes from AppTheory's `theorycloud_resource_naming.v0.1` contract, bound from
+[`src/stage-config.ts`](src/stage-config.ts) — stage config, never an operator environment variable. With the committed
+config (`app: facetheory-ssr-site`, `stage: lab`, `region: us-east-1`) the stack derives:
+
+| Resource | Name |
+| --- | --- |
+| Assets bucket | prefix `facetheory-ssr-site-lab-site-assets` in the `account-regional` namespace, so `facetheory-ssr-site-lab-site-assets-<account>-<region>-an` |
+| CloudFront access-log group | `theorycloud_theorycloud_facetheory-ssr-site_lab_logs_access_cdn_site`, 30-day retention |
+| Log delivery source and destination | `facetheory-ssr-site-lab-logs-access-cdn-site` |
+| Lambda function | CloudFormation-generated (no construct here sets a function name) |
+
+Set `account` in `src/stage-config.ts` to your twelve-digit account id before deploying: the committed value is a
+placeholder, and the stack is environment-bound because the standard logging profile can only prove the CloudFront
+delivery lives in `us-east-1`. The first deploy after this change **replaces** the assets bucket (S3 cannot rename a
+bucket) and **removes** the per-stack S3 access-log bucket; assets are re-uploaded by the stack's bucket deployment. If a
+deployment must keep today's names, move the config to the legacy naming and logging profiles first — see
+[Resource Naming](../../docs/features/resource-naming.md#path-b-keep-todays-names).
 
 ## Local Commands
 
