@@ -118,14 +118,14 @@ The `v5.2.0` GitHub release also ships the matching `facetheory-reference-${FACE
 
 ## At a glance
 
-| Surface             | Count           | Contract                                                  |
-| ------------------- | --------------- | --------------------------------------------------------- |
-| Server render modes | 3               | SSR · SSG · blocking ISR                                  |
-| SPA client runtime  | 1               | Same-origin navigation layered on a server-rendered shell |
-| Adapters            | 3               | React · Vue · Svelte                                      |
-| Distribution        | GitHub Releases | immutable, pinned                                         |
-| Runtime             | Node ≥22        | Node 22 · 24 · 26 tested; Node 22 deprecated; 26 from the next release   |
-| License             | Apache-2.0      | open source                                               |
+| Surface             | Count           | Contract                                                               |
+| ------------------- | --------------- | ---------------------------------------------------------------------- |
+| Server render modes | 3               | SSR · SSG · blocking ISR                                               |
+| SPA client runtime  | 1               | Same-origin navigation layered on a server-rendered shell              |
+| Adapters            | 3               | React · Vue · Svelte                                                   |
+| Distribution        | GitHub Releases | immutable, pinned                                                      |
+| Runtime             | Node ≥22        | Node 22 · 24 · 26 tested; Node 22 deprecated; 26 from the next release |
+| License             | Apache-2.0      | open source                                                            |
 
 ## Resource Routes And Hydration Sidecars
 
