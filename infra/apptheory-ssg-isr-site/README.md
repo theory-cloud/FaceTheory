@@ -39,7 +39,8 @@ and [the contract,
 — and is **not** guaranteed by FaceTheory today. The two classes that stay open are the separator ambiguity and a
 shortened name that equals a valid name. Before a second site shares an account, compare the complete derived name set
 of both — `derivedPhysicalNames()` and `sharedPhysicalNames()` in
-[`src/physical-names.ts`](src/physical-names.ts) — rather than one bucket prefix.
+[`src/physical-names.ts`](src/physical-names.ts) — rather than one bucket prefix: that check reports either class
+when the pair you compare is the affected one, and it reads no AWS, so a name a third site already owns is outside it.
 
 Set `account` in `src/stage-config.ts` to your twelve-digit account id before deploying. The first deploy after this
 change **replaces** both buckets and the ISR table and **removes** the per-stack S3 access-log bucket.
@@ -47,7 +48,12 @@ change **replaces** both buckets and the ISR table and **removes** the per-stack
 Replacement is safe only for the state these stacks put there: assets re-upload, pre-rendered SSG HTML re-deploys, and
 ISR cache metadata and leases regenerate per cache key. The deploy empties and deletes the three old buckets — each is
 `Delete` with an auto-delete custom resource — and replaces the table, so if a bucket holds an object this stack did not
-write, stay on the legacy profiles until you have copied it out and can restore it: see
+write, stay on the legacy profiles unless that object has a restore destination no deployment prunes or overwrites:
+the immutable `assets/` deployment prunes its prefix, so a copy put back under `assets/` is deleted at the next deploy,
+and a bucketed object belongs under a prefix of its own that no deployment targets or in a bucket this stack does not
+manage. See
+[where a restored object survives the deploy](../../docs/features/resource-naming.md#where-a-restored-object-survives-the-deploy)
+and
 [the stop condition](../../docs/features/resource-naming.md#stop-keep-path-b-when-a-site-bucket-holds-objects-these-stacks-did-not-write).
 To keep today's resources instead — names and CloudFormation logical IDs both — move the config to the legacy naming and
 logging profiles first: see

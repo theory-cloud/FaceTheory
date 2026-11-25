@@ -27,8 +27,12 @@ equals a valid name](#known-limit-a-shortened-name-can-equal-a-valid-name).
 What you have in the meantime is an exact check on the names the two configs
 derive: [compare the complete name sets of both
 sites](#check-two-sites-before-they-share-an-account) before they share an
-account. It cannot see a collision the contract's own composition creates, which
-is why the two limits stay open until the contract closes them.
+account. Hand it the pair that one of the limits above affects and it **reports
+the collision** — both classes compose ordinary names that land in the two lists
+it compares, and a test pins each one through it. What it cannot do is inspect
+the deployed account: it compares the two stage configs you give it, so a name a
+third site or an earlier deployment already owns is invisible to it, which is
+why the two limits stay open until the contract closes them.
 
 This page states what changed, resource by resource, which resources an existing
 deployment replaces, which path keeps them, the stop condition before a cutover,
@@ -265,10 +269,48 @@ So the stop condition is about the buckets:
 
 > **Stay on Path B** if any of the removed buckets holds an object these stacks did
 > not write — an operator upload, a redirect file, a manual archive, an artifact
-> another pipeline puts there. Cut over only once you have copied those objects out
-> and can restore them into the derived buckets at the same keys, and treat that
-> copy as part of the change you approve. A maintenance window does not preserve
-> them; it only picks the moment they are deleted.
+> another pipeline puts there — **unless that object has a restore destination no
+> deployment prunes or overwrites** (see below). Copying an object out and putting it
+> back at the same key is **not** enough on its own: the deploy manages part of every
+> one of these buckets, so a restore under a stack-managed key is a second copy
+> waiting to be lost. Treat the copy as part of the change you approve. A maintenance
+> window does not preserve anything; it only picks the moment the old resources are
+> deleted.
+
+#### Where a restored object survives the deploy
+
+Each stack deploys assets into the same buckets that hold the site's content, and one
+of those deployments prunes. `prune: false` only writes, so an object the deployment
+did not put there survives unless its key is one the deployment ships. `prune: true`
+deletes every object under the deployment's prefix that its source does not contain.
+
+| Bucket | Prefix | Deployment | `prune` | A foreign object at that prefix |
+| --- | --- | --- | --- | --- |
+| site assets (both stacks) | `assets/` | `AssetsDeploymentImmutable` | **`true`** | **deleted by the next deployment**, whatever its key |
+| site assets (both stacks) | bucket root | `AssetsDeploymentManifest` | `false` | kept, unless its key is one the deployment ships (`.vite/manifest.json`) |
+| site assets (SSR) | bucket root | `AssetsDeploymentSsgData` | `false` | kept, unless its key is one the deployment ships (the SSG hydration data) |
+| site assets (SSG+ISR) | `_facetheory/data/` | `AssetsDeploymentSsgSidecars` | `false` | kept, unless its key is one the deployment ships |
+| ISR html store (SSG+ISR) | `isr/` | `AssetsDeploymentSsg` | `false` | kept, unless its key is one the deployment ships or the ISR runtime writes |
+
+`test/unit/bucket-deployment-pruning.test.ts` in each stack pins that table against
+the synthesized templates — the immutable `assets/` deployment is the only one with
+`prune: true`, and it stays that way — so a change that starts pruning a prefix this
+page calls safe fails the suite.
+
+What that means for a restore:
+
+- **`assets/` is the prefix that is lost.** It holds build output the deploy owns, so
+  an object restored there is deleted at the next deployment whatever its key. If a
+  file must be served from the site's asset path, add it to the asset source and let
+  the deploy ship it; do not restore it by hand.
+- **A restored object is safe only at a key no deployment ships and no runtime
+  writes.** Operator objects belong under a prefix of your own (for example
+  `operator/`) in the derived bucket, which no deployment targets and no ISR cache
+  key uses, or in a bucket these stacks do not manage at all. Bucket root and `isr/`
+  survive pruning, but a key the build or the ISR runtime writes is overwritten on
+  the next deploy or request, so the same key is not a place to park anything.
+- **If the object has no such destination, the answer is still to stay on Path B.**
+  The copy-out is a step, not the exception.
 
 ## Known limits of the contract
 
@@ -357,6 +399,16 @@ metadata table. `test/unit/resource-naming.test.ts` pins the list against the
 synthesized template, so it is the set the stack really sets and cannot fall behind
 a newly added derived resource.
 
+The list accepts the [Path B](#path-b-keep-todays-resources) config as well, which
+is what an operator on the legacy profiles runs the check with. Under the legacy
+logging profile the config creates no log group and no log delivery, so those
+entries are not listed; a `generated` bucket entry has **no name in the config** to
+compare (read the deployed name from the stack's `AssetsBucketName` /
+`IsrBucketName` output), and a `pins` entry is compared as the literal it is. A
+legacy config that leaves a consumed entry with neither a pin nor a `generated`
+entry cannot synthesize at all, so the check raises the contract's refusal instead
+of reporting an empty result that would read as an all-clear.
+
 A stack that is not one of these two — a copy that grew another named resource —
 uses the same shape, one call per construct that consumes a contract entry:
 
@@ -368,17 +420,28 @@ const values = stageNamingValues(config);
 AppTheoryResourceNaming.physicalName(values, 's3_bucket', 'site-assets').bucketNamePrefix;
 ```
 
-Three things about the answer:
+Four things about the answer:
 
-- **Compare like types.** A bucket name, a table name and a log delivery name live
-  in three namespaces, so `sharedPhysicalNames` reports same-type matches only.
-- **Compare one account and region.** A bucket name is a prefix plus
+- **It compares the complete derived name set of the two configs you pass.** Every
+  entry the stack consumes is in the list, and a shared entry is reported with its
+  type. That is what makes it a check rather than a spot check on one bucket
+  prefix: in the shortened case below the two assets prefixes differ while a log
+  delivery name does not.
+- **It reports either known limit when the pair you pass is the affected one.** Both
+  classes compose ordinary names, so they land in the two lists like any other
+  collision, and `infra/*/test/unit/naming-limits.test.ts` pins the separator pair
+  and the shortened pair through this function. The limits stay open because the
+  contract permits them, not because the check is blind to them.
+- **It does not inspect the deployed account.** It never reads AWS: a name a third
+  site already owns, a name an earlier deployment still holds, and a `generated`
+  bucket's real name are all invisible to it. An empty result is evidence about
+  these two configs and not a proof that the account is collision-free; whether two
+  app ids may share an account at all is the registry question `docs/155` scopes.
+- **Compare like types, in one account and region.** A bucket name, a table name and
+  a log delivery name live in three namespaces, so `sharedPhysicalNames` reports
+  same-type matches only; and a bucket name is a prefix plus
   `-<account>-<region>-an`, so two sites in different accounts or regions differ by
   the suffix even when their prefixes match.
-- **An empty result is evidence, not a proof.** It says these two configs derive
-  disjoint names today. It cannot see a name a third site already owns, and it
-  cannot see either limit above. Whether two app ids may share an account at all is
-  the registry question `docs/155` scopes.
 
 What to do in your own config while the limits are open:
 

@@ -499,10 +499,14 @@ and the stack exports `AccessLogsBucketName` instead of `AccessLogGroupName`. Bo
 [Resource Naming](/features/resource-naming/#upgrading-an-existing-deployment).
 
 That legacy profile is where such a deployment **stays** until the objects are dealt with. Cutting over later deletes
-the site buckets and their auto-delete custom resources, so do it only after copying those objects out and confirming
-they can be restored at the same keys — see
-[the stop condition](/features/resource-naming/#stop-keep-path-b-when-a-site-bucket-holds-objects-these-stacks-did-not-write).
-A maintenance window does not make the cutover lossless; it only chooses when the deletion happens.
+the site buckets and their auto-delete custom resources, so do it only after copying those objects out **and** placing
+them where the derived stack will not prune or overwrite them: the immutable `assets/` deployment prunes its prefix, so
+an object put back at the same key under `assets/` is deleted at the next deployment whatever its key. Operator objects
+belong under a prefix of your own that no deployment targets, or in a bucket these stacks do not manage — see
+[where a restored object survives the deploy](/features/resource-naming/#where-a-restored-object-survives-the-deploy)
+and [the stop condition](/features/resource-naming/#stop-keep-path-b-when-a-site-bucket-holds-objects-these-stacks-did-not-write).
+If an object has no such destination, staying on the legacy profiles is the answer. A maintenance window does not make
+the cutover lossless; it only chooses when the deletion happens.
 
 Validation:
 
