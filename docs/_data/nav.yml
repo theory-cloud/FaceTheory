@@ -178,6 +178,13 @@ groups:
         }
       - { id: testing-guide, title: Testing, url: /testing-guide/, icon: check }
       - {
+          id: runtime-support,
+          title: Runtime Support,
+          url: /runtimes/support/,
+          icon: cpu,
+          tag: ga,
+        }
+      - {
           id: troubleshooting,
           title: Troubleshooting,
           url: /troubleshooting/,
@@ -256,6 +263,7 @@ order:
   - cdk-operations
   - core-patterns
   - testing-guide
+  - runtime-support
   - troubleshooting
   - migration-guide
   - deprecation-policy
@@ -298,6 +306,7 @@ url_to_id:
   /cdk/operations/: cdk-operations
   /core-patterns/: core-patterns
   /testing-guide/: testing-guide
+  /runtimes/support/: runtime-support
   /troubleshooting/: troubleshooting
   /migration-guide/: migration-guide
   /deprecation-policy/: deprecation-policy

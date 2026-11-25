@@ -88,14 +88,16 @@ Symptoms:
 
 Cause:
 
-- FaceTheory requires Node.js `>=22`. The floor moved from 20 to 22 when Node 20 reached end of life in April 2026.
+- The installed package declares `engines.node` `>=22`, and a host below that fails `npm ci` on engines. The floor is the only Node fact this page needs: which lines are tested, which one is deprecated, and which release carries each row is stated in [Runtime Support](/runtimes/support/). Node 22 is deprecated but still supported, so a Node 22 host is not what this error means.
+- Move to a line that page lists for the FaceTheory version you have installed — not to the newest line in the repository. A release you pinned predates any row added after it, so the newest major may not be part of your release's verified set.
 
 Solution:
 
 ```bash
 node --version
 
-# switch to a supported version, then rerun:
+# switch to a Node line your installed FaceTheory release verifies
+# (Runtime Support names the lines per release), then rerun:
 cd ts
 npm ci
 npm run typecheck

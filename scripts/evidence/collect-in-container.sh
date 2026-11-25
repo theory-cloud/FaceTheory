@@ -14,7 +14,12 @@
 # paths (node_modules, dist, coverage) are ignored build state, so the record
 # produced here verifies against the host checkout.
 #
-# Usage: scripts/evidence/collect-in-container.sh --gate <gate-id> --profile <profile-id>
+# Collection inside the container is incremental: an applicable record copied in
+# with the checkout is reused and the gate's commands do not run. `--force`
+# re-executes them, which is what makes a container run a fresh reproduction
+# rather than a re-verification of the record the tree already carries.
+#
+# Usage: scripts/evidence/collect-in-container.sh --gate <gate-id> --profile <profile-id> [--force]
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -22,6 +27,7 @@ cd "${repo_root}"
 
 gate=""
 profile=""
+force=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --gate)
@@ -32,13 +38,18 @@ while [[ $# -gt 0 ]]; do
       profile="${2:-}"
       shift 2
       ;;
+    --force)
+      force=true
+      shift
+      ;;
     --help|-h)
       cat <<'USAGE'
-usage: scripts/evidence/collect-in-container.sh --gate <gate-id> --profile <profile-id>
+usage: scripts/evidence/collect-in-container.sh --gate <gate-id> --profile <profile-id> [--force]
 
 Produces the named gate's record for a container-bound proof profile. The image
 digest, platform and profile declarations come from
-scripts/evidence/validation-gates.json.
+scripts/evidence/validation-gates.json. An applicable record copied in with the
+checkout is reused; --force re-executes the gate's commands.
 USAGE
       exit 0
       ;;
@@ -103,6 +114,7 @@ echo "collect-in-container: gate=${gate} profile=${profile} image=${image} platf
 docker run --rm \
   --platform "${container_platform}" \
   -e CI=1 \
+  -e "EVIDENCE_FORCE=${force}" \
   -e "EVIDENCE_GATE=${gate}" \
   -e "EVIDENCE_PROFILE=${profile}" \
   -e "EVIDENCE_DIRECTORY=${evidence_directory}" \
@@ -147,7 +159,11 @@ docker run --rm \
     git -c user.email=evidence@facetheory.invalid -c user.name=evidence \
       -c commit.gpgsign=false commit -qm "evidence snapshot"
 
-    bash scripts/evidence/collect.sh --gate "${EVIDENCE_GATE}" --profile "${EVIDENCE_PROFILE}"
+    collect_args=(--gate "${EVIDENCE_GATE}" --profile "${EVIDENCE_PROFILE}")
+    if [[ "${EVIDENCE_FORCE:-false}" == "true" ]]; then
+      collect_args+=(--force)
+    fi
+    bash scripts/evidence/collect.sh "${collect_args[@]}"
 
     cp -a "${work}/${EVIDENCE_DIRECTORY}/." /out/
 

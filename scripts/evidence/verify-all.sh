@@ -6,6 +6,13 @@
 # missing or stale record fails the run by name and every other gate is still
 # reported. A failure names the exact local collection command.
 #
+# This is the verify path, not the reproduction path: it reuses committed records
+# and runs no gate. To re-execute a gate instead, produce the record again with
+# `scripts/evidence/collect-all.sh --force` (every gate and profile) or with the
+# single pair's own producer - `scripts/evidence/collect-in-container.sh` for a
+# container-bound profile, `scripts/evidence/collect.sh` for a host profile -
+# each with `--force`.
+#
 # Usage: scripts/evidence/verify-all.sh
 set -euo pipefail
 
@@ -35,7 +42,7 @@ done <<<"${pairs}"
 if [[ "${failures}" -gt 0 ]]; then
   echo "" >&2
   echo "verify-all: FAIL (${failures} gate/profile record(s) do not apply to this tree)" >&2
-  echo "produce evidence locally: run 'scripts/evidence/collect.sh --all' on this tree (or the named --gate/--profile pair) and commit the record it writes; CI verifies records and never executes a gate" >&2
+  echo "produce evidence locally: 'scripts/evidence/collect-all.sh' produces every gate and profile in the producer each one declares - container-bound profiles through 'scripts/evidence/collect-in-container.sh' inside their digest-pinned image, host profiles through 'scripts/evidence/collect.sh' - and each names its own --gate/--profile pair above. Records are reusable, so a gate already proven for this tree is not re-run: add --force to re-execute instead. Commit the record each run writes; CI verifies records and never executes a gate." >&2
   exit 1
 fi
 

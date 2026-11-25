@@ -14,7 +14,7 @@ Package:
 
 Runtime:
 
-- Node.js `>=22`
+- Node.js `>=22`. Which lines are tested, which is deprecated, and which release carries each row is [Runtime Support](/runtimes/support/); this page does not restate that matrix, and the `v5.2.0` asset installed below predates the newest row it lists.
 
 Primary package exports are defined in `ts/package.json`. The repository also includes a local SSG CLI entrypoint used by `npm run ssg`.
 

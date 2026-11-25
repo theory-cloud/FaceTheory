@@ -520,6 +520,66 @@ Validation:
   lists.
 - `npx cdk diff` is the review artefact: the resource names above should be the only physical-name changes.
 
+## Migration 13: Node 22 Runtime Support Deprecation
+
+Node.js 22 is deprecated as a FaceTheory runtime against its upstream end of life. This is a support-contract change, not
+an API change and not a breaking change today: `engines.node` stays `>=22`, Node 22 stays in the tested matrix, and no
+import, Face mode, render contract, head primitive or style path changes. Nothing is required of a consumer on 22 right
+now.
+
+The schedule:
+
+- **Now (2026-11):** the floor did not move. `engines.node` stays `>=22`, Node 22 stays in the tested matrix and stays a supported install target, and Node 24 stays supported. Node 26 joins the matrix on `staging` and ships in the FaceTheory release after `v5.2.0`, so it is not part of any release you can install today. [Runtime Support](/runtimes/support/) holds the rows and states which release carries each one; this entry does not restate that matrix.
+- **2027-02 - floor raise:** a dated major release raises `engines.node` to `>=24` and drops the Node 22 row from the
+  matrix. That release carries the `BREAKING CHANGE:` footer, release notes, and the completed version of this entry.
+- **2027-04-30 - upstream end of life:** Node 22 stops receiving security fixes. The floor raise is scheduled ahead of
+  this date so no consumer is still on a Node major that gets no fixes.
+
+What to do now:
+
+1. Nothing, if you are on Node 22 and it deploys: keep shipping. Re-read this entry when the 2027-02 major is published.
+2. New projects and new work: pick a Node line the FaceTheory release you install verifies. On `v5.2.0` that is Node 22
+   or Node 24; Node 26 becomes an option in the release that carries it. Read [Runtime Support](/runtimes/support/) for
+   the row that applies to your release rather than assuming the newest line is available to you.
+3. If you pin Node in CI or in a container image, add the line you intend to move to once the release you install
+   carries it, ahead of the floor raise, so the move is one line when it lands.
+
+When the floor raise ships, the migration is:
+
+1. Move the local/CI Node major, then reinstall:
+
+   ```bash
+   nvm install 24 && nvm use 24
+   rm -rf node_modules && npm ci
+   ```
+
+2. Re-run the app's gates (`cd ts && npm run check` here, or the consuming app's equivalent) and render one
+   representative Face per mode, checking the browser console for hydration warnings.
+3. Keep the previous pinned GitHub Release tarball until the new one is verified; the render contract does not change,
+   so a rollback is a version pin, not a code change.
+
+Two deadlines are separate and easy to conflate:
+
+- **This page's schedule is about the package.** It says which Node majors FaceTheory installs and renders on.
+- **The Lambda runtime your stack declares** (`nodejs22.x`, `nodejs24.x`) follows AWS's own deprecation schedule, tracked
+  in [Migration 11](#migration-11-node-20-to-node-24-lambda-runtime). A function can be on a supported managed runtime
+  while the package floor, or the reverse, moves on a different date.
+
+Validation:
+
+```bash
+node --version            # the line you are on
+npx --package <pinned Facetheory release tarball> facetheory doctor
+```
+
+`facetheory doctor` reads the Node floor from the installed package's `engines.node` and reports a mismatch before a
+deploy does.
+
+Rollback:
+
+- stay on the prior pinned tarball and Node 22 until the 2027-02 major is verified against your Faces; the floor does
+  not move under an existing pin.
+
 ## Rollback Notes
 
 - Keep the prior handler or deployable artifact available until the new path is verified.

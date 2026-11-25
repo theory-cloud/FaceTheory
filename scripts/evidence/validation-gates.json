@@ -53,6 +53,20 @@
         }
       }
     },
+    "floor-node26": {
+      "description": "Node 26 runtime line for the TypeScript suite, the package and the clean-consumer install on Linux, produced in the digest-pinned official Node 26 arm64 image under linux/arm64. Node 26 is the newest tested line, not a floor: engines.node stays >=22, so this profile proves the newest supported line runs rather than declaring a new minimum. Produced on the Factory host's colima container runtime under linux/arm64, which is this host's native guest architecture. The historical GitHub runner was linux/x64; that architecture is not reproducible here, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap'), so the record states the architecture that really ran instead of claiming x64. The image carries no Go toolchain; the go field records the repository pin and is not a compared dimension for these gates.",
+      "image": "node@sha256:893ea48106e988a5f91e69629d6472600daa9d0494adf7db87eb0b886ce82255",
+      "containerPlatform": "linux/arm64",
+      "environment": {
+        "go": "go1.27.4",
+        "node": "26",
+        "python": "3.11",
+        "platform": {
+          "os": "linux",
+          "arch": "arm64"
+        }
+      }
+    },
     "linux-root": {
       "description": "Linux run as UID 0 for the subtree destination claim, produced in the digest-pinned official Node 24 arm64 image under linux/arm64, where the container's default user is root. This is the leg CI performed with sudo -n and is why the subtree claim needs no privileged step on any runner. Produced on the Factory host's colima container runtime under linux/arm64, which is this host's native guest architecture. The historical GitHub runner was linux/x64; that architecture is not reproducible here, because user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap'), so the record states the architecture that really ran instead of claiming x64. The Node-major floor is the claim these profiles carry.",
       "image": "node@sha256:9e7ec64106f43779ecb669cb299cce07a033ac6c41603c1039dea7b51119e550",
@@ -191,9 +205,10 @@
       ],
       "profiles": [
         "floor-node22",
-        "floor-node24"
+        "floor-node24",
+        "floor-node26"
       ],
-      "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, under each supported Node major on Linux arm64, which is the architecture each proof profile really runs. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the historical GitHub runner's architecture cannot be recorded as covered. The Node-major floor is the claim these profiles carry.",
+      "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, and a clean-consumer install of the packed tarball into an empty project exercised through a real SSR render and SSG build, under each supported Node major on Linux arm64 (oldest 22, middle 24, newest 26), which is the architecture each proof profile really runs. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the historical GitHub runner's architecture cannot be recorded as covered. The Node-major floor is the claim these profiles carry.",
       "resource": "repo-write",
       "paths": [
         "ts/",
@@ -205,6 +220,8 @@
         "AGENTS.md",
         "Makefile",
         "scripts/verify-ts-suite.sh",
+        "scripts/verify-consumer-install.sh",
+        "scripts/fixtures/consumer-install/",
         "scripts/verify-docs-export-map.sh",
         "scripts/verify-node-engines-floor.sh",
         "scripts/check-node-engines-floor.mjs",
@@ -222,6 +239,13 @@
             "bash",
             "scripts/verify-ts-suite.sh"
           ]
+        },
+        {
+          "id": "consumer-install",
+          "argv": [
+            "bash",
+            "scripts/verify-consumer-install.sh"
+          ]
         }
       ]
     },
@@ -233,7 +257,8 @@
       ],
       "profiles": [
         "floor-node22",
-        "floor-node24"
+        "floor-node24",
+        "floor-node26"
       ],
       "description": "npm pack of the TypeScript package at the repository version on Linux arm64, inspected and installed from the tarball, under each supported Node major. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the architecture recorded is the one that really ran.",
       "resource": "repo-write",

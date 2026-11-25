@@ -81,6 +81,40 @@ summary_line() {
   fi
 }
 
+# Where a record for this profile is produced is a property of the profile, not a
+# choice: a floor profile is a claim about a Linux environment the macOS host
+# cannot satisfy, so its record only exists when it is produced inside the
+# digest-pinned image the profile declares. The diagnostic has to name that
+# producer, or it points the reader at a command that must refuse to run.
+profile_is_container_bound() {
+  python3 - "${requested_profile_id}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+profile = sys.argv[1]
+registry = json.loads(Path("scripts/evidence/validation-gates.json").read_text(encoding="utf-8"))
+declaration = registry.get("proofProfiles", {}).get(profile) or {}
+print("yes" if str(declaration.get("image") or "") else "no")
+PY
+}
+
+produce_evidence_command() {
+  if [[ "$(profile_is_container_bound)" == "yes" ]]; then
+    printf 'scripts/evidence/collect-in-container.sh --gate %s --profile %s' "${gate}" "${requested_profile_id}"
+  else
+    printf 'scripts/evidence/collect.sh --gate %s --profile %s' "${gate}" "${requested_profile_id}"
+  fi
+}
+
+produce_evidence_note() {
+  if [[ "$(profile_is_container_bound)" == "yes" ]]; then
+    printf 'profile %s is container-bound, so its record is produced inside that digest-pinned image and not on this host' "${requested_profile_id}"
+  else
+    printf 'profile %s is produced on this host, and collect.sh selects the repository Go pin from .go-version for it' "${requested_profile_id}"
+  fi
+}
+
 registry_query() {
   python3 - "${gate}" "${profile}" <<'PY'
 import json
@@ -153,6 +187,6 @@ while IFS=$'\t' read -r kind dependency; do
 done < <(printf '%s\n' "${plan}" | awk -F'\t' '$1 == "composed"')
 
 echo "gate $(describe_target): no applicable evidence record (${reason:-no applicable record})" >&2
-echo "produce evidence locally: run 'scripts/evidence/collect.sh --gate ${gate} --profile ${requested_profile_id}' on this tree and commit the record it writes; CI verifies records and never executes a gate" >&2
-summary_line "- \`${gate}\`: FAILED, no applicable evidence record for \`${requested_profile_id}\`; produce evidence locally"
+echo "produce evidence locally: run '$(produce_evidence_command)' on this tree and commit the record it writes. $(produce_evidence_note); 'scripts/evidence/collect-all.sh --force' re-executes every gate and profile in the producer each one declares. CI verifies records and never executes a gate." >&2
+summary_line "- \`${gate}\`: FAILED, no applicable evidence record for \`${requested_profile_id}\`; produce evidence locally with \`$(produce_evidence_command)\`"
 exit 1

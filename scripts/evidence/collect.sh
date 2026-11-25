@@ -20,4 +20,12 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
+# The default profile declares the repository Go pin, and the collector probes
+# the Go version it would actually run under, so the pin is selected here rather
+# than left to the ambient toolchain. That makes every printed command work as
+# written: a host pair is this script, and this script carries the pin.
+if [[ -f .go-version ]]; then
+  export GOTOOLCHAIN="go$(tr -d '[:space:]' < .go-version)"
+fi
+
 exec python3 scripts/evidence/validation_evidence.py collect "$@"

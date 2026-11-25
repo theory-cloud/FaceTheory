@@ -5,16 +5,16 @@
         "bash",
         "scripts/verify-ts-pack.sh"
       ],
-      "durationSeconds": 9.008,
+      "durationSeconds": 8.677,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-25T02:37:53Z",
+      "finishedAt": "2026-11-25T13:59:13Z",
       "id": "ts-pack",
       "inputsDigest": "sha256:068c82bb896c2495ffe423a7bad1d9e5ad219d427dcf23ba49fb815c81a87c87",
       "logDigest": "sha256:d00ff5890a900dedafee28e62bf786985ce0581baf93c10c3a471e7ade2587fa",
-      "logRef": "gov-infra/evidence/local/ts-pack-ts-pack-20261125T023744Z-18.log",
+      "logRef": "gov-infra/evidence/local/ts-pack-ts-pack-20261125T135904Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-25T02:37:44Z"
+      "startedAt": "2026-11-25T13:59:04Z"
     }
   ],
   "consumed": [],
@@ -36,11 +36,11 @@
   },
   "profile": "floor-node22",
   "reason": "",
-  "recordedAt": "2026-11-25T02:37:53Z",
+  "recordedAt": "2026-11-25T13:59:13Z",
   "releaseOnly": {
-    "digest": "sha256:d3d0770d031d3d3229a92eb34897e6c29e37fc336668535292e95d7b6fa9cf3a",
+    "digest": "sha256:9b9e841c4ad5e7e85db5cb8c3e94999b1d1063d911baa75ee80312cd28aa43c2",
     "fileCount": 16,
-    "normalizedDigest": "sha256:76d48c17d4afd9878051e8e4f47f3cc8a2cd2024e6210a8b3aae3c766de5d641",
+    "normalizedDigest": "sha256:ea163e7f8e678a668b5fadbcc783b6f6a13d9972089e97451618dd9e1e06ace8",
     "version": "5.2.0"
   },
   "reviews": [],
@@ -59,8 +59,8 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:fd375d140e0fa0f308e6343b5e04ba47702c7b6c4ea081b62584cd9ba2417d85",
-    "fileCount": 780
+    "digest": "sha256:f303815c1d751f27828967b355c126fe810a93f181bd08c35f824b8da8628f2b",
+    "fileCount": 800
   },
   "verdict": "PASS"
 }
