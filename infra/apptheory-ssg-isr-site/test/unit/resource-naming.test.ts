@@ -8,6 +8,7 @@ import {
   RESOURCE_NAMING_CONTRACT,
 } from '@theory-cloud/apptheory-cdk';
 
+import { derivedPhysicalNames, sharedPhysicalNames } from '../../src/physical-names.js';
 import { FaceTheoryAppTheorySsgIsrSiteStack } from '../../src/stack.js';
 import {
   REFERENCE_STAGE_CONFIG,
@@ -156,6 +157,50 @@ test('the SSG+ISR distribution serves a contract-named root object from S3', () 
   // contract sets `index.html`, and the SSG deployment puts that key behind the
   // `isr` origin path. A miss still fails over to the Lambda origin (403/404).
   assert.equal(distributionConfig(synth()).DefaultRootObject, 'index.html');
+});
+
+test('the documented collision check lists every name the stack derives', () => {
+  // `src/physical-names.ts` is the list `docs/features/resource-naming.md` tells an
+  // operator to compare between two sites. Pin it to the template: a new derived
+  // name fails here until it is in the list, so comparing one entry — the assets
+  // bucket prefix, say — can never quietly stand in for comparing the set.
+  const derived = derivedPhysicalNames(REFERENCE_STAGE_CONFIG);
+
+  assert.deepEqual(
+    derived.map((entry) => entry.name).sort(),
+    contractNames(synth()),
+    'the documented list is exactly the contract names this template sets',
+  );
+  assert.deepEqual(
+    derived.map((entry) => entry.entry).sort(),
+    [
+      'dynamodb_table:site-isr-metadata',
+      'log_delivery_destination:logs/access/cdn/site',
+      'log_delivery_source:logs/access/cdn/site',
+      'log_group:logs/access/cdn/site',
+      's3_bucket:site-assets',
+      's3_bucket:site-html-store',
+    ],
+    'one entry per contract entry the stack consumes',
+  );
+
+  // The comparison is not vacuous: one config derives every name twice...
+  assert.deepEqual(
+    sharedPhysicalNames(derived, derivedPhysicalNames()),
+    derived
+      .map((entry) => `${entry.entry.slice(0, entry.entry.indexOf(':'))}: ${entry.name}`)
+      .sort(),
+    'identical configs share every entry',
+  );
+  // ...and two sites that differ in `app` share none.
+  assert.deepEqual(
+    sharedPhysicalNames(
+      derived,
+      derivedPhysicalNames({ ...REFERENCE_STAGE_CONFIG, app: 'facetheory-marketing-site' }),
+    ),
+    [],
+    'a different app id derives a disjoint set',
+  );
 });
 
 test('the standard logging profile replaces the per-stack S3 logs bucket', () => {

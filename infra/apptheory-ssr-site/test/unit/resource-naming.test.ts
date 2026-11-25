@@ -8,6 +8,7 @@ import {
   RESOURCE_NAMING_CONTRACT,
 } from '@theory-cloud/apptheory-cdk';
 
+import { derivedPhysicalNames, sharedPhysicalNames } from '../../src/physical-names.js';
 import { FaceTheoryAppTheorySsrSiteStack } from '../../src/stack.js';
 import {
   REFERENCE_STAGE_CONFIG,
@@ -132,6 +133,48 @@ test('every derived physical name follows the contract composition', () => {
   assert.equal(
     AppTheoryResourceNaming.logGroupName(stageNamingValues(), 'logs/access/cdn/site'),
     template.Outputs?.AccessLogGroupName?.Value,
+  );
+});
+
+test('the documented collision check lists every name the stack derives', () => {
+  // `src/physical-names.ts` is the list `docs/features/resource-naming.md` tells an
+  // operator to compare between two sites. Pin it to the template: a new derived
+  // name fails here until it is in the list, so comparing one entry — the assets
+  // bucket prefix, say — can never quietly stand in for comparing the set.
+  const derived = derivedPhysicalNames(REFERENCE_STAGE_CONFIG);
+
+  assert.deepEqual(
+    derived.map((entry) => entry.name).sort(),
+    contractNames(synth()),
+    'the documented list is exactly the contract names this template sets',
+  );
+  assert.deepEqual(
+    derived.map((entry) => entry.entry).sort(),
+    [
+      'log_delivery_destination:logs/access/cdn/site',
+      'log_delivery_source:logs/access/cdn/site',
+      'log_group:logs/access/cdn/site',
+      's3_bucket:site-assets',
+    ],
+    'one entry per contract entry the stack consumes',
+  );
+
+  // The comparison is not vacuous: one config derives every name twice...
+  assert.deepEqual(
+    sharedPhysicalNames(derived, derivedPhysicalNames()),
+    derived
+      .map((entry) => `${entry.entry.slice(0, entry.entry.indexOf(':'))}: ${entry.name}`)
+      .sort(),
+    'identical configs share every entry',
+  );
+  // ...and two sites that differ in `app` share none.
+  assert.deepEqual(
+    sharedPhysicalNames(
+      derived,
+      derivedPhysicalNames({ ...REFERENCE_STAGE_CONFIG, app: 'facetheory-marketing-site' }),
+    ),
+    [],
+    'a different app id derives a disjoint set',
   );
 });
 
