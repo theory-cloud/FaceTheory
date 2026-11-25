@@ -5,23 +5,23 @@
         "make",
         "rubric"
       ],
-      "durationSeconds": 61.428,
+      "durationSeconds": 81.43,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-25T06:13:34Z",
+      "finishedAt": "2026-11-25T13:09:48Z",
       "id": "rubric",
-      "inputsDigest": "sha256:64ef317b93b5d4bc013665c5541e00fe4f75fa59276c9569cf266a4a9bad9551",
-      "logDigest": "sha256:de5e3bdcf64c66c41dd572a15331431731f847fee5bb04d86c9483e700f5941e",
-      "logRef": "gov-infra/evidence/local/rubric-rubric-20261125T061232Z-67143.log",
+      "inputsDigest": "sha256:f50207fbc97d04a094e1567462b27eb833912d0dde17ed6779a5dc0d96e6f453",
+      "logDigest": "sha256:68e3d71df383f47de957dc3996e0350b836d98ac67143be92ff2887361a2d664",
+      "logRef": "gov-infra/evidence/local/rubric-rubric-20261125T130827Z-29582.log",
       "reused": false,
-      "startedAt": "2026-11-25T06:12:32Z"
+      "startedAt": "2026-11-25T13:08:27Z"
     }
   ],
   "consumed": [],
   "description": "The one local rubric entry point: consistency, completeness, security, compliance, maintainability and docs items plus the infra synth snapshots. Its input scope is every tracked file, so any tooling, workflow, docs or guard edit stales it and requires a fresh record",
   "environment": {
     "go": "go1.27.4",
-    "node": "v24.21.0",
+    "node": "v24.13.1",
     "platform": {
       "arch": "arm64",
       "os": "darwin"
@@ -36,26 +36,26 @@
   },
   "profile": "default",
   "reason": "",
-  "recordedAt": "2026-11-25T06:13:34Z",
+  "recordedAt": "2026-11-25T13:09:48Z",
   "releaseOnly": {
-    "digest": "sha256:d3d0770d031d3d3229a92eb34897e6c29e37fc336668535292e95d7b6fa9cf3a",
+    "digest": "sha256:99605e6376c949a473ae6cd1f53f2916ea2f0d900eddc31c274b00bfe6c952dd",
     "fileCount": 16,
-    "normalizedDigest": "sha256:76d48c17d4afd9878051e8e4f47f3cc8a2cd2024e6210a8b3aae3c766de5d641",
+    "normalizedDigest": "sha256:3203953bea1b612051c9243bfd6acd433be25a53417545cdf7725878c0791231",
     "version": "5.2.0"
   },
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:25235e4d92983b7902e0aed50e5fce047359f6b7606b86624b2b6cdf72e390f5",
-    "fileCount": 814,
+    "digest": "sha256:3b6c176407cb17f39a11cb47b267e49d9731e0ffbbfa5c56c3e49a50021842e0",
+    "fileCount": 817,
     "paths": [
       "**"
     ],
     "version": 1
   },
   "source": {
-    "digest": "sha256:ec12682a3d022561908505af23fd1b7f0bb530c233be1bf2d48f345aae29152a",
-    "fileCount": 798
+    "digest": "sha256:1b6bcadba3dec08d7502656440fd6d365ec92069ad8fcbb21ac1f66d1d0b3db9",
+    "fileCount": 801
   },
   "verdict": "PASS"
 }

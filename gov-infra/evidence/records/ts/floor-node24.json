@@ -5,20 +5,36 @@
         "bash",
         "scripts/verify-ts-suite.sh"
       ],
-      "durationSeconds": 174.232,
+      "durationSeconds": 227.659,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-25T06:08:01Z",
+      "finishedAt": "2026-11-25T13:04:08Z",
       "id": "ts-suite",
-      "inputsDigest": "sha256:8660ec212a97c6f744ad46ea1d116c3c62b3086a9d80f542047d751a56128760",
-      "logDigest": "sha256:72ccd057b6879ecc07d88702102641bacad499a1fb103982deefea7ef33f48ac",
-      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261125T060506Z-18.log",
+      "inputsDigest": "sha256:69e1b7e23b1bcc44111b88512615c03c91cf37c1b1138eaa2f975583902cbf6b",
+      "logDigest": "sha256:54f4d95bd8b7a7b3dc0c4548627e04c05efb5768e9b12e8a613d5f792383a797",
+      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261125T130020Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-25T06:05:06Z"
+      "startedAt": "2026-11-25T13:00:20Z"
+    },
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-consumer-install.sh"
+      ],
+      "durationSeconds": 11.374,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-25T13:04:19Z",
+      "id": "consumer-install",
+      "inputsDigest": "sha256:8f339df83e8dfd40cebf605a8835bdff1087885598bcc05c8403f6fb7bbe90ab",
+      "logDigest": "sha256:1427cc87748328714acae264a594548952096f5afdefab1008d6da54d56f0cae",
+      "logRef": "gov-infra/evidence/local/ts-consumer-install-20261125T130408Z-18.log",
+      "reused": false,
+      "startedAt": "2026-11-25T13:04:08Z"
     }
   ],
   "consumed": [],
-  "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, under each supported Node major on Linux arm64, which is the architecture each proof profile really runs. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the historical GitHub runner's architecture cannot be recorded as covered. The Node-major floor is the claim these profiles carry.",
+  "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, and a clean-consumer install of the packed tarball into an empty project exercised through a real SSR render and SSG build, under each supported Node major on Linux arm64 (oldest 22, middle 24, newest 26), which is the architecture each proof profile really runs. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the historical GitHub runner's architecture cannot be recorded as covered. The Node-major floor is the claim these profiles carry.",
   "environment": {
     "go": "",
     "node": "v24.22.3",
@@ -36,18 +52,18 @@
   },
   "profile": "floor-node24",
   "reason": "",
-  "recordedAt": "2026-11-25T06:08:01Z",
+  "recordedAt": "2026-11-25T13:04:19Z",
   "releaseOnly": {
-    "digest": "sha256:d3d0770d031d3d3229a92eb34897e6c29e37fc336668535292e95d7b6fa9cf3a",
+    "digest": "sha256:99605e6376c949a473ae6cd1f53f2916ea2f0d900eddc31c274b00bfe6c952dd",
     "fileCount": 16,
-    "normalizedDigest": "sha256:76d48c17d4afd9878051e8e4f47f3cc8a2cd2024e6210a8b3aae3c766de5d641",
+    "normalizedDigest": "sha256:3203953bea1b612051c9243bfd6acd433be25a53417545cdf7725878c0791231",
     "version": "5.2.0"
   },
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:6d3cc05ea0e52cbf9dad43e767336cf6ed95776496e04e3a0c4f7c890b50a040",
-    "fileCount": 644,
+    "digest": "sha256:f6085c94f5cfed01e554826d98f1aa4274c740ca2ca826a4829bed79b11015f7",
+    "fileCount": 647,
     "paths": [
       "ts/",
       "docs/",
@@ -58,6 +74,8 @@
       "AGENTS.md",
       "Makefile",
       "scripts/verify-ts-suite.sh",
+      "scripts/verify-consumer-install.sh",
+      "scripts/fixtures/consumer-install/",
       "scripts/verify-docs-export-map.sh",
       "scripts/verify-node-engines-floor.sh",
       "scripts/check-node-engines-floor.mjs",
@@ -71,8 +89,8 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:e00fbb3ebd9825324126e2c166adba39b89e39df9d670f3989b12295e68eca9c",
-    "fileCount": 797
+    "digest": "sha256:f39b9291f33c77ed0c2e4280363afbd5247e1e89ea69d9c4374cdb8b22a2f87b",
+    "fileCount": 800
   },
   "verdict": "PASS"
 }

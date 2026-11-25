@@ -1,0 +1,96 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-ts-suite.sh"
+      ],
+      "durationSeconds": 184.021,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-25T13:07:25Z",
+      "id": "ts-suite",
+      "inputsDigest": "sha256:901032b61cdedd234e75e0d9b114510bce7b6def7efa55585a0df2fcf651ca04",
+      "logDigest": "sha256:b8fd3f30ccf0db62f29225e49baaab05519ffd5990f2a6c87f1723a96017bb0d",
+      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261125T130421Z-18.log",
+      "reused": false,
+      "startedAt": "2026-11-25T13:04:21Z"
+    },
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-consumer-install.sh"
+      ],
+      "durationSeconds": 11.639,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-25T13:07:36Z",
+      "id": "consumer-install",
+      "inputsDigest": "sha256:eedb5849fbdfbc126cce2b402e263458033812de4549e3e2c4c1ee95673c1e45",
+      "logDigest": "sha256:39b1926fe36fcd73a2fdca939ce036097c15df0a6095a9b2a2dbf234cd7a23a3",
+      "logRef": "gov-infra/evidence/local/ts-consumer-install-20261125T130725Z-18.log",
+      "reused": false,
+      "startedAt": "2026-11-25T13:07:25Z"
+    }
+  ],
+  "consumed": [],
+  "description": "TypeScript typecheck, lint, format, example-README, docs export-map, unit and coverage suites plus the Node engines floor and Lambda runtime deprecation checks, and a clean-consumer install of the packed tarball into an empty project exercised through a real SSR render and SSG build, under each supported Node major on Linux arm64 (oldest 22, middle 24, newest 26), which is the architecture each proof profile really runs. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the historical GitHub runner's architecture cannot be recorded as covered. The Node-major floor is the claim these profiles carry.",
+  "environment": {
+    "go": "",
+    "node": "v26.13.1",
+    "platform": {
+      "arch": "aarch64",
+      "os": "linux"
+    },
+    "python": "3.11.2"
+  },
+  "gate": "ts",
+  "kind": "source",
+  "producer": {
+    "registry": "validation-gates.json",
+    "tool": "scripts/evidence/validation_evidence.py"
+  },
+  "profile": "floor-node26",
+  "reason": "",
+  "recordedAt": "2026-11-25T13:07:36Z",
+  "releaseOnly": {
+    "digest": "sha256:99605e6376c949a473ae6cd1f53f2916ea2f0d900eddc31c274b00bfe6c952dd",
+    "fileCount": 16,
+    "normalizedDigest": "sha256:3203953bea1b612051c9243bfd6acd433be25a53417545cdf7725878c0791231",
+    "version": "5.2.0"
+  },
+  "reviews": [],
+  "schemaVersion": 1,
+  "scope": {
+    "digest": "sha256:f6085c94f5cfed01e554826d98f1aa4274c740ca2ca826a4829bed79b11015f7",
+    "fileCount": 647,
+    "paths": [
+      "ts/",
+      "docs/",
+      ".github/workflows/",
+      "README.md",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "AGENTS.md",
+      "Makefile",
+      "scripts/verify-ts-suite.sh",
+      "scripts/verify-consumer-install.sh",
+      "scripts/fixtures/consumer-install/",
+      "scripts/verify-docs-export-map.sh",
+      "scripts/verify-node-engines-floor.sh",
+      "scripts/check-node-engines-floor.mjs",
+      "scripts/verify-lambda-runtime-deprecations.sh",
+      "scripts/check-lambda-runtime-deprecations.mjs",
+      "infra/apptheory-ssr-site/package-lock.json",
+      "infra/apptheory-ssg-isr-site/package-lock.json",
+      "infra/apptheory-ssr-site/src/stack.ts",
+      "infra/apptheory-ssg-isr-site/src/stack.ts"
+    ],
+    "version": 1
+  },
+  "source": {
+    "digest": "sha256:f39b9291f33c77ed0c2e4280363afbd5247e1e89ea69d9c4374cdb8b22a2f87b",
+    "fileCount": 800
+  },
+  "verdict": "PASS"
+}

@@ -1,0 +1,66 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "scripts/verify-ts-pack.sh"
+      ],
+      "durationSeconds": 8.337,
+      "executed": true,
+      "exitCode": 0,
+      "finishedAt": "2026-11-25T12:55:16Z",
+      "id": "ts-pack",
+      "inputsDigest": "sha256:5d2aafd06ff2dd484af2f839737e3a54b36cfc2a2ee7d10f304f87104577ca71",
+      "logDigest": "sha256:d00ff5890a900dedafee28e62bf786985ce0581baf93c10c3a471e7ade2587fa",
+      "logRef": "gov-infra/evidence/local/ts-pack-ts-pack-20261125T125508Z-19.log",
+      "reused": false,
+      "startedAt": "2026-11-25T12:55:08Z"
+    }
+  ],
+  "consumed": [],
+  "description": "npm pack of the TypeScript package at the repository version on Linux arm64, inspected and installed from the tarball, under each supported Node major. Linux/x64 is no longer proven anywhere: user-mode x86_64 emulation crashes Go-built binaries (esbuild aborts with 'found bad pointer in Go heap') on the producing host, so the architecture recorded is the one that really ran.",
+  "environment": {
+    "go": "",
+    "node": "v26.13.1",
+    "platform": {
+      "arch": "aarch64",
+      "os": "linux"
+    },
+    "python": "3.11.2"
+  },
+  "gate": "ts-pack",
+  "kind": "source",
+  "producer": {
+    "registry": "validation-gates.json",
+    "tool": "scripts/evidence/validation_evidence.py"
+  },
+  "profile": "floor-node26",
+  "reason": "",
+  "recordedAt": "2026-11-25T12:55:16Z",
+  "releaseOnly": {
+    "digest": "sha256:99605e6376c949a473ae6cd1f53f2916ea2f0d900eddc31c274b00bfe6c952dd",
+    "fileCount": 16,
+    "normalizedDigest": "sha256:3203953bea1b612051c9243bfd6acd433be25a53417545cdf7725878c0791231",
+    "version": "5.2.0"
+  },
+  "reviews": [],
+  "schemaVersion": 1,
+  "scope": {
+    "digest": "sha256:4b11647b4b9817ce1f0a571882eaaf1d74959f3c6e47a42409685a53e9de8c43",
+    "fileCount": 533,
+    "paths": [
+      "ts/",
+      "VERSION",
+      "Makefile",
+      "scripts/verify-ts-pack.sh",
+      "scripts/read-version.sh",
+      "scripts/pack-dev-archive.sh"
+    ],
+    "version": 1
+  },
+  "source": {
+    "digest": "sha256:94ca28147ae2e5a6bf762d65abdc2f4e299f729b654ef59cca7e9121f3ab9ba7",
+    "fileCount": 800
+  },
+  "verdict": "PASS"
+}
