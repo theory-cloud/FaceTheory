@@ -250,3 +250,9 @@ local synth/tests/docs-build proof unless it actually deployed with authorized A
 - `infra/apptheory-ssr-site/` — SSR-only CloudFront + S3 assets + Lambda Function URL using a real FaceApp handler.
 - `infra/apptheory-ssg-isr-site/` — `AppTheorySsrSiteMode.SSG_ISR`, S3-primary HTML origin group, Lambda fallback, and
   TableTheory-backed ISR metadata wiring.
+
+Both stacks name every resource they create through AppTheory's `theorycloud_resource_naming.v0.1` contract, bound from
+their own `src/stage-config.ts`. Set `account` there before deploying, and read
+[Resource Naming](../features/resource-naming.md) before upgrading an existing deployment: the buckets, the ISR table
+and the CloudFront log destination are replaced by that change, and the page states each consequence and the
+replacement-free path.

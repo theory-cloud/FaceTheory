@@ -19,16 +19,17 @@ Use this guide when you are:
 
 Use this index to find the migration path by release line. Release Please updates version markers automatically; do not hand-edit `x-release-please-version` comments when adding migration notes.
 
-| From                                    | To                    | Migration path                                                                            | Notes                                                                                                                                    |
-| --------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| App-local SSR glue                      | Post-1.0 release line | [Migration 1](#migration-1-ad-hoc-handler-to-canonical-aws-entrypoint)                    | Move request translation into `createFaceApp()` and the Lambda/AppTheory entrypoints.                                                    |
-| SSR-only FaceTheory apps                | Post-1.0 release line | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr)                      | Reclassify routes into the three server `FaceMode` values before adding SPA navigation.                                                  |
-| ISR routes without tenant partitioning  | Post-1.0 release line | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                                       |
-| Inline hydration / raw head workarounds | Post-1.0 release line | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                                |
-| Svelte 4 adapter consumers              | v4.0.0                | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                            |
-| Deprecated 3.x public surface           | v4.0.0                | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated; `Headers` and `head.html` are removed; optional surfaces move to subpaths.                                   |
-| Invalid 3.x Face contracts              | v4.0.0                | [Migration 10](#migration-10-v4-face-contract-construction-errors)                        | ISR Faces must set `revalidateSeconds` and parameterized SSG Faces must set `generateStaticParams()` before `createFaceApp()`.           |
-| `nodejs20.x` Lambda stacks              | `nodejs24.x`          | [Migration 11](#migration-11-node-20-to-node-24-lambda-runtime)                           | Support-contract update, not a breaking API change: regenerate or edit the one runtime line and redeploy before the AWS creation cutoff. |
+| From                                               | To                    | Migration path                                                                            | Notes                                                                                                                                    |
+| -------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| App-local SSR glue                                 | Post-1.0 release line | [Migration 1](#migration-1-ad-hoc-handler-to-canonical-aws-entrypoint)                    | Move request translation into `createFaceApp()` and the Lambda/AppTheory entrypoints.                                                    |
+| SSR-only FaceTheory apps                           | Post-1.0 release line | [Migration 2](#migration-2-ssr-only-routes-to-mixed-ssr-ssg-and-isr)                      | Reclassify routes into the three server `FaceMode` values before adding SPA navigation.                                                  |
+| ISR routes without tenant partitioning             | Post-1.0 release line | [Migration 4](#migration-4-adopt-isr-tenant-fail-closed-defaults)                         | Tenant-varying cached HTML needs an explicit trusted `tenantKey` or `cacheKey`; otherwise use SSR.                                       |
+| Inline hydration / raw head workarounds            | Post-1.0 release line | [Migration 7](#migration-7-move-legacy-inline-hydration-to-strict-csp-hydration-sidecars) | Strict no-inline routes move data, styles, and bootstraps to same-origin sidecars/assets.                                                |
+| Svelte 4 adapter consumers                         | v4.0.0                | [Migration 8](#migration-8-svelte-4-to-svelte-5-v400)                                     | v4.0.0 requires Svelte `>=5.55.7`; Svelte 4 support is dropped and Stitch primitives are authored with runes.                            |
+| Deprecated 3.x public surface                      | v4.0.0                | [Migration 9](#migration-9-v4-public-surface-curation)                                    | The root barrel is curated; `Headers` and `head.html` are removed; optional surfaces move to subpaths.                                   |
+| Invalid 3.x Face contracts                         | v4.0.0                | [Migration 10](#migration-10-v4-face-contract-construction-errors)                        | ISR Faces must set `revalidateSeconds` and parameterized SSG Faces must set `generateStaticParams()` before `createFaceApp()`.           |
+| `nodejs20.x` Lambda stacks                         | `nodejs24.x`          | [Migration 11](#migration-11-node-20-to-node-24-lambda-runtime)                           | Support-contract update, not a breaking API change: regenerate or edit the one runtime line and redeploy before the AWS creation cutoff. |
+| Reference-stack deployments before resource naming | Next release line     | [Migration 12](#migration-12-adopt-the-resource-naming-contract-in-a-reference-stack)     | Buckets, the ISR table and CloudFront log destination are named by `theorycloud_resource_naming.v0.1`; the first deploy replaces them.   |
 
 ## Scope Guardrails
 
@@ -450,6 +451,42 @@ Rollback:
 
 - reverting the one `runtime:` line still deploys in place until 2027-03-03, but it does not restore the ability to
   create a new `nodejs20.x` stack after 2027-02-01, so a rollback here is short-term only
+
+## Migration 12: Adopt The Resource Naming Contract In A Reference Stack
+
+The reference stacks (`infra/apptheory-ssr-site`, `infra/apptheory-ssg-isr-site`) now bind AppTheory's
+`theorycloud_resource_naming.v0.1` contract, so every resource they create is named from stage config and two FaceTheory
+sites in one account cannot collide. The framework API is unchanged; the deployed resource names are not. The
+resource-by-resource table, the exact derived names and the upgrade consequences live in
+[Resource Naming](/features/resource-naming/).
+
+Before you deploy:
+
+1. Set `account` in the stack's `src/stage-config.ts` to your twelve-digit account id. The committed value is a
+   placeholder, and the stack is environment-bound because the standard logging profile can only prove the CloudFront
+   log delivery lives in `us-east-1`.
+2. Bootstrap that account and region if you have not already: the template now names the CDK asset bucket literally.
+3. Copy any S3 CloudFront access logs you want to keep out of the stack's current access-log bucket. That bucket is
+   removed on upgrade.
+
+```bash
+cd infra/apptheory-ssg-isr-site
+npm ci
+npm run test
+npx cdk diff      # expect: replace both buckets + the ISR table, remove the access-log bucket
+npx cdk deploy
+```
+
+If nothing may be replaced — for example a bucket that holds objects the stacks did not put there — move the config to
+the legacy naming and logging profiles first, which keeps every physical resource name the deployment already owns, then
+cut over to the derived profile in a window you choose. Both paths, with the exact `pins`/`generated` entries, are in
+[Resource Naming](/features/resource-naming/#upgrading-an-existing-deployment).
+
+Validation:
+
+- `npm run test` in each affected stack asserts the derived names, the contract posture, and that two sites in one
+  account derive disjoint names.
+- `npx cdk diff` is the review artefact: the resource names above should be the only physical-name changes.
 
 ## Rollback Notes
 
