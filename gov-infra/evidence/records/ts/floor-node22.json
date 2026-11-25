@@ -5,16 +5,16 @@
         "bash",
         "scripts/verify-ts-suite.sh"
       ],
-      "durationSeconds": 197.356,
+      "durationSeconds": 206.959,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-25T02:34:42Z",
+      "finishedAt": "2026-11-25T03:16:05Z",
       "id": "ts-suite",
-      "inputsDigest": "sha256:7c44070b3dda8ff7c0623a997994dbf65ec64adff64cab2bebb7396cb8f15289",
-      "logDigest": "sha256:21f6068a29df1f2ac13adce44becf465b5e2ba4cbbe02d7e9b05182fd6a9b6cb",
-      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261125T023125Z-18.log",
+      "inputsDigest": "sha256:b790e89ccc145260fd174d5a5aab88641046777b4ddca8b403fae41f6d5f4da4",
+      "logDigest": "sha256:439e4897c1d0c12f7cc8ec33951b83258f0a5574cf413e0baeb613af99feafaa",
+      "logRef": "gov-infra/evidence/local/ts-ts-suite-20261125T031238Z-18.log",
       "reused": false,
-      "startedAt": "2026-11-25T02:31:25Z"
+      "startedAt": "2026-11-25T03:12:38Z"
     }
   ],
   "consumed": [],
@@ -36,7 +36,7 @@
   },
   "profile": "floor-node22",
   "reason": "",
-  "recordedAt": "2026-11-25T02:34:42Z",
+  "recordedAt": "2026-11-25T03:16:05Z",
   "releaseOnly": {
     "digest": "sha256:d3d0770d031d3d3229a92eb34897e6c29e37fc336668535292e95d7b6fa9cf3a",
     "fileCount": 16,
@@ -46,8 +46,8 @@
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:0e42f91fbd38ceb097dac63c1bff0c3f8c266b732e8eabb62a6bf0020386bfe8",
-    "fileCount": 643,
+    "digest": "sha256:7fd32b1b5bb795ae0228861619098820ac6f272bf3169328e71fe5f3c5cf21d4",
+    "fileCount": 644,
     "paths": [
       "ts/",
       "docs/",
@@ -71,8 +71,8 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:fd375d140e0fa0f308e6343b5e04ba47702c7b6c4ea081b62584cd9ba2417d85",
-    "fileCount": 780
+    "digest": "sha256:67b3215cf69a77607a704b384e27633532752dc128075843044c89743f153d71",
+    "fileCount": 785
   },
   "verdict": "PASS"
 }

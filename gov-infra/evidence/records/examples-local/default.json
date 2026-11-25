@@ -5,16 +5,16 @@
         "bash",
         "scripts/verify-examples-local.sh"
       ],
-      "durationSeconds": 217.416,
+      "durationSeconds": 219.394,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-25T02:41:40Z",
+      "finishedAt": "2026-11-25T03:22:54Z",
       "id": "examples-local-harness",
-      "inputsDigest": "sha256:35b0a065667717852162c65258a320e0736f3507b572061eae725d548304f6cc",
-      "logDigest": "sha256:4afb1197607f9e0ac134a043b484fb7f41b1651a40b0dc4d239856107c29ab02",
-      "logRef": "gov-infra/evidence/local/examples-local-examples-local-harness-20261125T023803Z-14417.log",
+      "inputsDigest": "sha256:c39fef76ffa23096e34fc929f22e7f948a57c8567e7de993ddbaf4dc4047bf54",
+      "logDigest": "sha256:67a347ac0a509c767d41a93ce8f2b8f1ba98f8bf99424915bad1350d4ff1ff76",
+      "logRef": "gov-infra/evidence/local/examples-local-examples-local-harness-20261125T031914Z-6039.log",
       "reused": false,
-      "startedAt": "2026-11-25T02:38:03Z"
+      "startedAt": "2026-11-25T03:19:14Z"
     }
   ],
   "consumed": [],
@@ -36,7 +36,7 @@
   },
   "profile": "default",
   "reason": "",
-  "recordedAt": "2026-11-25T02:41:40Z",
+  "recordedAt": "2026-11-25T03:22:54Z",
   "releaseOnly": {
     "digest": "sha256:d3d0770d031d3d3229a92eb34897e6c29e37fc336668535292e95d7b6fa9cf3a",
     "fileCount": 16,
@@ -46,8 +46,8 @@
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:d9af75356df21e25a5a975e3e30e8bf75d25849b69c2d0d76a5cdd7cf2ac7537",
-    "fileCount": 579,
+    "digest": "sha256:a7fa6268568697c21521709a39da3f5e690d4c455e64e07813cc0961593ec0b0",
+    "fileCount": 583,
     "paths": [
       ".go-version",
       "Makefile",
@@ -59,8 +59,8 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:01c2e99f200c165f39262e69a45846cc7281fbdee2a5e253f001d7909bc746d6",
-    "fileCount": 781
+    "digest": "sha256:eb15620f711dd34e216ea38e42c34e77cc353309484ded53cc7305c117d04604",
+    "fileCount": 786
   },
   "verdict": "PASS"
 }
