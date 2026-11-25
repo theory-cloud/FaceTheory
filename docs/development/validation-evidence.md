@@ -7,7 +7,9 @@ holds no credential, and runs nothing on a push.
 
 - Registry: `scripts/evidence/validation-gates.json`.
 - Produce: `scripts/evidence/collect.sh --gate <gate> --profile <profile>`, or
-  `scripts/evidence/collect-all.sh` for every gate and profile.
+  `scripts/evidence/collect-all.sh` for every gate and profile. Both select the
+  repository Go pin from `.go-version` themselves, so every host command on this
+  page runs as written rather than needing a toolchain prefix.
 - Container profiles: `scripts/evidence/collect-in-container.sh --gate <gate> --profile <profile>`.
 - Verify (this is what CI runs): `scripts/evidence/verify-all.sh`.
 - Re-execute: add `--force` to any producer. Collection is incremental by design —
@@ -88,9 +90,9 @@ scripts/evidence/collect-all.sh --force
 scripts/evidence/collect-in-container.sh --gate ts --profile floor-node26 --force
 
 # one host-profile pair, re-executed on this machine. A host profile declares the
-# repository Go pin the run must use, and collect-all.sh above selects it for you;
-# a single pair is given the same selection, or the collector refuses the profile.
-GOTOOLCHAIN="go$(cat .go-version)" scripts/evidence/collect.sh --gate examples-local --profile default --force
+# repository Go pin the run must use, and collect.sh selects that pin from
+# .go-version itself, so the command is the whole command.
+scripts/evidence/collect.sh --gate examples-local --profile default --force
 
 # then verify what CI will verify at this head
 scripts/evidence/verify-all.sh
@@ -99,9 +101,11 @@ scripts/evidence/verify-all.sh
 A container-bound profile cannot be produced on this host at all: the collector
 probes the live environment and refuses a profile it does not satisfy, which is
 what keeps a Node 26 record from being written on a Node 24 host. A host profile
-is checked the same way, which is why the single-pair line above selects the
-repository Go pin — `collect-all.sh` exports it already, and `collect.sh` refuses
-a host that resolves the pin to another Go version instead of recording it. The
+is checked the same way, which is what makes the pin a producer concern: a host
+profile declares the repository Go pin, `collect.sh` exports it from `.go-version`
+before it probes, and a host that still resolves the pin to another Go version is
+refused instead of recorded. So `collect.sh`, `collect-all.sh` and the
+missing-record failure all name a command that works as printed. The
 producer for a profile is its `image` in the registry: `collect-in-container.sh`
 when it declares one, `collect.sh` when it does not, and a missing-record failure
 names the right one for you.

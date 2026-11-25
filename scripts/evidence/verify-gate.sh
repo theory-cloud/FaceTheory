@@ -111,7 +111,7 @@ produce_evidence_note() {
   if [[ "$(profile_is_container_bound)" == "yes" ]]; then
     printf 'profile %s is container-bound, so its record is produced inside that digest-pinned image and not on this host' "${requested_profile_id}"
   else
-    printf 'profile %s is produced on this host' "${requested_profile_id}"
+    printf 'profile %s is produced on this host, and collect.sh selects the repository Go pin from .go-version for it' "${requested_profile_id}"
   fi
 }
 
