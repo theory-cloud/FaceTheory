@@ -7,13 +7,13 @@ import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import {
-  AppTheoryBucket,
   AppTheoryDynamoTable,
   AppTheorySsrSite,
   AppTheorySsrSiteMode,
 } from '@theory-cloud/apptheory-cdk';
 import { Construct } from 'constructs';
 
+import { createSiteBucket } from './site-bucket.js';
 import {
   REFERENCE_STAGE_CONFIG,
   createNamingContext,
@@ -54,7 +54,7 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
     const naming = createNamingContext(this, stageConfig);
     const logical = stageConfig.logicalName;
 
-    const assetsBucket = new AppTheoryBucket(this, 'AssetsBucket', {
+    const assetsBucket = createSiteBucket(this, 'AssetsBucket', {
       namingContext: naming,
       logical: `${logical}-assets`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -62,9 +62,9 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
       enforceSSL: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
-    }).bucket;
+    });
 
-    const isrBucket = new AppTheoryBucket(this, 'IsrBucket', {
+    const isrBucket = createSiteBucket(this, 'IsrBucket', {
       namingContext: naming,
       logical: `${logical}-html-store`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -72,7 +72,7 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
       enforceSSL: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
-    }).bucket;
+    });
 
     const ssrFunction = new NodejsFunction(this, 'SsrFunction', {
       runtime: lambda.Runtime.NODEJS_24_X,
@@ -200,11 +200,26 @@ export class FaceTheoryAppTheorySsgIsrSiteStack extends Stack {
       value: this.site.distribution.distributionDomainName,
     });
 
-    new CfnOutput(this, 'AccessLogGroupName', {
-      // The standard logging profile puts CloudFront access logs in this
-      // contract-named log group instead of a per-stack S3 logs bucket.
-      value: naming.logGroupName(`logs/access/cdn/${logical}`),
-    });
+    // The output names the destination this stack actually deploys. Under the
+    // standard logging profile that is a contract-named CloudWatch Logs group the
+    // site construct creates; under the legacy profile it is the construct's S3
+    // access-log bucket, and exporting a log-group name there would point an
+    // operator at a group nothing creates.
+    if (naming.standardLogging) {
+      new CfnOutput(this, 'AccessLogGroupName', {
+        value: naming.logGroupName(`logs/access/cdn/${logical}`),
+      });
+    } else {
+      const accessLogsBucket = this.site.logsBucket;
+      if (!accessLogsBucket) {
+        throw new Error(
+          'the legacy logging profile must create the site S3 access-log bucket; enableLogging is required for this stack',
+        );
+      }
+      new CfnOutput(this, 'AccessLogsBucketName', {
+        value: accessLogsBucket.bucketName,
+      });
+    }
 
     new CfnOutput(this, 'AssetsBucketName', {
       value: assetsBucket.bucketName,
