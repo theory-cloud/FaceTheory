@@ -8,7 +8,7 @@ FaceTheory is a TypeScript runtime, so Node.js is the only runtime this page sup
 
 ## Tested lines
 
-The published package declares `engines.node` `>=22`. That floor and the pushed default have not moved: Node 26 is an addition to the tested set, not a new minimum.
+The published package declares `engines.node` `>=22`, and the release and prerelease workflows keep pinning Node 24.13.1. Neither has moved: Node 26 is an addition to the tested set, not a new minimum.
 
 | Node.js line | Status                                      | Proven by                                                           |
 | ------------ | ------------------------------------------- | ------------------------------------------------------------------- |
@@ -50,7 +50,7 @@ This is a support-contract change rather than an API change, following the [Depr
 
 ## Which line should I run?
 
-- **New projects:** Node 24 or Node 26. Both are supported and tested; Node 24 is the conservative choice today because it is also the line the local example harness and the reference stacks use.
+- **New projects:** Node 24 or Node 26. Both are supported and tested; Node 24 is the conservative choice today because the local example harness requires 24 or newer and the reference stacks emit the `nodejs24.x` Lambda runtime.
 - **Projects on Node 22:** nothing to do now. Track the 2027-02 major, then move to 24 or 26.
 - **Projects on Node 20 or older:** below the declared floor. Move to 24 or 26 — see [Migration 11](/migration-guide/#migration-11-node-20-to-node-24-lambda-runtime) for the Lambda-runtime side and this page for the package side.
 
