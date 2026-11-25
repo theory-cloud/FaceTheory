@@ -87,8 +87,10 @@ scripts/evidence/collect-all.sh --force
 # one container-bound pair, re-executed inside its digest-pinned image
 scripts/evidence/collect-in-container.sh --gate ts --profile floor-node26 --force
 
-# one host-profile pair, re-executed on this machine
-scripts/evidence/collect.sh --gate examples-local --profile default --force
+# one host-profile pair, re-executed on this machine. A host profile declares the
+# repository Go pin the run must use, and collect-all.sh above selects it for you;
+# a single pair is given the same selection, or the collector refuses the profile.
+GOTOOLCHAIN="go$(cat .go-version)" scripts/evidence/collect.sh --gate examples-local --profile default --force
 
 # then verify what CI will verify at this head
 scripts/evidence/verify-all.sh
@@ -96,10 +98,13 @@ scripts/evidence/verify-all.sh
 
 A container-bound profile cannot be produced on this host at all: the collector
 probes the live environment and refuses a profile it does not satisfy, which is
-what keeps a Node 26 record from being written on a Node 24 host. The producer for
-a profile is its `image` in the registry — `collect-in-container.sh` when it
-declares one, `collect.sh` when it does not — and a missing-record failure names
-the right one for you.
+what keeps a Node 26 record from being written on a Node 24 host. A host profile
+is checked the same way, which is why the single-pair line above selects the
+repository Go pin — `collect-all.sh` exports it already, and `collect.sh` refuses
+a host that resolves the pin to another Go version instead of recording it. The
+producer for a profile is its `image` in the registry: `collect-in-container.sh`
+when it declares one, `collect.sh` when it does not, and a missing-record failure
+names the right one for you.
 
 A record binds the gate's input scope, each command's inputs, the tracked proof
 profile and the environment the collector probed. A changed input, a changed
