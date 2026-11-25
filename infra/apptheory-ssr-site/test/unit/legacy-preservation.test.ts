@@ -161,6 +161,63 @@ test('the legacy profile refuses to pin a bucket CloudFormation generated', () =
   );
 });
 
+test('cutting Path B over to the derived profile removes these resources', () => {
+  // `docs/features/resource-naming.md` says to stay on Path B unless everything in
+  // the site buckets can be restored, and lists exactly what the cutover deletes.
+  // Pin that list here so the guide cannot drift from the template: a change to the
+  // construct shape shows up as an extra or missing logical ID rather than as a
+  // quiet addition to what a cutover destroys.
+  const legacy = synth(LEGACY_CONFIG);
+  const derived = synth(REFERENCE_STAGE_CONFIG);
+
+  const removed = Object.keys(legacy.Resources)
+    .filter((logicalId) => !(logicalId in derived.Resources))
+    .sort();
+  const added = Object.keys(derived.Resources)
+    .filter((logicalId) => !(logicalId in legacy.Resources))
+    .sort();
+
+  assert.deepEqual(removed, [
+    // The site assets bucket, its auto-delete custom resource and its policy: the
+    // derived bucket sits one construct deeper, so CloudFormation sees a different
+    // resource, creates the new one and deletes this one with the objects in it.
+    'AssetsBucket5CB76180',
+    'AssetsBucketAutoDeleteObjectsCustomResource51BA1286',
+    'AssetsBucketPolicyFFACF6C4',
+    // The CloudFront S3 access-log bucket and its two companions: the standard
+    // logging profile does not create it at all.
+    'SiteCloudFrontLogsBucketAutoDeleteObjectsCustomResource016FEC8F',
+    'SiteCloudFrontLogsBucketF9C1CD02',
+    'SiteCloudFrontLogsBucketPolicy816DFF56',
+  ]);
+  assert.deepEqual(added, [
+    'AssetsBucket0481D73F',
+    'AssetsBucketAutoDeleteObjectsCustomResource4EEDE0F2',
+    'AssetsBucketPolicyE8CC694A',
+    'SiteCdnLoggingDelivery1416FEBB',
+    'SiteCdnLoggingDeliveryDestinationC2E0B5F7',
+    'SiteCdnLoggingDeliverySource159DB5E3',
+    'SiteCdnLoggingLogGroup5FA337C7',
+  ]);
+
+  // Why the removal is destructive rather than a handover: both buckets carry a
+  // delete policy and an auto-delete custom resource, so CloudFormation empties
+  // them before deleting them. Objects these stacks did not put there do not
+  // survive, which is the stop condition the guide states.
+  for (const logicalId of ['AssetsBucket5CB76180', 'SiteCloudFrontLogsBucketF9C1CD02']) {
+    assert.equal(legacy.Resources[logicalId].DeletionPolicy, 'Delete', logicalId);
+    assert.equal(legacy.Resources[logicalId].UpdateReplacePolicy, 'Delete', logicalId);
+  }
+  assert.equal(
+    legacy.Resources.AssetsBucketAutoDeleteObjectsCustomResource51BA1286?.Type,
+    'Custom::S3AutoDeleteObjects',
+  );
+  assert.equal(
+    legacy.Resources.SiteCloudFrontLogsBucketAutoDeleteObjectsCustomResource016FEC8F?.Type,
+    'Custom::S3AutoDeleteObjects',
+  );
+});
+
 test('the legacy template is the pre-contract template, snapshotted', async () => {
   buildFaceTheoryDist();
 
