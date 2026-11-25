@@ -25,11 +25,23 @@ config (`app: facetheory-ssr-site`, `stage: lab`, `region: us-east-1`) the stack
 | Log delivery source and destination | `facetheory-ssr-site-lab-logs-access-cdn-site` |
 | Lambda function | CloudFormation-generated (no construct here sets a function name) |
 
+FaceTheory derives every name through that contract and adds no naming rule of its own. Cross-site uniqueness **within
+one account** is governed by the Factory resource-naming contract — [the separator finding,
+`docs/155`](https://github.com/theory-cloud/factory/blob/staging/docs/155-resource-naming-separator-ambiguity-scoped-need-2026-11-25.md)
+and [the contract,
+`contracts/resource-naming`](https://github.com/theory-cloud/factory/blob/staging/contracts/resource-naming/v0.1/README.md)
+— and is **not** guaranteed by FaceTheory today. The two classes that stay open are the separator ambiguity and a
+shortened name that equals a valid name. Before a second site shares an account, compare the complete derived name set
+of both — `derivedPhysicalNames()` and `sharedPhysicalNames()` in
+[`src/physical-names.ts`](src/physical-names.ts) — rather than one bucket prefix.
+
 Set `account` in `src/stage-config.ts` to your twelve-digit account id before deploying: the committed value is a
 placeholder, and the stack is environment-bound because the standard logging profile can only prove the CloudFront
-delivery lives in `us-east-1`. The first deploy after this change **replaces** the assets bucket (S3 cannot rename a
-bucket) and **removes** the per-stack S3 access-log bucket; assets are re-uploaded by the stack's bucket deployment. If a
-deployment must keep today's resources — names and CloudFormation logical IDs both — move the config to the legacy
+delivery lives in `us-east-1`.
+
+The first deploy after this change **replaces** the assets bucket (S3 cannot rename a bucket) and **removes** the
+per-stack S3 access-log bucket; assets are re-uploaded by the stack's bucket deployment. If a deployment must keep
+today's resources — names and CloudFormation logical IDs both — move the config to the legacy
 naming and logging profiles first — see
 [Resource Naming](../../docs/features/resource-naming.md#path-b-keep-todays-resources).
 

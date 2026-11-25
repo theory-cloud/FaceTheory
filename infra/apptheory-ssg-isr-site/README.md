@@ -31,12 +31,23 @@ config (`app: facetheory-ssg-isr`, `stage: lab`, `region: us-east-1`) the stack 
 | Log delivery source and destination | `facetheory-ssg-isr-lab-logs-access-cdn-site` |
 | Distribution root object | `index.html`, served from the S3 html store; a miss still fails over to the Lambda origin |
 
+FaceTheory derives every name through that contract and adds no naming rule of its own. Cross-site uniqueness **within
+one account** is governed by the Factory resource-naming contract — [the separator finding,
+`docs/155`](https://github.com/theory-cloud/factory/blob/staging/docs/155-resource-naming-separator-ambiguity-scoped-need-2026-11-25.md)
+and [the contract,
+`contracts/resource-naming`](https://github.com/theory-cloud/factory/blob/staging/contracts/resource-naming/v0.1/README.md)
+— and is **not** guaranteed by FaceTheory today. The two classes that stay open are the separator ambiguity and a
+shortened name that equals a valid name. Before a second site shares an account, compare the complete derived name set
+of both — `derivedPhysicalNames()` and `sharedPhysicalNames()` in
+[`src/physical-names.ts`](src/physical-names.ts) — rather than one bucket prefix.
+
 Set `account` in `src/stage-config.ts` to your twelve-digit account id before deploying. The first deploy after this
-change **replaces** both buckets and the ISR table and **removes** the per-stack S3 access-log bucket. Replacement is
-safe for the state they hold — assets re-upload, pre-rendered SSG HTML re-deploys, and ISR cache metadata and leases
-regenerate per cache key — but copy any S3 access logs you want to keep before you approve the change set. To keep
-today's resources instead — names and CloudFormation logical IDs both — move the config to the legacy naming and logging
-profiles first: see
+change **replaces** both buckets and the ISR table and **removes** the per-stack S3 access-log bucket.
+
+Replacement is safe for the state they hold — assets re-upload, pre-rendered SSG HTML re-deploys, and ISR cache
+metadata and leases regenerate per cache key — but copy any S3 access logs you want to keep before you approve the
+change set. To keep today's resources instead — names and CloudFormation logical IDs both — move the config to the legacy naming and
+logging profiles first: see
 [Resource Naming](../../docs/features/resource-naming.md#path-b-keep-todays-resources).
 
 ## Build Requirement

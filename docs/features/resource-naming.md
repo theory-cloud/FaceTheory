@@ -8,16 +8,32 @@ AppTheory's [resource-naming contract](#the-contract)
 7.5.0). Before this, a FaceTheory site's names came from CloudFormation
 generation and from the stack name: no name was reviewable in a template diff,
 and nothing in the template said which other deployment could collide with it.
-Names are now derived from stage config, so a reviewer can read them and two
-deployments whose composed `app`/`stage`/`logical` strings differ cannot collide.
+Names are now derived from stage config, so a reviewer can read them and compare
+them against the deployments that share an account.
 
-That last clause is narrower than "no collisions", deliberately — the contract
-joins its segments with `-`, which leaves one known ambiguity, documented under
-[the separator limit](#known-limit-the-separator-is-ambiguous).
+Deriving a name is not the same as proving two deployments in one account can
+never collide, and **FaceTheory does not claim that today.** FaceTheory derives
+every name through AppTheory's contract and adds no naming rule of its own.
+Cross-site uniqueness within one account is governed by the Factory resource-naming
+contract — [the separator finding,
+`docs/155`](https://github.com/theory-cloud/factory/blob/staging/docs/155-resource-naming-separator-ambiguity-scoped-need-2026-11-25.md),
+and [the contract itself,
+`contracts/resource-naming`](https://github.com/theory-cloud/factory/blob/staging/contracts/resource-naming/v0.1/README.md)
+— and it is not guaranteed by FaceTheory today. The owned classes are the two
+known limits below: [separator
+ambiguity](#known-limit-the-separator-is-ambiguous) and [a shortened name that
+equals a valid name](#known-limit-a-shortened-name-can-equal-a-valid-name).
+
+What you have in the meantime is an exact check on the names the two configs
+derive: [compare the complete name sets of both
+sites](#check-two-sites-before-they-share-an-account) before they share an
+account. It cannot see a collision the contract's own composition creates, which
+is why the two limits stay open until the contract closes them.
 
 This page states what changed, resource by resource, which resources an existing
-deployment replaces, which path keeps them, and the limit above. Read it before
-deploying any stack that was synthesized from an earlier FaceTheory release.
+deployment replaces, which path keeps them, the stop condition before a cutover,
+and the two limits above. Read it before deploying any stack that was synthesized
+from an earlier FaceTheory release.
 
 ## The contract
 
@@ -66,7 +82,7 @@ corresponding name from the same rules.
 | CloudFront access logs | S3 objects under the log bucket | CloudWatch Logs group `theorycloud_theorycloud_facetheory-ssr-site_lab_logs_access_cdn_site`, retained 30 days | **New destination.** Query logs with CloudWatch Logs Insights. The contract's fixed `theorycloud_` log prefix plus the configured namespace repeats that literal once. |
 | Log delivery source / destination | *absent* | `facetheory-ssr-site-lab-logs-access-cdn-site` | **New.** CloudFront vended delivery (`ACCESS_LOGS`, `json`, the contract's record fields). |
 | Distribution root object | not set | still not set | **Unchanged, deliberately.** In `ssr-only` a default root object would rewrite `/` onto the function URL, so the contract sets none. |
-| Lambda function | CloudFormation-generated name | CloudFormation-generated name | **Unchanged.** No construct sets a function name: a generated name cannot collide, and naming the function would replace it and with it the Function URL the distribution targets. |
+| Lambda function | CloudFormation-generated name | CloudFormation-generated name | **Unchanged.** No construct sets a function name. CloudFormation derives the name from the stack name plus its own unique suffix, so no two stacks in one account share it, and setting a name of our own would replace the function — and with it the Function URL the distribution targets. |
 
 ### `infra/apptheory-ssg-isr-site`
 
@@ -203,7 +219,14 @@ replacements Path A describes.
 > in the account-regional namespace) still replaces the bucket, because the
 > deployed resource is still the one CloudFormation generated.
 
-## Known limit: the separator is ambiguous
+## Known limits of the contract
+
+Two collision classes stay open. Both belong to `theorycloud_resource_naming.v0.1`
+and to the Factory contract that owns it; FaceTheory derives names through the
+contract, reports what it derives, and adds no rule of its own. Each class is
+pinned by a test, so each flips when the contract changes.
+
+### Known limit: the separator is ambiguous
 
 The contract composes a derived name as `<app>-<stage>-<logical>`, joined with
 `-`. The result does not record where one segment ends and the next begins, so two
@@ -215,41 +238,107 @@ different contexts can compose the same string:
 | app `shop-lab`, `logicalName` `site` | `shop-lab-lab-site-assets` |
 
 Both stacks in that example derive the same assets prefix, and the SSG+ISR pair
-also shares its html store prefix and its ISR metadata table name. What this
-adoption therefore guarantees is: **derived names are disjoint when the composed
-app/stage/logical strings differ.** Distinct app ids alone are not enough.
+also shares its html store prefix and its ISR metadata table name.
 
-This is a limit of `theorycloud_resource_naming.v0.1`'s `-` composition, not a
-FaceTheory rule. FaceTheory consumes the contract as published and does not
-re-implement the composition, so the fix belongs upstream in AppTheory; the
-consumer-side workaround is in your own stage config. `infra/*/test/unit/naming-limits.test.ts`
-pins the collision as a known limit, so the day the contract encodes its segment
-boundaries that test fails and this section goes away with it.
+Ownership is Factory's, not FaceTheory's.
+[`docs/155`](https://github.com/theory-cloud/factory/blob/staging/docs/155-resource-naming-separator-ambiguity-scoped-need-2026-11-25.md)
+scopes the fix as validation plus registry enforcement rather than a change to the
+derivation, because changing the composition would rename live resources — a
+replacement of data-bearing buckets and tables. The proposed rule is that no
+registered app id may be a hyphen-prefix of another in one account (`shop` and
+`shop-lab` could not both be bound to it), enforced when an application is bound to
+an account. That work is in plan gate and nothing enforces it today. FaceTheory
+neither enforces it nor re-implements the composition, so no FaceTheory change can
+close this class. `infra/*/test/unit/naming-limits.test.ts` pins the collision, so
+the day the contract encodes its segment boundaries that test fails and this
+section goes away with it.
 
-Until then, keep two deployments in one account disjoint:
+### Known limit: a shortened name can equal a valid name
+
+Every contract type has a length budget: 63 characters for a bucket name — 37 for
+its prefix, because the account-regional suffix reserves 26 — and 60 for a log
+delivery source or destination. A longer name is shortened to its head plus an
+8-character digest, and the shortened result is itself a valid name, so it can equal
+a *different* site's name that fits the budget:
+
+| Context | `log_delivery_source` name |
+| --- | --- |
+| app `shop`, `logicalName` `storefront-collection-renderer-marketing-edition-renewal-page` | `shop-lab-logs-access-cdn-storefront-collection-rend-ofrzmlkx` (shortened) |
+| app `shop`, `logicalName` `storefront-collection-rend-ofrzmlkx` | `shop-lab-logs-access-cdn-storefront-collection-rend-ofrzmlkx` (literal) |
+
+Their assets bucket prefixes differ — `shop-lab-storefront-collecti-ym46aa3g` and
+`shop-lab-storefront-collecti-wk2yjkkp` — so a check that compared that one entry
+would pass while the second deploy collided on a name AWS does not treat as
+shareable. `docs/155` scopes this class as well: the registry check refuses a
+binding whose shortened names equal a shortened name already derived in the
+account, and the contract states the residual for an app that does not go through
+the registry. None of it is in force yet.
+
+`infra/*/test/unit/naming-limits.test.ts` pins this pair in both stacks, for the
+same reason as the separator class: closing it means changing when and how the
+contract shortens, which is the contract's decision and not a FaceTheory change.
+
+## Check two sites before they share an account
+
+Before deploying a second site into an account, compare the **complete** set of
+names the two stage configs derive — every bucket prefix, the ISR table, the log
+group, and the log delivery source and destination. Both reference stacks ship that
+list, so the check is the code that deploys them rather than a second
+implementation of the composition:
+
+```ts
+// infra/apptheory-ssr-site/ — the same module exists in infra/apptheory-ssg-isr-site/
+import { REFERENCE_STAGE_CONFIG } from './src/stage-config.js';
+import { derivedPhysicalNames, sharedPhysicalNames } from './src/physical-names.js';
+
+const siteA = derivedPhysicalNames({ ...REFERENCE_STAGE_CONFIG, app: 'shop', logicalName: 'lab-site' });
+const siteB = derivedPhysicalNames({ ...REFERENCE_STAGE_CONFIG, app: 'shop-lab', logicalName: 'site' });
+
+sharedPhysicalNames(siteA, siteB);
+// ['s3_bucket: shop-lab-lab-site-assets'] — one of the two must change before it deploys
+```
+
+`src/physical-names.ts` is one `AppTheoryResourceNaming.physicalName()` call per
+contract entry the stack consumes: for `infra/apptheory-ssr-site` the assets
+bucket, the log group, and the log delivery source and destination; for
+`infra/apptheory-ssg-isr-site` those plus the html store bucket and the ISR
+metadata table. `test/unit/resource-naming.test.ts` pins the list against the
+synthesized template, so it is the set the stack really sets and cannot fall behind
+a newly added derived resource.
+
+A stack that is not one of these two — a copy that grew another named resource —
+uses the same shape, one call per construct that consumes a contract entry:
+
+```ts
+import { AppTheoryResourceNaming } from '@theory-cloud/apptheory-cdk';
+import { stageNamingValues } from './stage-config.js';
+
+const values = stageNamingValues(config);
+AppTheoryResourceNaming.physicalName(values, 's3_bucket', 'site-assets').bucketNamePrefix;
+```
+
+Three things about the answer:
+
+- **Compare like types.** A bucket name, a table name and a log delivery name live
+  in three namespaces, so `sharedPhysicalNames` reports same-type matches only.
+- **Compare one account and region.** A bucket name is a prefix plus
+  `-<account>-<region>-an`, so two sites in different accounts or regions differ by
+  the suffix even when their prefixes match.
+- **An empty result is evidence, not a proof.** It says these two configs derive
+  disjoint names today. It cannot see a name a third site already owns, and it
+  cannot see either limit above. Whether two app ids may share an account at all is
+  the registry question `docs/155` scopes.
+
+What to do in your own config while the limits are open:
 
 - **Give each site its own `app` id** (`facetheory-ssr-site` and
-  `facetheory-ssg-isr`) and use `logicalName` for what varies inside a site — that
-  is the shape both reference stacks follow.
+  `facetheory-ssg-isr`) and use `logicalName` for what varies inside a site — the
+  shape both reference stacks follow.
 - **Do not put stage-shaped tokens in `app` or `logicalName`.** `app: shop-lab` at
-  stage `lab` reads as three segments, which is exactly the ambiguous case.
-- **Do not let a `logicalName` start with a segment that could belong to the app
-  id**, and do not rely on "the app ids are different" as the only argument:
-  compare the composed strings.
-- **Check the composed name before deploying a second site into an account.** The
-  contract call is the check, and no synthesis is needed:
-
-  ```ts
-  import { AppTheoryResourceNaming } from '@theory-cloud/apptheory-cdk';
-
-  AppTheoryResourceNaming.physicalName(valuesA, 's3_bucket', 'site-assets').bucketNamePrefix;
-  AppTheoryResourceNaming.physicalName(valuesB, 's3_bucket', 'site-assets').bucketNamePrefix;
-  ```
-
-  Equal prefixes means one of the two must change its `app` or `logicalName`
-  before it deploys. A collision is a real collision: the second stack's deploy
-  fails on the shared bucket prefix or table name rather than silently sharing the
-  resource.
+  stage `lab` reads as three segments, which is the ambiguous case.
+- **Keep `logicalName` short enough not to be shortened**, and never let one
+  logical name look like another's shortened form: that is the second class.
+- **Run the comparison above** instead of relying on "the app ids are different".
 
 ## Rules this adoption keeps
 
@@ -265,11 +354,13 @@ Until then, keep two deployments in one account disjoint:
   resource. The ISR table uses the same `{logicalName}-isr-metadata` entry the
   construct would consume if it created the table, so a later move to
   construct-owned resources keeps one name.
-- **Two sites, one account, disjoint names.** The naming tests synthesize the two
-  actual reference stacks against one account, and a same-app/same-stage pair that
-  differs only in `logicalName`, and assert the derived name sets are disjoint and
-  that derivation is deterministic. Names that do collide come from the separator
-  limit above and are pinned as such.
+- **The two reference sites do not collide.** The naming tests synthesize the two
+  actual reference stacks against one account — and one app and stage with two
+  different `logicalName`s — and assert the derived name sets are disjoint and that
+  derivation is deterministic. That is a fact about these two committed configs,
+  not a rule that holds for any two sites: the check for another pair is [the
+  comparison above](#check-two-sites-before-they-share-an-account), and the two
+  limits above stay open until the contract closes them.
 - **AWS stays visible.** These are AWS names — CloudFront, S3, Lambda, DynamoDB
   through TableTheory — not an abstraction over them. The contract is AppTheory's,
   and FaceTheory consumes it rather than re-implementing it.
@@ -277,9 +368,9 @@ Until then, keep two deployments in one account disjoint:
 ## Not in scope
 
 - The generated starter app (`create-facetheory-app`) still lets CloudFormation
-  generate its bucket name. A generated name cannot collide, and a scaffold that
-  demanded a twelve-digit account id before `cdk synth` would be a worse
-  starting point. Adopt a naming context when you copy the stack.
+  generate its bucket name. That name is per stack, and a scaffold that demanded a
+  twelve-digit account id before `cdk synth` would be a worse starting point. Adopt
+  a naming context when you copy the stack.
 - S3 server access logging (`serverAccessLogsBucket`) stays opt-in: a log target
   costs money, and the contract gives the target bucket no naming entry.
 - Anything outside `us-east-1` under the standard logging profile is out of the
