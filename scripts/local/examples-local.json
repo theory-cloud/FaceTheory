@@ -15,7 +15,7 @@
     "apptheoryRunner": {
       "module": "github.com/theory-cloud/apptheory/v7",
       "package": "github.com/theory-cloud/apptheory/v7/cmd/apptheory-local",
-      "version": "v7.4.0"
+      "version": "v7.5.0"
     },
     "storage": {
       "ports": { "dynamodb": 8250, "s3": 8251 },

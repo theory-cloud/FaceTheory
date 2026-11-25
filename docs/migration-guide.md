@@ -167,6 +167,16 @@ package raises its exact `aws-cdk-lib` peer to `2.277.0`. Keep the
 `ts/package.json` does, so both resolve one TableTheory copy. `aws-cdk-lib` moves to `2.277.0`, and the reference infra
 snapshots are regenerated because the bundled handler hash changes.
 
+The release-wave pin move takes AppTheory to `v7.5.0` and TableTheory to `v6.5.3`, both immutable GitHub releases;
+resolve the current tags as `docs/UPSTREAM_RELEASE_PINS.md` describes rather than reading this paragraph as the pin.
+FaceTheory's API does not change and no configuration key is removed. Three upstream facts reach consumers: AppTheory
+raises its `@aws-sdk/*` floor to `^3.1177.0`, which collapses the nested `@aws-sdk/*` copies the previous floor left in
+lockfiles pinned from that line; the CDK package raises its exact `aws-cdk-lib` peer to `2.278.0`, which bundles
+`minimatch` `11.0.9` (retiring this repository's `GHSA-g3hv-75wg-m249` exception) and changes no stack shape; and
+AppTheory's TypeScript package and Go module now both name TableTheory `v6.5.3`, the release FaceTheory pins, so the
+`overrides` block no longer changes the resolved version even though it is kept. `aws-cdk-lib` moves to `2.278.0`, and
+the reference infra snapshots are regenerated because the bundled handler hash changes.
+
 Validation:
 
 ```bash
