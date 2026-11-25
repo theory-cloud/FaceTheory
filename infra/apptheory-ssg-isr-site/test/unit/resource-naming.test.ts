@@ -4,16 +4,14 @@ import test from 'node:test';
 import { App } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import {
-  AppTheoryLoggingProfile,
-  AppTheoryNamingProfile,
   AppTheoryResourceNaming,
   RESOURCE_NAMING_CONTRACT,
-  type AppTheoryNamingContextValues,
 } from '@theory-cloud/apptheory-cdk';
 
 import { FaceTheoryAppTheorySsgIsrSiteStack } from '../../src/stack.js';
 import {
   REFERENCE_STAGE_CONFIG,
+  stageNamingValues,
   type FaceTheoryReferenceStageConfig,
 } from '../../src/stage-config.js';
 
@@ -34,30 +32,6 @@ function synth(
   const app = new App();
   const stack = new FaceTheoryAppTheorySsgIsrSiteStack(app, stackId, {}, config);
   return Template.fromStack(stack).toJSON() as TemplateShape;
-}
-
-/**
- * The contract input for a stage config.
- *
- * `AppTheoryNamingContextValues` is the published, enum-typed shape the contract
- * API takes; the stack config keeps its own readonly string-literal shape so
- * `src/stage-config.ts` reads as configuration rather than as an API struct.
- */
-function namingValues(
-  config: FaceTheoryReferenceStageConfig = REFERENCE_STAGE_CONFIG,
-): AppTheoryNamingContextValues {
-  return {
-    namespace: config.namespace,
-    app: config.app,
-    stage: config.stage,
-    account: config.account,
-    region: config.region,
-    namingProfile: AppTheoryNamingProfile.DERIVED,
-    loggingProfile: AppTheoryLoggingProfile.STANDARD,
-    retentionDays: config.retentionDays,
-    pins: { ...(config.pins ?? {}) },
-    generated: [...(config.generated ?? [])],
-  };
 }
 
 function resourcesOfType(template: TemplateShape, type: string): TemplateResource[] {
@@ -110,7 +84,7 @@ test('the reference stack adopts theorycloud_resource_naming.v0.1', () => {
     'this stack is pinned to the contract version it was reviewed against',
   );
   assert.doesNotThrow(
-    () => AppTheoryResourceNaming.validateContext(namingValues()),
+    () => AppTheoryResourceNaming.validateContext(stageNamingValues()),
     'the committed stage config must satisfy the contract grammar',
   );
 });
@@ -143,7 +117,7 @@ test('every derived physical name follows the contract composition', () => {
   // 8-character base32 digest of the full name. That is the contract's answer to
   // an over-budget logical, not a stack-local naming choice.
   assert.equal(
-    AppTheoryResourceNaming.physicalName(namingValues(), 's3_bucket', 'site-html-store')
+    AppTheoryResourceNaming.physicalName(stageNamingValues(), 's3_bucket', 'site-html-store')
       .bucketNamePrefix,
     'facetheory-ssg-isr-lab-site-aatexg6p',
   );

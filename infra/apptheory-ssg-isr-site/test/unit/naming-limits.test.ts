@@ -3,16 +3,12 @@ import test from 'node:test';
 
 import { App } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import {
-  AppTheoryLoggingProfile,
-  AppTheoryNamingProfile,
-  AppTheoryResourceNaming,
-  type AppTheoryNamingContextValues,
-} from '@theory-cloud/apptheory-cdk';
+import { AppTheoryResourceNaming } from '@theory-cloud/apptheory-cdk';
 
 import { FaceTheoryAppTheorySsgIsrSiteStack } from '../../src/stack.js';
 import {
   REFERENCE_STAGE_CONFIG,
+  stageNamingValues,
   type FaceTheoryReferenceStageConfig,
 } from '../../src/stage-config.js';
 
@@ -32,30 +28,6 @@ function synth(
   const app = new App();
   const stack = new FaceTheoryAppTheorySsgIsrSiteStack(app, stackId, {}, config);
   return Template.fromStack(stack).toJSON() as TemplateShape;
-}
-
-/**
- * The contract input for a stage config.
- *
- * `AppTheoryNamingContextValues` is the published, enum-typed shape the contract
- * API takes; the stack config keeps its own readonly string-literal shape so
- * `src/stage-config.ts` reads as configuration rather than as an API struct.
- */
-function namingValues(
-  config: FaceTheoryReferenceStageConfig = REFERENCE_STAGE_CONFIG,
-): AppTheoryNamingContextValues {
-  return {
-    namespace: config.namespace,
-    app: config.app,
-    stage: config.stage,
-    account: config.account,
-    region: config.region,
-    namingProfile: AppTheoryNamingProfile.DERIVED,
-    loggingProfile: AppTheoryLoggingProfile.STANDARD,
-    retentionDays: config.retentionDays,
-    pins: { ...(config.pins ?? {}) },
-    generated: [...(config.generated ?? [])],
-  };
 }
 
 function resourcesOfType(template: TemplateShape, type: string): TemplateResource[] {
@@ -102,7 +74,7 @@ function contractNames(template: TemplateShape): string[] {
  * fails there rather than passing quietly here.
  */
 function ssrSiteNames(): string[] {
-  const values = namingValues({ ...REFERENCE_STAGE_CONFIG, app: 'facetheory-ssr-site' });
+  const values = stageNamingValues({ ...REFERENCE_STAGE_CONFIG, app: 'facetheory-ssr-site' });
   const names: string[] = [];
   const composed = AppTheoryResourceNaming.physicalName(values, 's3_bucket', 'site-assets');
   names.push(composed.bucketNamePrefix ?? composed.name ?? '');
@@ -178,13 +150,13 @@ test('separator ambiguity is a known limit of the contract, not a FaceTheory rul
   // is in the composition and not in this stack.
   assert.equal(
     AppTheoryResourceNaming.physicalName(
-      namingValues({ ...shared, app: 'shop' }),
+      stageNamingValues({ ...shared, app: 'shop' }),
       'dynamodb_table',
       'lab-site-isr-metadata',
     )
       .name,
     AppTheoryResourceNaming.physicalName(
-      namingValues({ ...shared, app: 'shop-lab' }),
+      stageNamingValues({ ...shared, app: 'shop-lab' }),
       'dynamodb_table',
       'site-isr-metadata',
     )

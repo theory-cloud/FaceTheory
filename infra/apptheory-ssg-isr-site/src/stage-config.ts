@@ -3,6 +3,7 @@ import {
   AppTheoryLoggingProfile,
   AppTheoryNamingContext,
   AppTheoryNamingProfile,
+  type AppTheoryNamingContextValues,
 } from '@theory-cloud/apptheory-cdk';
 import type { Construct } from 'constructs';
 
@@ -112,6 +113,41 @@ export const REFERENCE_STAGE_CONFIG: FaceTheoryReferenceStageConfig = {
 };
 
 /**
+ * The contract input for a stage config.
+ *
+ * `AppTheoryNamingContextValues` is the published, enum-typed shape the contract
+ * API takes; this record keeps its own readonly string-literal shape so
+ * `src/stage-config.ts` reads as configuration rather than as an API struct. This
+ * function is the one place that maps between the two, so both profile literals in
+ * the committed config reach the contract through the configured fields. Tests use
+ * it as well, which is what makes a test saying "the committed stage config must
+ * satisfy the contract grammar" exercise this record's own profile fields instead
+ * of a restatement of them.
+ */
+export function stageNamingValues(
+  config: FaceTheoryReferenceStageConfig = REFERENCE_STAGE_CONFIG,
+): AppTheoryNamingContextValues {
+  return {
+    namespace: config.namespace,
+    app: config.app,
+    stage: config.stage,
+    account: config.account,
+    region: config.region,
+    namingProfile:
+      config.namingProfile === 'legacy'
+        ? AppTheoryNamingProfile.LEGACY
+        : AppTheoryNamingProfile.DERIVED,
+    loggingProfile:
+      config.loggingProfile === 'legacy'
+        ? AppTheoryLoggingProfile.LEGACY
+        : AppTheoryLoggingProfile.STANDARD,
+    retentionDays: config.retentionDays,
+    pins: { ...(config.pins ?? {}) },
+    generated: [...(config.generated ?? [])],
+  };
+}
+
+/**
  * The stack environment, bound from the same config record.
  *
  * A naming context with the standard logging profile needs a resolved stack
@@ -132,22 +168,5 @@ export function createNamingContext(
   scope: Construct,
   config: FaceTheoryReferenceStageConfig = REFERENCE_STAGE_CONFIG,
 ): AppTheoryNamingContext {
-  return new AppTheoryNamingContext(scope, 'Naming', {
-    namespace: config.namespace,
-    app: config.app,
-    stage: config.stage,
-    account: config.account,
-    region: config.region,
-    namingProfile:
-      config.namingProfile === 'legacy'
-        ? AppTheoryNamingProfile.LEGACY
-        : AppTheoryNamingProfile.DERIVED,
-    loggingProfile:
-      config.loggingProfile === 'legacy'
-        ? AppTheoryLoggingProfile.LEGACY
-        : AppTheoryLoggingProfile.STANDARD,
-    retentionDays: config.retentionDays,
-    pins: { ...(config.pins ?? {}) },
-    generated: [...(config.generated ?? [])],
-  });
+  return new AppTheoryNamingContext(scope, 'Naming', stageNamingValues(config));
 }
