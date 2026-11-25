@@ -5,16 +5,16 @@
         "make",
         "rubric"
       ],
-      "durationSeconds": 63.494,
+      "durationSeconds": 138.892,
       "executed": true,
       "exitCode": 0,
-      "finishedAt": "2026-11-25T14:04:51Z",
+      "finishedAt": "2026-11-25T14:23:41Z",
       "id": "rubric",
-      "inputsDigest": "sha256:3cf4894b813bc64cf6c05bc7abbc2701833a542ffdf3c4db042bf03af0462ff6",
-      "logDigest": "sha256:ca29229561419ccd1a0c003157bf4b5700010324c8e6440ad644394b82bfba02",
-      "logRef": "gov-infra/evidence/local/rubric-rubric-20261125T140347Z-15353.log",
+      "inputsDigest": "sha256:5feb0e370e7582b170eed68940b5e55457243e93870af68f069efb59bdcbda86",
+      "logDigest": "sha256:68e3d71df383f47de957dc3996e0350b836d98ac67143be92ff2887361a2d664",
+      "logRef": "gov-infra/evidence/local/rubric-rubric-20261125T142122Z-65594.log",
       "reused": false,
-      "startedAt": "2026-11-25T14:03:47Z"
+      "startedAt": "2026-11-25T14:21:22Z"
     }
   ],
   "consumed": [],
@@ -36,17 +36,17 @@
   },
   "profile": "default",
   "reason": "",
-  "recordedAt": "2026-11-25T14:04:51Z",
+  "recordedAt": "2026-11-25T14:23:41Z",
   "releaseOnly": {
-    "digest": "sha256:9b9e841c4ad5e7e85db5cb8c3e94999b1d1063d911baa75ee80312cd28aa43c2",
+    "digest": "sha256:c35a1886534af39fa2ece5b03d0a5d7afe287fdc29ec030b228a9688bd3450c9",
     "fileCount": 16,
-    "normalizedDigest": "sha256:ea163e7f8e678a668b5fadbcc783b6f6a13d9972089e97451618dd9e1e06ace8",
+    "normalizedDigest": "sha256:632d27cabca6661d01ba5abd595796eb6c79175c94096e32a8d4619d2ca19d9f",
     "version": "5.2.0"
   },
   "reviews": [],
   "schemaVersion": 1,
   "scope": {
-    "digest": "sha256:00c139f70034217a4b78937c7efc74c2c30b71d46f0744ddba305bdccf9b8d7c",
+    "digest": "sha256:8d317a60f467c8fdcfba70ae45341d7e1742cd05a6acd3c250e3a869a65252c9",
     "fileCount": 817,
     "paths": [
       "**"
@@ -54,7 +54,7 @@
     "version": 1
   },
   "source": {
-    "digest": "sha256:11311c9acfa01b22fcfa80dffa829d9209fb41561e8da0ac519e49a58478ac86",
+    "digest": "sha256:2c3a88a652277a8749a5f25e05ac9d532af4cb0e2f1af473d9c2a56765f23b5f",
     "fileCount": 801
   },
   "verdict": "PASS"
