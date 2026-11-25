@@ -529,7 +529,7 @@ now.
 
 The schedule:
 
-- **Now (2026-11):** Node 22, 24, and 26 are all tested and supported. Node 26 joined the matrix; the floor did not move.
+- **Now (2026-11):** Node 22, 24, and 26 are all tested and supported on the `staging` candidate tree. Node 26 joined the matrix there and ships in the next FaceTheory release; `v5.2.0` and earlier releases were verified on Node 22 and Node 24 only. The floor did not move.
 - **2027-02 - floor raise:** a dated major release raises `engines.node` to `>=24` and drops the Node 22 row from the
   matrix. That release carries the `BREAKING CHANGE:` footer, release notes, and the completed version of this entry.
 - **2027-04-30 - upstream end of life:** Node 22 stops receiving security fixes. The floor raise is scheduled ahead of

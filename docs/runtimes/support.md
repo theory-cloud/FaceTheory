@@ -4,7 +4,7 @@ title: Runtime Support
 
 # Runtime Support
 
-FaceTheory is a TypeScript runtime, so Node.js is the only runtime this page supports: there is no Python, Go, or .NET surface, and nothing here is a statement about another platform. The table below says which Node.js majors are tested today, what the declared floor is, and when the deprecated line stops being supported.
+FaceTheory is a TypeScript runtime, so Node.js is the only runtime this page supports: there is no Python, Go, or .NET surface, and nothing here is a statement about another platform. The table below says which Node.js majors are tested on the `staging` candidate tree, what the declared floor is, and when the deprecated line stops being supported.
 
 ## Tested lines
 
@@ -17,6 +17,15 @@ The published package declares `engines.node` `>=22`, and the release and prerel
 | 26           | Supported and tested — the newest line      | `ts` and `ts-pack` gates at the `floor-node26` proof profile        |
 
 Node 22 is the oldest line and stays in the gate matrix while it is deprecated, so a consumer on 22 keeps working and keeps being verified. Node 26 is the newest line and is verified the same way. There is no "reference" row: each supported line is proven by its own record.
+
+### When these rows reach a release
+
+The rows describe the candidate tree, and only a release makes them a claim about an artifact you can install:
+
+- Node 26 support landed on `staging` in the change that added its row and ships in the next FaceTheory release. Until that release is published, "Node 26 is supported" is true of `staging`, not of the published package.
+- Releases up to and including `v5.2.0` were built and verified on Node 22 and Node 24 only. Node 26 is **not** a claim about them, and their own records are what they were tested on.
+
+The Node 22 row is unaffected: it was tested before this change, it is tested now, and it stays tested until the 2027-02 floor raise.
 
 ### What "tested" means here
 
@@ -50,7 +59,7 @@ This is a support-contract change rather than an API change, following the [Depr
 
 ## Which line should I run?
 
-- **New projects:** Node 24 or Node 26. Both are supported and tested; Node 24 is the conservative choice today because the local example harness requires 24 or newer and the reference stacks emit the `nodejs24.x` Lambda runtime.
+- **New projects:** Node 24 or Node 26. Both are supported and tested, so pick 26 when the release you install carries it: it is supported on `staging` today and ships in the next FaceTheory release, while Node 24 is what `v5.2.0` and earlier were verified on. Node 24 also stays the conservative choice because the local example harness requires 24 or newer and the reference stacks emit the `nodejs24.x` Lambda runtime.
 - **Projects on Node 22:** nothing to do now. Track the 2027-02 major, then move to 24 or 26.
 - **Projects on Node 20 or older:** below the declared floor. Move to 24 or 26 — see [Migration 11](/migration-guide/#migration-11-node-20-to-node-24-lambda-runtime) for the Lambda-runtime side and this page for the package side.
 
