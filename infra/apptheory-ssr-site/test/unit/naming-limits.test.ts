@@ -5,6 +5,7 @@ import { App } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { AppTheoryResourceNaming } from '@theory-cloud/apptheory-cdk';
 
+import { derivedPhysicalNames, sharedPhysicalNames } from '../../src/physical-names.js';
 import { FaceTheoryAppTheorySsrSiteStack } from '../../src/stack.js';
 import {
   REFERENCE_STAGE_CONFIG,
@@ -144,5 +145,55 @@ test('separator ambiguity is a known limit of the contract, not a FaceTheory rul
       .bucketNamePrefix,
     AppTheoryResourceNaming.physicalName(stageNamingValues({ ...shared, app: 'shop-lab' }), 's3_bucket', 'site-assets')
       .bucketNamePrefix,
+  );
+});
+
+test('an over-budget shortened name can equal a valid unshortened name', () => {
+  // The second known collision class, and the reason the check compares the whole
+  // name set rather than one entry. `log_delivery_source` and
+  // `log_delivery_destination` names have a 60-character budget, and the contract
+  // shortens an over-budget name to its head plus an 8-character digest. That
+  // shortened form is itself a valid name, so it can coincide with a *different*
+  // site's logical name that fits the budget:
+  //
+  //   site A logical `storefront-collection-renderer-marketing-edition-renewal-page`
+  //   site B logical `storefront-collection-rend-ofrzmlkx`
+  //
+  // Both derive `shop-lab-logs-access-cdn-storefront-collection-rend-ofrzmlkx` as
+  // their delivery name — one shortened, one literal — while their assets bucket
+  // prefixes differ. An assets-prefix-only check passes here, and the second deploy
+  // then collides on a name AWS requires to be unique.
+  //
+  // Pinned as a known limit of `theorycloud_resource_naming.v0.1`, not as a rule
+  // FaceTheory adds: closing it belongs to the Factory resource-naming contract
+  // (`docs/155`), which owns the separator class above as well. When the contract
+  // stops shortening into a namespace that also holds literal names, this test
+  // flips and the matching section of `docs/features/resource-naming.md` goes with
+  // it.
+  const shared = { ...REFERENCE_STAGE_CONFIG, app: 'shop', stage: 'lab' };
+  const siteA = derivedPhysicalNames({
+    ...shared,
+    logicalName: 'storefront-collection-renderer-marketing-edition-renewal-page',
+  });
+  const siteB = derivedPhysicalNames({
+    ...shared,
+    logicalName: 'storefront-collection-rend-ofrzmlkx',
+  });
+
+  assert.deepEqual(
+    sharedPhysicalNames(siteA, siteB),
+    [
+      'log_delivery_destination: shop-lab-logs-access-cdn-storefront-collection-rend-ofrzmlkx',
+      'log_delivery_source: shop-lab-logs-access-cdn-storefront-collection-rend-ofrzmlkx',
+    ],
+    'the shortened delivery name equals a valid unshortened name from another site',
+  );
+
+  // The assets prefixes differ, which is exactly why comparing that one entry was
+  // not a name-set check.
+  assert.notEqual(
+    siteA[0].name,
+    siteB[0].name,
+    'the assets bucket prefixes differ, so an assets-only preflight would have passed',
   );
 });
