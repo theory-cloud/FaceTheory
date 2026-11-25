@@ -93,12 +93,13 @@ function contractNames(template: TemplateShape): string[] {
 }
 
 /**
- * The contract entries the other reference site owns, composed by the contract
- * itself.
+ * The other reference site's contract entries, composed by the contract itself.
  *
- * `infra/apptheory-ssr-site/src/stack.ts` (the other reference site) owns these
- * entries, and that package's own suite asserts the same strings against its own
- * synthesized template, so this mirror cannot drift without a failure there.
+ * `infra/apptheory-ssr-site/src/stack.ts` owns these entries. This mirror pins the
+ * entry kinds and logical names, which is the part a collision depends on; the
+ * context values are that stack's committed stage config, and its own suite pins
+ * the exact names its template derives, so a change to its entries or its values
+ * fails there rather than passing quietly here.
  */
 function ssrSiteNames(): string[] {
   const values = namingValues({ ...REFERENCE_STAGE_CONFIG, app: 'facetheory-ssr-site' });

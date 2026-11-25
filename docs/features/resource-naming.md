@@ -134,8 +134,10 @@ If a deployment must not replace a resource — for example a bucket that holds
 objects the FaceTheory stacks did not put there — move the stage config to the
 legacy profiles first. Under `legacy` no name is derived and no construct level
 moves, so the physical names **and** the CloudFormation logical IDs stay where
-the deployment already has them: `cdk diff` reports an in-place update for the
-buckets and the table, and nothing data-bearing is deleted.
+the deployment already has them: `cdk diff` shows no replacement and no removal
+for the buckets, the table or the distribution — in fact their properties are
+unchanged, so CloudFormation may report them as no change at all — and nothing
+data-bearing is deleted.
 
 Both halves matter. CloudFormation keys a resource on its logical ID, and CDK
 derives that ID from the construct path, so putting the same bucket one construct
