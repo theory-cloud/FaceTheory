@@ -529,7 +529,7 @@ now.
 
 The schedule:
 
-- **Now (2026-11):** Node 22, 24, and 26 are all tested and supported on the `staging` candidate tree. Node 26 joined the matrix there and ships in the next FaceTheory release; `v5.2.0` and earlier releases were verified on Node 22 and Node 24 only. The floor did not move.
+- **Now (2026-11):** the floor did not move. `engines.node` stays `>=22`, Node 22 stays in the tested matrix and stays a supported install target, and Node 24 stays supported. Node 26 joins the matrix on `staging` and ships in the FaceTheory release after `v5.2.0`, so it is not part of any release you can install today. [Runtime Support](/runtimes/support/) holds the rows and states which release carries each one; this entry does not restate that matrix.
 - **2027-02 - floor raise:** a dated major release raises `engines.node` to `>=24` and drops the Node 22 row from the
   matrix. That release carries the `BREAKING CHANGE:` footer, release notes, and the completed version of this entry.
 - **2027-04-30 - upstream end of life:** Node 22 stops receiving security fixes. The floor raise is scheduled ahead of
@@ -538,10 +538,11 @@ The schedule:
 What to do now:
 
 1. Nothing, if you are on Node 22 and it deploys: keep shipping. Re-read this entry when the 2027-02 major is published.
-2. New projects and new work start on Node 24 or Node 26. See [Runtime Support](/runtimes/support/) for which line is
-   proven by which evidence record.
-3. If you pin Node in CI or in a container image, add 24 or 26 to the pin ahead of the floor raise so the move is one
-   line when it lands.
+2. New projects and new work: pick a Node line the FaceTheory release you install verifies. On `v5.2.0` that is Node 22
+   or Node 24; Node 26 becomes an option in the release that carries it. Read [Runtime Support](/runtimes/support/) for
+   the row that applies to your release rather than assuming the newest line is available to you.
+3. If you pin Node in CI or in a container image, add the line you intend to move to once the release you install
+   carries it, ahead of the floor raise, so the move is one line when it lands.
 
 When the floor raise ships, the migration is:
 
