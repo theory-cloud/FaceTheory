@@ -250,6 +250,57 @@ test('two FaceTheory sites in one account cannot collide on a name', () => {
   assert.deepEqual(contractNames(synth()), referenceNames, 'derivation is deterministic');
 });
 
+test('the collision check accepts the documented Path B config', () => {
+  // `docs/features/resource-naming.md` tells an operator who stays on Path B to run
+  // the same check. That config consumes only the bucket entry: the legacy logging
+  // profile keeps the construct's S3 access-log bucket, so the config names no log
+  // group and no log delivery. The bucket is `generated`, so the config carries no
+  // name for it either — CloudFormation owns that name and only the account knows it.
+  const pathB: FaceTheoryReferenceStageConfig = {
+    ...REFERENCE_STAGE_CONFIG,
+    namingProfile: 'legacy',
+    loggingProfile: 'legacy',
+    generated: ['s3_bucket:site-assets'],
+  };
+
+  const entries = derivedPhysicalNames(pathB);
+  assert.deepEqual(
+    entries.map((entry) => entry.entry),
+    ['s3_bucket:site-assets'],
+    'a Path B config consumes no log entry, so the list has none',
+  );
+  assert.equal(entries[0].generated, true);
+  assert.equal(entries[0].name, undefined, 'the config has no name to compare for a generated entry');
+
+  assert.deepEqual(
+    sharedPhysicalNames(entries, derivedPhysicalNames(pathB)),
+    [],
+    'nothing comparable: read the deployed name from the AssetsBucketName output instead',
+  );
+  assert.deepEqual(
+    sharedPhysicalNames(entries, derivedPhysicalNames()),
+    [],
+    'a legacy bucket name is unknown from config, so the check claims nothing about it',
+  );
+});
+
+test('the collision check refuses a legacy config it cannot name', () => {
+  // A legacy naming profile with the standard logging profile consumes a log group
+  // and a log delivery the config does not name. Listing a gap or returning an empty
+  // comparison would read as an all-clear, so the contract's own refusal surfaces.
+  assert.throws(
+    () =>
+      derivedPhysicalNames({
+        ...REFERENCE_STAGE_CONFIG,
+        namingProfile: 'legacy',
+        loggingProfile: 'standard',
+        generated: ['s3_bucket:site-assets'],
+      }),
+    /legacy naming profile requires a pin or a generated entry for log_group:logs\/access\/cdn\/site/,
+    'an entry the config does not name is refused rather than silently dropped',
+  );
+});
+
 test('the legacy profiles keep the physical names a deployment already owns', () => {
   // The migration path documented in docs/features/resource-naming.md: no name is
   // derived, CloudFormation keeps the bucket it generated, and CloudFront goes

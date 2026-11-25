@@ -165,6 +165,37 @@ test('separator ambiguity is a known limit of the contract, not a FaceTheory rul
   );
 });
 
+test('the documented preflight reports the separator collision for its pair', () => {
+  // The same two contexts, through the check `docs/features/resource-naming.md`
+  // tells an operator to run: `derivedPhysicalNames()` for each config and
+  // `sharedPhysicalNames()` over the two lists. The test above compares two
+  // synthesized templates; this one pins the guide's claim that the helper does see
+  // this class when it is given the affected pair, so the claim cannot rot into the
+  // opposite ("the comparison cannot see the contract's own collisions").
+  const shared = { ...REFERENCE_STAGE_CONFIG, stage: 'lab' };
+  const siteA = derivedPhysicalNames({ ...shared, app: 'shop', logicalName: 'lab-site' });
+  const siteB = derivedPhysicalNames({ ...shared, app: 'shop-lab', logicalName: 'site' });
+
+  assert.deepEqual(
+    sharedPhysicalNames(siteA, siteB),
+    [
+      'dynamodb_table: shop-lab-lab-site-isr-metadata',
+      's3_bucket: shop-lab-lab-site-assets',
+      's3_bucket: shop-lab-lab-site-html-store',
+    ],
+    'the helper reports every separator collision this stack derives, not just the assets prefix',
+  );
+
+  // And it stays silent about what it was not given: the same pair compared against
+  // the committed reference config shares nothing, which is evidence about those two
+  // configs and not a statement about the account.
+  assert.deepEqual(
+    sharedPhysicalNames(siteA, derivedPhysicalNames()),
+    [],
+    'an unaffected pair yields no shared name',
+  );
+});
+
 test('an over-budget shortened name can equal a valid unshortened name', () => {
   // The second known collision class, and the reason the check compares the whole
   // name set rather than one entry. `log_delivery_source` and

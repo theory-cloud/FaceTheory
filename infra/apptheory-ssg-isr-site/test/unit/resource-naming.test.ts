@@ -243,6 +243,64 @@ test('two FaceTheory sites in one account cannot collide on a name', () => {
   assert.deepEqual(contractNames(synth()), referenceNames, 'derivation is deterministic');
 });
 
+test('the collision check accepts the documented Path B config', () => {
+  // `docs/features/resource-naming.md` tells an operator who stays on Path B to run
+  // the same check. That config consumes the two buckets (both `generated`) and the
+  // ISR table (pinned, because `AppTheoryDynamoTable` needs a physical name), and no
+  // log entry: the legacy logging profile keeps the construct's S3 access-log bucket.
+  const pathB: FaceTheoryReferenceStageConfig = {
+    ...REFERENCE_STAGE_CONFIG,
+    namingProfile: 'legacy',
+    loggingProfile: 'legacy',
+    pins: { 'dynamodb_table:site-isr-metadata': 'FaceTheoryAppTheorySsgIsrSite-facetheory-cache' },
+    generated: ['s3_bucket:site-assets', 's3_bucket:site-html-store'],
+  };
+
+  const entries = derivedPhysicalNames(pathB);
+  assert.deepEqual(
+    entries.map((entry) => entry.entry),
+    ['s3_bucket:site-assets', 's3_bucket:site-html-store', 'dynamodb_table:site-isr-metadata'],
+    'a Path B config consumes no log entry, so the list has none',
+  );
+  assert.deepEqual(entries.map((entry) => entry.generated), [true, true, false]);
+  assert.deepEqual(
+    entries.map((entry) => entry.name),
+    [undefined, undefined, 'FaceTheoryAppTheorySsgIsrSite-facetheory-cache'],
+    'a generated entry has no name in the config; a pin is the literal it is',
+  );
+
+  // A pin is compared, because it is a name the config really sets: two deployments
+  // pinned to the same table name do collide, and that is worth reporting.
+  assert.deepEqual(
+    sharedPhysicalNames(entries, derivedPhysicalNames(pathB)),
+    ['dynamodb_table: FaceTheoryAppTheorySsgIsrSite-facetheory-cache'],
+    'the pinned table name is compared as the literal it is',
+  );
+  assert.deepEqual(
+    sharedPhysicalNames(entries, derivedPhysicalNames()),
+    [],
+    'the generated bucket names are unknown from config, so the check claims nothing about them',
+  );
+});
+
+test('the collision check refuses a legacy config it cannot name', () => {
+  // A legacy naming profile with the standard logging profile consumes a log group
+  // and a log delivery the config does not name. Listing a gap or returning an empty
+  // comparison would read as an all-clear, so the contract's own refusal surfaces.
+  assert.throws(
+    () =>
+      derivedPhysicalNames({
+        ...REFERENCE_STAGE_CONFIG,
+        namingProfile: 'legacy',
+        loggingProfile: 'standard',
+        pins: { 'dynamodb_table:site-isr-metadata': 'FaceTheoryAppTheorySsgIsrSite-facetheory-cache' },
+        generated: ['s3_bucket:site-assets', 's3_bucket:site-html-store'],
+      }),
+    /legacy naming profile requires a pin or a generated entry for log_group:logs\/access\/cdn\/site/,
+    'an entry the config does not name is refused rather than silently dropped',
+  );
+});
+
 test('the legacy profiles keep the physical names a deployment already owns', () => {
   // The migration path documented in docs/features/resource-naming.md: the two
   // buckets keep the names CloudFormation generated, the table keeps the name the
