@@ -44,9 +44,12 @@ of both — `derivedPhysicalNames()` and `sharedPhysicalNames()` in
 Set `account` in `src/stage-config.ts` to your twelve-digit account id before deploying. The first deploy after this
 change **replaces** both buckets and the ISR table and **removes** the per-stack S3 access-log bucket.
 
-Replacement is safe for the state they hold — assets re-upload, pre-rendered SSG HTML re-deploys, and ISR cache
-metadata and leases regenerate per cache key — but copy any S3 access logs you want to keep before you approve the
-change set. To keep today's resources instead — names and CloudFormation logical IDs both — move the config to the legacy naming and
+Replacement is safe only for the state these stacks put there: assets re-upload, pre-rendered SSG HTML re-deploys, and
+ISR cache metadata and leases regenerate per cache key. The deploy empties and deletes the three old buckets — each is
+`Delete` with an auto-delete custom resource — and replaces the table, so if a bucket holds an object this stack did not
+write, stay on the legacy profiles until you have copied it out and can restore it: see
+[the stop condition](../../docs/features/resource-naming.md#stop-keep-path-b-when-a-site-bucket-holds-objects-these-stacks-did-not-write).
+To keep today's resources instead — names and CloudFormation logical IDs both — move the config to the legacy naming and
 logging profiles first: see
 [Resource Naming](../../docs/features/resource-naming.md#path-b-keep-todays-resources).
 

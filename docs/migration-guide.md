@@ -476,8 +476,11 @@ Before you deploy:
    placeholder, and the stack is environment-bound because the standard logging profile can only prove the CloudFront
    log delivery lives in `us-east-1`.
 2. Bootstrap that account and region if you have not already: the template now names the CDK asset bucket literally.
-3. Copy any S3 CloudFront access logs you want to keep out of the stack's current access-log bucket. That bucket is
-   removed on upgrade.
+3. Copy out anything the deploy would delete. The upgrade removes the CloudFront access-log bucket and replaces the
+   site buckets, and CloudFormation empties each removed bucket before deleting it. S3 access logs already written are
+   historical records; anything an operator put in a site bucket is not regenerable at all. The exact logical IDs the
+   change set removes are listed under
+   [the stop condition](/features/resource-naming/#stop-keep-path-b-when-a-site-bucket-holds-objects-these-stacks-did-not-write).
 
 ```bash
 cd infra/apptheory-ssg-isr-site
@@ -493,8 +496,13 @@ logical ID the deployment already owns, so `cdk diff` shows an in-place update a
 `generated` entries (a `pins` entry for one is refused, because naming a CloudFormation-generated bucket replaces it),
 and the stack exports `AccessLogsBucketName` instead of `AccessLogGroupName`. Both paths, with the exact
 `pins`/`generated` entries, are in
-[Resource Naming](/features/resource-naming/#upgrading-an-existing-deployment). Cut over to the derived profile in a
-window you choose.
+[Resource Naming](/features/resource-naming/#upgrading-an-existing-deployment).
+
+That legacy profile is where such a deployment **stays** until the objects are dealt with. Cutting over later deletes
+the site buckets and their auto-delete custom resources, so do it only after copying those objects out and confirming
+they can be restored at the same keys — see
+[the stop condition](/features/resource-naming/#stop-keep-path-b-when-a-site-bucket-holds-objects-these-stacks-did-not-write).
+A maintenance window does not make the cutover lossless; it only chooses when the deletion happens.
 
 Validation:
 

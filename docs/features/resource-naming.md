@@ -123,11 +123,17 @@ Two paths. Pick one per deployment; both are supported by the same stack code.
 
 ### Path A: accept the derived names (recommended for asset and cache state)
 
-The replaced resources hold only regenerable state: static assets re-deployed by
-the stack, pre-rendered SSG HTML re-deployed by the stack, and ISR cache metadata
-and leases that regenerate per cache key. The CloudFront access-log bucket is the
-one exception — S3 access logs already written there are historical records, not
-regenerable.
+Path A is safe for what these stacks put in those resources themselves: static
+assets, the Vite manifest and the SSG sidecars are re-uploaded by the deploy,
+pre-rendered SSG HTML is re-uploaded, and ISR cache metadata and regeneration
+leases regenerate per cache key.
+
+It is not safe for anything else in them. S3 access logs already written are
+historical records, and an object an operator or another pipeline put in a site
+bucket is not regenerable at all. Read [the stop
+condition](#stop-keep-path-b-when-a-site-bucket-holds-objects-these-stacks-did-not-write)
+before you approve this change set: the deploy empties and deletes those buckets,
+and a maintenance window only chooses when.
 
 ```bash
 # 1. If you need the S3 access logs already collected, copy them out first.
@@ -210,14 +216,59 @@ literal and the stack's account/region binding, and the new
 `AccessLogsBucketName` output appears. No bucket, table or distribution is
 replaced or removed.
 
-Then cut over to the derived profile at a maintenance window you choose: drop the
-profiles and the entries above, review the change set, and accept the
-replacements Path A describes.
+Then cut over to the derived profile in a window you choose — but only after the
+stop condition below, which is about what is in the buckets rather than when the
+window falls.
 
 > **Do not** pin a *derived* name and then also expect a replacement-free cutover.
 > A pin is a literal: pointing it at the derived value (`<app>-<stage>-<logical>`
 > in the account-regional namespace) still replaces the bucket, because the
 > deployed resource is still the one CloudFormation generated.
+
+### STOP: keep Path B when a site bucket holds objects these stacks did not write
+
+The cutover is not a rename. It replaces the site buckets and the ISR table and
+removes the CloudFront S3 access-log bucket, and CloudFormation deletes each
+removed bucket with its contents. These are the resources the change set removes,
+by CloudFormation logical ID; `test/unit/legacy-preservation.test.ts` in each stack
+pins its list against the two synthesized templates, so the guide and the template
+agree.
+
+`infra/apptheory-ssr-site` removes six:
+
+| Logical ID | What it is | What the cutover does |
+| --- | --- | --- |
+| `AssetsBucket5CB76180` | the site assets bucket, `DeletionPolicy: Delete`, `UpdateReplacePolicy: Delete` | replaced by `AssetsBucket0481D73F`; the old bucket is **emptied and deleted** |
+| `AssetsBucketAutoDeleteObjectsCustomResource51BA1286` | that bucket's `Custom::S3AutoDeleteObjects` | removed with it — this is what empties the bucket |
+| `AssetsBucketPolicyFFACF6C4` | its bucket policy | removed with it |
+| `SiteCloudFrontLogsBucketF9C1CD02` | the CloudFront S3 access-log bucket, `Delete` / `Delete` | **not created** under the standard logging profile; emptied and deleted |
+| `SiteCloudFrontLogsBucketAutoDeleteObjectsCustomResource016FEC8F` | its auto-delete custom resource | removed with it |
+| `SiteCloudFrontLogsBucketPolicy816DFF56` | its bucket policy | removed with it |
+
+`infra/apptheory-ssg-isr-site` removes those six and three more:
+
+| Logical ID | What it is | What the cutover does |
+| --- | --- | --- |
+| `IsrBucketCAA25890` | the S3 html store holding the pre-rendered SSG HTML, `Delete` / `Delete` | replaced by `IsrBucket9673BF26`; the old bucket is **emptied and deleted** |
+| `IsrBucketAutoDeleteObjectsCustomResourceD92212A8` | its auto-delete custom resource | removed with it |
+| `IsrBucketPolicy39B2E35A` | its bucket policy | removed with it |
+
+It also replaces one resource the change set does not report as removed: the ISR
+metadata table keeps its logical ID (`CacheTableCDD8F844`) but changes its name,
+and the table is `DESTROY`, so CloudFormation replaces it and the old table — ISR
+cache entries and regeneration leases — is deleted. That state is derivable, and
+the first request per cache key regenerates it. Everything else in both templates
+is updated in place or added: the distribution, the bucket deployments, the
+`SiteCdnLoggingDelivery*` resources and the log group.
+
+So the stop condition is about the buckets:
+
+> **Stay on Path B** if any of the removed buckets holds an object these stacks did
+> not write — an operator upload, a redirect file, a manual archive, an artifact
+> another pipeline puts there. Cut over only once you have copied those objects out
+> and can restore them into the derived buckets at the same keys, and treat that
+> copy as part of the change you approve. A maintenance window does not preserve
+> them; it only picks the moment they are deleted.
 
 ## Known limits of the contract
 

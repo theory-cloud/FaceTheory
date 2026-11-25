@@ -40,8 +40,11 @@ placeholder, and the stack is environment-bound because the standard logging pro
 delivery lives in `us-east-1`.
 
 The first deploy after this change **replaces** the assets bucket (S3 cannot rename a bucket) and **removes** the
-per-stack S3 access-log bucket; assets are re-uploaded by the stack's bucket deployment. If a deployment must keep
-today's resources — names and CloudFormation logical IDs both — move the config to the legacy
+per-stack S3 access-log bucket, and assets are re-uploaded by the stack's bucket deployment. Both buckets are `Delete`
+with an auto-delete custom resource, so the deploy empties them before deleting them: if either holds an object this
+stack did not write, stay on the legacy profiles until it is copied out — see
+[the stop condition](../../docs/features/resource-naming.md#stop-keep-path-b-when-a-site-bucket-holds-objects-these-stacks-did-not-write).
+If a deployment must keep today's resources — names and CloudFormation logical IDs both — move the config to the legacy
 naming and logging profiles first — see
 [Resource Naming](../../docs/features/resource-naming.md#path-b-keep-todays-resources).
 
