@@ -24,18 +24,20 @@ Node 22 is the oldest line and stays in the gate matrix while it is deprecated, 
 
 The rows describe the candidate tree, and only a release makes a row a claim about an artifact you can install:
 
-- Node 26 support landed on `staging` in the change that added its row and ships in the next FaceTheory release after `v5.2.0`. Until that release is published, "Node 26 is supported" is true of `staging`, not of any installable package, so a reader on `v5.2.0` has no Node 26 claim to move to.
+- Node 26 support landed on `staging` in the change that added its row and ships in the release after `v5.2.0`. Until that release is published, "Node 26 is supported" is true of `staging`, not of any installable package, so a reader on `v5.2.0` has no Node 26 claim to move to.
 - The Node 22 and Node 24 rows are unaffected: both were tested before this change, both are tested now, and Node 22 stays tested until the 2027-02 floor raise.
 
 Which Node majors each published release line was actually verified on, from this repository's own records at those tags:
 
-| Release line       | `engines.node` | Verified on         | Where the record is                                                                        |
-| ------------------ | -------------- | ------------------- | ------------------------------------------------------------------------------------------ |
-| `v4.0.0`–`v4.0.10` | `>=20`         | Node 20 and Node 24 | `node-version: ["20", "24"]` in `.github/workflows/ci.yml` at those tags                    |
-| `v4.1.0`–`v5.1.1`  | `>=22`         | Node 22 and Node 24 | `node-version: ["22", "24"]` in the same file, after the floor raise in `v4.1.0`            |
-| `v5.2.0`           | `>=22`         | Node 22 and Node 24 | the `floor-node22` and `floor-node24` proof profiles; CI verifies the records and runs none |
+| Release line       | Floor at that tag        | Verified on         | Where the record is                                                                        |
+| ------------------ | ------------------------ | ------------------- | ------------------------------------------------------------------------------------------ |
+| `v4.0.0`–`v4.0.10` | `>=20` — historical      | Node 20 and Node 24 | `node-version: ["20", "24"]` in `.github/workflows/ci.yml` at those tags                    |
+| `v4.1.0`–`v5.1.1`  | `>=22` — still the floor | Node 22 and Node 24 | `node-version: ["22", "24"]` in the same file, after the floor raise in `v4.1.0`            |
+| `v5.2.0`           | `>=22` — still the floor | Node 22 and Node 24 | the `floor-node22` and `floor-node24` proof profiles; CI verifies the records and runs none |
 
-Node 26 does not appear in any published release's verification. The `v4.0.x` line is on Node 20 because that is where the floor was before `v4.1.0` raised it to `>=22`, which it did because Node 20 reached end of life in April 2026; a historical claim about "what earlier releases were verified on" has to name the release line, not just the current one. The record at a tag is the authority for that tag: where this table and a release's own record ever disagree, the record wins.
+The middle column is the floor **that release line declared**, not today's floor. `v4.0.0`–`v4.0.10` declare `>=20` because `>=20` was the floor then; `v4.1.0` raised it to `>=22`, which it did because Node 20 reached end of life in April 2026, and `>=22` is still the floor today. So Node 20 is below the current floor *and* the historical row is still accurate at its own tags — the two statements describe different release lines, and neither overrides the other. A historical claim about "what earlier releases were verified on" has to name the release line, not just the current one: the record at a tag is the authority for that tag, and where this table and a release's own record ever disagree, the record wins.
+
+Node 26 does not appear in any published release's verification, so it is in the table above and in no published row of this one.
 
 ### What "tested" means here
 
@@ -69,9 +71,9 @@ This is a support-contract change rather than an API change, following the [Depr
 
 ## Which line should I run?
 
-- **New projects:** Node 24, or Node 26 once the release you install carries it. Both are supported and tested on the candidate tree, but only Node 24 is in every published release's verified set today (see the table above), so Node 24 is the line that works against the tarball you can actually install. Node 24 also stays the conservative choice because the local example harness requires 24 or newer and the reference stacks emit the `nodejs24.x` Lambda runtime.
+- **New projects:** Node 24, or Node 26 once you install the release after `v5.2.0`. Both are supported and tested on the candidate tree, but only Node 24 is in every published release's verified set today (see the table above), so Node 24 is the line that works against the tarball you can actually install. Node 24 also stays the conservative choice because the local example harness requires 24 or newer and the reference stacks emit the `nodejs24.x` Lambda runtime.
 - **Projects on Node 22:** nothing to do now. Track the 2027-02 major, then move to a line that major supports — Node 24, or Node 26 by then.
-- **Projects on Node 20 or older:** below the declared floor. Move to a line the release you install verifies: Node 22 or Node 24 today, Node 26 once the release carrying it is published. See [Migration 11](/migration-guide/#migration-11-node-20-to-node-24-lambda-runtime) for the Lambda-runtime side and this page for the package side.
+- **Projects on Node 20 or older:** below today's declared floor (`>=22`), whatever a historical row says about an older tag. Move to a line the release you install verifies: Node 22 or Node 24 today, Node 26 once the release after `v5.2.0` is published. See [Migration 11](/migration-guide/#migration-11-node-20-to-node-24-lambda-runtime) for the Lambda-runtime side and this page for the package side.
 
 ## Reproducing these claims locally
 
