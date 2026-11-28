@@ -523,20 +523,20 @@ Validation:
 ## Migration 13: Node 22 Runtime Support Deprecation
 
 Node.js 22 is deprecated as a FaceTheory runtime against its upstream end of life. This is a support-contract change, not
-an API change and not a breaking change today: `engines.node` stays `>=22`, Node 22 stays in the tested matrix, and no
-import, Face mode, render contract, head primitive or style path changes. Nothing is required of a consumer on 22 right
-now.
+an API change and not a breaking change today: no import, Face mode, render contract, head primitive or style path
+changes, and nothing is required of a consumer on 22 right now.
 
-**The schedule and the support matrix are [Runtime Support](/runtimes/support/)'s.** That page owns which lines are
-supported, tested and deprecated, the dates of the 2027-02 floor raise and Node 22's end of life, and which release
-carries each row. This entry deliberately does not repeat any of it; it covers only what you do.
+**Everything about Node status is [Runtime Support](/runtimes/support/)'s**: which lines are supported, tested and
+deprecated, the `engines.node` floor each release line declares, the schedule, and which release carries each row. This
+entry deliberately does not repeat any of it; it covers only what you do.
 
 What to do now:
 
-1. Nothing, if you are on Node 22 and it deploys: keep shipping. Re-read this entry when the 2027-02 major is published.
-2. New projects and new work: pick the Node line that [Runtime Support](/runtimes/support/) lists for the FaceTheory
-   release you have installed, rather than the newest line in this repository. A release you pinned predates any row
-   added after it, and Node 26 in particular only reaches an installable package in the release after `v5.2.0`.
+1. Nothing, if you are on Node 22 and it deploys: keep shipping. Re-read this entry when the floor-raise major is
+   published.
+2. New projects and new work: read `engines.node` out of the FaceTheory release you have installed, and pick a line that
+   release verifies — [Runtime Support](/runtimes/support/) tables the floor and the verified lines per release line. Do
+   not read either off this repository: a release you pinned predates any row added after it.
 3. If you pin Node in CI or in a container image, add the line you intend to move to once the release you install
    carries it, ahead of the floor raise, so the move is one line when it lands.
 
@@ -556,7 +556,8 @@ When the floor raise ships, the migration is:
 
 Two deadlines are separate and easy to conflate:
 
-- **This page's schedule is about the package.** It says which Node majors FaceTheory installs and renders on.
+- **The package deadline is [Runtime Support](/runtimes/support/)'s.** It says which Node majors FaceTheory installs
+  and renders on, and when the floor moves.
 - **The Lambda runtime your stack declares** (`nodejs22.x`, `nodejs24.x`) follows AWS's own deprecation schedule, tracked
   in [Migration 11](#migration-11-node-20-to-node-24-lambda-runtime). A function can be on a supported managed runtime
   while the package floor, or the reverse, moves on a different date.
@@ -573,7 +574,7 @@ deploy does.
 
 Rollback:
 
-- stay on the prior pinned tarball and Node 22 until the 2027-02 major is verified against your Faces; the floor does
+- stay on the prior pinned tarball and Node 22 until the floor-raise major is verified against your Faces; the floor does
   not move under an existing pin.
 
 ## Rollback Notes
