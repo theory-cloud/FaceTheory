@@ -88,7 +88,7 @@ Symptoms:
 
 Cause:
 
-- The installed package declares `engines.node` `>=22`, and a host below that fails `npm ci` on engines. The floor is the only Node fact this page needs: which lines are tested, which one is deprecated, and which release carries each row is stated in [Runtime Support](/runtimes/support/). Node 22 is deprecated but still supported, so a Node 22 host is not what this error means.
+- The installed package declares `engines.node` `>=22`, and a host below that fails `npm ci` on engines. The floor is the only Node fact this page needs: which lines are tested, which one is deprecated, and which release carries each row is stated in [Runtime Support](/runtimes/support/). The floor is what `npm ci` enforces, so a host on a line your installed release supports is not what this error means, deprecation status notwithstanding.
 - Move to a line that page lists for the FaceTheory version you have installed — not to the newest line in the repository. A release you pinned predates any row added after it, so the newest major may not be part of your release's verified set.
 
 Solution:

@@ -527,20 +527,16 @@ an API change and not a breaking change today: `engines.node` stays `>=22`, Node
 import, Face mode, render contract, head primitive or style path changes. Nothing is required of a consumer on 22 right
 now.
 
-The schedule:
-
-- **Now (2026-11):** the floor did not move. `engines.node` stays `>=22`, Node 22 stays in the tested matrix and stays a supported install target, and Node 24 stays supported. Node 26 joins the matrix on `staging` and ships in the FaceTheory release after `v5.2.0`, so it is not part of any release you can install today. [Runtime Support](/runtimes/support/) holds the rows and states which release carries each one; this entry does not restate that matrix.
-- **2027-02 - floor raise:** a dated major release raises `engines.node` to `>=24` and drops the Node 22 row from the
-  matrix. That release carries the `BREAKING CHANGE:` footer, release notes, and the completed version of this entry.
-- **2027-04-30 - upstream end of life:** Node 22 stops receiving security fixes. The floor raise is scheduled ahead of
-  this date so no consumer is still on a Node major that gets no fixes.
+**The schedule and the support matrix are [Runtime Support](/runtimes/support/)'s.** That page owns which lines are
+supported, tested and deprecated, the dates of the 2027-02 floor raise and Node 22's end of life, and which release
+carries each row. This entry deliberately does not repeat any of it; it covers only what you do.
 
 What to do now:
 
 1. Nothing, if you are on Node 22 and it deploys: keep shipping. Re-read this entry when the 2027-02 major is published.
-2. New projects and new work: pick a Node line the FaceTheory release you install verifies. On `v5.2.0` that is Node 22
-   or Node 24; Node 26 becomes an option in the release that carries it. Read [Runtime Support](/runtimes/support/) for
-   the row that applies to your release rather than assuming the newest line is available to you.
+2. New projects and new work: pick the Node line that [Runtime Support](/runtimes/support/) lists for the FaceTheory
+   release you have installed, rather than the newest line in this repository. A release you pinned predates any row
+   added after it, and Node 26 in particular only reaches an installable package in the release after `v5.2.0`.
 3. If you pin Node in CI or in a container image, add the line you intend to move to once the release you install
    carries it, ahead of the floor raise, so the move is one line when it lands.
 
